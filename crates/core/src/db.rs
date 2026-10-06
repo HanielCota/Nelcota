@@ -132,6 +132,29 @@ pub fn api_pool(
         .expect("runtime definido, build não falha")
 }
 
+/// Pool administrativo (role dona do schema), usado só pelo painel. Pequeno e
+/// com `statement_timeout` próprio.
+pub fn admin_pool(admin: &tokio_postgres::Config, max_size: usize) -> Pool {
+    let mut config = admin.clone();
+    config
+        .application_name("nelcota-admin")
+        .options("-c statement_timeout=30s");
+    let manager = Manager::from_config(
+        config,
+        NoTls,
+        ManagerConfig {
+            recycling_method: RecyclingMethod::Fast,
+        },
+    );
+    Pool::builder(manager)
+        .max_size(max_size)
+        .runtime(Runtime::Tokio1)
+        .wait_timeout(Some(Duration::from_secs(5)))
+        .create_timeout(Some(Duration::from_secs(5)))
+        .build()
+        .expect("runtime definido, build não falha")
+}
+
 /// Abre a transação do request e assume a role/claims do JWT.
 ///
 /// Equivale a `SET LOCAL ROLE <role>` + `set_config('request.jwt.claims', ..., true)`,

@@ -1,0 +1,69 @@
+# Gerado por `nelcota init` em {{GENERATED_AT}}. Pode editar à vontade.
+# Só o Caddy expõe portas (80/443). O Postgres fica na rede interna.
+name: nelcota
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    # Perfil: {{PROFILE}} (deploy/postgres/profiles/{{PROFILE}}.conf)
+    command:
+      - postgres
+{{POSTGRES_ARGS}}
+    shm_size: 256mb
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [interno]
+
+  app:
+    image: ${NELCOTA_IMAGE}:${NELCOTA_VERSION}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NELCOTA_LISTEN: 0.0.0.0:8000
+      NELCOTA_TRUST_PROXY: "true"
+    volumes:
+      - ./migrations:/migrations:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/nelcota", "healthcheck"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    networks: [interno, web]
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+    networks: [web]
+
+networks:
+  interno:
+    internal: true
+  web: {}
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

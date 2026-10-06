@@ -64,6 +64,11 @@ pub struct Config {
     pub auth_rate_limit_per_minute: u32,
     /// Confiar no `X-Forwarded-For` (só atrás de um proxy como o Caddy).
     pub trust_proxy: bool,
+    /// Login do painel (separado dos usuários finais). Sem os dois, o painel
+    /// fica desligado.
+    pub admin_email: Option<String>,
+    /// Hash PHC argon2id da senha do admin (gerado pelo `nelcota init`).
+    pub admin_password_hash: Option<Secret>,
     /// Schema exposto pela API REST.
     pub db_schema: String,
     /// Teto de linhas por leitura na API (`None` = sem teto).
@@ -99,6 +104,8 @@ impl Default for Config {
             signup_enabled: true,
             auth_rate_limit_per_minute: 30,
             trust_proxy: false,
+            admin_email: None,
+            admin_password_hash: None,
             db_schema: "public".into(),
             max_rows: None,
             listen: SocketAddr::from(([0, 0, 0, 0], 8000)),

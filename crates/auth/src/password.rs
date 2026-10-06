@@ -55,6 +55,20 @@ impl Passwords {
     }
 }
 
+/// Hash síncrono (para o CLI, fora do servidor).
+pub fn hash_password(password: &str) -> Option<String> {
+    hash_blocking(password.as_bytes())
+}
+
+/// Verificação síncrona (para o CLI e o painel).
+pub fn verify_password(password: &str, phc: &str) -> bool {
+    PasswordHash::new(phc).is_ok_and(|parsed| {
+        Argon2::default()
+            .verify_password(password.as_bytes(), &parsed)
+            .is_ok()
+    })
+}
+
 fn hash_blocking(password: &[u8]) -> Option<String> {
     Argon2::default()
         .hash_password(password)

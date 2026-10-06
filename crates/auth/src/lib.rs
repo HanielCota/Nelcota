@@ -20,7 +20,7 @@ use nelcota_core::{ApiError, Claims};
 
 pub use handlers::{AuthSettings, AuthState, router};
 pub use keys::{KeyError, Keys, generate_ed25519_private_key};
-pub use password::Passwords;
+pub use password::{Passwords, hash_password, verify_password};
 pub use rate_limit::RateLimiter;
 
 #[derive(Debug, thiserror::Error)]

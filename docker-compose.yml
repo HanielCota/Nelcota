@@ -1,5 +1,7 @@
 # Ambiente de DESENVOLVIMENTO: só o Postgres. O binário roda com `cargo run`.
 # (O compose de produção, com app + Caddy, é gerado pelo `nelcota init` no Marco 4.)
+name: nelcota-dev
+
 services:
   postgres:
     image: postgres:17-alpine

@@ -1,15 +1,26 @@
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 
 use anyhow::Context;
+use clap::Parser;
 use nelcota_api::{ApiSettings, spawn_reload_listener};
 use nelcota_auth::{AuthSettings, AuthState, Keys, Passwords, RateLimiter};
+use nelcota_cli::{Cli, Outcome};
 use nelcota_core::{Config, config::LogFormat, db};
 use nelcota_server::{AppState, app, load_catalog};
 use tracing_subscriber::{EnvFilter, fmt};
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    let config = Config::load().context("configuração inválida")?;
+fn main() -> anyhow::Result<()> {
+    let cli = Cli::parse();
+    match nelcota_cli::run(cli).context("nelcota")? {
+        Outcome::Done => Ok(()),
+        Outcome::Serve(config) => tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()?
+            .block_on(serve(*config)),
+    }
+}
+
+async fn serve(config: Config) -> anyhow::Result<()> {
     init_tracing(config.log_format);
 
     let admin = config.database_config()?;
@@ -61,9 +72,32 @@ async fn main() -> anyhow::Result<()> {
             trust_proxy: config.trust_proxy,
         }),
     };
+    let admin = match (&config.admin_email, &config.admin_password_hash) {
+        (Some(email), Some(hash)) if !email.is_empty() && !hash.expose().is_empty() => {
+            Some(nelcota_admin::AdminState {
+                db: db::admin_pool(&admin, 2),
+                db_config: admin.clone(),
+                catalog: state.catalog.clone(),
+                credentials: Arc::new(nelcota_admin::Credentials {
+                    email: email.clone(),
+                    password_hash: hash.expose().to_owned(),
+                }),
+                sessions: Arc::default(),
+                limiter: Arc::new(RateLimiter::new(10)),
+                secure_cookies: config.trust_proxy,
+            })
+        }
+        _ => {
+            tracing::info!(
+                "painel desligado (defina NELCOTA_ADMIN_EMAIL e NELCOTA_ADMIN_PASSWORD_HASH)"
+            );
+            None
+        }
+    };
     let router = app(
         state,
         auth,
+        admin,
         Duration::from_secs(config.request_timeout_secs),
     );
 

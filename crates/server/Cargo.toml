@@ -15,7 +15,10 @@ path = "src/main.rs"
 nelcota-core.workspace = true
 nelcota-auth.workspace = true
 nelcota-api.workspace = true
+nelcota-cli.workspace = true
+nelcota-admin.workspace = true
 anyhow.workspace = true
+clap.workspace = true
 axum.workspace = true
 deadpool-postgres.workspace = true
 serde_json.workspace = true
@@ -25,6 +28,7 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 
 [dev-dependencies]
+form_urlencoded.workspace = true
 http-body-util.workspace = true
 jsonwebtoken.workspace = true
 serde_json.workspace = true
