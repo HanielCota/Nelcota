@@ -1,9 +1,14 @@
-//! Autenticação: verifica o JWT do request e entrega as [`Claims`].
+//! Autenticação: emissão e verificação de JWT, senhas, sessões e refresh
+//! tokens, e o extrator de claims para o axum.
 //!
 //! A verificação fica atrás da trait [`JwtVerifier`] para que a origem dos
-//! tokens seja substituível (HS256 local hoje; EdDSA + JWKS no Marco 2; um
-//! provedor OIDC externo depois). Este crate só AUTENTICA: autorização é
-//! exclusivamente do RLS do Postgres.
+//! tokens seja substituível (chaves locais hoje; um provedor OIDC externo
+//! depois). Este crate só AUTENTICA: autorização é exclusivamente do RLS.
+
+mod handlers;
+mod keys;
+mod password;
+mod rate_limit;
 
 use std::sync::Arc;
 
@@ -11,14 +16,19 @@ use axum::{
     extract::{FromRef, FromRequestParts},
     http::{header, request::Parts},
 };
-use jsonwebtoken::{Algorithm, DecodingKey, Validation};
 use nelcota_core::{ApiError, Claims};
-use serde_json::Value;
+
+pub use handlers::{AuthSettings, AuthState, router};
+pub use keys::{KeyError, Keys, generate_ed25519_private_key};
+pub use password::Passwords;
+pub use rate_limit::RateLimiter;
 
 #[derive(Debug, thiserror::Error)]
 pub enum VerifyError {
     #[error("token inválido: {0}")]
     Token(#[from] jsonwebtoken::errors::Error),
+    #[error("algoritmo ou chave (kid) desconhecidos")]
+    UnknownKey,
     #[error(transparent)]
     Claims(#[from] nelcota_core::InvalidClaims),
 }
@@ -26,32 +36,6 @@ pub enum VerifyError {
 /// Valida um JWT (assinatura, expiração, formato das claims).
 pub trait JwtVerifier: Send + Sync + 'static {
     fn verify(&self, token: &str) -> Result<Claims, VerifyError>;
-}
-
-/// Verificador HS256 com segredo compartilhado.
-pub struct Hs256Verifier {
-    key: DecodingKey,
-    validation: Validation,
-}
-
-impl Hs256Verifier {
-    pub fn new(secret: &[u8]) -> Self {
-        let mut validation = Validation::new(Algorithm::HS256);
-        validation.leeway = 30;
-        // `aud` entra no contrato no Marco 2; por ora não é verificada.
-        validation.validate_aud = false;
-        Hs256Verifier {
-            key: DecodingKey::from_secret(secret),
-            validation,
-        }
-    }
-}
-
-impl JwtVerifier for Hs256Verifier {
-    fn verify(&self, token: &str) -> Result<Claims, VerifyError> {
-        let data = jsonwebtoken::decode::<Value>(token, &self.key, &self.validation)?;
-        Ok(Claims::from_payload(data.claims)?)
-    }
 }
 
 /// Verificador compartilhado no estado do axum.

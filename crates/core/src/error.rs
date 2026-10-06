@@ -15,6 +15,7 @@ pub struct ApiError {
     status: StatusCode,
     code: &'static str,
     message: String,
+    retry_after_secs: Option<u64>,
 }
 
 impl ApiError {
@@ -23,6 +24,19 @@ impl ApiError {
             status,
             code,
             message: message.into(),
+            retry_after_secs: None,
+        }
+    }
+
+    /// 429 com `Retry-After`.
+    pub fn rate_limited(retry_after_secs: u64) -> Self {
+        ApiError {
+            retry_after_secs: Some(retry_after_secs.max(1)),
+            ..Self::new(
+                StatusCode::TOO_MANY_REQUESTS,
+                "rate_limited",
+                "muitas tentativas; aguarde e tente de novo",
+            )
         }
     }
 
@@ -76,11 +90,11 @@ impl ApiError {
                 return Self::internal();
             }
         };
-        ApiError {
+        Self::new(
             status,
-            code: "db_error",
-            message: format!("{} ({})", db.message(), db.code().code()),
-        }
+            "db_error",
+            format!("{} ({})", db.message(), db.code().code()),
+        )
     }
 
     pub fn from_pool(err: deadpool_postgres::PoolError) -> Self {
@@ -101,6 +115,11 @@ impl IntoResponse for ApiError {
                 header::WWW_AUTHENTICATE,
                 HeaderValue::from_static(r#"Bearer error="invalid_token""#),
             );
+        }
+        if let Some(secs) = self.retry_after_secs {
+            response
+                .headers_mut()
+                .insert(header::RETRY_AFTER, HeaderValue::from(secs));
         }
         response
     }

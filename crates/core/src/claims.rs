@@ -42,6 +42,7 @@ pub enum InvalidClaims {
 pub struct Claims {
     role: Role,
     sub: Option<Uuid>,
+    payload: Value,
     json: String,
 }
 
@@ -58,6 +59,7 @@ impl Claims {
         Claims {
             role: Role::Anon,
             sub: None,
+            payload: serde_json::json!({ "role": "anon" }),
             json: r#"{"role":"anon"}"#.to_owned(),
         }
     }
@@ -72,6 +74,7 @@ impl Claims {
             role: known.role,
             sub: known.sub,
             json: payload.to_string(),
+            payload,
         })
     }
 
@@ -81,6 +84,11 @@ impl Claims {
 
     pub fn sub(&self) -> Option<Uuid> {
         self.sub
+    }
+
+    /// Uma claim qualquer do payload (ex.: `session_id`, `email`).
+    pub fn claim(&self, name: &str) -> Option<&Value> {
+        self.payload.get(name)
     }
 
     /// JSON das claims, como o Postgres vai enxergar em `auth.jwt()`.

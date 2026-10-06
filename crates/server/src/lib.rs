@@ -12,7 +12,7 @@ use axum::{
     routing::get,
 };
 use deadpool_postgres::Pool;
-use nelcota_auth::SharedVerifier;
+use nelcota_auth::{AuthState, SharedVerifier};
 use serde_json::json;
 use tower_http::{
     cors::{Any, CorsLayer},
@@ -26,7 +26,7 @@ pub struct AppState {
     pub verifier: SharedVerifier,
 }
 
-pub fn app(state: AppState, request_timeout: Duration) -> Router {
+pub fn app(state: AppState, auth: AuthState, request_timeout: Duration) -> Router {
     // A API é chamada direto do navegador, de qualquer origem; a proteção é
     // o JWT + RLS, não o CORS. Cookies não são usados (nada de credentials).
     let cors = CorsLayer::new()
@@ -48,6 +48,7 @@ pub fn app(state: AppState, request_timeout: Duration) -> Router {
         .route("/health", get(health))
         .merge(nelcota_api::router())
         .with_state(state)
+        .merge(nelcota_auth::router(auth))
         .layer(TimeoutLayer::with_status_code(
             StatusCode::GATEWAY_TIMEOUT,
             request_timeout,

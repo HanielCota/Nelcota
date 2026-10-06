@@ -1,7 +1,7 @@
-use std::{sync::Arc, time::Duration};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 
 use anyhow::Context;
-use nelcota_auth::Hs256Verifier;
+use nelcota_auth::{AuthSettings, AuthState, Keys, Passwords, RateLimiter};
 use nelcota_core::{Config, config::LogFormat, db};
 use nelcota_server::{AppState, app};
 use tracing_subscriber::{EnvFilter, fmt};
@@ -16,24 +16,59 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("falha ao preparar o banco")?;
 
+    let keys = Arc::new(
+        Keys::new(
+            config.jwt_private_key(),
+            config.jwt_secret().map(str::as_bytes),
+        )
+        .context("chave de JWT inválida")?,
+    );
+    tracing::info!(alg = ?keys.algorithm(), "assinatura de JWT");
+    let pool = db::api_pool(
+        &admin,
+        config.authenticator_password.expose(),
+        config.db_pool_size,
+    );
     let state = AppState {
-        pool: db::api_pool(
-            &admin,
-            config.authenticator_password.expose(),
-            config.db_pool_size,
-        ),
-        verifier: Arc::new(Hs256Verifier::new(config.jwt_secret.expose().as_bytes())),
+        pool: pool.clone(),
+        verifier: keys.clone(),
     };
-    let router = app(state, Duration::from_secs(config.request_timeout_secs));
+    let auth = AuthState {
+        pool,
+        keys,
+        passwords: Arc::new(Passwords::new(hash_concurrency())),
+        limiter: Arc::new(RateLimiter::new(config.auth_rate_limit_per_minute)),
+        settings: Arc::new(AuthSettings {
+            issuer: config.jwt_issuer.clone(),
+            access_ttl_secs: config.jwt_expiry_secs,
+            refresh_ttl_days: config.refresh_token_ttl_days,
+            signup_enabled: config.signup_enabled,
+            trust_proxy: config.trust_proxy,
+        }),
+    };
+    let router = app(
+        state,
+        auth,
+        Duration::from_secs(config.request_timeout_secs),
+    );
 
     let listener = tokio::net::TcpListener::bind(config.listen)
         .await
         .with_context(|| format!("não foi possível escutar em {}", config.listen))?;
     tracing::info!(addr = %config.listen, "nelcota no ar");
-    axum::serve(listener, router)
-        .with_graceful_shutdown(shutdown_signal())
-        .await?;
+    axum::serve(
+        listener,
+        router.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .with_graceful_shutdown(shutdown_signal())
+    .await?;
     Ok(())
+}
+
+/// Hashes argon2 simultâneos: cada um usa ~19 MiB; com até 4 o pico fica
+/// abaixo de 80 MiB mesmo sob ataque.
+fn hash_concurrency() -> usize {
+    std::thread::available_parallelism().map_or(1, |n| n.get().min(4))
 }
 
 fn init_tracing(format: LogFormat) {

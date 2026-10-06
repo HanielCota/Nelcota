@@ -47,8 +47,23 @@ pub struct Config {
     pub database_url: Secret,
     /// Senha da role `authenticator`.
     pub authenticator_password: Secret,
-    /// Segredo HS256 dos JWTs (provisório: no Marco 2 entra EdDSA + JWKS).
-    pub jwt_secret: Secret,
+    /// Chave privada Ed25519 (PKCS#8, em PEM ou base64 de uma linha) usada para
+    /// assinar os JWTs (EdDSA). A chave pública é publicada no JWKS.
+    pub jwt_private_key: Option<Secret>,
+    /// Segredo HS256 (modo simples/legado). Se houver chave EdDSA, só é usado
+    /// para VERIFICAR tokens antigos; senão também assina.
+    pub jwt_secret: Option<Secret>,
+    /// Claim `iss` dos tokens emitidos.
+    pub jwt_issuer: String,
+    /// Validade do JWT de acesso, em segundos.
+    pub jwt_expiry_secs: u64,
+    /// Validade do refresh token (renovada a cada rotação), em dias.
+    pub refresh_token_ttl_days: u32,
+    pub signup_enabled: bool,
+    /// Limite de requests por minuto, por IP, nos endpoints de login/cadastro.
+    pub auth_rate_limit_per_minute: u32,
+    /// Confiar no `X-Forwarded-For` (só atrás de um proxy como o Caddy).
+    pub trust_proxy: bool,
     pub listen: SocketAddr,
     pub db_pool_size: usize,
     pub request_timeout_secs: u64,
@@ -70,7 +85,14 @@ impl Default for Config {
         Config {
             database_url: Secret::default(),
             authenticator_password: Secret::default(),
-            jwt_secret: Secret::default(),
+            jwt_private_key: None,
+            jwt_secret: None,
+            jwt_issuer: "nelcota".into(),
+            jwt_expiry_secs: 900,
+            refresh_token_ttl_days: 30,
+            signup_enabled: true,
+            auth_rate_limit_per_minute: 30,
+            trust_proxy: false,
             listen: SocketAddr::from(([0, 0, 0, 0], 8000)),
             db_pool_size: 10,
             request_timeout_secs: 15,
@@ -100,9 +122,22 @@ impl Config {
                 "NELCOTA_AUTHENTICATOR_PASSWORD precisa de ao menos 16 caracteres",
             ));
         }
-        if self.jwt_secret.expose().len() < 32 {
+        match (self.jwt_private_key(), self.jwt_secret()) {
+            (None, None) => {
+                return Err(ConfigError::Invalid(
+                    "defina NELCOTA_JWT_PRIVATE_KEY (recomendado) ou NELCOTA_JWT_SECRET",
+                ));
+            }
+            (_, Some(secret)) if secret.len() < 32 => {
+                return Err(ConfigError::Invalid(
+                    "NELCOTA_JWT_SECRET precisa de ao menos 32 caracteres",
+                ));
+            }
+            _ => {}
+        }
+        if self.jwt_expiry_secs == 0 || self.refresh_token_ttl_days == 0 {
             return Err(ConfigError::Invalid(
-                "NELCOTA_JWT_SECRET precisa de ao menos 32 caracteres",
+                "NELCOTA_JWT_EXPIRY_SECS e NELCOTA_REFRESH_TOKEN_TTL_DAYS precisam ser > 0",
             ));
         }
         if self.db_pool_size == 0 {
@@ -112,10 +147,27 @@ impl Config {
         Ok(())
     }
 
+    /// Chave EdDSA configurada (variável vazia conta como ausente).
+    pub fn jwt_private_key(&self) -> Option<&str> {
+        non_empty(&self.jwt_private_key)
+    }
+
+    /// Segredo HS256 configurado (variável vazia conta como ausente).
+    pub fn jwt_secret(&self) -> Option<&str> {
+        non_empty(&self.jwt_secret)
+    }
+
     pub fn database_config(&self) -> Result<tokio_postgres::Config, ConfigError> {
         tokio_postgres::Config::from_str(self.database_url.expose())
             .map_err(ConfigError::DatabaseUrl)
     }
+}
+
+fn non_empty(value: &Option<Secret>) -> Option<&str> {
+    value
+        .as_ref()
+        .map(|s| s.expose().trim())
+        .filter(|s| !s.is_empty())
 }
 
 #[cfg(test)]
@@ -125,7 +177,7 @@ mod tests {
     #[test]
     fn secret_nao_aparece_no_debug() {
         let config = Config {
-            jwt_secret: Secret::new("super-secreto"),
+            jwt_secret: Some(Secret::new("super-secreto")),
             ..Config::default()
         };
         assert!(!format!("{config:?}").contains("super-secreto"));
