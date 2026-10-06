@@ -25,6 +25,8 @@
     try {
       await onconfirm()
       open = false
+    } catch {
+      // Quem chamou já mostrou o erro; o diálogo fica aberto para tentar de novo.
     } finally {
       busy = false
     }
