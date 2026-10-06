@@ -33,12 +33,13 @@ No login por projeto não há segredo compartilhado: o handoff deixa de existir,
 e cada painel só aceita as próprias credenciais.
 
 SPA em **Svelte 5 + shadcn-svelte + Tailwind v4**, com **CodeMirror 6** no
-editor SQL e fontes IBM Plex Sans/Mono. O build fica embutido no binário: sem
-CDN e sem Node em produção. Tema escuro por padrão; o claro fica no menu do
-usuário (canto superior direito).
+editor SQL, fonte Manrope na interface e IBM Plex Mono no código. O build fica
+embutido no binário: sem CDN e sem Node em produção (as fontes também, por causa
+da CSP `font-src 'self'`). Tema escuro por padrão; o botão de tema fica na barra
+superior.
 
-Cor aparece só onde há algo a corrigir: tabela exposta sem RLS (vermelho), RLS
-ligado sem policies (âmbar), erros e ações destrutivas. O resto é neutro.
+O estado do RLS aparece como selo colorido: verde (RLS com policies), âmbar
+(RLS ligado sem policies) e vermelho (tabela exposta sem RLS).
 
 | Recurso | Como usar |
 |---|---|
@@ -53,14 +54,19 @@ ligado sem policies (âmbar), erros e ações destrutivas. O resto é neutro.
 | Salvar consultas | Ctrl+S ou "Salvar"; ficam na barra lateral do editor e na paleta. Guardadas no navegador, por projeto |
 | Exportar resultado do SQL | "Exportar" acima de cada resultado → CSV ou JSON |
 | Paleta de comandos | Ctrl+K (⌘K no Mac) ou "Buscar…" na barra superior: páginas, tabelas, consultas salvas, modelos e ações |
+| Criar tabela | "+" na lista de tabelas: colunas (tipo, default, PK, identity, UNIQUE, chave estrangeira), RLS ligado por padrão e matriz de GRANTs. Mostra o SQL antes de criar |
+| Editar a estrutura | aba **Estrutura** da tabela (`/admin/tables/<nome>/structure`): adicionar, editar e apagar colunas; renomear a tabela; descrição; ligar/desligar o RLS; GRANTs por role; apagar a tabela (digitando o nome) |
+| Policies | "Nova policy" em cada tabela, com modelos (leitura pública, logados leem, dono lê/cria/altera/apaga); editar e apagar; "Ativar RLS" nas tabelas sem |
+| Token service_role | página **API**: gera um token com validade escolhida; aparece uma vez e não é guardado |
 
 | Página | O que tem |
 |---|---|
 | **Visão geral** | contadores (tabelas, usuários, policies, funções), alerta de tabelas sem RLS e lista de tabelas com GRANTs |
-| **Editor de tabelas** | todas as tabelas do schema exposto, linhas estimadas, GRANTs de `anon`/`authenticated` e status do RLS. Listar, inserir, editar e apagar linhas (tabelas com chave primária) |
+| **Editor de tabelas** | todas as tabelas do schema exposto, linhas estimadas, GRANTs de `anon`/`authenticated` e status do RLS. Listar, inserir, editar e apagar linhas (tabelas com chave primária); criar tabelas e editar a estrutura |
 | **SQL** | editor que roda como o dono do banco (ignora RLS); Ctrl+Enter executa; erros com código e posição |
 | **Usuários** | busca por email, último login, sessões ativas; encerrar sessões ou apagar usuário |
-| **Policies** | policies de cada tabela (`USING`/`WITH CHECK`), tabelas sem RLS, funções executáveis por `anon` |
+| **Policies** | policies de cada tabela (`USING`/`WITH CHECK`): criar, editar e apagar; tabelas sem RLS; funções executáveis por `anon` |
+| **API** | endereço do projeto, como cada role chama a API, exemplos em curl e JavaScript gerados das colunas de cada tabela, token service_role |
 
 ## Alertas de RLS
 
@@ -90,6 +96,16 @@ aspas simples por causa dos `$`), seguido de `docker compose up -d --force-recre
   sessão. Todo request que muda estado precisa vir da mesma origem.
 - CSP sem scripts inline (`script-src 'self'`), `X-Frame-Options: DENY`.
 - O Svelte escapa todo texto; o painel nunca usa `{@html}`.
+- DDL feito pelo painel (tabelas, colunas, policies): a interface envia uma
+  especificação tipada, e o servidor monta o SQL com identificadores sempre
+  entre aspas e tipos de uma lista fechada. Expressões (`DEFAULT`, `USING`,
+  `WITH CHECK`) são SQL por natureza: cada comando vai pelo protocolo
+  estendido, que recusa um segundo comando escondido na expressão, e tudo roda
+  numa transação (ou nada é aplicado). O SQL aparece antes de executar.
+- Chaves estrangeiras pelo formulário só apontam para o schema exposto (para
+  `auth.users`, use o editor SQL).
+- Tokens `service_role` emitidos pelo painel não são guardados nem vão para o
+  log (só o fato e a validade).
 
 ## Desenvolvimento do painel
 
