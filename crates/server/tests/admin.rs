@@ -785,3 +785,48 @@ async fn filtros_na_grade_validados_pelo_catalogo() {
     .await;
     assert_eq!(lixo.status, StatusCode::BAD_REQUEST);
 }
+
+#[tokio::test]
+async fn colunas_indicam_a_chave_estrangeira() {
+    let app = TestApp::spawn().await;
+    let cookie = login(&app).await;
+    app.admin_client
+        .batch_execute(
+            "CREATE TABLE public.avaliacoes (
+                 id int PRIMARY KEY,
+                 produto_id int REFERENCES public.produtos (id),
+                 nota int
+             );
+             GRANT SELECT ON public.avaliacoes TO service_role;",
+        )
+        .await
+        .unwrap();
+
+    // O catálogo recarrega sozinho depois do DDL.
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    let data = loop {
+        let reply = get(&app, "/admin/api/tables/avaliacoes", &cookie).await;
+        if reply.status == StatusCode::OK {
+            break reply.body;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "tabela nova não apareceu"
+        );
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    };
+    let column = |name: &str| {
+        data["table"]["columns"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["name"] == name)
+            .unwrap()
+            .clone()
+    };
+    assert_eq!(
+        column("produto_id")["references"],
+        json!({ "table": "produtos", "column": "id" })
+    );
+    assert_eq!(column("nota")["references"], Value::Null);
+}

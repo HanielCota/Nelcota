@@ -359,6 +359,24 @@ async fn bounded_count(client: &mut Client, sql: &query::Sql) -> Option<i64> {
     Some(count)
 }
 
+/// Chave estrangeira simples (uma coluna) para outra tabela exposta: a grade
+/// usa para navegar até a linha referenciada.
+fn references(catalog: &Catalog, table: &Table, column: &str) -> Value {
+    table
+        .foreign_keys
+        .iter()
+        .find(|fk| {
+            fk.columns.len() == 1
+                && fk.columns[0] == column
+                && fk.foreign_schema == catalog.schema
+                && catalog.tables.contains_key(&fk.foreign_table)
+        })
+        .map_or(
+            Value::Null,
+            |fk| json!({ "table": fk.foreign_table, "column": fk.foreign_columns[0] }),
+        )
+}
+
 // Campos repetidos de `RowsQuery` em vez de `#[serde(flatten)]`: com flatten o
 // serde_urlencoded entrega tudo como texto e `page`/`desc` deixam de converter.
 #[derive(Deserialize)]
@@ -447,6 +465,7 @@ pub async fn table(
                 "enum_values": c.enum_values,
                 "is_pk": table.primary_key.contains(&c.name),
                 "comment": c.comment,
+                "references": references(&catalog, &table, &c.name),
             })
         })
         .collect();
