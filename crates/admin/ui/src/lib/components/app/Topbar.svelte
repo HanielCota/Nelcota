@@ -29,6 +29,14 @@
   const crumbs = $derived.by((): { label: string; path?: string }[] => {
     const table = match('/tables/:name', route.path)
     if (table) return [{ label: 'Tabelas', path: '/tables' }, { label: table.name }]
+    const structure = match('/tables/:name/structure', route.path)
+    if (structure) {
+      return [
+        { label: 'Tabelas', path: '/tables' },
+        { label: structure.name, path: `/tables/${encodeURIComponent(structure.name)}` },
+        { label: 'Estrutura' },
+      ]
+    }
     return [{ label: titles[route.path.replace(/\/$/, '') || '/'] ?? 'Página' }]
   })
 

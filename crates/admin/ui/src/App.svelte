@@ -38,7 +38,11 @@
   })
 
   const path = $derived(route.path.replace(/\/$/, '') || '/')
-  const tableName = $derived(match('/tables/:name', path)?.name)
+  const structureName = $derived(match('/tables/:name/structure', path)?.name)
+  const tableName = $derived(match('/tables/:name', path)?.name ?? structureName)
+  // Trocar de aba (Dados/Estrutura) não remonta o editor; trocar de tabela sim
+  // (ordenação, página e seleção são de cada tabela).
+  const pageKey = $derived(tableName ? `/tables/${tableName}` : route.path)
 </script>
 
 <ModeWatcher defaultMode="dark" />
@@ -57,11 +61,11 @@
       <div class="flex min-h-0 flex-1">
         <AppSidebar />
         <main class="min-w-0 flex-1 overflow-auto">
-          {#key route.path}
+          {#key pageKey}
             {#if path === '/'}
               <Overview />
             {:else if path === '/tables' || tableName}
-              <TableEditor name={tableName} />
+              <TableEditor name={tableName} view={structureName ? 'structure' : 'data'} />
             {:else if path === '/sql'}
               <!-- CodeMirror só é baixado quando o editor SQL é aberto. -->
               {#await import('$lib/pages/SqlEditor.svelte') then m}

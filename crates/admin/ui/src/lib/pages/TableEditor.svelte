@@ -26,12 +26,13 @@
   import ConfirmDialog from '$lib/components/app/ConfirmDialog.svelte'
   import FilterBar from '$lib/components/app/FilterBar.svelte'
   import CreateTableSheet from '$lib/components/app/CreateTableSheet.svelte'
+  import StructureView from '$lib/components/app/StructureView.svelte'
   import { api, enc, isAbort } from '$lib/api'
   import { describe, filtersParam, filtersToSearch, parseFilters, type TableFilter } from '$lib/filters'
   import { href, navigate, route } from '$lib/router.svelte'
   import type { Column, RowData, TableData, TableSummary } from '$lib/types'
 
-  let { name }: { name?: string } = $props()
+  let { name, view = 'data' }: { name?: string; view?: 'data' | 'structure' } = $props()
 
   let tables = $state<TableSummary[]>([])
   let filter = $state('')
@@ -81,6 +82,21 @@
     navigate(`/tables/${enc(table)}`)
   }
 
+  async function onRenamed(table: string) {
+    await loadTables()
+    navigate(`/tables/${enc(table)}/structure`, true)
+  }
+
+  async function onDropped() {
+    await loadTables()
+    navigate('/tables')
+  }
+
+  const tabs = [
+    { view: 'data', label: 'Dados', suffix: '' },
+    { view: 'structure', label: 'Estrutura', suffix: '/structure' },
+  ] as const
+
   /** Ordem e filtros atuais, no formato da API (listagem e exportação). */
   function rowsParams(): URLSearchParams {
     const params = new URLSearchParams()
@@ -119,7 +135,7 @@
 
   // Recarrega ao trocar de tabela, página, tamanho, ordenação ou filtros.
   $effect(() => {
-    void [name, page, size, sort, filtersKey]
+    void [name, view, page, size, sort, filtersKey]
     load()
     return () => inflight?.abort()
   })
@@ -271,67 +287,86 @@
       <div class="flex h-12 shrink-0 flex-wrap items-center gap-3 border-b px-4">
         <h1 class="text-sm font-medium">{name}</h1>
         {#if data}<RlsBadge rls={data.table.rls} />{/if}
-        <div class="ml-auto flex items-center gap-2">
-          {#if selected.size > 0}
-            <Button variant="destructive" size="sm" onclick={() => (confirmOpen = true)}>
-              <Trash2 />Apagar {selected.size}
+        <nav class="ml-1 flex items-center gap-0.5 rounded-md bg-muted p-0.5 text-xs" aria-label="Visão da tabela">
+          {#each tabs as tab (tab.view)}
+            <a
+              href={href(`/tables/${enc(name)}${tab.suffix}`)}
+              aria-current={view === tab.view ? 'page' : undefined}
+              class={[
+                'rounded px-2.5 py-1 transition-colors',
+                view === tab.view ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground',
+              ]}>{tab.label}</a
+            >
+          {/each}
+        </nav>
+        {#if view === 'data'}
+          <div class="ml-auto flex items-center gap-2">
+            {#if selected.size > 0}
+              <Button variant="destructive" size="sm" onclick={() => (confirmOpen = true)}>
+                <Trash2 />Apagar {selected.size}
+              </Button>
+            {/if}
+            <Button
+              variant={filterOpen || filters.length ? 'secondary' : 'ghost'}
+              size="sm"
+              onclick={() => (filterOpen = !filterOpen)}
+              aria-expanded={filterOpen}
+            >
+              <Funnel />Filtrar{#if filters.length}<span
+                  class="rounded-full bg-brand/15 px-1.5 text-[10px] text-brand tabular-nums">{filters.length}</span
+                >{/if}
             </Button>
-          {/if}
-          <Button
-            variant={filterOpen || filters.length ? 'secondary' : 'ghost'}
-            size="sm"
-            onclick={() => (filterOpen = !filterOpen)}
-            aria-expanded={filterOpen}
-          >
-            <Funnel />Filtrar{#if filters.length}<span
-                class="rounded-full bg-brand/15 px-1.5 text-[10px] text-brand tabular-nums">{filters.length}</span
-              >{/if}
-          </Button>
-          <DropdownMenu.Root>
-            <DropdownMenu.Trigger>
-              {#snippet child({ props })}
-                <Button variant="ghost" size="sm" {...props}><Download />Exportar</Button>
-              {/snippet}
-            </DropdownMenu.Trigger>
-            <DropdownMenu.Content align="end" class="w-56">
-              <DropdownMenu.Label class="text-xs font-normal text-muted-foreground">
-                {filters.length ? 'Linhas filtradas, na ordem atual' : 'Todas as linhas, na ordem atual'}
-              </DropdownMenu.Label>
-              <DropdownMenu.Item>
-                {#snippet child({ props })}<a {...props} href={exportHref('csv')} download>CSV</a>{/snippet}
-              </DropdownMenu.Item>
-              <DropdownMenu.Item>
-                {#snippet child({ props })}<a {...props} href={exportHref('json')} download>JSON</a>{/snippet}
-              </DropdownMenu.Item>
-            </DropdownMenu.Content>
-          </DropdownMenu.Root>
-          <Button variant="ghost" size="icon-sm" onclick={load} aria-label="Recarregar" title="Recarregar">
-            <RefreshCw class={loading ? 'animate-spin' : ''} />
-          </Button>
-          {#if data?.table.insertable}
-            <Button size="sm" onclick={() => openSheet(null)}><Plus />Inserir linha</Button>
-          {/if}
-        </div>
+            <DropdownMenu.Root>
+              <DropdownMenu.Trigger>
+                {#snippet child({ props })}
+                  <Button variant="ghost" size="sm" {...props}><Download />Exportar</Button>
+                {/snippet}
+              </DropdownMenu.Trigger>
+              <DropdownMenu.Content align="end" class="w-56">
+                <DropdownMenu.Label class="text-xs font-normal text-muted-foreground">
+                  {filters.length ? 'Linhas filtradas, na ordem atual' : 'Todas as linhas, na ordem atual'}
+                </DropdownMenu.Label>
+                <DropdownMenu.Item>
+                  {#snippet child({ props })}<a {...props} href={exportHref('csv')} download>CSV</a>{/snippet}
+                </DropdownMenu.Item>
+                <DropdownMenu.Item>
+                  {#snippet child({ props })}<a {...props} href={exportHref('json')} download>JSON</a>{/snippet}
+                </DropdownMenu.Item>
+              </DropdownMenu.Content>
+            </DropdownMenu.Root>
+            <Button variant="ghost" size="icon-sm" onclick={load} aria-label="Recarregar" title="Recarregar">
+              <RefreshCw class={loading ? 'animate-spin' : ''} />
+            </Button>
+            {#if data?.table.insertable}
+              <Button size="sm" onclick={() => openSheet(null)}><Plus />Inserir linha</Button>
+            {/if}
+          </div>
+        {/if}
       </div>
 
-      {#if filterOpen && data}
-        <FilterBar columns={data.table.columns} {filters} onapply={setFilters} onclose={() => (filterOpen = false)} />
-      {:else if filters.length}
-        <div class="flex shrink-0 flex-wrap items-center gap-1.5 border-b px-4 py-2">
-          {#each filters as filter, i (i)}
-            <span
-              class="inline-flex h-6 items-center gap-1 rounded-md border border-border-strong bg-muted pr-0.5 pl-2 font-mono text-[11px]"
-            >
-              {describe(filter)}
-              <button
-                class="grid size-5 place-items-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
-                aria-label="Remover filtro"
-                onclick={() => setFilters(filters.filter((_, j) => j !== i))}><X class="size-3" /></button
-              >
-            </span>
-          {/each}
-          <Button variant="ghost" size="xs" class="text-muted-foreground" onclick={() => setFilters([])}>Limpar</Button>
+      {#if view === 'structure'}
+        <div class="min-h-0 flex-1 overflow-auto bg-muted/20">
+          <StructureView {name} onrenamed={onRenamed} ondropped={onDropped} />
         </div>
+      {:else}
+        {#if filterOpen && data}
+          <FilterBar columns={data.table.columns} {filters} onapply={setFilters} onclose={() => (filterOpen = false)} />
+        {:else if filters.length}
+          <div class="flex shrink-0 flex-wrap items-center gap-1.5 border-b px-4 py-2">
+            {#each filters as filter, i (i)}
+              <span
+                class="inline-flex h-6 items-center gap-1 rounded-md border border-border-strong bg-muted pr-0.5 pl-2 font-mono text-[11px]"
+              >
+                {describe(filter)}
+                <button
+                  class="grid size-5 place-items-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+                  aria-label="Remover filtro"
+                  onclick={() => setFilters(filters.filter((_, j) => j !== i))}><X class="size-3" /></button
+                >
+              </span>
+            {/each}
+            <Button variant="ghost" size="xs" class="text-muted-foreground" onclick={() => setFilters([])}>Limpar</Button>
+          </div>
       {/if}
 
       {#if data?.table.exposed_without_rls}
@@ -495,6 +530,7 @@
             </Button>
           </div>
         </footer>
+      {/if}
       {/if}
     {/if}
   </section>
