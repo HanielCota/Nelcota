@@ -4,6 +4,7 @@
   import { Input } from '$lib/components/ui/input'
   import { Checkbox } from '$lib/components/ui/checkbox'
   import * as Select from '$lib/components/ui/select'
+  import * as DropdownMenu from '$lib/components/ui/dropdown-menu'
   import Search from '@lucide/svelte/icons/search'
   import RefreshCw from '@lucide/svelte/icons/refresh-cw'
   import Trash2 from '@lucide/svelte/icons/trash-2'
@@ -15,6 +16,7 @@
   import ChevronLeft from '@lucide/svelte/icons/chevron-left'
   import ChevronRight from '@lucide/svelte/icons/chevron-right'
   import Funnel from '@lucide/svelte/icons/funnel'
+  import Download from '@lucide/svelte/icons/download'
   import X from '@lucide/svelte/icons/x'
   import { toast } from 'svelte-sonner'
   import RlsBadge from '$lib/components/app/RlsBadge.svelte'
@@ -116,6 +118,12 @@
     page = 0
     const search = filtersToSearch(next)
     navigate(`/tables/${enc(name!)}${search ? `?${search}` : ''}`)
+  }
+
+  const exportHref = (format: 'csv' | 'json') => {
+    const params = rowsParams()
+    params.set('format', format)
+    return href(`/api/tables/${enc(name!)}/export?${params}`)
   }
 
 
@@ -257,6 +265,24 @@
                 class="rounded-full bg-brand/15 px-1.5 text-[10px] text-brand tabular-nums">{filters.length}</span
               >{/if}
           </Button>
+          <DropdownMenu.Root>
+            <DropdownMenu.Trigger>
+              {#snippet child({ props })}
+                <Button variant="ghost" size="sm" {...props}><Download />Exportar</Button>
+              {/snippet}
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Content align="end" class="w-56">
+              <DropdownMenu.Label class="text-xs font-normal text-muted-foreground">
+                {filters.length ? 'Linhas filtradas, na ordem atual' : 'Todas as linhas, na ordem atual'}
+              </DropdownMenu.Label>
+              <DropdownMenu.Item>
+                {#snippet child({ props })}<a {...props} href={exportHref('csv')} download>CSV</a>{/snippet}
+              </DropdownMenu.Item>
+              <DropdownMenu.Item>
+                {#snippet child({ props })}<a {...props} href={exportHref('json')} download>JSON</a>{/snippet}
+              </DropdownMenu.Item>
+            </DropdownMenu.Content>
+          </DropdownMenu.Root>
           <Button variant="ghost" size="icon-sm" onclick={load} aria-label="Recarregar" title="Recarregar">
             <RefreshCw class={loading ? 'animate-spin' : ''} />
           </Button>
