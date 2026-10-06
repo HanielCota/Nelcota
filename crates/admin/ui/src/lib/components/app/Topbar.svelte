@@ -6,7 +6,7 @@
   import Menu from '@lucide/svelte/icons/menu'
   import Sun from '@lucide/svelte/icons/sun'
   import Moon from '@lucide/svelte/icons/moon'
-  import BookOpen from '@lucide/svelte/icons/book-open'
+  import Plug from '@lucide/svelte/icons/plug'
   import LogOut from '@lucide/svelte/icons/log-out'
   import Search from '@lucide/svelte/icons/search'
   import Logo from './Logo.svelte'
@@ -24,6 +24,7 @@
     '/users': 'Usuários',
     '/policies': 'Policies',
     '/projects': 'Projetos',
+    '/connect': 'API',
   }
 
   const crumbs = $derived.by((): { label: string; path?: string }[] => {
@@ -85,8 +86,8 @@
       <span class="hidden flex-1 text-left sm:inline">Buscar…</span>
       <kbd class="hidden rounded border bg-muted px-1 font-sans text-[10px] sm:inline">{isMac ? '⌘' : 'Ctrl'} K</kbd>
     </button>
-    <Button variant="outline" size="sm" href="/rest/v1/" target="_blank" rel="noopener" class="hidden sm:inline-flex">
-      <BookOpen />API
+    <Button variant="outline" size="sm" href={href('/connect')} class="hidden sm:inline-flex">
+      <Plug />API
     </Button>
     <Button variant="ghost" size="icon-sm" onclick={toggleMode} aria-label="Alternar tema" title="Alternar tema">
       {#if mode.current === 'dark'}<Sun />{:else}<Moon />{/if}

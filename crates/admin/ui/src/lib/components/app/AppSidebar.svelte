@@ -42,7 +42,7 @@
         class="flex h-9 items-center gap-3 overflow-hidden rounded-md px-[9px] text-sm whitespace-nowrap text-sidebar-foreground transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
       >
         <BookOpen class="size-[18px] shrink-0" strokeWidth={1.6} />
-        <span class="opacity-0 transition-opacity duration-150 group-hover/rail:opacity-100">API (OpenAPI)</span>
+        <span class="opacity-0 transition-opacity duration-150 group-hover/rail:opacity-100">Docs (OpenAPI)</span>
       </a>
       <p
         class="mt-2 w-48 px-2 pb-1 text-[11px] leading-snug font-light text-muted-foreground opacity-0 transition-opacity duration-150 group-hover/rail:opacity-100"

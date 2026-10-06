@@ -13,6 +13,7 @@
   import Policies from '$lib/pages/Policies.svelte'
   import NotFound from '$lib/pages/NotFound.svelte'
   import Projects from '$lib/pages/Projects.svelte'
+  import ApiPage from '$lib/pages/ApiPage.svelte'
   import { takeHandoffToken } from '$lib/projects'
   import { api } from '$lib/api'
   import { session } from '$lib/session.svelte'
@@ -77,6 +78,8 @@
               <Policies />
             {:else if path === '/projects'}
               <Projects />
+            {:else if path === '/connect'}
+              <ApiPage />
             {:else}
               <NotFound />
             {/if}
