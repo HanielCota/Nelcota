@@ -41,6 +41,8 @@ export interface Column {
   enum_values: string[]
   is_pk: boolean
   comment: string | null
+  /** Chave estrangeira de uma coluna para outra tabela exposta. */
+  references: { table: string; column: string } | null
 }
 
 export type RowData = Record<string, string | null>

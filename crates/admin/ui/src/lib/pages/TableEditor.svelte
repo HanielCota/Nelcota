@@ -17,6 +17,7 @@
   import ChevronRight from '@lucide/svelte/icons/chevron-right'
   import Funnel from '@lucide/svelte/icons/funnel'
   import Download from '@lucide/svelte/icons/download'
+  import ArrowUpRight from '@lucide/svelte/icons/arrow-up-right'
   import X from '@lucide/svelte/icons/x'
   import { toast } from 'svelte-sonner'
   import RlsBadge from '$lib/components/app/RlsBadge.svelte'
@@ -126,6 +127,11 @@
     return href(`/api/tables/${enc(name!)}/export?${params}`)
   }
 
+  /** Link para a linha referenciada pela chave estrangeira. */
+  const referenceHref = (column: Column, value: string) =>
+    href(
+      `/tables/${enc(column.references!.table)}?${filtersToSearch([{ column: column.references!.column, op: 'eq', value }])}`,
+    )
 
   function toggleSort(column: string) {
     sort = sort?.column === column ? (sort.desc ? null : { column, desc: true }) : { column, desc: false }
@@ -352,7 +358,11 @@
                         <span class="text-[12.5px] text-foreground"
                           >{column.name}{#if column.is_pk}<span class="ml-1.5 font-mono text-[10px] font-normal text-muted-foreground">pk</span>{/if}</span
                         >
-                        <span class="font-mono text-[10.5px] font-normal text-muted-foreground">{column.full_type}</span>
+                        <span class="font-mono text-[10.5px] font-normal text-muted-foreground"
+                          >{column.full_type}{#if column.references}<span class="text-brand/80"
+                              >{` → ${column.references.table}`}</span
+                            >{/if}</span
+                        >
                       </span>
                       {#if sort?.column === column.name}
                         {#if sort.desc}<ArrowDown class="ml-auto size-3.5" />{:else}<ArrowUp class="ml-auto size-3.5" />{/if}
@@ -375,7 +385,7 @@
                     {@const value = row[column.name]}
                     <td
                       class={[
-                        'max-w-96 border-r border-b p-0 font-mono',
+                        'group/cell max-w-96 border-r border-b p-0 font-mono',
                         editable && !column.generated && 'cursor-text',
                       ]}
                       ondblclick={() => startEdit(i, column)}
@@ -400,11 +410,20 @@
                           {/if}
                         </div>
                       {:else}
-                        <div class="truncate px-3 py-1.5" title={value ?? 'NULL'}>
-                          {#if value === null}
-                            <span class="text-muted-foreground">NULL</span>
-                          {:else}
-                            {value}
+                        <div class="flex items-center gap-1 px-3 py-1.5" title={value ?? 'NULL'}>
+                          <span class="truncate">
+                            {#if value === null}<span class="text-muted-foreground">NULL</span>{:else}{value}{/if}
+                          </span>
+                          {#if column.references && value !== null}
+                            <a
+                              href={referenceHref(column, value)}
+                              class="ml-auto grid size-5 shrink-0 place-items-center rounded text-muted-foreground opacity-0 group-hover/cell:opacity-100 hover:bg-accent hover:text-brand focus-visible:opacity-100"
+                              title={`Abrir em ${column.references.table}`}
+                              aria-label={`Abrir linha referenciada em ${column.references.table}`}
+                              ondblclick={(e) => e.stopPropagation()}
+                            >
+                              <ArrowUpRight class="size-3.5" />
+                            </a>
                           {/if}
                         </div>
                       {/if}
