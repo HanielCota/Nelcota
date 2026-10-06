@@ -25,6 +25,7 @@
   import RowSheet from '$lib/components/app/RowSheet.svelte'
   import ConfirmDialog from '$lib/components/app/ConfirmDialog.svelte'
   import FilterBar from '$lib/components/app/FilterBar.svelte'
+  import CreateTableSheet from '$lib/components/app/CreateTableSheet.svelte'
   import { api, enc, isAbort } from '$lib/api'
   import { describe, filtersParam, filtersToSearch, parseFilters, type TableFilter } from '$lib/filters'
   import { href, navigate, route } from '$lib/router.svelte'
@@ -63,13 +64,22 @@
   const editable = $derived(data?.table.editable ?? false)
   const fmt = new Intl.NumberFormat('pt-BR')
 
-  onMount(async () => {
+  async function loadTables() {
     try {
       tables = (await api.get<{ tables: TableSummary[] }>('/tables')).tables
     } catch (e) {
       toast.error((e as Error).message)
     }
-  })
+  }
+
+  onMount(loadTables)
+
+  let createOpen = $state(false)
+
+  async function onCreated(table: string) {
+    await loadTables()
+    navigate(`/tables/${enc(table)}`)
+  }
 
   /** Ordem e filtros atuais, no formato da API (listagem e exportação). */
   function rowsParams(): URLSearchParams {
@@ -211,7 +221,12 @@
   <!-- Lista de tabelas -->
   <aside class="hidden w-64 shrink-0 flex-col border-r bg-sidebar md:flex">
     <div class="grid gap-3 border-b p-3">
-      <p class="px-1 text-sm font-medium">Editor de tabelas</p>
+      <div class="flex items-center justify-between">
+        <p class="px-1 text-sm font-medium">Editor de tabelas</p>
+        <Button variant="ghost" size="icon-sm" title="Nova tabela" aria-label="Nova tabela" onclick={() => (createOpen = true)}>
+          <Plus />
+        </Button>
+      </div>
       <div class="relative">
         <Search class="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
         <Input bind:value={filter} placeholder="Buscar tabelas…" class="h-8 bg-card pl-8 text-sm" />
@@ -249,6 +264,7 @@
           <Table2 class="mx-auto size-7 text-muted-foreground" strokeWidth={1.3} />
           <p class="mt-3 text-sm font-medium">Escolha uma tabela</p>
           <p class="mt-1 text-sm font-light text-muted-foreground">Selecione na lista ao lado para ver e editar as linhas.</p>
+          <Button variant="outline" size="sm" class="mt-4" onclick={() => (createOpen = true)}><Plus />Criar tabela</Button>
         </div>
       </div>
     {:else}
@@ -483,6 +499,8 @@
     {/if}
   </section>
 </div>
+
+<CreateTableSheet bind:open={createOpen} oncreated={onCreated} />
 
 {#if data && name}
   <RowSheet
