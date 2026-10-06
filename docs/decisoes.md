@@ -172,6 +172,71 @@ documentação e o painel alertam.
 dependências transitivas (axum/tokio-postgres); `compression-gzip` do
 tower-http adiciona `flate2`.
 
+## Marco 4
+
+**D37. Um binário, dois papéis.** `nelcota` sem argumentos (ou `serve`) sobe o
+servidor; os subcomandos operam a instalação. No host, `migrate`/`types`/`token`
+são repassados ao container `app` (`docker compose exec`), que é quem alcança
+o Postgres numa rede `internal: true`; com `NELCOTA_DATABASE_URL` no ambiente,
+rodam direto.
+
+**D38. Perfis do Postgres viram `-c chave=valor` no compose.** Os arquivos
+`deploy/postgres/profiles/*.conf` são a fonte; o `init` os converte em
+argumentos do comando `postgres`. Usar `config_file` substituiria o
+`postgresql.conf` inteiro da imagem (e mudaria o diretório padrão do
+`pg_hba.conf`).
+
+**D39. Backup por `pg_dump -Fc`; envio ao S3 com a imagem `amazon/aws-cli`.**
+Nada a instalar no host e nenhuma implementação própria de assinatura S3
+(SigV4). Restore em transação única (`--single-transaction --exit-on-error`).
+PITR com WAL-G fica como pendência (dumps diários: RPO de até 24 h).
+
+**D40. Upgrade com rollback = imagem anterior + restore do backup pré-upgrade.**
+A versão nova pode ter aplicado migrações internas que a anterior não conhece
+(o refinery recusa subir com migração "desconhecida"). Por isso o rollback
+também restaura o banco. O teste de aceitação cobre esse caminho.
+
+**D41. Imagem `scratch` com binário musl; healthcheck embutido.** Sem shell nem
+curl na imagem: `nelcota healthcheck` faz o `GET /health` por TCP puro.
+
+**D42. Migrações do usuário no formato do refinery (`V<n>__<nome>.sql`)**, em
+`nelcota.user_migrations`, separadas das internas (`nelcota.schema_migrations`).
+CRLF é normalizado antes do checksum (checkout no Windows não diverge).
+
+**D43. `install.sh` instala o Docker pelo script oficial se ele faltar** (como
+root e sem `NELCOTA_SKIP_DOCKER=1`): é o que torna os "3 comandos" possíveis
+numa VPS zerada. O checksum SHA-256 do binário é sempre conferido.
+
+**D44. `init` não ativa o firewall sem `--firewall`.** Ativar `ufw` remotamente
+com a porta SSH errada tranca o dono fora da máquina. Por padrão só recomenda.
+
+## Marco 5
+
+**D45. Painel com HTML no servidor + ~2 KB de JS próprio, sem HTMX.** As páginas
+são formulários comuns; o único trecho interativo (editor SQL) cabe em poucas
+linhas de `fetch`. CSP `script-src 'self'` sem `unsafe-inline`. Assets
+embutidos com `rust-embed`.
+
+**D46. Login do painel separado dos usuários finais.** Email + hash argon2id no
+`.env` (gerados pelo `init`; a senha é mostrada uma vez). Sessões em memória
+(reiniciar o servidor desloga o admin), cookie `HttpOnly; SameSite=Strict`
+(`Secure` atrás do proxy), rate limit de login e checagem de `Origin`/
+`Sec-Fetch-Site` em todo POST (CSRF).
+
+**D47. O painel usa a conexão administrativa.** O admin é o dono do banco, como
+no `psql`. As escritas em tabelas reutilizam o construtor de SQL da API
+(identificadores do catálogo, valores parametrizados). O editor SQL abre uma
+conexão **nova** por execução: `BEGIN` sem `COMMIT` ou `SET ROLE` não
+contaminam o pool. O texto do SQL não vai para o log.
+
+**D48. Valores no painel preservam o texto do Postgres** (`RawValue`), sem
+passar por `f64`: `numeric(30,10)` aparece e é editado com todas as casas.
+
 ### Pendências conhecidas
 
 - Embed de relações, `or=`/`and=` e upsert ficam para depois do MVP.
+- PITR com WAL-G (ou pgBackRest) arquivando WAL no S3.
+- Instalação sem Docker (systemd): o binário já não depende de Docker, falta o
+  `init` gerar as units.
+- O workflow de release (binários musl + imagem no GHCR) foi escrito, mas só
+  roda quando o repositório estiver no GitHub; o `install.sh` depende dele.
