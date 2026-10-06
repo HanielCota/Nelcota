@@ -8,9 +8,11 @@
   import Moon from '@lucide/svelte/icons/moon'
   import BookOpen from '@lucide/svelte/icons/book-open'
   import LogOut from '@lucide/svelte/icons/log-out'
+  import Search from '@lucide/svelte/icons/search'
   import Logo from './Logo.svelte'
   import ProjectSwitcher from './ProjectSwitcher.svelte'
-  import { api } from '$lib/api'
+  import { logout } from '$lib/auth'
+  import { palette } from '$lib/palette.svelte'
   import { session } from '$lib/session.svelte'
   import { href, match, route } from '$lib/router.svelte'
   import { isActive, navGroups } from '$lib/nav'
@@ -32,11 +34,7 @@
 
   let mobileOpen = $state(false)
   const initial = $derived((session.email ?? '?').charAt(0).toUpperCase())
-
-  async function logout() {
-    await api.post('/logout').catch(() => {})
-    session.email = null
-  }
+  const isMac = /Mac|iPhone|iPad/.test(navigator.platform)
 </script>
 
 {#snippet slash()}
@@ -69,6 +67,16 @@
   </nav>
 
   <div class="ml-auto flex items-center gap-1.5">
+    <button
+      type="button"
+      onclick={() => (palette.open = true)}
+      class="flex h-7 items-center gap-2 rounded-md border border-border-strong bg-card px-2 text-xs text-muted-foreground transition-colors hover:border-ring hover:text-foreground sm:w-56"
+      aria-label="Buscar"
+    >
+      <Search class="size-3.5" />
+      <span class="hidden flex-1 text-left sm:inline">Buscar…</span>
+      <kbd class="hidden rounded border bg-muted px-1 font-sans text-[10px] sm:inline">{isMac ? '⌘' : 'Ctrl'} K</kbd>
+    </button>
     <Button variant="outline" size="sm" href="/rest/v1/" target="_blank" rel="noopener" class="hidden sm:inline-flex">
       <BookOpen />API
     </Button>

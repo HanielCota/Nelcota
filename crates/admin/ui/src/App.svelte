@@ -5,6 +5,7 @@
   import * as Tooltip from '$lib/components/ui/tooltip'
   import AppSidebar from '$lib/components/app/AppSidebar.svelte'
   import Topbar from '$lib/components/app/Topbar.svelte'
+  import CommandPalette from '$lib/components/app/CommandPalette.svelte'
   import Login from '$lib/pages/Login.svelte'
   import Overview from '$lib/pages/Overview.svelte'
   import TableEditor from '$lib/pages/TableEditor.svelte'
@@ -79,5 +80,6 @@
         </main>
       </div>
     </div>
+    <CommandPalette />
   </Tooltip.Provider>
 {/if}
