@@ -1,0 +1,31 @@
+# cargo deny check — licenças, advisories, origens e duplicatas.
+
+[graph]
+all-features = false
+
+[advisories]
+# Mesma justificativa de .cargo/audit.toml (ver docs/decisoes.md).
+ignore = [
+    { id = "RUSTSEC-2023-0071", reason = "rsa só usada para verificar (nunca assinamos com RSA)" },
+]
+
+[licenses]
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "Unicode-3.0",
+    "Zlib",
+]
+confidence-threshold = 0.9
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+allow-wildcard-paths = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

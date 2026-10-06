@@ -1,0 +1,25 @@
+# Ambiente de DESENVOLVIMENTO: só o Postgres. O binário roda com `cargo run`.
+# (O compose de produção, com app + Caddy, é gerado pelo `nelcota init` no Marco 4.)
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=pg_stat_statements
+    ports:
+      # Apenas localhost: o Postgres nunca fica exposto na rede.
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:
