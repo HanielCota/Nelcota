@@ -418,7 +418,29 @@ fn order_clause(order: &[OrderTerm]) -> String {
 /// `SELECT` que devolve `(json_text, linhas)`; o Postgres monta o JSON.
 pub fn select(schema: &str, table: &Table, request: &Request, max_rows: Option<i64>) -> Sql {
     let mut sql = Sql::default();
-    let filters = where_clause(&mut sql, table, &request.filters);
+    let rows = rows_subquery(&mut sql, schema, table, request, max_rows);
+    sql.text = format!("SELECT coalesce(json_agg(_r), '[]')::text, count(*) FROM ({rows}) _r");
+    sql
+}
+
+/// Um registro por linha do resultado, como texto JSON: para ler em fluxo
+/// (exportação) sem montar a resposta inteira na memória.
+pub fn select_rows(schema: &str, table: &Table, request: &Request) -> Sql {
+    let mut sql = Sql::default();
+    let rows = rows_subquery(&mut sql, schema, table, request, None);
+    sql.text = format!("SELECT row_to_json(_r)::text FROM ({rows}) _r");
+    sql
+}
+
+/// Colunas, filtros, ordem e paginação da tabela (alias `_t`).
+fn rows_subquery(
+    sql: &mut Sql,
+    schema: &str,
+    table: &Table,
+    request: &Request,
+    max_rows: Option<i64>,
+) -> String {
+    let filters = where_clause(sql, table, &request.filters);
     let mut tail = order_clause(&request.order);
     let limit = match (request.limit, max_rows) {
         (Some(l), Some(m)) => Some(l.min(m)),
@@ -432,12 +454,11 @@ pub fn select(schema: &str, table: &Table, request: &Request, max_rows: Option<i
         let p = sql.param(Param::Int(offset));
         tail.push_str(&format!(" OFFSET {p}"));
     }
-    sql.text = format!(
-        "SELECT coalesce(json_agg(_r), '[]')::text, count(*) FROM (SELECT {} FROM {} AS _t{filters}{tail}) _r",
+    format!(
+        "SELECT {} FROM {} AS _t{filters}{tail}",
         select_list(&request.select, "_t"),
         qualified(schema, table),
-    );
-    sql
+    )
 }
 
 /// Total de linhas que os filtros alcançam (para `Prefer: count=exact`).
@@ -746,6 +767,19 @@ mod tests {
         );
         assert_eq!(sql.params.len(), 4);
         assert!(matches!(&sql.params[1], Param::Text(p) if p == "%compr%"));
+    }
+
+    #[test]
+    fn select_rows_devolve_um_registro_json_por_linha() {
+        let t = table();
+        let req = parse_request(&pairs(&[("done", "eq.true"), ("order", "id")]), &t).unwrap();
+        let sql = select_rows("public", &t, &req);
+        assert_eq!(
+            sql.text,
+            "SELECT row_to_json(_r)::text FROM (SELECT _t.* FROM \"public\".\"todos\" AS _t \
+             WHERE _t.\"done\" = $1::text::boolean ORDER BY _t.\"id\" ASC) _r"
+        );
+        assert_eq!(sql.params.len(), 1);
     }
 
     #[test]
