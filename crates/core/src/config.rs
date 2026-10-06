@@ -64,9 +64,15 @@ pub struct Config {
     pub auth_rate_limit_per_minute: u32,
     /// Confiar no `X-Forwarded-For` (só atrás de um proxy como o Caddy).
     pub trust_proxy: bool,
+    /// Schema exposto pela API REST.
+    pub db_schema: String,
+    /// Teto de linhas por leitura na API (`None` = sem teto).
+    pub max_rows: Option<i64>,
     pub listen: SocketAddr,
     pub db_pool_size: usize,
     pub request_timeout_secs: u64,
+    /// `statement_timeout` das conexões da API.
+    pub statement_timeout_secs: u64,
     pub log_format: LogFormat,
 }
 
@@ -93,9 +99,12 @@ impl Default for Config {
             signup_enabled: true,
             auth_rate_limit_per_minute: 30,
             trust_proxy: false,
+            db_schema: "public".into(),
+            max_rows: None,
             listen: SocketAddr::from(([0, 0, 0, 0], 8000)),
             db_pool_size: 10,
             request_timeout_secs: 15,
+            statement_timeout_secs: 10,
             log_format: LogFormat::Text,
         }
     }

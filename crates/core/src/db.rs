@@ -37,6 +37,7 @@ pub enum BootstrapError {
 pub async fn bootstrap(
     admin: &tokio_postgres::Config,
     authenticator_password: &str,
+    statement_timeout_secs: u64,
 ) -> Result<(), BootstrapError> {
     let (mut client, connection) = admin
         .connect(NoTls)
@@ -73,6 +74,17 @@ pub async fn bootstrap(
         .await?
         .get(0);
     client.batch_execute(&statement).await?;
+    // Teto de duração por statement nas conexões da API. Vale para todas as
+    // roles do request: `ALTER ROLE anon SET ...` não teria efeito, porque o
+    // Postgres só aplica as configurações por role no login (authenticator).
+    let statement: String = client
+        .query_one(
+            "SELECT format('ALTER ROLE authenticator SET statement_timeout = %L', $1::text)",
+            &[&format!("{statement_timeout_secs}s")],
+        )
+        .await?
+        .get(0);
+    client.batch_execute(&statement).await?;
     client
         .batch_execute("SELECT pg_advisory_unlock(hashtext('nelcota.migrations'))")
         .await?;
@@ -82,17 +94,26 @@ pub async fn bootstrap(
     Ok(())
 }
 
+/// Config de conexão como `authenticator` (mesmo host/banco da URL administrativa).
+pub fn authenticator_config(
+    admin: &tokio_postgres::Config,
+    authenticator_password: &str,
+) -> tokio_postgres::Config {
+    let mut config = admin.clone();
+    config
+        .user("authenticator")
+        .password(authenticator_password)
+        .application_name("nelcota");
+    config
+}
+
 /// Pool da API: mesmo host/banco da URL administrativa, mas como `authenticator`.
 pub fn api_pool(
     admin: &tokio_postgres::Config,
     authenticator_password: &str,
     max_size: usize,
 ) -> Pool {
-    let mut config = admin.clone();
-    config
-        .user("authenticator")
-        .password(authenticator_password)
-        .application_name("nelcota");
+    let config = authenticator_config(admin, authenticator_password);
     // `Fast` não roda nada ao devolver a conexão: role e claims são definidas
     // com escopo de transação (`is_local = true`) e morrem no COMMIT/ROLLBACK.
     let manager = Manager::from_config(

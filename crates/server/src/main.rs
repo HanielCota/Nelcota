@@ -1,9 +1,10 @@
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 
 use anyhow::Context;
+use nelcota_api::{ApiSettings, spawn_reload_listener};
 use nelcota_auth::{AuthSettings, AuthState, Keys, Passwords, RateLimiter};
 use nelcota_core::{Config, config::LogFormat, db};
-use nelcota_server::{AppState, app};
+use nelcota_server::{AppState, app, load_catalog};
 use tracing_subscriber::{EnvFilter, fmt};
 
 #[tokio::main]
@@ -12,9 +13,13 @@ async fn main() -> anyhow::Result<()> {
     init_tracing(config.log_format);
 
     let admin = config.database_config()?;
-    db::bootstrap(&admin, config.authenticator_password.expose())
-        .await
-        .context("falha ao preparar o banco")?;
+    db::bootstrap(
+        &admin,
+        config.authenticator_password.expose(),
+        config.statement_timeout_secs,
+    )
+    .await
+    .context("falha ao preparar o banco")?;
 
     let keys = Arc::new(
         Keys::new(
@@ -29,9 +34,19 @@ async fn main() -> anyhow::Result<()> {
         config.authenticator_password.expose(),
         config.db_pool_size,
     );
+    let catalog = load_catalog(&pool, &config.db_schema).await?;
+    spawn_reload_listener(
+        catalog.clone(),
+        pool.clone(),
+        db::authenticator_config(&admin, config.authenticator_password.expose()),
+    );
     let state = AppState {
         pool: pool.clone(),
         verifier: keys.clone(),
+        catalog,
+        api: Arc::new(ApiSettings {
+            max_rows: config.max_rows,
+        }),
     };
     let auth = AuthState {
         pool,

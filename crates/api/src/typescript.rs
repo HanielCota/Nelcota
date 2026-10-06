@@ -1,0 +1,167 @@
+//! Tipos TypeScript gerados do catálogo (`nelcota types`).
+//!
+//! O formato (`Database[schema]["Tables"][t]["Row" | "Insert" | "Update"]`)
+//! segue a convenção já conhecida do ecossistema, mas é só TypeScript: não
+//! depende de SDK nenhum.
+
+use std::fmt::Write;
+
+use crate::catalog::{Catalog, Column, TableKind};
+
+fn ts_scalar(type_name: &str) -> String {
+    if let Some(element) = type_name.strip_suffix("[]") {
+        return format!("{}[]", ts_scalar(element));
+    }
+    match type_name {
+        "smallint" | "integer" | "bigint" | "real" | "double precision" | "numeric" | "oid" => {
+            "number".into()
+        }
+        "boolean" => "boolean".into(),
+        "json" | "jsonb" => "Json".into(),
+        "void" => "undefined".into(),
+        _ => "string".into(),
+    }
+}
+
+fn ts_column(column: &Column) -> String {
+    if !column.enum_values.is_empty() {
+        let union = column
+            .enum_values
+            .iter()
+            .map(|v| serde_json::to_string(v).unwrap_or_default())
+            .collect::<Vec<_>>()
+            .join(" | ");
+        return if column.category == 'A' {
+            format!("({union})[]")
+        } else {
+            union
+        };
+    }
+    ts_scalar(&column.type_name)
+}
+
+fn key(name: &str) -> String {
+    let simple = name
+        .chars()
+        .next()
+        .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
+        && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_');
+    if simple {
+        name.to_owned()
+    } else {
+        serde_json::to_string(name).unwrap_or_default()
+    }
+}
+
+pub fn generate(catalog: &Catalog) -> String {
+    let mut out = String::new();
+    let schema = key(&catalog.schema);
+    out.push_str("// Gerado por `nelcota types`. Não edite à mão.\n\n");
+    out.push_str(
+        "export type Json =\n  | string\n  | number\n  | boolean\n  | null\n  | { [key: string]: Json | undefined }\n  | Json[];\n\n",
+    );
+    let _ = writeln!(out, "export interface Database {{\n  {schema}: {{");
+
+    for (section, views) in [("Tables", false), ("Views", true)] {
+        let _ = writeln!(out, "    {section}: {{");
+        for table in catalog
+            .tables
+            .values()
+            .filter(|t| (t.kind != TableKind::Table) == views)
+        {
+            let _ = writeln!(out, "      {}: {{", key(&table.name));
+            out.push_str("        Row: {\n");
+            for c in &table.columns {
+                let null = if c.nullable { " | null" } else { "" };
+                let _ = writeln!(out, "          {}: {}{null};", key(&c.name), ts_column(c));
+            }
+            out.push_str("        };\n");
+            if table.kind != TableKind::MaterializedView {
+                for (variant, all_optional) in [("Insert", false), ("Update", true)] {
+                    let _ = writeln!(out, "        {variant}: {{");
+                    for c in table.columns.iter().filter(|c| !c.generated) {
+                        let optional = all_optional || c.nullable || c.has_default;
+                        let null = if c.nullable { " | null" } else { "" };
+                        let _ = writeln!(
+                            out,
+                            "          {}{}: {}{null};",
+                            key(&c.name),
+                            if optional { "?" } else { "" },
+                            ts_column(c)
+                        );
+                    }
+                    out.push_str("        };\n");
+                }
+            }
+            out.push_str("      };\n");
+        }
+        out.push_str("    };\n");
+    }
+
+    out.push_str("    Functions: {\n");
+    for (name, overloads) in &catalog.functions {
+        // Sobrecargas viram uma união de assinaturas.
+        let signatures: Vec<String> = overloads
+            .iter()
+            .map(|f| {
+                let args = f
+                    .args
+                    .iter()
+                    .map(|a| {
+                        format!(
+                            "{}{}: {}",
+                            key(&a.name),
+                            if a.has_default { "?" } else { "" },
+                            ts_scalar(&a.type_name)
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join("; ");
+                let base = catalog
+                    .tables
+                    .get(
+                        f.return_type
+                            .trim_start_matches(&format!("{}.", catalog.schema)),
+                    )
+                    .map(|t| format!("Database[{schema:?}][\"Tables\"][{:?}][\"Row\"]", t.name))
+                    .unwrap_or_else(|| ts_scalar(&f.return_type));
+                let returns = if f.returns_set {
+                    format!("{base}[]")
+                } else {
+                    base
+                };
+                format!("{{ Args: {{ {args} }}; Returns: {returns} }}")
+            })
+            .collect();
+        let _ = writeln!(out, "      {}: {};", key(name), signatures.join(" | "));
+    }
+    out.push_str("    };\n");
+
+    out.push_str("    Enums: {\n");
+    let mut enums: Vec<(String, &Vec<String>)> = Vec::new();
+    for table in catalog.tables.values() {
+        for c in table.columns.iter().filter(|c| !c.enum_values.is_empty()) {
+            let name = c
+                .type_name
+                .trim_end_matches("[]")
+                .rsplit('.')
+                .next()
+                .unwrap_or_default()
+                .trim_matches('"')
+                .to_owned();
+            if !enums.iter().any(|(n, _)| n == &name) {
+                enums.push((name, &c.enum_values));
+            }
+        }
+    }
+    for (name, values) in enums {
+        let union = values
+            .iter()
+            .map(|v| serde_json::to_string(v).unwrap_or_default())
+            .collect::<Vec<_>>()
+            .join(" | ");
+        let _ = writeln!(out, "      {}: {union};", key(&name));
+    }
+    out.push_str("    };\n  };\n}\n");
+    out
+}

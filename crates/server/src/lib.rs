@@ -12,9 +12,12 @@ use axum::{
     routing::get,
 };
 use deadpool_postgres::Pool;
+use nelcota_api::{ApiSettings, Catalog, CatalogHandle};
 use nelcota_auth::{AuthState, SharedVerifier};
 use serde_json::json;
+use std::sync::Arc;
 use tower_http::{
+    compression::CompressionLayer,
     cors::{Any, CorsLayer},
     timeout::TimeoutLayer,
     trace::TraceLayer,
@@ -24,6 +27,21 @@ use tower_http::{
 pub struct AppState {
     pub pool: Pool,
     pub verifier: SharedVerifier,
+    pub catalog: Arc<CatalogHandle>,
+    pub api: Arc<ApiSettings>,
+}
+
+/// Faz a primeira introspecção do schema exposto.
+pub async fn load_catalog(pool: &Pool, schema: &str) -> anyhow::Result<Arc<CatalogHandle>> {
+    let client = pool.get().await?;
+    let catalog = Catalog::load(&**client, schema).await?;
+    tracing::info!(
+        schema,
+        tabelas = catalog.tables.len(),
+        funcoes = catalog.functions.len(),
+        "catálogo carregado"
+    );
+    Ok(Arc::new(CatalogHandle::new(catalog)))
 }
 
 pub fn app(state: AppState, auth: AuthState, request_timeout: Duration) -> Router {
@@ -54,6 +72,7 @@ pub fn app(state: AppState, auth: AuthState, request_timeout: Duration) -> Route
             request_timeout,
         ))
         .layer(cors)
+        .layer(CompressionLayer::new())
         // O span padrão registra método e URI, nunca headers (Authorization).
         .layer(TraceLayer::new_for_http())
 }

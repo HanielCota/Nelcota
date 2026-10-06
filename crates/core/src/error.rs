@@ -76,15 +76,24 @@ impl ApiError {
             tracing::error!(error = %err, "falha de comunicação com o Postgres");
             return Self::unavailable();
         };
+        let code = db.code().code();
         let status = match *db.code() {
             SqlState::INSUFFICIENT_PRIVILEGE if role == Role::Anon => StatusCode::UNAUTHORIZED,
             SqlState::INSUFFICIENT_PRIVILEGE => StatusCode::FORBIDDEN,
-            SqlState::UNDEFINED_TABLE | SqlState::UNDEFINED_FUNCTION => StatusCode::NOT_FOUND,
-            SqlState::UNIQUE_VIOLATION | SqlState::FOREIGN_KEY_VIOLATION => StatusCode::CONFLICT,
-            SqlState::NOT_NULL_VIOLATION
-            | SqlState::CHECK_VIOLATION
-            | SqlState::INVALID_TEXT_REPRESENTATION => StatusCode::BAD_REQUEST,
+            SqlState::UNDEFINED_TABLE => StatusCode::NOT_FOUND,
+            SqlState::UNIQUE_VIOLATION
+            | SqlState::FOREIGN_KEY_VIOLATION
+            | SqlState::EXCLUSION_VIOLATION => StatusCode::CONFLICT,
             SqlState::QUERY_CANCELED => StatusCode::GATEWAY_TIMEOUT,
+            // Tipo/operador incompatível, coluna gerada, RAISE EXCEPTION em
+            // função do usuário: erro do cliente, não do servidor.
+            SqlState::UNDEFINED_FUNCTION
+            | SqlState::UNDEFINED_COLUMN
+            | SqlState::DATATYPE_MISMATCH
+            | SqlState::GENERATED_ALWAYS
+            | SqlState::RAISE_EXCEPTION => StatusCode::BAD_REQUEST,
+            // Classe 22 (dados inválidos) e 23 (integridade): 400.
+            _ if code.starts_with("22") || code.starts_with("23") => StatusCode::BAD_REQUEST,
             _ => {
                 tracing::error!(code = db.code().code(), error = %db, "erro inesperado do Postgres");
                 return Self::internal();
