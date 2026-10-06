@@ -14,13 +14,17 @@
   import ArrowDown from '@lucide/svelte/icons/arrow-down'
   import ChevronLeft from '@lucide/svelte/icons/chevron-left'
   import ChevronRight from '@lucide/svelte/icons/chevron-right'
+  import Funnel from '@lucide/svelte/icons/funnel'
+  import X from '@lucide/svelte/icons/x'
   import { toast } from 'svelte-sonner'
   import RlsBadge from '$lib/components/app/RlsBadge.svelte'
   import RlsDot from '$lib/components/app/RlsDot.svelte'
   import RowSheet from '$lib/components/app/RowSheet.svelte'
   import ConfirmDialog from '$lib/components/app/ConfirmDialog.svelte'
-  import { api, enc } from '$lib/api'
-  import { href } from '$lib/router.svelte'
+  import FilterBar from '$lib/components/app/FilterBar.svelte'
+  import { api, enc, isAbort } from '$lib/api'
+  import { describe, filtersParam, filtersToSearch, parseFilters, type TableFilter } from '$lib/filters'
+  import { href, navigate, route } from '$lib/router.svelte'
   import type { Column, RowData, TableData, TableSummary } from '$lib/types'
 
   let { name }: { name?: string } = $props()
@@ -38,6 +42,12 @@
   let sheetOpen = $state(false)
   let sheetRow = $state<RowData | null>(null)
   let confirmOpen = $state(false)
+  let filterOpen = $state(false)
+
+  // Filtros vêm da URL (`?preco=gte.10`): links compartilháveis e o voltar do
+  // navegador funcionam. A chave em texto evita recarregar sem mudança real.
+  const filters = $derived(parseFilters(route.query))
+  const filtersKey = $derived(filtersToSearch(filters))
 
   // Edição inline: célula (linha, coluna) em edição e o rascunho.
   let editing = $state<{ row: number; column: string } | null>(null)
@@ -58,31 +68,56 @@
     }
   })
 
+  /** Ordem e filtros atuais, no formato da API (listagem e exportação). */
+  function rowsParams(): URLSearchParams {
+    const params = new URLSearchParams()
+    if (sort) {
+      params.set('sort', sort.column)
+      if (sort.desc) params.set('desc', 'true')
+    }
+    const f = filtersParam(filters)
+    if (f) params.set('filters', f)
+    return params
+  }
+
+  let inflight: AbortController | undefined
+
   async function load() {
     if (!name) return
+    // Só a resposta mais recente vale: a anterior é cancelada.
+    inflight?.abort()
+    const controller = (inflight = new AbortController())
     loading = true
     error = ''
     try {
-      const params = new URLSearchParams({ page: String(page), size })
-      if (sort) {
-        params.set('sort', sort.column)
-        if (sort.desc) params.set('desc', 'true')
-      }
-      data = await api.get<TableData>(`/tables/${enc(name)}?${params}`)
+      const params = rowsParams()
+      params.set('page', String(page))
+      params.set('size', size)
+      data = await api.get<TableData>(`/tables/${enc(name)}?${params}`, { signal: controller.signal })
       selected = new Set()
     } catch (e) {
+      if (isAbort(e)) return
       error = (e as Error).message
       data = null
     } finally {
-      loading = false
+      if (inflight === controller) loading = false
     }
   }
 
-  // Recarrega ao trocar de tabela, página, tamanho ou ordenação.
+  // Recarrega ao trocar de tabela, página, tamanho, ordenação ou filtros.
   $effect(() => {
-    void [name, page, size, sort]
+    void [name, page, size, sort, filtersKey]
     load()
+    return () => inflight?.abort()
   })
+
+  function setFilters(next: TableFilter[]) {
+    filterOpen = false
+    page = 0
+    const search = filtersToSearch(next)
+    navigate(`/tables/${enc(name!)}${search ? `?${search}` : ''}`)
+  }
+
 
   function toggleSort(column: string) {
     sort = sort?.column === column ? (sort.desc ? null : { column, desc: true }) : { column, desc: false }
@@ -212,6 +247,16 @@
               <Trash2 />Apagar {selected.size}
             </Button>
           {/if}
+          <Button
+            variant={filterOpen || filters.length ? 'secondary' : 'ghost'}
+            size="sm"
+            onclick={() => (filterOpen = !filterOpen)}
+            aria-expanded={filterOpen}
+          >
+            <Funnel />Filtrar{#if filters.length}<span
+                class="rounded-full bg-brand/15 px-1.5 text-[10px] text-brand tabular-nums">{filters.length}</span
+              >{/if}
+          </Button>
           <Button variant="ghost" size="icon-sm" onclick={load} aria-label="Recarregar" title="Recarregar">
             <RefreshCw class={loading ? 'animate-spin' : ''} />
           </Button>
@@ -220,6 +265,26 @@
           {/if}
         </div>
       </div>
+
+      {#if filterOpen && data}
+        <FilterBar columns={data.table.columns} {filters} onapply={setFilters} onclose={() => (filterOpen = false)} />
+      {:else if filters.length}
+        <div class="flex shrink-0 flex-wrap items-center gap-1.5 border-b px-4 py-2">
+          {#each filters as filter, i (i)}
+            <span
+              class="inline-flex h-6 items-center gap-1 rounded-md border border-border-strong bg-muted pr-0.5 pl-2 font-mono text-[11px]"
+            >
+              {describe(filter)}
+              <button
+                class="grid size-5 place-items-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+                aria-label="Remover filtro"
+                onclick={() => setFilters(filters.filter((_, j) => j !== i))}><X class="size-3" /></button
+              >
+            </span>
+          {/each}
+          <Button variant="ghost" size="xs" class="text-muted-foreground" onclick={() => setFilters([])}>Limpar</Button>
+        </div>
+      {/if}
 
       {#if data?.table.exposed_without_rls}
         <p class="border-b border-destructive/30 bg-destructive/5 px-4 py-2 text-xs text-destructive">
@@ -337,7 +402,9 @@
             </tbody>
           </table>
           {#if data.rows.length === 0}
-            <p class="py-12 text-center text-sm text-muted-foreground">Nenhuma linha.</p>
+            <p class="py-12 text-center text-sm text-muted-foreground">
+              {filters.length ? 'Nenhuma linha para esses filtros.' : 'Nenhuma linha.'}
+            </p>
           {/if}
         {/if}
       </div>
