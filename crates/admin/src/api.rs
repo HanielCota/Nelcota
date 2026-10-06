@@ -7,6 +7,7 @@ use axum::{
     Json,
     extract::{Path, Query, State},
 };
+use futures_util::future::{join_all, try_join, try_join3};
 use nelcota_api::{
     Catalog,
     catalog::{Table, TableKind},
@@ -14,6 +15,7 @@ use nelcota_api::{
 };
 use serde::Deserialize;
 use serde_json::{Map, Value, json, value::RawValue};
+use tokio_postgres::Client;
 
 use crate::{AdminState, ApiError};
 
@@ -44,11 +46,7 @@ fn table_or_404(state: &AdminState, name: &str) -> Result<Table, ApiError> {
         .ok_or_else(|| ApiError::not_found(format!("tabela '{name}' não existe no schema exposto")))
 }
 
-async fn policy_counts(
-    state: &AdminState,
-    schema: &str,
-) -> Result<HashMap<String, usize>, ApiError> {
-    let client = state.db.get().await?;
+async fn policy_counts(client: &Client, schema: &str) -> Result<HashMap<String, usize>, ApiError> {
     let rows = client
         .query(
             "SELECT tablename::text, count(*) FROM pg_policies WHERE schemaname = $1 GROUP BY 1",
@@ -118,7 +116,7 @@ fn exposed(catalog: &Catalog) -> Vec<&str> {
 /// Contagem exata para tabelas pequenas (ou nunca analisadas); estimativa do
 /// planejador nas grandes, para não custar um seq scan.
 async fn row_count(
-    client: &deadpool_postgres::Object,
+    client: &Client,
     schema: &str,
     table: &Table,
     estimate: i64,
@@ -136,8 +134,7 @@ async fn row_count(
     ((estimate >= 0).then_some(estimate), false)
 }
 
-async fn estimates(state: &AdminState, schema: &str) -> Result<HashMap<String, i64>, ApiError> {
-    let client = state.db.get().await?;
+async fn estimates(client: &Client, schema: &str) -> Result<HashMap<String, i64>, ApiError> {
     Ok(client
         .query(
             "SELECT c.relname::text, c.reltuples::int8 FROM pg_class c
@@ -152,18 +149,30 @@ async fn estimates(state: &AdminState, schema: &str) -> Result<HashMap<String, i
 
 pub async fn overview(State(state): State<AdminState>) -> ApiResult {
     let catalog = state.catalog.get();
-    let policies = policy_counts(&state, &catalog.schema).await?;
-    let estimates = estimates(&state, &catalog.schema).await?;
+    // Uma conexão só, com as consultas independentes em pipeline nela.
     let client = state.db.get().await?;
-    let users: i64 = client
-        .query_one("SELECT count(*) FROM auth.users", &[])
-        .await?
-        .get(0);
+    let (policies, estimates, users) = try_join3(
+        policy_counts(&client, &catalog.schema),
+        estimates(&client, &catalog.schema),
+        async {
+            Ok::<_, ApiError>(
+                client
+                    .query_one("SELECT count(*) FROM auth.users", &[])
+                    .await?,
+            )
+        },
+    )
+    .await?;
+    let users: i64 = users.get(0);
+
+    let counts = join_all(catalog.tables.values().map(|table| {
+        let estimate = estimates.get(&table.name).copied().unwrap_or(-1);
+        row_count(&client, &catalog.schema, table, estimate)
+    }))
+    .await;
 
     let mut tables = Vec::new();
-    for table in catalog.tables.values() {
-        let estimate = estimates.get(&table.name).copied().unwrap_or(-1);
-        let (rows, exact) = row_count(&client, &catalog.schema, table, estimate).await;
+    for (table, (rows, exact)) in catalog.tables.values().zip(counts) {
         tables.push(json!({
             "name": table.name,
             "kind": kind(table),
@@ -189,7 +198,8 @@ pub async fn overview(State(state): State<AdminState>) -> ApiResult {
 
 pub async fn tables(State(state): State<AdminState>) -> ApiResult {
     let catalog = state.catalog.get();
-    let policies = policy_counts(&state, &catalog.schema).await?;
+    let client = state.db.get().await?;
+    let policies = policy_counts(&client, &catalog.schema).await?;
     let list: Vec<Value> = catalog
         .tables
         .values()
@@ -288,13 +298,14 @@ pub async fn table(
         })
         .collect();
 
-    let estimate = estimates(&state, &catalog.schema)
-        .await?
-        .get(&table.name)
-        .copied()
-        .unwrap_or(-1);
+    // Estimativas e policies em pipeline na mesma conexão das linhas.
+    let (estimates, policies) = try_join(
+        estimates(&client, &catalog.schema),
+        policy_counts(&client, &catalog.schema),
+    )
+    .await?;
+    let estimate = estimates.get(&table.name).copied().unwrap_or(-1);
     let (total, exact) = row_count(&client, &catalog.schema, &table, estimate).await;
-    let policies = policy_counts(&state, &catalog.schema).await?;
     let columns: Vec<Value> = table
         .columns
         .iter()
