@@ -1,4 +1,4 @@
-//! Operação da instalação: up/down/status/logs, backup/restore e upgrade com
+//! Operação dos projetos: up/down/status/logs, backup/restore e upgrade com
 //! rollback automático.
 
 use std::{
@@ -11,52 +11,67 @@ use std::{
 use anyhow::{Context, bail};
 
 use crate::{
+    caddy,
+    host::{Host, Manifest},
     project::Project,
     util::{self, ok, step, warn},
 };
 
 const HEALTH_TIMEOUT: Duration = Duration::from_secs(120);
 
-pub fn up(project: &Project) -> anyhow::Result<()> {
-    project.require()?;
-    step("Subindo postgres, app e caddy");
-    project.compose_ok(&["up", "-d"])?;
-    project.wait_healthy("app", HEALTH_TIMEOUT)?;
-    ok("app saudável");
-    let domain = project
-        .env_value("NELCOTA_DOMAIN")?
-        .unwrap_or_else(|| "localhost".into());
+/// Sobe os projetos (cada um até o healthcheck) e o Caddy.
+pub fn up(host: &Host, manifest: &Manifest, projects: &[Project]) -> anyhow::Result<()> {
+    caddy::ensure_network()?;
+    caddy::write(host, manifest)?;
+    for project in projects {
+        step(&format!("Subindo {}", project.name));
+        project.compose_ok(&["up", "-d"])?;
+        project.wait_healthy("app", HEALTH_TIMEOUT)?;
+        ok(&format!("{} saudável", project.name));
+    }
+    caddy::up(host)?;
     println!();
-    println!("No ar: https://{domain}/health");
+    for entry in manifest
+        .projects
+        .iter()
+        .filter(|e| projects.iter().any(|p| p.name == e.name))
+    {
+        println!("  {:<16} {}/health", entry.name, entry.url());
+    }
     Ok(())
 }
 
 pub fn down(project: &Project, volumes: bool) -> anyhow::Result<()> {
-    project.require()?;
     if volumes {
-        warn("--volumes: os dados do Postgres e os certificados serão APAGADOS");
+        warn(&format!(
+            "--volumes: os dados de {} serão APAGADOS",
+            project.name
+        ));
         project.compose_ok(&["down", "--volumes"])
     } else {
         project.compose_ok(&["down"])
     }
 }
 
-pub fn status(project: &Project) -> anyhow::Result<()> {
-    project.require()?;
-    project.compose_ok(&["ps"])?;
-    println!();
-    match project.in_app(&["healthcheck"]) {
-        Ok(()) => ok("API respondendo (/health 200)"),
-        Err(_) => warn("API não respondeu ao healthcheck"),
-    }
-    if let Some(version) = project.env_value("NELCOTA_VERSION")? {
-        println!("  versão do app: {version}");
+pub fn status(manifest: &Manifest, projects: &[Project]) -> anyhow::Result<()> {
+    println!("{:<16} {:<32} {:<10} VERSÃO", "PROJETO", "DOMÍNIO", "APP");
+    for project in projects {
+        let domain = manifest
+            .projects
+            .iter()
+            .find(|e| e.name == project.name)
+            .map_or("", |e| e.domain.as_str());
+        let health = project.health("app").unwrap_or_else(|| "parado".into());
+        let version = project.env().get("NELCOTA_VERSION")?.unwrap_or_default();
+        println!(
+            "{:<16} {:<32} {:<10} {}",
+            project.name, domain, health, version
+        );
     }
     Ok(())
 }
 
 pub fn logs(project: &Project, follow: bool, service: Option<&str>) -> anyhow::Result<()> {
-    project.require()?;
     let mut args = vec!["logs", "--tail", "200"];
     if follow {
         args.push("-f");
@@ -67,51 +82,46 @@ pub fn logs(project: &Project, follow: bool, service: Option<&str>) -> anyhow::R
     project.compose_ok(&args)
 }
 
-/// Senha nova para o admin do painel: grava só o hash no `.env` e recria o app.
-pub fn admin_password(project: &Project) -> anyhow::Result<()> {
-    project.require()?;
-    let password = util::secret(20);
-    let hash = nelcota_auth::hash_password(&password).context("falha ao gerar o hash")?;
-    project.set_env_value("NELCOTA_ADMIN_PASSWORD_HASH", &format!("'{hash}'"))?;
-    step("Reiniciando o app com a senha nova");
-    project.compose_ok(&["up", "-d", "--force-recreate", "app"])?;
-    project.wait_healthy("app", HEALTH_TIMEOUT)?;
-    println!();
-    println!("  Senha nova do painel: {password}");
-    println!("  (mostrada só agora; o .env guarda apenas o hash argon2id)");
+/// Recria os apps já criados (para aplicar mudanças no `.env`).
+pub fn recreate_apps(projects: &[Project]) -> anyhow::Result<()> {
+    for project in projects.iter().filter(|p| p.has_container("app")) {
+        step(&format!("Reiniciando o app de {}", project.name));
+        project.compose_ok(&["up", "-d", "--force-recreate", "app"])?;
+        project.wait_healthy("app", HEALTH_TIMEOUT)?;
+    }
     Ok(())
 }
 
 /// `pg_dump -Fc` dentro do container do Postgres, gravado em `backups/`.
-pub fn backup(project: &Project, upload: bool, keep: Option<usize>) -> anyhow::Result<PathBuf> {
-    project.require()?;
+pub fn backup(
+    host: &Host,
+    project: &Project,
+    upload: bool,
+    keep: Option<usize>,
+) -> anyhow::Result<PathBuf> {
     let dir = project.path("backups");
     fs::create_dir_all(&dir)?;
-    let name = format!("nelcota-{}.dump", util::timestamp());
+    let name = format!("nelcota-{}-{}.dump", project.name, util::timestamp());
     let path = dir.join(&name);
-    step(&format!("Gerando backup {name}"));
+    step(&format!("Backup de {}: {name}", project.name));
 
     let file = fs::File::create(&path)?;
-    let status = Command::new("docker")
-        .args(["compose", "--project-directory"])
-        .arg(&project.dir)
-        .arg("-f")
-        .arg(project.path("docker-compose.yml"))
-        .args([
+    let status = project.compose_piped(
+        &[
             "exec", "-T", "postgres", "pg_dump", "-U", "postgres", "-Fc", "postgres",
-        ])
-        .stdout(Stdio::from(file))
-        .status()
-        .context("falha ao executar pg_dump")?;
+        ],
+        Stdio::null(),
+        Stdio::from(file),
+    )?;
     let size = fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
     if !status.success() || size == 0 {
         let _ = fs::remove_file(&path);
-        bail!("pg_dump falhou ({status})");
+        bail!("[{}] pg_dump falhou ({status})", project.name);
     }
     ok(&format!("{} ({} KB)", path.display(), size / 1024));
 
     if upload {
-        upload_s3(project, &path, &name)?;
+        upload_s3(host, &project.name, &path, &name)?;
     }
     if let Some(keep) = keep {
         prune(&dir, keep)?;
@@ -119,23 +129,24 @@ pub fn backup(project: &Project, upload: bool, keep: Option<usize>) -> anyhow::R
     Ok(path)
 }
 
-/// Envia ao S3-compatible com a imagem oficial do aws-cli (nada a instalar).
-fn upload_s3(project: &Project, path: &Path, name: &str) -> anyhow::Result<()> {
+/// Envia ao S3-compatible (credenciais do `host.env`), em `<bucket>/<projeto>/`.
+fn upload_s3(host: &Host, project: &str, path: &Path, name: &str) -> anyhow::Result<()> {
+    let secrets = host.secrets();
     let get = |key: &str| -> anyhow::Result<String> {
-        project
-            .env_value(key)?
-            .with_context(|| format!("{key} não configurado no .env (veja docs/backup.md)"))
+        secrets
+            .get(key)?
+            .with_context(|| format!("{key} não configurado no host.env (veja docs/backup.md)"))
     };
     let endpoint = get("NELCOTA_BACKUP_S3_ENDPOINT")?;
     let bucket = get("NELCOTA_BACKUP_S3_BUCKET")?;
     let access_key = get("NELCOTA_BACKUP_S3_ACCESS_KEY")?;
     let secret_key = get("NELCOTA_BACKUP_S3_SECRET_KEY")?;
-    let region = project
-        .env_value("NELCOTA_BACKUP_S3_REGION")?
+    let region = secrets
+        .get("NELCOTA_BACKUP_S3_REGION")?
         .unwrap_or_else(|| "us-east-1".into());
     let dir = fs::canonicalize(path.parent().unwrap_or(Path::new(".")))?;
 
-    step(&format!("Enviando para s3://{bucket}/{name}"));
+    step(&format!("Enviando para s3://{bucket}/{project}/{name}"));
     let status = Command::new("docker")
         .args(["run", "--rm", "-v"])
         .arg(format!("{}:/backups:ro", dir.display()))
@@ -152,7 +163,7 @@ fn upload_s3(project: &Project, path: &Path, name: &str) -> anyhow::Result<()> {
         .env("AWS_DEFAULT_REGION", region)
         .args(["amazon/aws-cli", "s3", "cp"])
         .arg(format!("/backups/{name}"))
-        .arg(format!("s3://{bucket}/{name}"))
+        .arg(format!("s3://{bucket}/{project}/{name}"))
         .args(["--endpoint-url", &endpoint])
         .status()
         .context("falha ao executar o aws-cli")?;
@@ -166,11 +177,7 @@ fn upload_s3(project: &Project, path: &Path, name: &str) -> anyhow::Result<()> {
 fn prune(dir: &Path, keep: usize) -> anyhow::Result<()> {
     let mut dumps: Vec<PathBuf> = fs::read_dir(dir)?
         .filter_map(|e| e.ok().map(|e| e.path()))
-        .filter(|p| {
-            p.file_name()
-                .and_then(|n| n.to_str())
-                .is_some_and(|n| n.starts_with("nelcota-") && n.ends_with(".dump"))
-        })
+        .filter(|p| p.extension().is_some_and(|x| x == "dump"))
         .collect();
     dumps.sort();
     let excess = dumps.len().saturating_sub(keep);
@@ -184,21 +191,20 @@ fn prune(dir: &Path, keep: usize) -> anyhow::Result<()> {
 /// Restaura um dump: para o app, recria os objetos numa transação só e sobe
 /// o app de novo.
 pub fn restore(project: &Project, file: &Path, yes: bool) -> anyhow::Result<()> {
-    project.require()?;
     if !file.is_file() {
         bail!("arquivo não encontrado: {}", file.display());
     }
     if !yes
         && !(util::interactive()
             && util::confirm(&format!(
-                "Isso SUBSTITUI o banco atual pelo conteúdo de {}. Continuar?",
+                "Isso SUBSTITUI o banco de {} pelo conteúdo de {}. Continuar?",
+                project.name,
                 file.display()
             )))
     {
         bail!("restore cancelado (use --yes para não perguntar)");
     }
-
-    step("Parando o app");
+    step(&format!("Parando o app de {}", project.name));
     project.compose_ok(&["stop", "app"])?;
     step(&format!("Restaurando {}", file.display()));
     let result = restore_dump(project, file);
@@ -212,12 +218,8 @@ pub fn restore(project: &Project, file: &Path, yes: bool) -> anyhow::Result<()> 
 
 fn restore_dump(project: &Project, file: &Path) -> anyhow::Result<()> {
     let input = fs::File::open(file)?;
-    let status = Command::new("docker")
-        .args(["compose", "--project-directory"])
-        .arg(&project.dir)
-        .arg("-f")
-        .arg(project.path("docker-compose.yml"))
-        .args([
+    let status = project.compose_piped(
+        &[
             "exec",
             "-T",
             "postgres",
@@ -230,10 +232,10 @@ fn restore_dump(project: &Project, file: &Path) -> anyhow::Result<()> {
             "--if-exists",
             "--single-transaction",
             "--exit-on-error",
-        ])
-        .stdin(Stdio::from(input))
-        .status()
-        .context("falha ao executar pg_restore")?;
+        ],
+        Stdio::from(input),
+        Stdio::inherit(),
+    )?;
     if !status.success() {
         bail!("pg_restore falhou ({status}); o banco não foi alterado (transação única)");
     }
@@ -243,24 +245,24 @@ fn restore_dump(project: &Project, file: &Path) -> anyhow::Result<()> {
 
 /// Backup → nova imagem → healthcheck. Se falhar: volta a imagem anterior e
 /// restaura o backup (a versão nova pode ter aplicado migrações).
-pub fn upgrade(project: &Project, version: Option<String>) -> anyhow::Result<()> {
-    project.require()?;
-    let current = project
-        .env_value("NELCOTA_VERSION")?
+pub fn upgrade(host: &Host, project: &Project, version: Option<&str>) -> anyhow::Result<()> {
+    let env = project.env();
+    let current = env
+        .get("NELCOTA_VERSION")?
         .context("NELCOTA_VERSION ausente no .env")?;
-    let target = version.unwrap_or_else(|| env!("CARGO_PKG_VERSION").to_owned());
-    println!("Atualizando o app: {current} → {target}");
+    let target = version.map_or_else(|| env!("CARGO_PKG_VERSION").to_owned(), str::to_owned);
+    println!("Atualizando {}: {current} → {target}", project.name);
 
-    let dump =
-        backup(project, false, None).context("backup pré-upgrade falhou; nada foi alterado")?;
+    let dump = backup(host, project, false, None)
+        .context("backup pré-upgrade falhou; nada foi alterado")?;
 
-    project.set_env_value("NELCOTA_VERSION", &target)?;
+    env.set("NELCOTA_VERSION", &target)?;
     step("Baixando a imagem nova");
-    let pulled = project
+    if !project
         .compose(&["pull", "app"])
         .map(|s| s.success())
-        .unwrap_or(false);
-    if !pulled {
+        .unwrap_or(false)
+    {
         warn("não foi possível baixar a imagem (seguindo com a imagem local, se existir)");
     }
     step("Reiniciando o app na versão nova");
@@ -270,14 +272,14 @@ pub fn upgrade(project: &Project, version: Option<String>) -> anyhow::Result<()>
 
     match healthy {
         Ok(()) => {
-            ok(&format!("app saudável na versão {target}"));
+            ok(&format!("{} saudável na versão {target}", project.name));
             println!("Backup pré-upgrade: {}", dump.display());
             Ok(())
         }
         Err(err) => {
             warn(&format!("a versão {target} não ficou saudável: {err}"));
             step(&format!("Rollback para {current}"));
-            project.set_env_value("NELCOTA_VERSION", &current)?;
+            env.set("NELCOTA_VERSION", &current)?;
             project.compose_ok(&["stop", "app"])?;
             restore_dump(project, &dump)?;
             project.compose_ok(&["up", "-d", "app"])?;
@@ -285,7 +287,10 @@ pub fn upgrade(project: &Project, version: Option<String>) -> anyhow::Result<()>
             ok(&format!(
                 "rollback concluído: versão {current}, banco restaurado"
             ));
-            bail!("upgrade para {target} falhou e foi revertido")
+            bail!(
+                "upgrade de {} para {target} falhou e foi revertido",
+                project.name
+            )
         }
     }
 }

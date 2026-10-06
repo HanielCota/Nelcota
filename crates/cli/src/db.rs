@@ -1,7 +1,7 @@
 //! Comandos que falam com o banco: migrate, types e token.
 //!
 //! Rodam direto quando há configuração no ambiente (container, dev); num
-//! projeto do `nelcota init`, são repassados ao container `app`.
+//! host do `nelcota init`, são repassados ao container `app` do projeto.
 
 use std::{fs, path::Path};
 
@@ -14,6 +14,7 @@ use tokio_postgres::NoTls;
 
 use crate::{
     dev,
+    host::Host,
     project::Project,
     util::{ok, step},
 };
@@ -23,17 +24,18 @@ pub const USER_MIGRATIONS_TABLE: &str = "nelcota.user_migrations";
 
 enum Target {
     Direct(Box<Config>),
-    Container,
+    Container(Project),
 }
 
-fn target(project: &Project) -> anyhow::Result<Target> {
+fn target(host: &Host, selection: Option<&str>) -> anyhow::Result<Target> {
     if std::env::var_os("NELCOTA_DATABASE_URL").is_some() {
         return Ok(Target::Direct(Box::new(Config::load()?)));
     }
-    if project.exists() {
-        return Ok(Target::Container);
+    if host.exists() {
+        let manifest = host.manifest()?;
+        return Ok(Target::Container(host.select(&manifest, selection)?));
     }
-    if let Some(config) = dev::saved_config(project)? {
+    if let Some(config) = dev::saved_config(host.root())? {
         return Ok(Target::Direct(Box::new(config)));
     }
     bail!(
@@ -84,9 +86,9 @@ fn load_migrations(dir: &Path) -> anyhow::Result<Vec<Migration>> {
     Ok(migrations)
 }
 
-pub fn migrate(project: &Project, dir: &Path) -> anyhow::Result<()> {
-    match target(project)? {
-        Target::Container => {
+pub fn migrate(host: &Host, selection: Option<&str>, dir: &Path) -> anyhow::Result<()> {
+    match target(host, selection)? {
+        Target::Container(project) => {
             // O compose monta ./migrations em /migrations (somente leitura).
             if dir != Path::new("migrations") {
                 bail!("num projeto do `nelcota init`, as migrações ficam em ./migrations");
@@ -124,9 +126,9 @@ pub fn migrate(project: &Project, dir: &Path) -> anyhow::Result<()> {
     }
 }
 
-pub fn types(project: &Project, out: Option<&Path>) -> anyhow::Result<()> {
-    let code = match target(project)? {
-        Target::Container => project.in_app_output(&["types"])?,
+pub fn types(host: &Host, selection: Option<&str>, out: Option<&Path>) -> anyhow::Result<()> {
+    let code = match target(host, selection)? {
+        Target::Container(project) => project.in_app_output(&["types"])?,
         Target::Direct(config) => runtime()?.block_on(async {
             let client = connect(&config).await?;
             let catalog = nelcota_api::Catalog::load(&client, &config.db_schema).await?;
@@ -143,9 +145,9 @@ pub fn types(project: &Project, out: Option<&Path>) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn service_role_token(project: &Project, days: u64) -> anyhow::Result<()> {
-    match target(project)? {
-        Target::Container => {
+pub fn service_role_token(host: &Host, selection: Option<&str>, days: u64) -> anyhow::Result<()> {
+    match target(host, selection)? {
+        Target::Container(project) => {
             let token =
                 project.in_app_output(&["token", "service-role", "--days", &days.to_string()])?;
             print!("{token}");

@@ -13,9 +13,11 @@ use nelcota_core::{Config, Secret, config::LogFormat};
 use serde_json::json;
 use tokio_postgres::NoTls;
 
+use std::path::Path;
+
 use crate::{
     DevArgs, Outcome,
-    project::{Project, parse_env, write_private},
+    envfile::{parse, write_private},
     util::{self, ok, step},
 };
 
@@ -28,11 +30,11 @@ struct DevState {
     db_port: u16,
 }
 
-fn load_state(project: &Project) -> anyhow::Result<Option<DevState>> {
-    let Ok(text) = fs::read_to_string(project.path(STATE_FILE)) else {
+fn load_state(root: &Path) -> anyhow::Result<Option<DevState>> {
+    let Ok(text) = fs::read_to_string(root.join(STATE_FILE)) else {
         return Ok(None);
     };
-    let env = parse_env(&text);
+    let env = parse(&text);
     let get = |key: &str| {
         env.iter()
             .find(|(k, _)| k == key)
@@ -63,12 +65,12 @@ fn config_for(state: &DevState, listen: std::net::SocketAddr) -> Config {
 }
 
 /// Configuração do ambiente de dev já criado (para `migrate`/`types`).
-pub fn saved_config(project: &Project) -> anyhow::Result<Option<Config>> {
-    Ok(load_state(project)?.map(|s| config_for(&s, ([127, 0, 0, 1], 8000).into())))
+pub fn saved_config(root: &Path) -> anyhow::Result<Option<Config>> {
+    Ok(load_state(root)?.map(|s| config_for(&s, ([127, 0, 0, 1], 8000).into())))
 }
 
-pub fn run(project: &Project, args: DevArgs) -> anyhow::Result<Outcome> {
-    let state = match load_state(project)? {
+pub fn run(root: &Path, args: DevArgs) -> anyhow::Result<Outcome> {
+    let state = match load_state(root)? {
         Some(state) => state,
         None => {
             let state = DevState {
@@ -77,9 +79,9 @@ pub fn run(project: &Project, args: DevArgs) -> anyhow::Result<Outcome> {
                 jwt_private_key: nelcota_auth::generate_ed25519_private_key(),
                 db_port: args.db_port,
             };
-            fs::create_dir_all(project.path(".nelcota"))?;
+            fs::create_dir_all(root.join(".nelcota"))?;
             write_private(
-                &project.path(STATE_FILE),
+                &root.join(STATE_FILE),
                 &format!(
                     "# Segredos do ambiente de desenvolvimento (não use em produção).\n\
                      POSTGRES_PASSWORD={}\nAUTHENTICATOR_PASSWORD={}\nJWT_PRIVATE_KEY={}\nDB_PORT={}\n",
@@ -89,7 +91,7 @@ pub fn run(project: &Project, args: DevArgs) -> anyhow::Result<Outcome> {
                     state.db_port
                 ),
             )?;
-            fs::write(project.path(".nelcota/.gitignore"), "*\n")?;
+            fs::write(root.join(".nelcota/.gitignore"), "*\n")?;
             state
         }
     };

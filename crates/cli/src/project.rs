@@ -1,7 +1,7 @@
-//! Projeto de instalação: diretório com `docker-compose.yml` e `.env`.
+//! Um projeto do host: pasta com `docker-compose.yml` e `.env`, e as
+//! operações de `docker compose` sobre ele.
 
 use std::{
-    fs,
     path::{Path, PathBuf},
     process::{Command, ExitStatus, Stdio},
     time::{Duration, Instant},
@@ -9,13 +9,17 @@ use std::{
 
 use anyhow::{Context, bail};
 
+use crate::envfile::EnvFile;
+
 pub struct Project {
+    pub name: String,
     pub dir: PathBuf,
 }
 
 impl Project {
-    pub fn new(dir: &Path) -> Self {
+    pub fn new(name: &str, dir: &Path) -> Self {
         Project {
+            name: name.to_owned(),
             dir: dir.to_path_buf(),
         }
     }
@@ -24,29 +28,16 @@ impl Project {
         self.dir.join(name)
     }
 
+    pub fn env(&self) -> EnvFile {
+        EnvFile::new(self.path(".env"))
+    }
+
     pub fn exists(&self) -> bool {
         self.path("docker-compose.yml").is_file()
     }
 
-    pub fn require(&self) -> anyhow::Result<()> {
-        if !self.exists() {
-            bail!(
-                "nenhum projeto em {} (docker-compose.yml não encontrado). Rode `nelcota init` antes, ou use -C <dir>.",
-                self.dir.display()
-            );
-        }
-        Ok(())
-    }
-
     fn compose_command(&self) -> Command {
-        let mut command = Command::new("docker");
-        command
-            .arg("compose")
-            .arg("--project-directory")
-            .arg(&self.dir)
-            .arg("-f")
-            .arg(self.path("docker-compose.yml"));
-        command
+        compose_command(&self.dir)
     }
 
     /// `docker compose <args>` com a saída no terminal.
@@ -60,7 +51,11 @@ impl Project {
     pub fn compose_ok(&self, args: &[&str]) -> anyhow::Result<()> {
         let status = self.compose(args)?;
         if !status.success() {
-            bail!("`docker compose {}` falhou ({status})", args.join(" "));
+            bail!(
+                "[{}] `docker compose {}` falhou ({status})",
+                self.name,
+                args.join(" ")
+            );
         }
         Ok(())
     }
@@ -75,12 +70,28 @@ impl Project {
             .context("não foi possível executar `docker compose`")?;
         if !output.status.success() {
             bail!(
-                "`docker compose {}` falhou ({})",
+                "[{}] `docker compose {}` falhou ({})",
+                self.name,
                 args.join(" "),
                 output.status
             );
         }
         Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+    }
+
+    /// `docker compose` com stdin/stdout ligados a arquivos (pg_dump/pg_restore).
+    pub fn compose_piped(
+        &self,
+        args: &[&str],
+        stdin: Stdio,
+        stdout: Stdio,
+    ) -> anyhow::Result<ExitStatus> {
+        self.compose_command()
+            .args(args)
+            .stdin(stdin)
+            .stdout(stdout)
+            .status()
+            .context("não foi possível executar `docker compose`")
     }
 
     /// Roda `nelcota <args>` dentro do container `app`.
@@ -96,118 +107,56 @@ impl Project {
         self.compose_output(&full)
     }
 
+    /// O container do serviço existe (criado, rodando ou parado)?
+    pub fn has_container(&self, service: &str) -> bool {
+        self.compose_output(&["ps", "-a", "-q", service])
+            .map(|out| !out.trim().is_empty())
+            .unwrap_or(false)
+    }
+
+    /// Estado do healthcheck do serviço (`healthy`, `starting`, ...), se rodando.
+    pub fn health(&self, service: &str) -> Option<String> {
+        let id = self.compose_output(&["ps", "-q", service]).ok()?;
+        let id = id.trim();
+        if id.is_empty() {
+            return None;
+        }
+        let output = Command::new("docker")
+            .args(["inspect", "--format", "{{.State.Health.Status}}", id])
+            .output()
+            .ok()?;
+        Some(String::from_utf8_lossy(&output.stdout).trim().to_owned())
+    }
+
     /// Espera o healthcheck do serviço ficar `healthy`.
     pub fn wait_healthy(&self, service: &str, timeout: Duration) -> anyhow::Result<()> {
         let deadline = Instant::now() + timeout;
         loop {
-            let id = self.compose_output(&["ps", "-q", service])?;
-            let id = id.trim();
-            if !id.is_empty() {
-                let output = Command::new("docker")
-                    .args(["inspect", "--format", "{{.State.Health.Status}}", id])
-                    .output()?;
-                let health = String::from_utf8_lossy(&output.stdout).trim().to_owned();
-                if health == "healthy" {
-                    return Ok(());
-                }
-                if health == "unhealthy" {
-                    bail!("o serviço {service} ficou unhealthy");
-                }
+            match self.health(service).as_deref() {
+                Some("healthy") => return Ok(()),
+                Some("unhealthy") => bail!("[{}] o serviço {service} ficou unhealthy", self.name),
+                _ => {}
             }
             if Instant::now() > deadline {
                 bail!(
-                    "o serviço {service} não ficou saudável em {}s",
+                    "[{}] o serviço {service} não ficou saudável em {}s",
+                    self.name,
                     timeout.as_secs()
                 );
             }
             std::thread::sleep(Duration::from_secs(1));
         }
     }
-
-    pub fn read_env(&self) -> anyhow::Result<Vec<(String, String)>> {
-        let path = self.path(".env");
-        let text = fs::read_to_string(&path)
-            .with_context(|| format!("não foi possível ler {}", path.display()))?;
-        Ok(parse_env(&text))
-    }
-
-    pub fn env_value(&self, key: &str) -> anyhow::Result<Option<String>> {
-        Ok(self
-            .read_env()?
-            .into_iter()
-            .find(|(k, _)| k == key)
-            .map(|(_, v)| v)
-            .filter(|v| !v.is_empty()))
-    }
-
-    /// Troca (ou acrescenta) uma variável do `.env`, preservando o resto.
-    pub fn set_env_value(&self, key: &str, value: &str) -> anyhow::Result<()> {
-        let path = self.path(".env");
-        let text = fs::read_to_string(&path)?;
-        let mut found = false;
-        let mut lines: Vec<String> = text
-            .lines()
-            .map(|line| {
-                if line.split_once('=').is_some_and(|(k, _)| k.trim() == key) {
-                    found = true;
-                    format!("{key}={value}")
-                } else {
-                    line.to_owned()
-                }
-            })
-            .collect();
-        if !found {
-            lines.push(format!("{key}={value}"));
-        }
-        write_private(&path, &(lines.join("\n") + "\n"))
-    }
 }
 
-/// `CHAVE=valor`, ignorando comentários; aspas simples/duplas são removidas.
-pub fn parse_env(text: &str) -> Vec<(String, String)> {
-    text.lines()
-        .map(str::trim)
-        .filter(|l| !l.is_empty() && !l.starts_with('#'))
-        .filter_map(|l| l.split_once('='))
-        .map(|(k, v)| {
-            let v = v.trim();
-            let v = v
-                .strip_prefix('\'')
-                .and_then(|v| v.strip_suffix('\''))
-                .or_else(|| v.strip_prefix('"').and_then(|v| v.strip_suffix('"')))
-                .unwrap_or(v);
-            (k.trim().to_owned(), v.to_owned())
-        })
-        .collect()
-}
-
-/// Grava um arquivo legível só pelo dono (0600 em Unix).
-pub fn write_private(path: &Path, content: &str) -> anyhow::Result<()> {
-    fs::write(path, content)
-        .with_context(|| format!("não foi possível gravar {}", path.display()))?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(path, fs::Permissions::from_mode(0o600))?;
-    }
-    Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn le_env_com_aspas_e_comentarios() {
-        let env = parse_env("# comentário\nA=1\nB='$argon2id$v=19$x'\nC=\"com espaço\"\n\nD=\n");
-        assert_eq!(
-            env,
-            vec![
-                ("A".into(), "1".into()),
-                ("B".into(), "$argon2id$v=19$x".into()),
-                ("C".into(), "com espaço".into()),
-                ("D".into(), String::new()),
-            ]
-        );
-    }
+/// `docker compose --project-directory <dir> -f <dir>/docker-compose.yml`.
+pub fn compose_command(dir: &Path) -> Command {
+    let mut command = Command::new("docker");
+    command
+        .arg("compose")
+        .arg("--project-directory")
+        .arg(dir)
+        .arg("-f")
+        .arg(dir.join("docker-compose.yml"));
+    command
 }

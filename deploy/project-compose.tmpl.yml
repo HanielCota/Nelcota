@@ -1,0 +1,60 @@
+# Projeto "{{PROJECT}}". Gerado por `nelcota init` em {{GENERATED_AT}}. Pode editar à vontade.
+# O Postgres fica na rede interna do projeto; o app também entra na rede
+# compartilhada com o Caddy (nelcota_edge), onde atende como app-{{PROJECT}}.
+name: nelcota-{{PROJECT}}
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    # Perfil: {{PROFILE}} (deploy/postgres/profiles/{{PROFILE}}.conf)
+    command:
+      - postgres
+{{POSTGRES_ARGS}}
+    shm_size: 256mb
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [interno]
+
+  app:
+    image: ${NELCOTA_IMAGE}:${NELCOTA_VERSION}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NELCOTA_LISTEN: 0.0.0.0:8000
+      NELCOTA_TRUST_PROXY: "true"
+      NELCOTA_PROJECT_NAME: {{PROJECT}}
+      NELCOTA_HOST_REGISTRY: /etc/nelcota/shared/projects.json
+    volumes:
+      - ./migrations:/migrations:ro
+      - ../../shared:/etc/nelcota/shared:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/nelcota", "healthcheck"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    networks:
+      interno: {}
+      edge:
+        aliases: [app-{{PROJECT}}]
+
+networks:
+  interno:
+    internal: true
+  edge:
+    name: nelcota_edge
+    external: true
+
+volumes:
+  pgdata:

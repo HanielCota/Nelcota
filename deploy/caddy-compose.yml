@@ -1,0 +1,27 @@
+# Caddy compartilhado pelos projetos do host: HTTPS automático e roteamento por
+# domínio. Gerado por `nelcota init`. O Caddyfile (config/) é regenerado a cada
+# `nelcota init`/`remove`: não edite à mão.
+name: nelcota-edge
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./config:/etc/caddy:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [edge]
+
+networks:
+  edge:
+    name: nelcota_edge
+    external: true
+
+volumes:
+  caddy_data:
+  caddy_config:
