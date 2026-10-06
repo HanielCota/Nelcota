@@ -961,3 +961,202 @@ async fn estrutura_da_tabela_lida_do_catalogo_do_postgres() {
     let missing = get(&app, "/admin/api/tables/nao_existe/structure", &cookie).await;
     assert_eq!(missing.status, StatusCode::NOT_FOUND);
 }
+
+fn columns_of(structure: &Value) -> Vec<String> {
+    structure["columns"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| c["name"].as_str().unwrap().to_owned())
+        .collect()
+}
+
+#[tokio::test]
+async fn criar_alterar_e_apagar_tabelas_pelo_painel() {
+    let app = TestApp::spawn().await;
+    let cookie = login(&app).await;
+    let notas = json!({
+        "name": "notas",
+        "comment": "Notas da equipe",
+        "columns": [
+            { "name": "id", "data_type": "bigint", "primary_key": true, "identity": true },
+            { "name": "texto", "data_type": "text", "nullable": false },
+            { "name": "produto_id", "data_type": "integer",
+              "references": { "table": "produtos", "column": "id", "on_delete": "cascade" } },
+            { "name": "criada_em", "data_type": "timestamptz", "nullable": false, "default": "now()" },
+        ],
+        "grants": [{ "role": "anon", "privileges": ["select"] }],
+    });
+
+    // Prévia: devolve o SQL e não cria nada.
+    let preview = send(
+        &app,
+        Method::POST,
+        "/admin/api/tables",
+        &cookie,
+        json!({ "table": notas, "preview": true }),
+    )
+    .await;
+    assert_eq!(preview.status, StatusCode::OK, "{}", preview.text);
+    assert!(
+        preview.body["sql"][0]
+            .as_str()
+            .unwrap()
+            .starts_with("CREATE TABLE \"public\".\"notas\"")
+    );
+    assert_eq!(
+        get(&app, "/admin/api/tables/notas", &cookie).await.status,
+        StatusCode::NOT_FOUND
+    );
+
+    let created = send(
+        &app,
+        Method::POST,
+        "/admin/api/tables",
+        &cookie,
+        json!({ "table": notas }),
+    )
+    .await;
+    assert_eq!(created.status, StatusCode::OK, "{}", created.text);
+    // O catálogo já recarregou: a tabela está no painel e na API REST, sem espera.
+    let structure = get(&app, "/admin/api/tables/notas/structure", &cookie)
+        .await
+        .body;
+    assert_eq!(structure["rls_enabled"], true);
+    assert_eq!(
+        structure["grants"][0],
+        json!({ "role": "anon", "privileges": ["select"] })
+    );
+    let rest = app
+        .raw(Method::GET, "/rest/v1/notas", &[], String::new())
+        .await;
+    assert_eq!(rest.status, StatusCode::OK, "{}", rest.text);
+    assert_eq!(
+        rest.body,
+        json!([]),
+        "RLS ligado e sem policies: anon não vê nada"
+    );
+
+    // Várias alterações numa transação.
+    let altered = send(&app, Method::PATCH, "/admin/api/tables/notas", &cookie, json!({ "actions": [
+        { "action": "add_column", "column": { "name": "votos", "data_type": "integer", "default": "0", "nullable": false } },
+        { "action": "rename_column", "from": "texto", "to": "conteudo" },
+        { "action": "set_type", "column": "conteudo", "data_type": "varchar(500)" },
+        { "action": "set_unique", "column": "conteudo", "unique": true },
+        { "action": "set_grants", "grant": { "role": "authenticated", "privileges": ["select", "insert"] } },
+    ] })).await;
+    assert_eq!(altered.status, StatusCode::OK, "{}", altered.text);
+    let structure = get(&app, "/admin/api/tables/notas/structure", &cookie)
+        .await
+        .body;
+    assert_eq!(
+        columns_of(&structure),
+        ["id", "conteudo", "produto_id", "criada_em", "votos"]
+    );
+    let conteudo = &structure["columns"][1];
+    assert_eq!(conteudo["data_type"], "character varying(500)");
+    assert!(conteudo["unique"].is_string());
+    assert_eq!(
+        structure["grants"][1]["privileges"],
+        json!(["select", "insert"])
+    );
+
+    // Atomicidade: a segunda ação falha (cast impossível) e a primeira não fica.
+    let failed = send(
+        &app,
+        Method::PATCH,
+        "/admin/api/tables/notas",
+        &cookie,
+        json!({ "actions": [
+        { "action": "add_column", "column": { "name": "rascunho", "data_type": "boolean" } },
+        { "action": "set_type", "column": "criada_em", "data_type": "integer" },
+    ] }),
+    )
+    .await;
+    assert_eq!(failed.status, StatusCode::BAD_REQUEST, "{}", failed.text);
+    let structure = get(&app, "/admin/api/tables/notas/structure", &cookie)
+        .await
+        .body;
+    assert!(!columns_of(&structure).contains(&"rascunho".to_owned()));
+
+    // Expressão com um segundo comando: o protocolo estendido recusa.
+    let injection = send(
+        &app,
+        Method::PATCH,
+        "/admin/api/tables/notas",
+        &cookie,
+        json!({ "actions": [
+        { "action": "add_column", "column": { "name": "x", "data_type": "text",
+          "default": "'a'); DROP TABLE public.produtos; --" } },
+    ] }),
+    )
+    .await;
+    assert_eq!(
+        injection.status,
+        StatusCode::BAD_REQUEST,
+        "{}",
+        injection.text
+    );
+    assert_eq!(
+        get(&app, "/admin/api/tables/produtos", &cookie)
+            .await
+            .status,
+        StatusCode::OK
+    );
+
+    // Validação antes do banco.
+    let bad_type = send(
+        &app,
+        Method::POST,
+        "/admin/api/tables",
+        &cookie,
+        json!({ "table": {
+        "name": "t", "columns": [{ "name": "a", "data_type": "money" }] } }),
+    )
+    .await;
+    assert_eq!(bad_type.status, StatusCode::BAD_REQUEST);
+    assert!(
+        bad_type.text.contains("tipo desconhecido"),
+        "{}",
+        bad_type.text
+    );
+
+    // produtos é referenciada por notas: sem CASCADE o Postgres recusa.
+    let blocked = app
+        .raw(
+            Method::DELETE,
+            "/admin/api/tables/produtos",
+            &[("cookie", cookie.as_str())],
+            String::new(),
+        )
+        .await;
+    assert_eq!(blocked.status, StatusCode::BAD_REQUEST, "{}", blocked.text);
+    let dropped = app
+        .raw(
+            Method::DELETE,
+            "/admin/api/tables/notas",
+            &[("cookie", cookie.as_str())],
+            String::new(),
+        )
+        .await;
+    assert_eq!(dropped.status, StatusCode::OK, "{}", dropped.text);
+    assert_eq!(
+        get(&app, "/admin/api/tables/notas", &cookie).await.status,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        app.raw(Method::GET, "/rest/v1/notas", &[], String::new())
+            .await
+            .status,
+        StatusCode::NOT_FOUND
+    );
+
+    let types = get(&app, "/admin/api/types", &cookie).await.body;
+    assert!(
+        types["base"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("timestamptz"))
+    );
+    assert_eq!(types["enums"], json!(["prioridade"]));
+}

@@ -11,11 +11,14 @@
 //!   de SQL da API (identificadores só do catálogo, valores parametrizados).
 
 mod api;
+mod apply;
+mod ddl;
 mod export;
 mod projects;
 mod sql;
 mod sso;
 mod structure;
+mod tables_ddl;
 
 pub use projects::HostLink;
 pub use sso::Sso;
@@ -110,8 +113,17 @@ pub fn router(state: AdminState) -> Router {
         .route("/admin/api/logout", post(logout))
         .route("/admin/api/overview", get(api::overview))
         .route("/admin/api/schema", get(api::schema))
-        .route("/admin/api/tables", get(api::tables))
-        .route("/admin/api/tables/{name}", get(api::table))
+        .route("/admin/api/types", get(tables_ddl::types))
+        .route(
+            "/admin/api/tables",
+            get(api::tables).post(tables_ddl::create),
+        )
+        .route(
+            "/admin/api/tables/{name}",
+            get(api::table)
+                .patch(tables_ddl::alter)
+                .delete(tables_ddl::drop),
+        )
         .route("/admin/api/tables/{name}/export", get(export::export))
         .route(
             "/admin/api/tables/{name}/structure",

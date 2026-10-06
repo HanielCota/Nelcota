@@ -62,6 +62,12 @@ pub struct Structure {
     pub grants: Vec<Grant>,
 }
 
+impl Structure {
+    pub fn column(&self, name: &str) -> Option<&ColumnInfo> {
+        self.columns.iter().find(|c| c.name == name)
+    }
+}
+
 pub const PRIVILEGES: [&str; 4] = ["select", "insert", "update", "delete"];
 
 fn on_delete(code: &str) -> &'static str {
