@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import * as Table from '$lib/components/ui/table'
+  import { Skeleton } from '$lib/components/ui/skeleton'
+  import RefreshCw from '@lucide/svelte/icons/refresh-cw'
+  import ArrowUpRight from '@lucide/svelte/icons/arrow-up-right'
   import { Button } from '$lib/components/ui/button'
   import { toast } from 'svelte-sonner'
   import PageHeader from '$lib/components/app/PageHeader.svelte'
@@ -38,64 +40,74 @@
   const host = (url: string | null) => (url ? url.replace(/^https?:\/\//, '') : '—')
 </script>
 
-<div class="mx-auto max-w-5xl p-6">
-  <PageHeader title="Projetos">
+<div class="mx-auto max-w-6xl px-6 py-10 lg:px-10">
+  <PageHeader
+    title="Projetos"
+    description={projects
+      ? `${projects.length} ${projects.length === 1 ? 'projeto' : 'projetos'} neste host. ${sso ? 'Login único: os painéis abrem sem pedir senha.' : 'Cada painel pede o próprio login.'}`
+      : 'Projetos que rodam neste host.'}
+  >
     {#snippet actions()}
-      <Button variant="ghost" size="sm" onclick={load}>Atualizar</Button>
+      <Button variant="outline" size="sm" onclick={load}><RefreshCw />Atualizar</Button>
     {/snippet}
   </PageHeader>
 
   {#if error}
-    <p class="text-sm text-destructive">{error}</p>
+    <p class="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</p>
   {:else if !projects}
-    <p class="text-sm text-muted-foreground">Carregando…</p>
-  {:else}
-    <p class="mb-3 text-sm text-muted-foreground">
-      {projects.length} {projects.length === 1 ? 'projeto' : 'projetos'} neste host.
-      {sso ? 'Login único: os painéis abrem sem pedir senha.' : 'Cada painel pede o próprio login.'}
-    </p>
-    <div class="rounded border">
-      <Table.Root>
-        <Table.Header>
-          <Table.Row class="hover:bg-transparent">
-            <Table.Head>Projeto</Table.Head>
-            <Table.Head>Domínio</Table.Head>
-            <Table.Head>Estado</Table.Head>
-            <Table.Head>Versão</Table.Head>
-            <Table.Head class="w-32"></Table.Head>
-          </Table.Row>
-        </Table.Header>
-        <Table.Body>
-          {#each projects as project (project.name)}
-            <Table.Row>
-              <Table.Cell class="font-medium">
-                {project.name}
-                {#if project.current}<span class="ml-1 text-xs font-normal text-muted-foreground">(este)</span>{/if}
-              </Table.Cell>
-              <Table.Cell class="font-mono text-xs">{host(project.url)}</Table.Cell>
-              <Table.Cell>
-                {#if project.healthy}
-                  <span class="text-xs text-muted-foreground">
-                    no ar{project.latency_ms !== null ? `, ${project.latency_ms} ms` : ''}
-                  </span>
-                {:else}
-                  <span class="text-xs font-medium text-destructive">fora do ar</span>
-                {/if}
-              </Table.Cell>
-              <Table.Cell class="font-mono text-xs text-muted-foreground">{project.version ?? '—'}</Table.Cell>
-              <Table.Cell class="text-right">
-                {#if !project.current && project.url}
-                  <Button variant="ghost" size="sm" onclick={() => open(project)}>Abrir painel</Button>
-                {/if}
-              </Table.Cell>
-            </Table.Row>
-          {/each}
-        </Table.Body>
-      </Table.Root>
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {#each [0, 1, 2] as i (i)}<Skeleton class="h-40 rounded-lg" />{/each}
     </div>
-    <p class="mt-4 text-sm text-muted-foreground">
-      Novo projeto: <span class="font-mono">nelcota init --project nome</span> (subdomínio) ou
-      <span class="font-mono">nelcota init api.dominio.com</span>.
-    </p>
+  {:else}
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {#each projects as project (project.name)}
+        <div
+          class={[
+            'flex flex-col rounded-lg border bg-card p-5 transition-colors',
+            project.current ? 'border-brand/40' : 'hover:border-border-strong',
+          ]}
+        >
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <p class="truncate font-medium">{project.name}</p>
+              <p class="mt-0.5 truncate font-mono text-xs text-muted-foreground">{host(project.url)}</p>
+            </div>
+            {#if project.current}
+              <span
+                class="shrink-0 rounded-full border border-brand/30 bg-brand/10 px-2 py-px text-[11px] font-medium text-brand"
+                >este</span
+              >
+            {/if}
+          </div>
+
+          <div class="mt-6 flex items-center gap-2 text-xs">
+            {#if project.healthy}
+              <span class="size-2 rounded-full bg-brand shadow-[0_0_0_3px] shadow-brand/20"></span>
+              <span class="text-muted-foreground">
+                No ar{project.latency_ms !== null ? ` · ${project.latency_ms} ms` : ''}
+              </span>
+            {:else}
+              <span class="size-2 rounded-full bg-destructive shadow-[0_0_0_3px] shadow-destructive/20"></span>
+              <span class="font-medium text-destructive">Fora do ar</span>
+            {/if}
+            {#if project.version}<span class="ml-auto font-mono text-muted-foreground">{project.version}</span>{/if}
+          </div>
+
+          {#if !project.current && project.url}
+            <Button variant="outline" size="sm" class="mt-4 w-full" onclick={() => open(project)}>
+              Abrir painel<ArrowUpRight />
+            </Button>
+          {/if}
+        </div>
+      {/each}
+    </div>
+
+    <div class="mt-8 rounded-lg border border-dashed p-5 text-sm">
+      <p class="font-medium">Novo projeto</p>
+      <p class="mt-1 font-light text-muted-foreground">
+        <code class="text-xs text-foreground">nelcota init --project nome</code> (subdomínio) ou
+        <code class="text-xs text-foreground">nelcota init api.dominio.com</code>.
+      </p>
+    </div>
   {/if}
 </div>

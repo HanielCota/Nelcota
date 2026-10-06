@@ -2,6 +2,8 @@
   import { onMount } from 'svelte'
   import { Button } from '$lib/components/ui/button'
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu'
+  import Play from '@lucide/svelte/icons/play'
+  import SquareTerminal from '@lucide/svelte/icons/square-terminal'
   import CodeEditor from '$lib/components/app/CodeEditor.svelte'
   import { api } from '$lib/api'
   import type { SqlResponse } from '$lib/types'
@@ -118,9 +120,12 @@ limit 20;`,
 </script>
 
 <div class="flex h-full min-h-0 flex-col">
-  <div class="flex shrink-0 flex-wrap items-center gap-2 border-b px-4 py-2.5">
-    <h1 class="font-semibold">SQL</h1>
-    <span class="text-xs text-muted-foreground">roda como dono do banco, sem RLS</span>
+  <div class="flex h-12 shrink-0 flex-wrap items-center gap-3 border-b bg-sidebar px-4">
+    <h1 class="text-sm font-medium">Editor SQL</h1>
+    <span
+      class="hidden rounded-full border border-warning/30 bg-warning/10 px-2 py-px text-[11px] font-medium text-warning sm:inline"
+      >dono do banco · sem RLS</span
+    >
     <div class="ml-auto flex items-center gap-2">
       <DropdownMenu.Root>
         <DropdownMenu.Trigger>
@@ -147,7 +152,8 @@ limit 20;`,
         </DropdownMenu.Content>
       </DropdownMenu.Root>
       <Button size="sm" onclick={run} disabled={running} title="Ctrl+Enter">
-        {running ? 'Executando…' : 'Executar'}
+        <Play />{running ? 'Executando…' : 'Executar'}
+        <kbd class="ml-1 hidden rounded border border-white/20 px-1 font-sans text-[10px] font-normal opacity-80 sm:inline">Ctrl ↵</kbd>
       </Button>
     </div>
   </div>
@@ -158,7 +164,15 @@ limit 20;`,
 
   <div class="min-h-0 flex-1 overflow-auto">
     {#if !response}
-      <p class="p-4 text-sm text-muted-foreground">Ctrl+Enter executa. Limite de 30 s e 1000 linhas por resultado.</p>
+      <div class="grid h-full place-items-center p-8 text-center">
+        <div>
+          <SquareTerminal class="mx-auto size-7 text-muted-foreground" strokeWidth={1.3} />
+          <p class="mt-3 text-sm font-medium">Os resultados aparecem aqui</p>
+          <p class="mt-1 text-sm font-light text-muted-foreground">
+            Ctrl+Enter executa. Limite de 30 s e 1000 linhas por resultado.
+          </p>
+        </div>
+      </div>
     {:else if response.error}
       <div class="p-4 text-sm">
         <p class="text-destructive">
@@ -174,21 +188,21 @@ limit 20;`,
         <p class="px-4 py-3 text-xs text-muted-foreground">Executado, sem linhas. {elapsed} ms</p>
       {/if}
       {#each response.results as result, r (r)}
-        <p class="border-b px-4 py-2 text-xs text-muted-foreground">
-          {result.count} {result.count === 1 ? 'linha' : 'linhas'}{result.truncated ? ' (mostrando 1000)' : ''}, {elapsed} ms
+        <p class="border-b bg-sidebar px-4 py-2 text-xs text-muted-foreground">
+          <span class="mr-1.5 inline-block size-1.5 rounded-full bg-brand align-middle"></span>{result.count} {result.count === 1 ? 'linha' : 'linhas'}{result.truncated ? ' (mostrando 1000)' : ''}, {elapsed} ms
         </p>
         {#if result.columns.length}
           <table class="w-max min-w-full border-separate border-spacing-0 text-xs">
             <thead class="sticky top-0">
               <tr>
                 {#each result.columns as column, c (c)}
-                  <th class="border-r border-b bg-muted px-3 py-2 text-left font-medium">{column}</th>
+                  <th class="border-r border-b bg-card px-3 py-2 text-left font-medium">{column}</th>
                 {/each}
               </tr>
             </thead>
             <tbody>
               {#each result.rows as row, i (i)}
-                <tr class="hover:bg-muted/40">
+                <tr class="hover:bg-muted/50">
                   {#each row as cell, c (c)}
                     <td class="max-w-96 truncate border-r border-b px-3 py-1.5 font-mono" title={cell ?? 'NULL'}>
                       {#if cell === null}<span class="text-muted-foreground">NULL</span>{:else}{cell}{/if}

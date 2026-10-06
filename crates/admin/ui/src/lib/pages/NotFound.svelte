@@ -5,7 +5,9 @@
 
 <div class="grid h-full place-items-center p-8 text-center">
   <div>
-    <p class="text-sm text-muted-foreground">Página não encontrada.</p>
-    <Button variant="outline" class="mt-4" href={href('/')}>Voltar à visão geral</Button>
+    <p class="font-mono text-sm text-brand">404</p>
+    <h1 class="mt-2 text-2xl font-medium tracking-tight">Página não encontrada</h1>
+    <p class="mt-2 text-sm font-light text-muted-foreground">O endereço não existe neste painel.</p>
+    <Button variant="outline" class="mt-6" href={href('/')}>Voltar à visão geral</Button>
   </div>
 </div>

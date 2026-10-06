@@ -22,9 +22,12 @@
 
 <span
   class={[
-    'text-xs whitespace-nowrap',
-    rls.state === 'danger' && 'font-medium text-destructive',
-    rls.state === 'warn' && 'text-warning',
-    (rls.state === 'ok' || rls.state === 'none' || rls.state === 'view') && 'text-muted-foreground',
-  ]}>{label}</span
+    'inline-flex h-5 items-center gap-1.5 rounded-full border px-2 text-[11px] font-medium whitespace-nowrap',
+    rls.state === 'danger' && 'border-destructive/30 bg-destructive/10 text-destructive',
+    rls.state === 'warn' && 'border-warning/30 bg-warning/10 text-warning',
+    rls.state === 'ok' && 'border-brand/25 bg-brand/10 text-brand',
+    (rls.state === 'none' || rls.state === 'view') && 'border-border-strong bg-muted text-muted-foreground',
+  ]}
 >
+  <span class="size-1.5 rounded-full bg-current"></span>{label}
+</span>

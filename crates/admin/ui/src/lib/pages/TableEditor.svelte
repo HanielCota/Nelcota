@@ -8,6 +8,8 @@
   import RefreshCw from '@lucide/svelte/icons/refresh-cw'
   import Trash2 from '@lucide/svelte/icons/trash-2'
   import Pencil from '@lucide/svelte/icons/pencil'
+  import Plus from '@lucide/svelte/icons/plus'
+  import Table2 from '@lucide/svelte/icons/table-2'
   import ArrowUp from '@lucide/svelte/icons/arrow-up'
   import ArrowDown from '@lucide/svelte/icons/arrow-down'
   import ChevronLeft from '@lucide/svelte/icons/chevron-left'
@@ -158,26 +160,31 @@
 
 <div class="flex h-full min-h-0">
   <!-- Lista de tabelas -->
-  <aside class="hidden w-60 shrink-0 flex-col border-r bg-sidebar/50 md:flex">
-    <div class="border-b p-3">
+  <aside class="hidden w-64 shrink-0 flex-col border-r bg-sidebar md:flex">
+    <div class="grid gap-3 border-b p-3">
+      <p class="px-1 text-sm font-medium">Editor de tabelas</p>
       <div class="relative">
         <Search class="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
-        <Input bind:value={filter} placeholder="Buscar tabelas…" class="h-8 pl-8 text-sm" />
+        <Input bind:value={filter} placeholder="Buscar tabelas…" class="h-8 bg-card pl-8 text-sm" />
       </div>
     </div>
-    <nav class="flex-1 overflow-y-auto p-2">
+    <p class="px-4 pt-3 pb-1 text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
+      Tabelas ({visibleTables.length})
+    </p>
+    <nav class="flex-1 overflow-y-auto px-2 pb-2">
       {#each visibleTables as table (table.name)}
         <a
           href={href(`/tables/${encodeURIComponent(table.name)}`)}
           title={table.rls.label}
           class={[
-            'flex items-center gap-2 rounded px-2 py-1 text-sm text-muted-foreground hover:bg-accent hover:text-foreground',
-            table.name === name && 'bg-accent font-medium text-foreground',
+            'flex h-8 items-center gap-2 rounded-md px-2 text-sm text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground',
+            table.name === name && 'bg-accent text-foreground',
           ]}
         >
-          <RlsDot state={table.rls.state} />
+          <Table2 class={['size-3.5 shrink-0', table.name === name && 'text-brand']} strokeWidth={1.6} />
           <span class="truncate">{table.name}</span>
-          {#if table.kind !== 'table'}<span class="ml-auto text-xs">view</span>{/if}
+          <span class="ml-auto flex"><RlsDot state={table.rls.state} /></span>
+          {#if table.kind !== 'table'}<span class="text-[11px]">view</span>{/if}
         </a>
       {:else}
         <p class="px-2 py-4 text-sm text-muted-foreground">Nenhuma tabela.</p>
@@ -188,10 +195,16 @@
   <!-- Área principal -->
   <section class="flex min-w-0 flex-1 flex-col">
     {#if !name}
-      <p class="p-6 text-sm text-muted-foreground">Escolha uma tabela na lista.</p>
+      <div class="grid flex-1 place-items-center p-8 text-center">
+        <div>
+          <Table2 class="mx-auto size-7 text-muted-foreground" strokeWidth={1.3} />
+          <p class="mt-3 text-sm font-medium">Escolha uma tabela</p>
+          <p class="mt-1 text-sm font-light text-muted-foreground">Selecione na lista ao lado para ver e editar as linhas.</p>
+        </div>
+      </div>
     {:else}
-      <div class="flex shrink-0 flex-wrap items-center gap-2 border-b px-4 py-2.5">
-        <h1 class="font-semibold">{name}</h1>
+      <div class="flex h-12 shrink-0 flex-wrap items-center gap-3 border-b px-4">
+        <h1 class="text-sm font-medium">{name}</h1>
         {#if data}<RlsBadge rls={data.table.rls} />{/if}
         <div class="ml-auto flex items-center gap-2">
           {#if selected.size > 0}
@@ -203,17 +216,17 @@
             <RefreshCw class={loading ? 'animate-spin' : ''} />
           </Button>
           {#if data?.table.insertable}
-            <Button size="sm" onclick={() => openSheet(null)}>Inserir linha</Button>
+            <Button size="sm" onclick={() => openSheet(null)}><Plus />Inserir linha</Button>
           {/if}
         </div>
       </div>
 
       {#if data?.table.exposed_without_rls}
-        <p class="border-b px-4 py-2 text-sm text-destructive">
+        <p class="border-b border-destructive/30 bg-destructive/5 px-4 py-2 text-xs text-destructive">
           Sem RLS: quem tem GRANT nesta tabela lê e altera todas as linhas.
         </p>
       {:else if data && !data.table.editable && data.table.kind === 'table'}
-        <p class="border-b px-4 py-2 text-sm text-muted-foreground">
+        <p class="border-b bg-muted/40 px-4 py-2 text-xs text-muted-foreground">
           Sem chave primária: dá para ver as linhas, mas não editar por aqui.
         </p>
       {/if}
@@ -228,7 +241,7 @@
             <thead class="sticky top-0 z-10">
               <tr>
                 {#if editable}
-                  <th class="w-10 border-r border-b bg-muted px-3 py-2">
+                  <th class="w-10 border-r border-b bg-card px-3 py-2">
                     <Checkbox
                       checked={selected.size > 0 && selected.size === data.rows.length}
                       indeterminate={selected.size > 0 && selected.size < data.rows.length}
@@ -238,7 +251,7 @@
                   </th>
                 {/if}
                 {#each columns as column (column.name)}
-                  <th class="border-r border-b bg-muted p-0 text-left font-medium">
+                  <th class="border-r border-b bg-card p-0 text-left font-medium">
                     <button
                       class="group flex w-full min-w-36 items-start gap-1.5 px-3 py-2 text-left hover:bg-accent"
                       onclick={() => toggleSort(column.name)}
@@ -256,12 +269,12 @@
                     </button>
                   </th>
                 {/each}
-                {#if editable}<th class="w-12 border-b bg-muted"></th>{/if}
+                {#if editable}<th class="w-12 border-b bg-card"></th>{/if}
               </tr>
             </thead>
             <tbody>
               {#each data.rows as row, i (i)}
-                <tr class={['group', selected.has(i) ? 'bg-muted/60' : 'hover:bg-muted/40']}>
+                <tr class={['group', selected.has(i) ? 'bg-brand/5' : 'hover:bg-muted/50']}>
                   {#if editable}
                     <td class="border-r border-b px-3 py-1.5">
                       <Checkbox checked={selected.has(i)} onCheckedChange={(v) => toggleRow(i, v === true)} aria-label="Selecionar linha" />
@@ -277,7 +290,7 @@
                       ondblclick={() => startEdit(i, column)}
                     >
                       {#if editing?.row === i && editing.column === column.name}
-                        <div class="flex items-center gap-1 bg-background p-0.5 ring-1 ring-foreground/40 ring-inset">
+                        <div class="flex items-center gap-1 bg-background p-0.5 ring-1 ring-brand/70 ring-inset">
                           <input
                             id="inline-editor"
                             class="w-full min-w-40 bg-transparent px-2 py-1 font-mono text-xs outline-none"
@@ -330,7 +343,7 @@
       </div>
 
       {#if data}
-        <footer class="flex shrink-0 flex-wrap items-center gap-3 border-t px-4 py-2 text-xs text-muted-foreground">
+        <footer class="flex shrink-0 flex-wrap items-center gap-3 border-t bg-sidebar px-4 py-2 text-xs text-muted-foreground">
           <span>
             {#if data.total !== null}{data.total_exact ? '' : '~'}{fmt.format(data.total)} {data.total === 1 ? 'linha' : 'linhas'}{:else}{data.rows.length} nesta página{/if}
           </span>
