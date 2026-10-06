@@ -11,6 +11,7 @@
 //! um comando por vez. Regras que o Postgres já valida (tabela referenciada
 //! existe, cast possível) ficam com ele: a mensagem dele volta como 400.
 
+pub mod policy;
 pub mod table;
 
 use nelcota_api::query::ident;
@@ -22,6 +23,12 @@ use serde::Deserialize;
 pub struct DdlError(pub String);
 
 pub type Result<T> = std::result::Result<T, DdlError>;
+
+impl From<DdlError> for crate::ApiError {
+    fn from(err: DdlError) -> Self {
+        crate::ApiError::bad_request(err.0)
+    }
+}
 
 fn invalid<T>(message: impl Into<String>) -> Result<T> {
     Err(DdlError(message.into()))

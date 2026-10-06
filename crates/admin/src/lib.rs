@@ -14,6 +14,7 @@ mod api;
 mod apply;
 mod ddl;
 mod export;
+mod policies_ddl;
 mod projects;
 mod sql;
 mod sso;
@@ -36,7 +37,7 @@ use axum::{
     http::{HeaderMap, HeaderValue, Method, StatusCode, header},
     middleware::{self, Next},
     response::{IntoResponse, Redirect, Response},
-    routing::{delete, get, post},
+    routing::{delete, get, post, put},
 };
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use deadpool_postgres::Pool;
@@ -140,6 +141,14 @@ pub fn router(state: AdminState) -> Router {
         .route("/admin/api/users/{id}/revoke", post(api::revoke_sessions))
         .route("/admin/api/users/{id}", delete(api::delete_user))
         .route("/admin/api/policies", get(api::policies))
+        .route(
+            "/admin/api/tables/{name}/policies",
+            post(policies_ddl::create),
+        )
+        .route(
+            "/admin/api/tables/{name}/policies/{policy}",
+            put(policies_ddl::replace).delete(policies_ddl::drop),
+        )
         .route("/admin/api/projects", get(projects::list))
         .route("/admin/api/projects/status", get(projects::status))
         .route("/admin/api/sso/handoff", post(sso::handoff))

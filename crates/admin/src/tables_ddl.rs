@@ -14,19 +14,13 @@ use crate::{
     api::table_or_404,
     apply::apply,
     ddl::{
-        BASE_TYPES, DdlError,
+        BASE_TYPES,
         table::{self, AlterAction, Context, CreateTable},
     },
     structure,
 };
 
 type ApiResult = Result<Json<Value>, ApiError>;
-
-impl From<DdlError> for ApiError {
-    fn from(err: DdlError) -> Self {
-        ApiError::bad_request(err.0)
-    }
-}
 
 async fn enums(client: &Client, schema: &str) -> Result<Vec<String>, ApiError> {
     Ok(client

@@ -1160,3 +1160,98 @@ async fn criar_alterar_e_apagar_tabelas_pelo_painel() {
     );
     assert_eq!(types["enums"], json!(["prioridade"]));
 }
+
+async fn anon_rows(app: &TestApp) -> usize {
+    let reply = app
+        .raw(Method::GET, "/rest/v1/produtos", &[], String::new())
+        .await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.text);
+    reply.body.as_array().unwrap().len()
+}
+
+#[tokio::test]
+async fn policies_criadas_editadas_e_apagadas_pelo_painel() {
+    let app = TestApp::spawn().await;
+    let cookie = login(&app).await;
+    assert_eq!(anon_rows(&app).await, 4, "sem RLS, anon vê tudo");
+
+    let rls = send(
+        &app,
+        Method::PATCH,
+        "/admin/api/tables/produtos",
+        &cookie,
+        json!({ "actions": [{ "action": "set_rls", "enabled": true }] }),
+    )
+    .await;
+    assert_eq!(rls.status, StatusCode::OK, "{}", rls.text);
+    assert_eq!(anon_rows(&app).await, 0, "RLS sem policies: ninguém vê");
+
+    let policy = json!({ "name": "leitura pública", "command": "select", "roles": ["anon"], "using": "true" });
+    let created = send(
+        &app,
+        Method::POST,
+        "/admin/api/tables/produtos/policies",
+        &cookie,
+        json!({ "policy": policy }),
+    )
+    .await;
+    assert_eq!(created.status, StatusCode::OK, "{}", created.text);
+    assert_eq!(anon_rows(&app).await, 4);
+
+    // Editar: troca a expressão e o nome numa transação (DROP + CREATE).
+    let edited = send(&app, Method::PUT, "/admin/api/tables/produtos/policies/leitura%20p%C3%BAblica", &cookie,
+        json!({ "policy": { "name": "em estoque", "command": "select", "roles": ["anon"], "using": "estoque > 0" } })).await;
+    assert_eq!(edited.status, StatusCode::OK, "{}", edited.text);
+    assert_eq!(anon_rows(&app).await, 3, "Mochila tem estoque 0");
+    let listed = get(&app, "/admin/api/policies", &cookie).await.body;
+    let produtos = listed["tables"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|t| t["name"] == "produtos")
+        .unwrap()
+        .clone();
+    assert_eq!(produtos["policies"][0]["name"], "em estoque");
+    assert_eq!(produtos["policies"][0]["using"], "(estoque > 0)");
+
+    // Regras de cada comando validadas antes do banco.
+    let invalid = send(
+        &app,
+        Method::POST,
+        "/admin/api/tables/produtos/policies",
+        &cookie,
+        json!({ "policy": { "name": "x", "command": "insert", "using": "true" } }),
+    )
+    .await;
+    assert_eq!(invalid.status, StatusCode::BAD_REQUEST);
+    // Segundo comando escondido na expressão: recusado, e nada muda.
+    let injection = send(&app, Method::POST, "/admin/api/tables/produtos/policies", &cookie,
+        json!({ "policy": { "name": "y", "command": "select", "using": "true) ; DROP TABLE public.produtos; --" } })).await;
+    assert_eq!(
+        injection.status,
+        StatusCode::BAD_REQUEST,
+        "{}",
+        injection.text
+    );
+    assert_eq!(anon_rows(&app).await, 3);
+
+    let dropped = app
+        .raw(
+            Method::DELETE,
+            "/admin/api/tables/produtos/policies/em%20estoque",
+            &[("cookie", cookie.as_str())],
+            String::new(),
+        )
+        .await;
+    assert_eq!(dropped.status, StatusCode::OK, "{}", dropped.text);
+    assert_eq!(anon_rows(&app).await, 0);
+    let missing = app
+        .raw(
+            Method::DELETE,
+            "/admin/api/tables/produtos/policies/nao-existe",
+            &[("cookie", cookie.as_str())],
+            String::new(),
+        )
+        .await;
+    assert_eq!(missing.status, StatusCode::BAD_REQUEST, "{}", missing.text);
+}
