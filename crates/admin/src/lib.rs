@@ -11,6 +11,7 @@
 //!   de SQL da API (identificadores só do catálogo, valores parametrizados).
 
 mod api;
+mod export;
 mod projects;
 mod sql;
 mod sso;
@@ -110,6 +111,7 @@ pub fn router(state: AdminState) -> Router {
         .route("/admin/api/schema", get(api::schema))
         .route("/admin/api/tables", get(api::tables))
         .route("/admin/api/tables/{name}", get(api::table))
+        .route("/admin/api/tables/{name}/export", get(export::export))
         .route(
             "/admin/api/tables/{name}/rows",
             post(api::insert_row)

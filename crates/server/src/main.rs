@@ -75,7 +75,8 @@ async fn serve(config: Config) -> anyhow::Result<()> {
     let admin = match (&config.admin_email, &config.admin_password_hash) {
         (Some(email), Some(hash)) if !email.is_empty() && !hash.expose().is_empty() => {
             Some(nelcota_admin::AdminState {
-                db: db::admin_pool(&admin, 2),
+                // 3: uma exportação longa segura a dela e o painel segue com as outras.
+                db: db::admin_pool(&admin, 3),
                 db_config: admin.clone(),
                 catalog: state.catalog.clone(),
                 credentials: Arc::new(nelcota_admin::Credentials {

@@ -787,6 +787,68 @@ async fn filtros_na_grade_validados_pelo_catalogo() {
 }
 
 #[tokio::test]
+async fn exportar_tabela_em_csv_e_json() {
+    let app = TestApp::spawn().await;
+    let cookie = login(&app).await;
+
+    let csv = get(
+        &app,
+        "/admin/api/tables/produtos/export?format=csv&sort=id",
+        &cookie,
+    )
+    .await;
+    assert_eq!(csv.status, StatusCode::OK, "{}", csv.text);
+    assert_eq!(csv.headers[header::CONTENT_TYPE], "text/csv; charset=utf-8");
+    assert_eq!(
+        csv.headers[header::CONTENT_DISPOSITION],
+        "attachment; filename=\"produtos.csv\""
+    );
+    let lines: Vec<&str> = csv.text.split("\r\n").collect();
+    assert_eq!(lines[0], "\u{feff}id,nome,preco,estoque,criado_em,slug");
+    assert!(lines[1].starts_with("1,Caneta,2.50,100,"), "{}", lines[1]);
+    // Vírgula dentro do valor: campo entre aspas.
+    assert!(
+        lines[4].starts_with("4,\"Régua, 30cm\",4.00,"),
+        "{}",
+        lines[4]
+    );
+    assert_eq!(lines.len(), 6, "cabeçalho + 4 linhas + final vazio");
+
+    // A exportação segue os filtros da grade.
+    let filters = enc(&json!([{ "column": "estoque", "op": "eq", "value": "0" }]).to_string());
+    let filtrado = get(
+        &app,
+        &format!("/admin/api/tables/produtos/export?format=json&filters={filters}"),
+        &cookie,
+    )
+    .await;
+    assert_eq!(filtrado.headers[header::CONTENT_TYPE], "application/json");
+    let rows: Value = serde_json::from_str(&filtrado.text).unwrap();
+    assert_eq!(rows.as_array().unwrap().len(), 1);
+    assert_eq!(rows[0]["nome"], "Mochila");
+    // numeric sai com o texto do Postgres.
+    assert!(filtrado.text.contains("120.00"), "{}", filtrado.text);
+
+    let erro = get(
+        &app,
+        &format!(
+            "/admin/api/tables/produtos/export?format=csv&filters={}",
+            enc(&json!([{ "column": "id", "op": "eq", "value": "x" }]).to_string())
+        ),
+        &cookie,
+    )
+    .await;
+    assert_eq!(erro.status, StatusCode::BAD_REQUEST, "{}", erro.text);
+    let formato = get(
+        &app,
+        "/admin/api/tables/produtos/export?format=xls",
+        &cookie,
+    )
+    .await;
+    assert_eq!(formato.status, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
 async fn colunas_indicam_a_chave_estrangeira() {
     let app = TestApp::spawn().await;
     let cookie = login(&app).await;

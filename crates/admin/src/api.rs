@@ -20,13 +20,13 @@ use tokio_postgres::Client;
 use crate::{AdminState, ApiError};
 
 type ApiResult = Result<Json<Value>, ApiError>;
-type Row = HashMap<String, Box<RawValue>>;
+pub(crate) type Row = HashMap<String, Box<RawValue>>;
 
 const MAX_PAGE_SIZE: i64 = 500;
 
 /// Texto de um valor JSON vindo do Postgres, sem passar por `f64` (numeric
 /// mantém todas as casas). `None` = NULL.
-fn raw_text(value: Option<&RawValue>) -> Option<String> {
+pub(crate) fn raw_text(value: Option<&RawValue>) -> Option<String> {
     let raw = value?.get();
     if raw == "null" {
         None
@@ -37,7 +37,7 @@ fn raw_text(value: Option<&RawValue>) -> Option<String> {
     }
 }
 
-fn table_or_404(state: &AdminState, name: &str) -> Result<Table, ApiError> {
+pub(crate) fn table_or_404(state: &AdminState, name: &str) -> Result<Table, ApiError> {
     state
         .catalog
         .get()
