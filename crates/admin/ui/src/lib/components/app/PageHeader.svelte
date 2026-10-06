@@ -1,20 +1,11 @@
 <script lang="ts">
   import type { Snippet } from 'svelte'
 
-  let {
-    title,
-    description,
-    actions,
-  }: { title: string; description?: string; actions?: Snippet } = $props()
+  let { title, actions }: { title: string; actions?: Snippet } = $props()
 </script>
 
-<div class="mb-6 flex flex-wrap items-end justify-between gap-4">
-  <div>
-    <h1 class="text-xl font-semibold tracking-tight">{title}</h1>
-    {#if description}
-      <p class="mt-1 text-sm text-muted-foreground">{description}</p>
-    {/if}
-  </div>
+<div class="mb-5 flex flex-wrap items-center justify-between gap-4">
+  <h1 class="text-lg font-semibold">{title}</h1>
   {#if actions}
     <div class="flex items-center gap-2">{@render actions()}</div>
   {/if}

@@ -6,17 +6,17 @@
   import Users from '@lucide/svelte/icons/users'
   import ShieldCheck from '@lucide/svelte/icons/shield-check'
   import BookOpen from '@lucide/svelte/icons/book-open'
-  import KeyRound from '@lucide/svelte/icons/key-round'
   import Logo from './Logo.svelte'
   import { href, route } from '$lib/router.svelte'
 
+  // Ícones ficam porque a sidebar recolhe para só ícones.
   const groups = [
     {
-      label: 'Projeto',
+      label: '',
       items: [
         { title: 'Visão geral', path: '/', icon: LayoutDashboard },
-        { title: 'Editor de tabelas', path: '/tables', icon: Table2 },
-        { title: 'Editor SQL', path: '/sql', icon: SquareTerminal },
+        { title: 'Tabelas', path: '/tables', icon: Table2 },
+        { title: 'SQL', path: '/sql', icon: SquareTerminal },
       ],
     },
     {
@@ -33,28 +33,15 @@
 </script>
 
 <Sidebar.Root collapsible="icon">
-  <Sidebar.Header>
-    <Sidebar.Menu>
-      <Sidebar.MenuItem>
-        <Sidebar.MenuButton size="lg" class="hover:bg-transparent">
-          {#snippet child({ props })}
-            <a href={href('/')} {...props}>
-              <Logo class="size-8! shrink-0" />
-              <div class="grid flex-1 text-left leading-tight">
-                <span class="truncate font-semibold">nelcota</span>
-                <span class="truncate text-xs text-muted-foreground">painel administrativo</span>
-              </div>
-            </a>
-          {/snippet}
-        </Sidebar.MenuButton>
-      </Sidebar.MenuItem>
-    </Sidebar.Menu>
+  <Sidebar.Header class="h-12 justify-center px-4 group-data-[collapsible=icon]:px-2">
+    <a href={href('/')} class="group-data-[collapsible=icon]:hidden"><Logo /></a>
+    <a href={href('/')} class="hidden text-center font-semibold group-data-[collapsible=icon]:block">n</a>
   </Sidebar.Header>
 
   <Sidebar.Content>
-    {#each groups as group (group.label)}
+    {#each groups as group, g (g)}
       <Sidebar.Group>
-        <Sidebar.GroupLabel>{group.label}</Sidebar.GroupLabel>
+        {#if group.label}<Sidebar.GroupLabel>{group.label}</Sidebar.GroupLabel>{/if}
         <Sidebar.GroupContent>
           <Sidebar.Menu>
             {#each group.items as item (item.path)}
@@ -62,7 +49,7 @@
                 <Sidebar.MenuButton isActive={isActive(item.path)} tooltipContent={item.title}>
                   {#snippet child({ props })}
                     <a href={href(item.path)} {...props}>
-                      <item.icon class={isActive(item.path) ? 'text-primary' : ''} />
+                      <item.icon />
                       <span>{item.title}</span>
                     </a>
                   {/snippet}
@@ -93,16 +80,10 @@
     </Sidebar.Group>
   </Sidebar.Content>
 
-  <Sidebar.Footer>
-    <div
-      class="flex items-start gap-2 rounded-md border border-warning/25 bg-warning/5 p-2 text-[11px] leading-snug text-muted-foreground group-data-[collapsible=icon]:hidden"
-    >
-      <KeyRound class="mt-0.5 size-3.5 shrink-0 text-warning" />
-      <span
-        >A chave <code class="font-mono text-foreground">service_role</code> ignora o RLS: use só no seu
-        backend.</span
-      >
-    </div>
+  <Sidebar.Footer class="group-data-[collapsible=icon]:hidden">
+    <p class="px-2 pb-1 text-[11px] leading-snug text-muted-foreground">
+      A chave <span class="font-mono">service_role</span> ignora o RLS. Use só no backend.
+    </p>
   </Sidebar.Footer>
   <Sidebar.Rail />
 </Sidebar.Root>

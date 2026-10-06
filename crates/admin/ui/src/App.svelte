@@ -30,7 +30,7 @@
 </script>
 
 <ModeWatcher defaultMode="dark" />
-<Toaster position="bottom-right" richColors closeButton />
+<Toaster position="bottom-right" />
 
 {#if session.email === undefined}
   <div class="grid h-screen place-items-center text-sm text-muted-foreground">Carregando…</div>

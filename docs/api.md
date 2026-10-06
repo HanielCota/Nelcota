@@ -76,7 +76,7 @@ batem com as chaves.
 `RAISE EXCEPTION` vira 400 com a mensagem. A função roda com a role do JWT
 (a menos que seja `SECURITY DEFINER`): `auth.uid()` funciona dentro dela.
 
-> ⚠️ Por padrão, o Postgres concede `EXECUTE` de funções novas a `PUBLIC`
+> **Atenção:** Por padrão, o Postgres concede `EXECUTE` de funções novas a `PUBLIC`
 > (inclusive `anon`). Para funções sensíveis:
 > `REVOKE EXECUTE ON FUNCTION f() FROM PUBLIC; GRANT EXECUTE ON FUNCTION f() TO authenticated;`
 

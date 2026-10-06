@@ -5,8 +5,6 @@
   import { Input } from '$lib/components/ui/input'
   import { Textarea } from '$lib/components/ui/textarea'
   import { Checkbox } from '$lib/components/ui/checkbox'
-  import KeyRound from '@lucide/svelte/icons/key-round'
-  import LoaderCircle from '@lucide/svelte/icons/loader-circle'
   import { toast } from 'svelte-sonner'
   import { api, enc } from '$lib/api'
   import type { Column, RowData } from '$lib/types'
@@ -113,12 +111,9 @@
         {#if field}
           <div class="grid gap-1.5">
             <div class="flex items-center gap-2">
-              <label for={`f-${column.name}`} class="flex items-center gap-1.5 text-sm font-medium">
-                {#if column.is_pk}<KeyRound class="size-3.5 text-warning" />{/if}
-                {column.name}
-              </label>
-              <span class="rounded bg-muted px-1.5 py-px font-mono text-[10.5px] text-muted-foreground"
-                >{column.full_type}</span
+              <label for={`f-${column.name}`} class="text-sm font-medium">{column.name}</label>
+              <span class="font-mono text-[11px] text-muted-foreground"
+                >{column.full_type}{column.is_pk ? ', pk' : ''}</span
               >
               {#if column.nullable}
                 <label class="ml-auto flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -209,8 +204,7 @@
     <Sheet.Footer class="flex-row justify-end gap-2 border-t px-6 py-4">
       <Button variant="outline" onclick={() => (open = false)}>Cancelar</Button>
       <Button type="submit" form="row-form" disabled={saving}>
-        {#if saving}<LoaderCircle class="animate-spin" />{/if}
-        Salvar
+        {saving ? 'Salvando…' : 'Salvar'}
       </Button>
     </Sheet.Footer>
   </Sheet.Content>

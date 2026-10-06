@@ -86,7 +86,7 @@ token derruba a sessão.
 - [Deploy](docs/deploy.md) · [Backup](docs/backup.md) · [Saindo do Nelcota](docs/saida.md)
 - [Arquitetura](docs/arquitetura.md) · [Decisões](docs/decisoes.md) · [Benchmark](bench/README.md)
 
-> ⚠️ Um JWT com `role: service_role` ignora todo o RLS. Nunca o exponha no
+> **Atenção:** Um JWT com `role: service_role` ignora todo o RLS. Nunca o exponha no
 > frontend.
 
 ## Fora do MVP

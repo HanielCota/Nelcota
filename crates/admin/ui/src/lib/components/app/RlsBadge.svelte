@@ -1,32 +1,30 @@
 <script lang="ts">
-  import { cn } from '$lib/utils'
   import type { Rls } from '$lib/types'
 
-  let { rls, class: className = '' }: { rls: Rls; class?: string } = $props()
+  let { rls }: { rls: Rls } = $props()
 
-  const styles: Record<string, string> = {
-    ok: 'border-primary/30 bg-primary/10 text-primary',
-    warn: 'border-warning/30 bg-warning/10 text-warning',
-    danger: 'border-destructive/30 bg-destructive/10 text-destructive',
-    none: 'border-border text-muted-foreground',
-    view: 'border-border text-muted-foreground',
-  }
-  const dots: Record<string, string> = {
-    ok: 'bg-primary',
-    warn: 'bg-warning',
-    danger: 'bg-destructive',
-    none: 'bg-muted-foreground',
-    view: 'bg-muted-foreground',
-  }
+  // Cor só para problema: sem RLS (vermelho) e RLS sem policies (âmbar).
+  const label = $derived.by(() => {
+    switch (rls.state) {
+      case 'danger':
+        return 'sem RLS'
+      case 'warn':
+        return 'RLS sem policies'
+      case 'ok':
+        return `RLS, ${rls.policies} ${rls.policies === 1 ? 'policy' : 'policies'}`
+      case 'none':
+        return 'sem RLS, sem grants'
+      default:
+        return 'view'
+    }
+  })
 </script>
 
 <span
-  class={cn(
-    'inline-flex h-5 shrink-0 items-center gap-1.5 rounded-full border px-2 text-[11px] font-medium whitespace-nowrap',
-    styles[rls.state],
-    className,
-  )}
+  class={[
+    'text-xs whitespace-nowrap',
+    rls.state === 'danger' && 'font-medium text-destructive',
+    rls.state === 'warn' && 'text-warning',
+    (rls.state === 'ok' || rls.state === 'none' || rls.state === 'view') && 'text-muted-foreground',
+  ]}>{label}</span
 >
-  <span class={cn('size-1.5 rounded-full', dots[rls.state])}></span>
-  {rls.state === 'danger' ? '⚠ ' : ''}{rls.label}
-</span>

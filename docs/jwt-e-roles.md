@@ -16,7 +16,7 @@ biblioteca dita esse formato.
 `authenticator` é `NOINHERIT`: sozinho não tem privilégio nenhum. Ele é membro
 das outras roles e, em cada request, assume uma delas.
 
-> ⚠️ **Um JWT com `role: service_role` ignora todo o RLS. Ele NUNCA pode ir
+> **Atenção:** **Um JWT com `role: service_role` ignora todo o RLS. Ele NUNCA pode ir
 > para o frontend, um app mobile ou qualquer lugar fora do seu servidor.**
 
 ## O que acontece em cada request

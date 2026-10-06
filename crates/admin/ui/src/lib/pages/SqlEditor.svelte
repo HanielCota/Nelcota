@@ -2,13 +2,6 @@
   import { onMount } from 'svelte'
   import { Button } from '$lib/components/ui/button'
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu'
-  import Play from '@lucide/svelte/icons/play'
-  import LoaderCircle from '@lucide/svelte/icons/loader-circle'
-  import History from '@lucide/svelte/icons/history'
-  import FileCode from '@lucide/svelte/icons/file-code-2'
-  import SquareTerminal from '@lucide/svelte/icons/square-terminal'
-  import CircleX from '@lucide/svelte/icons/circle-x'
-  import CircleCheck from '@lucide/svelte/icons/circle-check'
   import CodeEditor from '$lib/components/app/CodeEditor.svelte'
   import { api } from '$lib/api'
   import type { SqlResponse } from '$lib/types'
@@ -126,16 +119,13 @@ limit 20;`,
 
 <div class="flex h-full min-h-0 flex-col">
   <div class="flex shrink-0 flex-wrap items-center gap-2 border-b px-4 py-2.5">
-    <SquareTerminal class="size-4 text-muted-foreground" />
-    <h1 class="font-semibold">Editor SQL</h1>
-    <span class="rounded-full border border-warning/30 bg-warning/10 px-2 py-0.5 text-[11px] font-medium text-warning">
-      dono do banco · ignora RLS
-    </span>
+    <h1 class="font-semibold">SQL</h1>
+    <span class="text-xs text-muted-foreground">roda como dono do banco, sem RLS</span>
     <div class="ml-auto flex items-center gap-2">
       <DropdownMenu.Root>
         <DropdownMenu.Trigger>
           {#snippet child({ props })}
-            <Button variant="outline" size="sm" {...props}><FileCode />Modelos</Button>
+            <Button variant="ghost" size="sm" {...props}>Modelos</Button>
           {/snippet}
         </DropdownMenu.Trigger>
         <DropdownMenu.Content align="end" class="w-64">
@@ -147,7 +137,7 @@ limit 20;`,
       <DropdownMenu.Root>
         <DropdownMenu.Trigger>
           {#snippet child({ props })}
-            <Button variant="outline" size="sm" disabled={history.length === 0} {...props}><History />Histórico</Button>
+            <Button variant="ghost" size="sm" disabled={history.length === 0} {...props}>Histórico</Button>
           {/snippet}
         </DropdownMenu.Trigger>
         <DropdownMenu.Content align="end" class="w-96">
@@ -156,28 +146,23 @@ limit 20;`,
           {/each}
         </DropdownMenu.Content>
       </DropdownMenu.Root>
-      <Button size="sm" onclick={run} disabled={running}>
-        {#if running}<LoaderCircle class="animate-spin" />{:else}<Play />{/if}
-        Executar
-        <kbd class="ml-1 rounded bg-primary-foreground/15 px-1 font-mono text-[10px]">Ctrl ↵</kbd>
+      <Button size="sm" onclick={run} disabled={running} title="Ctrl+Enter">
+        {running ? 'Executando…' : 'Executar'}
       </Button>
     </div>
   </div>
 
-  <div class="h-[42%] min-h-40 shrink-0 border-b bg-sidebar/40">
+  <div class="h-[42%] min-h-40 shrink-0 border-b">
     <CodeEditor bind:value={code} {schema} {defaultSchema} onrun={run} />
   </div>
 
   <div class="min-h-0 flex-1 overflow-auto">
     {#if !response}
-      <div class="grid h-full place-items-center text-sm text-muted-foreground">
-        Execute uma consulta para ver o resultado. Timeout de 30 s; até 1000 linhas por resultado.
-      </div>
+      <p class="p-4 text-sm text-muted-foreground">Ctrl+Enter executa. Limite de 30 s e 1000 linhas por resultado.</p>
     {:else if response.error}
-      <div class="m-4 rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm">
-        <p class="flex items-center gap-2 font-medium text-destructive">
-          <CircleX class="size-4" />
-          {#if response.error.code}<span class="font-mono">{response.error.code}</span> ·{/if}
+      <div class="p-4 text-sm">
+        <p class="text-destructive">
+          {#if response.error.code}<span class="font-mono">{response.error.code}</span>{/if}
           {response.error.message}
         </p>
         {#if response.error.position}<p class="mt-2 text-muted-foreground">Posição {response.error.position} no texto.</p>{/if}
@@ -186,15 +171,12 @@ limit 20;`,
       </div>
     {:else if response.results}
       {#if response.results.length === 0}
-        <p class="flex items-center gap-2 px-4 py-3 text-xs text-muted-foreground">
-          <CircleCheck class="size-3.5 text-primary" />Executado sem resultado · {elapsed} ms
-        </p>
+        <p class="px-4 py-3 text-xs text-muted-foreground">Executado, sem linhas. {elapsed} ms</p>
       {/if}
       {#each response.results as result, r (r)}
-        <div class="flex items-center gap-2 border-b bg-muted/30 px-4 py-2 text-xs text-muted-foreground">
-          <CircleCheck class="size-3.5 text-primary" />
-          {result.count} linha(s){result.truncated ? ' · mostrando 1000' : ''} · {elapsed} ms
-        </div>
+        <p class="border-b px-4 py-2 text-xs text-muted-foreground">
+          {result.count} {result.count === 1 ? 'linha' : 'linhas'}{result.truncated ? ' (mostrando 1000)' : ''}, {elapsed} ms
+        </p>
         {#if result.columns.length}
           <table class="w-max min-w-full border-separate border-spacing-0 text-xs">
             <thead class="sticky top-0">
@@ -209,7 +191,7 @@ limit 20;`,
                 <tr class="hover:bg-muted/40">
                   {#each row as cell, c (c)}
                     <td class="max-w-96 truncate border-r border-b px-3 py-1.5 font-mono" title={cell ?? 'NULL'}>
-                      {#if cell === null}<span class="text-muted-foreground/70 italic">NULL</span>{:else}{cell}{/if}
+                      {#if cell === null}<span class="text-muted-foreground">NULL</span>{:else}{cell}{/if}
                     </td>
                   {/each}
                 </tr>

@@ -4,8 +4,12 @@ Em `https://<seu-domínio>/admin/`. Login próprio, separado dos usuários finai
 email e senha gerados pelo `nelcota init` (a senha aparece uma única vez).
 
 SPA em **Svelte 5 + shadcn-svelte + Tailwind v4**, com **CodeMirror 6** no
-editor SQL. O build fica embutido no binário: sem CDN e sem Node em produção.
-Tema escuro por padrão, com botão para o claro.
+editor SQL e fontes IBM Plex Sans/Mono. O build fica embutido no binário: sem
+CDN e sem Node em produção. Tema escuro por padrão; o claro fica no menu do
+usuário (canto superior direito).
+
+Cor aparece só onde há algo a corrigir: tabela exposta sem RLS (vermelho), RLS
+ligado sem policies (âmbar), erros e ações destrutivas. O resto é neutro.
 
 | Recurso | Como usar |
 |---|---|
@@ -25,7 +29,7 @@ Tema escuro por padrão, com botão para o claro.
 
 ## Alertas de RLS
 
-- **⚠ sem RLS**: tabela comum com GRANT para `anon` ou `authenticated` e RLS
+- **sem RLS**: tabela comum com GRANT para `anon` ou `authenticated` e RLS
   desligado. Quem tem o GRANT vê e altera **todas** as linhas. Aparece em
   destaque no topo do painel e na página de policies.
 - **RLS sem policies**: RLS ligado e nenhuma policy. Ninguém além de

@@ -29,28 +29,27 @@
   const theme = EditorView.theme({
     '&': { height: '100%', fontSize: '13px', backgroundColor: 'transparent', color: 'var(--foreground)' },
     '.cm-scroller': { fontFamily: 'var(--font-mono)', lineHeight: '1.65' },
-    '.cm-content': { padding: '14px 0', caretColor: 'var(--primary)' },
+    '.cm-content': { padding: '12px 0', caretColor: 'var(--foreground)' },
     '.cm-gutters': { backgroundColor: 'transparent', color: 'var(--muted-foreground)', border: 'none' },
     '.cm-lineNumbers .cm-gutterElement': { padding: '0 12px 0 16px', opacity: '0.6' },
     '.cm-activeLine, .cm-activeLineGutter': { backgroundColor: 'color-mix(in oklch, var(--foreground) 4%, transparent)' },
-    '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--primary)', borderLeftWidth: '2px' },
+    '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--foreground)' },
     '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection': {
-      backgroundColor: 'color-mix(in oklch, var(--primary) 22%, transparent) !important',
+      backgroundColor: 'color-mix(in oklch, var(--foreground) 18%, transparent) !important',
     },
     '&.cm-focused': { outline: 'none' },
-    '.cm-matchingBracket': { backgroundColor: 'color-mix(in oklch, var(--primary) 18%, transparent)', outline: 'none' },
+    '.cm-matchingBracket': { backgroundColor: 'color-mix(in oklch, var(--foreground) 15%, transparent)', outline: 'none' },
     '.cm-tooltip': {
       backgroundColor: 'var(--popover)',
       color: 'var(--popover-foreground)',
       border: '1px solid var(--border)',
-      borderRadius: '8px',
+      borderRadius: '4px',
       overflow: 'hidden',
-      boxShadow: '0 10px 30px rgb(0 0 0 / 0.25)',
     },
     '.cm-tooltip-autocomplete > ul': { fontFamily: 'var(--font-mono)', fontSize: '12px', maxHeight: '16em' },
     '.cm-tooltip-autocomplete > ul > li': { padding: '3px 10px !important' },
     '.cm-tooltip-autocomplete > ul > li[aria-selected]': {
-      backgroundColor: 'color-mix(in oklch, var(--primary) 18%, transparent)',
+      backgroundColor: 'var(--accent)',
       color: 'var(--foreground)',
     },
     '.cm-completionDetail': { color: 'var(--muted-foreground)', fontStyle: 'normal', marginLeft: '8px' },
@@ -58,12 +57,13 @@
   })
 
   const highlight = HighlightStyle.define([
-    { tag: [t.keyword, t.operatorKeyword, t.modifier], color: 'oklch(0.75 0.15 160)', fontWeight: '500' },
-    { tag: [t.string, t.special(t.string)], color: 'oklch(0.8 0.13 75)' },
-    { tag: [t.number, t.bool, t.null], color: 'oklch(0.75 0.14 300)' },
-    { tag: [t.comment, t.lineComment, t.blockComment], color: 'var(--muted-foreground)', fontStyle: 'italic' },
-    { tag: [t.typeName, t.standard(t.name)], color: 'oklch(0.75 0.12 230)' },
-    { tag: [t.function(t.variableName), t.function(t.name)], color: 'oklch(0.78 0.12 200)' },
+    // Paleta contida: palavras-chave em destaque, literais e comentários atenuados.
+    { tag: [t.keyword, t.operatorKeyword, t.modifier], color: 'var(--foreground)', fontWeight: '500' },
+    { tag: [t.string, t.special(t.string)], color: 'oklch(0.72 0.09 150)' },
+    { tag: [t.number, t.bool, t.null], color: 'oklch(0.72 0.08 60)' },
+    { tag: [t.comment, t.lineComment, t.blockComment], color: 'var(--muted-foreground)' },
+    { tag: [t.typeName, t.standard(t.name)], color: 'var(--foreground)' },
+    { tag: [t.function(t.variableName), t.function(t.name)], color: 'var(--foreground)' },
     { tag: [t.operator, t.punctuation, t.bracket], color: 'var(--muted-foreground)' },
     { tag: [t.special(t.name)], color: 'var(--foreground)' },
   ])

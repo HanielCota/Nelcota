@@ -3,21 +3,15 @@
   import { Button } from '$lib/components/ui/button'
   import { Input } from '$lib/components/ui/input'
   import { Checkbox } from '$lib/components/ui/checkbox'
-  import { Skeleton } from '$lib/components/ui/skeleton'
   import * as Select from '$lib/components/ui/select'
-  import * as Tooltip from '$lib/components/ui/tooltip'
-  import Table2 from '@lucide/svelte/icons/table-2'
   import Search from '@lucide/svelte/icons/search'
-  import Plus from '@lucide/svelte/icons/plus'
   import RefreshCw from '@lucide/svelte/icons/refresh-cw'
   import Trash2 from '@lucide/svelte/icons/trash-2'
   import Pencil from '@lucide/svelte/icons/pencil'
-  import KeyRound from '@lucide/svelte/icons/key-round'
   import ArrowUp from '@lucide/svelte/icons/arrow-up'
   import ArrowDown from '@lucide/svelte/icons/arrow-down'
   import ChevronLeft from '@lucide/svelte/icons/chevron-left'
   import ChevronRight from '@lucide/svelte/icons/chevron-right'
-  import TriangleAlert from '@lucide/svelte/icons/triangle-alert'
   import { toast } from 'svelte-sonner'
   import RlsBadge from '$lib/components/app/RlsBadge.svelte'
   import RlsDot from '$lib/components/app/RlsDot.svelte'
@@ -172,21 +166,18 @@
       </div>
     </div>
     <nav class="flex-1 overflow-y-auto p-2">
-      <p class="px-2 pt-1 pb-2 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-        Tabelas ({visibleTables.length})
-      </p>
       {#each visibleTables as table (table.name)}
         <a
           href={href(`/tables/${encodeURIComponent(table.name)}`)}
           title={table.rls.label}
           class={[
-            'flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
+            'flex items-center gap-2 rounded px-2 py-1 text-sm text-muted-foreground hover:bg-accent hover:text-foreground',
             table.name === name && 'bg-accent font-medium text-foreground',
           ]}
         >
           <RlsDot state={table.rls.state} />
           <span class="truncate">{table.name}</span>
-          {#if table.kind !== 'table'}<span class="ml-auto text-[10px] uppercase">view</span>{/if}
+          {#if table.kind !== 'table'}<span class="ml-auto text-xs">view</span>{/if}
         </a>
       {:else}
         <p class="px-2 py-4 text-sm text-muted-foreground">Nenhuma tabela.</p>
@@ -197,18 +188,9 @@
   <!-- Área principal -->
   <section class="flex min-w-0 flex-1 flex-col">
     {#if !name}
-      <div class="grid flex-1 place-items-center p-8 text-center">
-        <div class="max-w-sm space-y-2">
-          <Table2 class="mx-auto size-8 text-muted-foreground" />
-          <p class="font-medium">Selecione uma tabela</p>
-          <p class="text-sm text-muted-foreground">
-            Verde: RLS com policies · amarelo: RLS sem policies · vermelho: exposta sem RLS.
-          </p>
-        </div>
-      </div>
+      <p class="p-6 text-sm text-muted-foreground">Escolha uma tabela na lista.</p>
     {:else}
       <div class="flex shrink-0 flex-wrap items-center gap-2 border-b px-4 py-2.5">
-        <Table2 class="size-4 text-muted-foreground" />
         <h1 class="font-semibold">{name}</h1>
         {#if data}<RlsBadge rls={data.table.rls} />{/if}
         <div class="ml-auto flex items-center gap-2">
@@ -217,37 +199,30 @@
               <Trash2 />Apagar {selected.size}
             </Button>
           {/if}
-          <Tooltip.Root>
-            <Tooltip.Trigger>
-              {#snippet child({ props })}
-                <Button variant="outline" size="icon-sm" onclick={load} aria-label="Recarregar" {...props}>
-                  <RefreshCw class={loading ? 'animate-spin' : ''} />
-                </Button>
-              {/snippet}
-            </Tooltip.Trigger>
-            <Tooltip.Content>Recarregar</Tooltip.Content>
-          </Tooltip.Root>
+          <Button variant="ghost" size="icon-sm" onclick={load} aria-label="Recarregar" title="Recarregar">
+            <RefreshCw class={loading ? 'animate-spin' : ''} />
+          </Button>
           {#if data?.table.insertable}
-            <Button size="sm" onclick={() => openSheet(null)}><Plus />Inserir linha</Button>
+            <Button size="sm" onclick={() => openSheet(null)}>Inserir linha</Button>
           {/if}
         </div>
       </div>
 
       {#if data?.table.exposed_without_rls}
-        <div class="flex items-center gap-2 border-b border-destructive/30 bg-destructive/5 px-4 py-2 text-sm text-destructive">
-          <TriangleAlert class="size-4" />Esta tabela está exposta sem RLS: quem tem GRANT vê e altera todas as linhas.
-        </div>
+        <p class="border-b px-4 py-2 text-sm text-destructive">
+          Sem RLS: quem tem GRANT nesta tabela lê e altera todas as linhas.
+        </p>
       {:else if data && !data.table.editable && data.table.kind === 'table'}
-        <div class="flex items-center gap-2 border-b border-warning/30 bg-warning/5 px-4 py-2 text-sm text-warning">
-          <TriangleAlert class="size-4" />Tabela sem chave primária: as linhas aparecem, mas não podem ser editadas pelo painel.
-        </div>
+        <p class="border-b px-4 py-2 text-sm text-muted-foreground">
+          Sem chave primária: dá para ver as linhas, mas não editar por aqui.
+        </p>
       {/if}
 
       <div class="min-h-0 flex-1 overflow-auto">
         {#if error}
-          <p class="m-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
+          <p class="p-4 text-sm text-destructive">{error}</p>
         {:else if !data}
-          <div class="space-y-2 p-4">{#each Array(8) as _, i (i)}<Skeleton class="h-8" />{/each}</div>
+          <p class="p-4 text-sm text-muted-foreground">Carregando…</p>
         {:else}
           <table class="w-max min-w-full border-separate border-spacing-0 text-xs">
             <thead class="sticky top-0 z-10">
@@ -269,13 +244,14 @@
                       onclick={() => toggleSort(column.name)}
                       title={column.comment ?? `Ordenar por ${column.name}`}
                     >
-                      {#if column.is_pk}<KeyRound class="mt-0.5 size-3 shrink-0 text-warning" />{/if}
                       <span class="grid">
-                        <span class="text-[12.5px] text-foreground">{column.name}</span>
+                        <span class="text-[12.5px] text-foreground"
+                          >{column.name}{#if column.is_pk}<span class="ml-1.5 font-mono text-[10px] font-normal text-muted-foreground">pk</span>{/if}</span
+                        >
                         <span class="font-mono text-[10.5px] font-normal text-muted-foreground">{column.full_type}</span>
                       </span>
                       {#if sort?.column === column.name}
-                        {#if sort.desc}<ArrowDown class="ml-auto size-3.5 text-primary" />{:else}<ArrowUp class="ml-auto size-3.5 text-primary" />{/if}
+                        {#if sort.desc}<ArrowDown class="ml-auto size-3.5" />{:else}<ArrowUp class="ml-auto size-3.5" />{/if}
                       {/if}
                     </button>
                   </th>
@@ -285,7 +261,7 @@
             </thead>
             <tbody>
               {#each data.rows as row, i (i)}
-                <tr class={['group', selected.has(i) ? 'bg-primary/5' : 'hover:bg-muted/40']}>
+                <tr class={['group', selected.has(i) ? 'bg-muted/60' : 'hover:bg-muted/40']}>
                   {#if editable}
                     <td class="border-r border-b px-3 py-1.5">
                       <Checkbox checked={selected.has(i)} onCheckedChange={(v) => toggleRow(i, v === true)} aria-label="Selecionar linha" />
@@ -301,7 +277,7 @@
                       ondblclick={() => startEdit(i, column)}
                     >
                       {#if editing?.row === i && editing.column === column.name}
-                        <div class="flex items-center gap-1 bg-background p-0.5 ring-2 ring-primary ring-inset">
+                        <div class="flex items-center gap-1 bg-background p-0.5 ring-1 ring-foreground/40 ring-inset">
                           <input
                             id="inline-editor"
                             class="w-full min-w-40 bg-transparent px-2 py-1 font-mono text-xs outline-none"
@@ -322,9 +298,7 @@
                       {:else}
                         <div class="truncate px-3 py-1.5" title={value ?? 'NULL'}>
                           {#if value === null}
-                            <span class="text-muted-foreground/70 italic">NULL</span>
-                          {:else if column.type === 'boolean'}
-                            <span class={value === 'true' ? 'text-primary' : 'text-muted-foreground'}>{value}</span>
+                            <span class="text-muted-foreground">NULL</span>
                           {:else}
                             {value}
                           {/if}
@@ -358,12 +332,11 @@
       {#if data}
         <footer class="flex shrink-0 flex-wrap items-center gap-3 border-t px-4 py-2 text-xs text-muted-foreground">
           <span>
-            {data.rows.length} linha(s) nesta página
-            {#if data.total !== null}· {data.total_exact ? '' : '≈ '}{fmt.format(data.total)} no total{/if}
+            {#if data.total !== null}{data.total_exact ? '' : '~'}{fmt.format(data.total)} {data.total === 1 ? 'linha' : 'linhas'}{:else}{data.rows.length} nesta página{/if}
           </span>
-          {#if editable}<span class="hidden lg:inline">· duplo clique numa célula para editar</span>{/if}
+          {#if editable}<span class="hidden lg:inline">Duplo clique numa célula para editar.</span>{/if}
           <div class="ml-auto flex items-center gap-2">
-            <span>Linhas por página</span>
+            <span>Por página</span>
             <Select.Root type="single" bind:value={size} onValueChange={() => (page = 0)}>
               <Select.Trigger size="sm" class="h-7 w-20">{size}</Select.Trigger>
               <Select.Content>

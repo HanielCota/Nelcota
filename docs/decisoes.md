@@ -275,6 +275,16 @@ gzip; o editor SQL (~145 KB gzip) só é baixado quando a página é aberta. As
 fontes Inter e JetBrains Mono vêm do `@fontsource-variable` (OFL), servidas
 pelo próprio binário.
 
+**D55. Painel sem ornamentos.** Removidos os padrões de template genérico:
+cards de estatística com ícone, gradientes, brilho no login, logo em quadrado
+colorido, pílulas e bolinhas em todo status, avatares com inicial, skeletons,
+toasts coloridos, ícone antes de cada título, subtítulos explicando o óbvio e a
+pílula "Postgres 17" (que era fixa no código, não lida do banco). Critério: cor
+só para problema (sem RLS, RLS sem policies, erro, ação destrutiva); textos
+curtos. Inter/JetBrains Mono trocadas por IBM Plex Sans/Mono, menos onipresentes
+e com cara de ferramenta técnica. Os avisos de segurança continuam, em texto
+simples.
+
 ### Pendências conhecidas
 
 - Embed de relações, `or=`/`and=` e upsert ficam para depois do MVP.
