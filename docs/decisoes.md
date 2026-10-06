@@ -212,7 +212,7 @@ com a porta SSH errada tranca o dono fora da máquina. Por padrão só recomenda
 
 ## Marco 5
 
-**D45. Painel com HTML no servidor + ~2 KB de JS próprio, sem HTMX.** As páginas
+**D45. Painel com HTML no servidor + ~2 KB de JS próprio, sem HTMX** (substituída por D50). As páginas
 são formulários comuns; o único trecho interativo (editor SQL) cabe em poucas
 linhas de `fetch`. CSP `script-src 'self'` sem `unsafe-inline`. Assets
 embutidos com `rust-embed`.
@@ -234,7 +234,7 @@ passar por `f64`: `numeric(30,10)` aparece e é editado com todas as casas.
 
 ## Design do painel
 
-**D49. Painel com estética de console de banco (escuro por padrão, acento
+**D49 (substituída por D50).** Painel com estética de console de banco (escuro por padrão, acento
 esmeralda)**, inspirado no Supabase, mas com nome, marca e ícones próprios.
 Tipografia Inter + JetBrains Mono, embutidas no binário (~88 KB, OFL, ver
 `crates/admin/assets/FONTS.md`): nada de Google Fonts, para manter a CSP
@@ -242,6 +242,38 @@ Tipografia Inter + JetBrains Mono, embutidas no binário (~88 KB, OFL, ver
 Ícones SVG desenhados à mão (sem pacote de ícones). Na visão geral, a contagem
 de linhas é exata para tabelas com menos de 10 mil linhas estimadas e usa a
 estimativa do planejador (`≈`) nas grandes.
+
+## Painel em Svelte
+
+**D50. Painel em Svelte 5 + shadcn-svelte + Tailwind v4 + CodeMirror 6**,
+compilado com Vite (escolha do mantenedor, 2026-10-06). O objetivo é a
+interatividade que o HTML do servidor não dava bem: edição inline na grade,
+sheets laterais, seleção múltipla, ordenação por coluna, editor SQL com
+destaque de sintaxe e autocomplete das tabelas e colunas do banco. SPA com Vite,
+**sem SvelteKit**: ele injeta script inline na página, o que quebraria a CSP
+`script-src 'self'`. Roteamento próprio (~60 linhas, history API).
+
+**D51. O build (`crates/admin/ui/dist`) é versionado no git** e embutido com
+`rust-embed`. Assim `cargo build`, `cargo install` e o Dockerfile continuam
+sem Node: só quem mexe no painel precisa do Node. O job `admin-ui` do CI roda
+`npm ci`, `npm audit`, `svelte-check`, `vite build` e falha se o `dist` versionado
+estiver desatualizado.
+
+**D52. CSP: `style-src` passa a aceitar `'unsafe-inline'`; `script-src` segue
+só `'self'`.** As transições do Svelte, o CodeMirror e o posicionamento de
+menus (floating-ui) injetam estilos em tempo de execução. Estilo inline não
+executa código; scripts inline continuam proibidos (há teste).
+
+**D53. O painel vira uma API JSON em `/admin/api/*`.** Mesma sessão, mesma
+checagem de origem (CSRF) e o mesmo construtor de SQL da API REST. Valores
+seguem como texto exato do Postgres (`RawValue`). Exclusão em lote numa
+transação só. A SPA é servida em qualquer `/admin/*` (fallback para o
+`index.html`). Assets com hash têm cache imutável; o `index.html`, `no-cache`.
+
+**D54. CodeMirror carregado sob demanda.** O bundle principal fica em ~130 KB
+gzip; o editor SQL (~145 KB gzip) só é baixado quando a página é aberta. As
+fontes Inter e JetBrains Mono vêm do `@fontsource-variable` (OFL), servidas
+pelo próprio binário.
 
 ### Pendências conhecidas
 

@@ -3,10 +3,17 @@
 Em `https://<seu-domínio>/admin/`. Login próprio, separado dos usuários finais:
 email e senha gerados pelo `nelcota init` (a senha aparece uma única vez).
 
-Visual de console de banco: tema escuro por padrão (claro se o sistema estiver
-em modo claro), sidebar com seções, editor de tabelas com lista lateral e grade
-de dados, fontes Inter e JetBrains Mono embutidas. Tudo é servido pelo próprio
-binário: sem CDN e sem build de frontend.
+SPA em **Svelte 5 + shadcn-svelte + Tailwind v4**, com **CodeMirror 6** no
+editor SQL. O build fica embutido no binário: sem CDN e sem Node em produção.
+Tema escuro por padrão, com botão para o claro.
+
+| Recurso | Como usar |
+|---|---|
+| Editar uma célula | duplo clique; Enter salva, Esc cancela, botão NULL para nulos |
+| Editar ou inserir linha completa | lápis no fim da linha / "Inserir linha" (painel lateral) |
+| Apagar várias linhas | marque as caixas e "Apagar N" (uma transação só) |
+| Ordenar | clique no cabeçalho da coluna (asc → desc → sem ordem) |
+| Executar SQL | Ctrl+Enter; autocomplete de tabelas e colunas; modelos e histórico |
 
 | Página | O que tem |
 |---|---|
@@ -39,8 +46,23 @@ aspas simples por causa dos `$`), seguido de `docker compose up -d --force-recre
 
 - Cookie de sessão `HttpOnly`, `SameSite=Strict` e `Secure` atrás do Caddy;
   sessões em memória com validade de 12 h (reiniciar o servidor desloga).
-- Todo POST precisa vir da mesma origem (`Origin`/`Sec-Fetch-Site`).
-- CSP sem scripts inline, `X-Frame-Options: DENY`, `no-store`.
+- A página em si não contém dados: tudo vem de `/admin/api/*`, que exige a
+  sessão. Todo request que muda estado precisa vir da mesma origem.
+- CSP sem scripts inline (`script-src 'self'`), `X-Frame-Options: DENY`.
+- O Svelte escapa todo texto; o painel nunca usa `{@html}`.
+
+## Desenvolvimento do painel
+
+```sh
+cd crates/admin/ui
+npm install
+npm run dev        # Vite com hot reload; /admin/api é encaminhado ao nelcota em https://localhost
+npm run check      # tipos (svelte-check)
+npm run build      # gera dist/ (versionado e embutido no binário)
+```
+
+Depois do `npm run build`, recompile o binário (`cargo build`) e faça commit do
+`dist/` junto com o código. O CI confere que o `dist` está atualizado.
 - Tentativas de login limitadas a 10 por minuto.
 - O editor SQL usa uma conexão nova por execução e o texto do SQL não vai para
   o log.

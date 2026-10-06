@@ -87,12 +87,15 @@ echo "ok: usuário lê a própria nota; anon recebe 401"
 
 say "Painel (login separado, via HTTPS)"
 admin_email=$(grep -o 'Admin do painel: .*' "$WORK/init.log" | awk '{print $4}')
-admin_pass=$(grep -o 'Senha: .*' "$WORK/init.log" | awk '{print $2}' | tr -d '')
+admin_pass=$(grep -o 'Senha: .*' "$WORK/init.log" | awk '{print $2}' | tr -d '\r')
 jar="$WORK/cookies.txt"
-code=$(curl -ks -o /dev/null -w '%{http_code}' -c "$jar" -X POST "$BASE/admin/login"   --data-urlencode "email=$admin_email" --data-urlencode "password=$admin_pass")
-[ "$code" = "303" ] || fail "login no painel falhou (HTTP $code)"
-"${CURL[@]}" -b "$jar" "$BASE/admin/" | grep -q "notas" || fail "painel não lista a tabela notas"
-echo "ok: login no painel e tabela notas listada"
+code=$(curl -ks -o /dev/null -w '%{http_code}' -c "$jar" -X POST "$BASE/admin/api/login" \
+  -H 'content-type: application/json' \
+  -d "{\"email\":\"$admin_email\",\"password\":\"$admin_pass\"}")
+[ "$code" = "200" ] || fail "login no painel falhou (HTTP $code)"
+"${CURL[@]}" -b "$jar" "$BASE/admin/api/overview" | grep -q '"notas"' || fail "painel não lista a tabela notas"
+"${CURL[@]}" "$BASE/admin/" | grep -q '<div id="app">' || fail "SPA do painel não foi servida"
+echo "ok: login no painel, tabela notas listada e SPA servida"
 
 say "Tipos TypeScript"
 nelcota types -o "$DIR/database.ts"

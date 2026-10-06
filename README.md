@@ -50,7 +50,8 @@ curl "https://api.seudominio.com/rest/v1/notas?texto=ilike.*oi*&order=id.desc" -
 ```
 
 Tipos para o frontend: `nelcota types -o database.ts`. OpenAPI em `/rest/v1/`.
-Painel em `/admin/`.
+Painel em `/admin/`: editor de tabelas com edição inline, editor SQL com
+autocomplete, usuários e policies RLS.
 
 ## Desenvolvimento
 
@@ -62,7 +63,13 @@ cargo test                  # testes de integração sobem Postgres 17 real (tes
 cargo clippy --all-targets -- -D warnings && cargo fmt --all --check
 cargo audit && cargo deny check
 ./scripts/acceptance.sh --local   # init + up + HTTPS + migrate + backup/restore + rollback
+
+# painel (Svelte 5 + shadcn-svelte + Tailwind v4 + CodeMirror)
+cd crates/admin/ui && npm install && npm run dev
 ```
+
+O build do painel (`crates/admin/ui/dist`) é versionado: compilar o binário não
+exige Node.
 
 Os testes provam, contra um Postgres real, que um usuário não lê nem altera
 dados de outro (em todos os verbos), que JWTs inválidos, expirados ou com role
