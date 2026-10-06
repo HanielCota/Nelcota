@@ -1,10 +1,20 @@
 <script lang="ts">
+  import { onMount } from 'svelte'
   import { Button } from '$lib/components/ui/button'
   import { Input } from '$lib/components/ui/input'
   import { Label } from '$lib/components/ui/label'
   import Logo from '$lib/components/app/Logo.svelte'
   import { api } from '$lib/api'
   import { session } from '$lib/session.svelte'
+
+  let project = $state('')
+  onMount(async () => {
+    try {
+      project = (await api.get<{ project: string }>('/whoami')).project
+    } catch {
+      project = ''
+    }
+  })
 
   let email = $state('')
   let password = $state('')
@@ -30,7 +40,9 @@
   <form class="grid w-full max-w-xs gap-4" onsubmit={submit}>
     <div class="mb-2">
       <Logo class="text-lg" />
-      <p class="text-sm text-muted-foreground">Painel administrativo</p>
+      <p class="text-sm text-muted-foreground">
+        Painel {#if project}do projeto <span class="font-medium text-foreground">{project}</span>{:else}administrativo{/if}
+      </p>
     </div>
     <div class="grid gap-1.5">
       <Label for="email">Email</Label>

@@ -4,6 +4,7 @@
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu'
   import { Button } from '$lib/components/ui/button'
   import { toggleMode } from 'mode-watcher'
+  import ProjectSwitcher from './ProjectSwitcher.svelte'
   import { api } from '$lib/api'
   import { session } from '$lib/session.svelte'
   import { href, match, route } from '$lib/router.svelte'
@@ -14,6 +15,7 @@
     '/sql': 'SQL',
     '/users': 'Usuários',
     '/policies': 'Policies',
+    '/projects': 'Projetos',
   }
 
   const crumbs = $derived.by((): { label: string; path?: string }[] => {
@@ -30,6 +32,7 @@
 
 <header class="flex h-12 shrink-0 items-center gap-3 border-b px-3">
   <Sidebar.Trigger />
+  <ProjectSwitcher />
   <Breadcrumb.Root>
     <Breadcrumb.List>
       {#each crumbs as crumb, i (i)}

@@ -101,3 +101,21 @@ export interface SqlResponse {
   results?: SqlResult[]
   error?: { message: string; code?: string; detail?: string; hint?: string; position?: number }
 }
+
+export interface ProjectLink {
+  name: string
+  url: string | null
+  current: boolean
+}
+
+export interface ProjectsData {
+  current: string
+  sso: boolean
+  projects: ProjectLink[]
+}
+
+export interface ProjectStatus extends ProjectLink {
+  healthy: boolean
+  version: string | null
+  latency_ms: number | null
+}

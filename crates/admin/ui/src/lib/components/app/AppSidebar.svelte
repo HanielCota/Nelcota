@@ -6,6 +6,7 @@
   import Users from '@lucide/svelte/icons/users'
   import ShieldCheck from '@lucide/svelte/icons/shield-check'
   import BookOpen from '@lucide/svelte/icons/book-open'
+  import Boxes from '@lucide/svelte/icons/boxes'
   import Logo from './Logo.svelte'
   import { href, route } from '$lib/router.svelte'
 
@@ -25,6 +26,10 @@
         { title: 'Usuários', path: '/users', icon: Users },
         { title: 'Policies', path: '/policies', icon: ShieldCheck },
       ],
+    },
+    {
+      label: 'Host',
+      items: [{ title: 'Projetos', path: '/projects', icon: Boxes }],
     },
   ]
 

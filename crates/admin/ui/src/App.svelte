@@ -12,11 +12,23 @@
   import Users from '$lib/pages/Users.svelte'
   import Policies from '$lib/pages/Policies.svelte'
   import NotFound from '$lib/pages/NotFound.svelte'
+  import Projects from '$lib/pages/Projects.svelte'
+  import { takeHandoffToken } from '$lib/projects'
   import { api } from '$lib/api'
   import { session } from '$lib/session.svelte'
   import { match, route } from '$lib/router.svelte'
 
   onMount(async () => {
+    // Vindo de outro painel do host (login único): troca o token por sessão.
+    const token = takeHandoffToken()
+    if (token) {
+      try {
+        session.email = (await api.post<{ email: string }>('/sso', { token })).email
+        return
+      } catch {
+        // Token vencido ou já usado: segue para o login normal.
+      }
+    }
     try {
       const me = await api.get<{ email: string }>('/session')
       session.email = me.email
@@ -57,6 +69,8 @@
               <Users />
             {:else if path === '/policies'}
               <Policies />
+            {:else if path === '/projects'}
+              <Projects />
             {:else}
               <NotFound />
             {/if}
