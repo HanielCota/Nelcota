@@ -1,136 +1,16 @@
 //! Testes de integração do fluxo JWT → role → RLS, contra um Postgres 17 real
 //! (testcontainers). Nada de mock do banco: o que está sob teste é o RLS.
-//!
-//! Requer Docker em execução.
 
-use std::{sync::Arc, time::Duration};
+mod common;
 
-use axum::{
-    Router,
-    body::Body,
-    http::{Request, StatusCode, header},
-};
-use http_body_util::BodyExt;
-use jsonwebtoken::{EncodingKey, Header, get_current_timestamp};
-use nelcota_auth::Hs256Verifier;
+use axum::body::Body;
+use axum::http::{Request, StatusCode, header};
+use common::*;
+use jsonwebtoken::get_current_timestamp;
 use nelcota_core::{Claims, db};
-use nelcota_server::{AppState, app};
 use serde_json::{Value, json};
-use testcontainers_modules::{
-    postgres::Postgres,
-    testcontainers::{ContainerAsync, ImageExt, runners::AsyncRunner},
-};
 use tower::ServiceExt;
 use uuid::Uuid;
-
-const JWT_SECRET: &str = "segredo-de-teste-com-mais-de-32-caracteres";
-const AUTHENTICATOR_PASSWORD: &str = "senha-do-authenticator-de-teste";
-
-struct TestApp {
-    router: Router,
-    pool: deadpool_postgres::Pool,
-    admin: tokio_postgres::Config,
-    user_a: Uuid,
-    user_b: Uuid,
-    _container: ContainerAsync<Postgres>,
-}
-
-impl TestApp {
-    async fn spawn() -> Self {
-        Self::spawn_with_pool(4).await
-    }
-
-    async fn spawn_with_pool(pool_size: usize) -> Self {
-        let container = Postgres::default()
-            .with_tag("17-alpine")
-            .with_cmd([
-                "postgres",
-                "-c",
-                "fsync=off",
-                "-c",
-                "shared_preload_libraries=pg_stat_statements",
-            ])
-            .start()
-            .await
-            .expect("Docker precisa estar rodando para os testes de integração");
-        let host = container.get_host().await.unwrap();
-        let port = container.get_host_port_ipv4(5432).await.unwrap();
-        let admin: tokio_postgres::Config =
-            format!("postgres://postgres:postgres@{host}:{port}/postgres")
-                .parse()
-                .unwrap();
-
-        db::bootstrap(&admin, AUTHENTICATOR_PASSWORD).await.unwrap();
-
-        // Fixture: tabela de exemplo + uma linha para cada usuário, inseridas
-        // como superusuário (que ignora RLS).
-        let (user_a, user_b) = (Uuid::new_v4(), Uuid::new_v4());
-        let (client, connection) = admin.connect(tokio_postgres::NoTls).await.unwrap();
-        tokio::spawn(connection);
-        client
-            .batch_execute(include_str!("../../../examples/todos.sql"))
-            .await
-            .unwrap();
-        client
-            .execute(
-                "INSERT INTO public.todos (user_id, title) VALUES ($1, 'tarefa de A'), ($2, 'tarefa de B')",
-                &[&user_a, &user_b],
-            )
-            .await
-            .unwrap();
-
-        let pool = db::api_pool(&admin, AUTHENTICATOR_PASSWORD, pool_size);
-        let state = AppState {
-            pool: pool.clone(),
-            verifier: Arc::new(Hs256Verifier::new(JWT_SECRET.as_bytes())),
-        };
-        TestApp {
-            router: app(state, Duration::from_secs(5)),
-            pool,
-            admin,
-            user_a,
-            user_b,
-            _container: container,
-        }
-    }
-
-    async fn get(&self, path: &str, token: Option<&str>) -> (StatusCode, Value) {
-        let mut request = Request::get(path);
-        if let Some(token) = token {
-            request = request.header(header::AUTHORIZATION, format!("Bearer {token}"));
-        }
-        let response = self
-            .router
-            .clone()
-            .oneshot(request.body(Body::empty()).unwrap())
-            .await
-            .unwrap();
-        let status = response.status();
-        let bytes = response.into_body().collect().await.unwrap().to_bytes();
-        let body = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
-        (status, body)
-    }
-}
-
-fn token(claims: Value) -> String {
-    token_with_secret(claims, JWT_SECRET)
-}
-
-fn token_with_secret(mut claims: Value, secret: &str) -> String {
-    if claims.get("exp").is_none() {
-        claims["exp"] = json!(get_current_timestamp() + 3600);
-    }
-    jsonwebtoken::encode(
-        &Header::default(),
-        &claims,
-        &EncodingKey::from_secret(secret.as_bytes()),
-    )
-    .unwrap()
-}
-
-fn user_token(sub: Uuid) -> String {
-    token(json!({ "role": "authenticated", "sub": sub }))
-}
 
 fn titles(body: &Value) -> Vec<&str> {
     body.as_array()
@@ -272,7 +152,11 @@ async fn jwt_expirado_ou_com_assinatura_invalida_retorna_401() {
 /// vazar para o seguinte.
 #[tokio::test]
 async fn role_e_claims_nao_vazam_entre_requests_do_pool() {
-    let app = TestApp::spawn_with_pool(1).await;
+    let app = TestApp::spawn_with(Options {
+        pool_size: 1,
+        ..Options::default()
+    })
+    .await;
     let service = token(json!({ "role": "service_role" }));
 
     let (status, body) = app.get("/rest/v1/todos", Some(&service)).await;
@@ -309,7 +193,11 @@ async fn role_e_claims_nao_vazam_entre_requests_do_pool() {
 /// Transação abortada (erro no meio do request) também não deixa resíduo.
 #[tokio::test]
 async fn transacao_com_erro_faz_rollback_da_role() {
-    let app = TestApp::spawn_with_pool(1).await;
+    let app = TestApp::spawn_with(Options {
+        pool_size: 1,
+        ..Options::default()
+    })
+    .await;
     let claims = Claims::from_payload(json!({ "role": "service_role" })).unwrap();
     {
         let mut client = app.pool.get().await.unwrap();
