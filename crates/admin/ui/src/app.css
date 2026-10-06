@@ -5,6 +5,11 @@
 @import "@fontsource/ibm-plex-mono/latin-400.css";
 @import "@fontsource/ibm-plex-mono/latin-500.css";
 
+/* O dist/ é versionado (não está no .gitignore), então a detecção automática
+   do Tailwind o lia como fonte: classes do build anterior voltavam no seguinte
+   e o build deixava de depender só do código. */
+@source not "../dist";
+
 @custom-variant dark (&:is(.dark *));
 
 /* Claro: superfícies quase brancas, bordas suaves e verde da marca. */
