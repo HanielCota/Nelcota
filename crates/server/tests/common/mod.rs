@@ -30,6 +30,27 @@ use uuid::Uuid;
 pub const JWT_SECRET: &str = "segredo-de-teste-com-mais-de-32-caracteres";
 pub const AUTHENTICATOR_PASSWORD: &str = "senha-do-authenticator-de-teste";
 pub const ADMIN_EMAIL: &str = "admin@exemplo.com";
+pub const SSO_SECRET: &str = "segredo-compartilhado-do-host-com-32+";
+
+/// Lista de projetos do host usada nos testes (este app é a "loja").
+fn registry_file() -> std::path::PathBuf {
+    let dir = std::env::temp_dir().join(format!("nelcota-test-{}", Uuid::new_v4()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("projects.json");
+    std::fs::write(
+        &path,
+        json!({
+            "panel_login": "shared",
+            "projects": [
+                { "name": "loja", "url": "https://loja.exemplo.com" },
+                { "name": "blog", "url": "https://blog.exemplo.com" },
+            ],
+        })
+        .to_string(),
+    )
+    .unwrap();
+    path
+}
 pub const ADMIN_PASSWORD: &str = "senha-do-admin-de-teste";
 
 pub struct Options {
@@ -154,6 +175,11 @@ impl TestApp {
             sessions: Arc::default(),
             limiter: Arc::new(RateLimiter::new(1000)),
             secure_cookies: false,
+            host: Arc::new(nelcota_admin::HostLink {
+                project: "loja".into(),
+                registry: Some(registry_file()),
+                sso: Some(nelcota_admin::Sso::new(SSO_SECRET.as_bytes())),
+            }),
         };
         let auth = AuthState {
             pool: pool.clone(),

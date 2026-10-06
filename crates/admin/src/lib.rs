@@ -11,7 +11,12 @@
 //!   de SQL da API (identificadores só do catálogo, valores parametrizados).
 
 mod api;
+mod projects;
 mod sql;
+mod sso;
+
+pub use projects::HostLink;
+pub use sso::Sso;
 
 use std::{
     collections::HashMap,
@@ -93,6 +98,8 @@ pub struct AdminState {
     pub limiter: Arc<RateLimiter>,
     /// Cookie com `Secure` (atrás do Caddy/HTTPS).
     pub secure_cookies: bool,
+    /// Projeto atual, lista do host e login único.
+    pub host: Arc<HostLink>,
 }
 
 pub fn router(state: AdminState) -> Router {
@@ -114,6 +121,9 @@ pub fn router(state: AdminState) -> Router {
         .route("/admin/api/users/{id}/revoke", post(api::revoke_sessions))
         .route("/admin/api/users/{id}", delete(api::delete_user))
         .route("/admin/api/policies", get(api::policies))
+        .route("/admin/api/projects", get(projects::list))
+        .route("/admin/api/projects/status", get(projects::status))
+        .route("/admin/api/sso/handoff", post(sso::handoff))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             require_session,
@@ -121,6 +131,8 @@ pub fn router(state: AdminState) -> Router {
 
     Router::new()
         .route("/admin/api/login", post(login))
+        .route("/admin/api/sso", post(sso::redeem))
+        .route("/admin/api/whoami", get(whoami))
         .merge(protected)
         .route("/admin/api/{*rest}", get(api_not_found).post(api_not_found))
         .route("/admin/assets/{*file}", get(asset))
@@ -327,22 +339,31 @@ async fn login(State(state): State<AdminState>, Json(form): Json<LoginRequest>) 
         return ApiError(StatusCode::UNAUTHORIZED, "Email ou senha inválidos.".into())
             .into_response();
     }
-    let token = state.sessions.create();
-    let secure = if state.secure_cookies { "; Secure" } else { "" };
-    let cookie = format!(
-        "{COOKIE}={token}; Path=/admin; HttpOnly; SameSite=Strict; Max-Age={}{secure}",
-        SESSION_TTL.as_secs()
-    );
     tracing::info!("login no painel");
     (
-        [(header::SET_COOKIE, cookie)],
+        [(header::SET_COOKIE, new_session_cookie(&state))],
         Json(json!({ "email": state.credentials.email })),
     )
         .into_response()
 }
 
+/// Cria uma sessão e devolve o `Set-Cookie` correspondente.
+fn new_session_cookie(state: &AdminState) -> String {
+    let token = state.sessions.create();
+    let secure = if state.secure_cookies { "; Secure" } else { "" };
+    format!(
+        "{COOKIE}={token}; Path=/admin; HttpOnly; SameSite=Strict; Max-Age={}{secure}",
+        SESSION_TTL.as_secs()
+    )
+}
+
+/// `GET /admin/api/whoami` (público): nome do projeto, para a tela de login.
+async fn whoami(State(state): State<AdminState>) -> Json<serde_json::Value> {
+    Json(json!({ "project": state.host.project, "sso": state.host.sso.is_some() }))
+}
+
 async fn session(State(state): State<AdminState>) -> Json<serde_json::Value> {
-    Json(json!({ "email": state.credentials.email }))
+    Json(json!({ "email": state.credentials.email, "project": state.host.project }))
 }
 
 async fn logout(State(state): State<AdminState>, headers: HeaderMap) -> Response {

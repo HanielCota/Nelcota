@@ -92,12 +92,16 @@ async fn health(State(pool): State<Pool>) -> impl IntoResponse {
         Ok(client) => client.simple_query("SELECT 1").await.is_ok(),
         Err(_) => false,
     };
+    let version = env!("CARGO_PKG_VERSION");
     if ok {
-        (StatusCode::OK, Json(json!({ "status": "ok" })))
+        (
+            StatusCode::OK,
+            Json(json!({ "status": "ok", "version": version })),
+        )
     } else {
         (
             StatusCode::SERVICE_UNAVAILABLE,
-            Json(json!({ "status": "unavailable" })),
+            Json(json!({ "status": "unavailable", "version": version })),
         )
     }
 }

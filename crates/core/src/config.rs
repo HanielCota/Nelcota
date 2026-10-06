@@ -69,6 +69,13 @@ pub struct Config {
     pub admin_email: Option<String>,
     /// Hash PHC argon2id da senha do admin (gerado pelo `nelcota init`).
     pub admin_password_hash: Option<Secret>,
+    /// Segredo compartilhado entre os projetos do mesmo host para o login
+    /// único do painel (handoff de SSO). Ausente = login por projeto.
+    pub admin_sso_secret: Option<Secret>,
+    /// Nome deste projeto no host (`nelcota init --project`).
+    pub project_name: Option<String>,
+    /// Lista pública de projetos do host (nome + URL), para o seletor do painel.
+    pub host_registry: Option<std::path::PathBuf>,
     /// Schema exposto pela API REST.
     pub db_schema: String,
     /// Teto de linhas por leitura na API (`None` = sem teto).
@@ -106,6 +113,9 @@ impl Default for Config {
             trust_proxy: false,
             admin_email: None,
             admin_password_hash: None,
+            admin_sso_secret: None,
+            project_name: None,
+            host_registry: None,
             db_schema: "public".into(),
             max_rows: None,
             listen: SocketAddr::from(([0, 0, 0, 0], 8000)),

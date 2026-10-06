@@ -85,6 +85,7 @@ async fn serve(config: Config) -> anyhow::Result<()> {
                 sessions: Arc::default(),
                 limiter: Arc::new(RateLimiter::new(10)),
                 secure_cookies: config.trust_proxy,
+                host: Arc::new(host_link(&config)),
             })
         }
         _ => {
@@ -112,6 +113,24 @@ async fn serve(config: Config) -> anyhow::Result<()> {
     .with_graceful_shutdown(shutdown_signal())
     .await?;
     Ok(())
+}
+
+/// Projeto atual, lista do host e login único (se houver segredo compartilhado).
+fn host_link(config: &Config) -> nelcota_admin::HostLink {
+    let sso = config
+        .admin_sso_secret
+        .as_ref()
+        .map(|s| s.expose())
+        .filter(|s| s.len() >= 32)
+        .map(|s| nelcota_admin::Sso::new(s.as_bytes()));
+    nelcota_admin::HostLink {
+        project: config
+            .project_name
+            .clone()
+            .unwrap_or_else(|| "nelcota".into()),
+        registry: config.host_registry.clone(),
+        sso,
+    }
 }
 
 /// Hashes argon2 simultâneos: cada um usa ~19 MiB; com até 4 o pico fica

@@ -540,3 +540,155 @@ async fn spa_embutida_com_cabecalhos_de_seguranca() {
         .await;
     assert_eq!(reply.status, StatusCode::NOT_FOUND);
 }
+
+/// Token de handoff assinado com o segredo compartilhado (como outro painel do
+/// host faria).
+fn handoff_token(audience: &str, email: &str, exp_offset: i64, secret: &str) -> String {
+    let now = jsonwebtoken::get_current_timestamp() as i64;
+    jsonwebtoken::encode(
+        &jsonwebtoken::Header::default(),
+        &json!({
+            "iss": "nelcota-admin",
+            "sub": email,
+            "aud": audience,
+            "iat": now,
+            "exp": now + exp_offset,
+            "jti": uuid::Uuid::new_v4().to_string(),
+        }),
+        &jsonwebtoken::EncodingKey::from_secret(secret.as_bytes()),
+    )
+    .unwrap()
+}
+
+async fn redeem(app: &TestApp, token: &str) -> Reply {
+    app.raw(
+        Method::POST,
+        "/admin/api/sso",
+        &[JSON],
+        json!({ "token": token }).to_string(),
+    )
+    .await
+}
+
+#[tokio::test]
+async fn login_unico_entre_projetos_do_host() {
+    let app = TestApp::spawn().await;
+
+    // A tela de login sabe em qual projeto está.
+    let whoami = app
+        .raw(Method::GET, "/admin/api/whoami", &[], String::new())
+        .await;
+    assert_eq!(whoami.body, json!({ "project": "loja", "sso": true }));
+
+    // Token emitido por outro painel do host para "loja": vira sessão.
+    let token = handoff_token("loja", ADMIN_EMAIL, 60, SSO_SECRET);
+    let reply = redeem(&app, &token).await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.text);
+    let cookie = reply.headers[header::SET_COOKIE]
+        .to_str()
+        .unwrap()
+        .split(';')
+        .next()
+        .unwrap()
+        .to_owned();
+    assert_eq!(
+        get(&app, "/admin/api/session", &cookie).await.body["project"],
+        "loja"
+    );
+
+    // Uso único.
+    assert_eq!(redeem(&app, &token).await.status, StatusCode::UNAUTHORIZED);
+
+    // Destino errado, admin errado, vencido ou segredo errado: recusados.
+    for bad in [
+        handoff_token("blog", ADMIN_EMAIL, 60, SSO_SECRET),
+        handoff_token("loja", "intruso@exemplo.com", 60, SSO_SECRET),
+        handoff_token("loja", ADMIN_EMAIL, -120, SSO_SECRET),
+        handoff_token(
+            "loja",
+            ADMIN_EMAIL,
+            60,
+            "outro-segredo-qualquer-de-32-bytes!!",
+        ),
+    ] {
+        assert_eq!(redeem(&app, &bad).await.status, StatusCode::UNAUTHORIZED);
+    }
+
+    // Handoff para outro projeto exige sessão e projeto existente.
+    let reply = app
+        .raw(
+            Method::POST,
+            "/admin/api/sso/handoff",
+            &[JSON],
+            json!({ "project": "blog" }).to_string(),
+        )
+        .await;
+    assert_eq!(reply.status, StatusCode::UNAUTHORIZED);
+    let reply = send(
+        &app,
+        Method::POST,
+        "/admin/api/sso/handoff",
+        &cookie,
+        json!({ "project": "nada" }),
+    )
+    .await;
+    assert_eq!(reply.status, StatusCode::NOT_FOUND);
+
+    let reply = send(
+        &app,
+        Method::POST,
+        "/admin/api/sso/handoff",
+        &cookie,
+        json!({ "project": "blog" }),
+    )
+    .await;
+    let url = reply.body["url"].as_str().unwrap().to_owned();
+    let (base, token) = url.split_once("/admin/#sso=").unwrap();
+    assert_eq!(base, "https://blog.exemplo.com");
+    // O token é para "blog": não serve para entrar na própria "loja".
+    assert_eq!(redeem(&app, token).await.status, StatusCode::UNAUTHORIZED);
+    let mut validation = jsonwebtoken::Validation::default();
+    validation.set_audience(&["blog"]);
+    let claims = jsonwebtoken::decode::<Value>(
+        token,
+        &jsonwebtoken::DecodingKey::from_secret(SSO_SECRET.as_bytes()),
+        &validation,
+    )
+    .unwrap()
+    .claims;
+    assert_eq!(claims["sub"], ADMIN_EMAIL);
+    let ttl = claims["exp"].as_u64().unwrap() - claims["iat"].as_u64().unwrap();
+    assert!(ttl <= 60, "token curto");
+}
+
+#[tokio::test]
+async fn lista_e_estado_dos_projetos_do_host() {
+    let app = TestApp::spawn().await;
+    let cookie = login(&app).await;
+
+    let list = get(&app, "/admin/api/projects", &cookie).await.body;
+    assert_eq!(list["current"], "loja");
+    assert_eq!(list["sso"], true);
+    let names: Vec<&str> = list["projects"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|p| p["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(names, ["loja", "blog"]);
+    assert_eq!(list["projects"][0]["current"], true);
+    assert!(
+        !list.to_string().contains("secret"),
+        "a lista nunca carrega segredos"
+    );
+
+    // Fora de um host Docker, os apps não respondem: o estado vem como fora do ar.
+    let status = get(&app, "/admin/api/projects/status", &cookie).await.body;
+    assert_eq!(status["projects"].as_array().unwrap().len(), 2);
+    assert_eq!(status["projects"][1]["healthy"], false);
+
+    let reply = app
+        .raw(Method::GET, "/admin/api/projects", &[], String::new())
+        .await;
+    assert_eq!(reply.status, StatusCode::UNAUTHORIZED);
+}
