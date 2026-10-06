@@ -1,31 +1,25 @@
-//! Testes do painel administrativo: login separado, proteção de rotas, CSRF,
+//! Testes do painel administrativo: login separado, API JSON protegida, CSRF,
 //! alerta de tabela sem RLS, editor SQL, edição de tabelas, usuários,
-//! policies e escape de HTML.
+//! policies e a SPA embutida.
 
 mod common;
 
 use axum::http::{Method, StatusCode, header};
 use common::*;
-use serde_json::json;
+use serde_json::{Value, json};
 
-const FORM: (&str, &str) = ("content-type", "application/x-www-form-urlencoded");
-
-fn form(fields: &[(&str, &str)]) -> String {
-    form_urlencoded::Serializer::new(String::new())
-        .extend_pairs(fields)
-        .finish()
-}
+const JSON: (&str, &str) = ("content-type", "application/json");
 
 async fn login(app: &TestApp) -> String {
     let reply = app
         .raw(
             Method::POST,
-            "/admin/login",
-            &[FORM],
-            form(&[("email", ADMIN_EMAIL), ("password", ADMIN_PASSWORD)]),
+            "/admin/api/login",
+            &[JSON],
+            json!({ "email": ADMIN_EMAIL, "password": ADMIN_PASSWORD }).to_string(),
         )
         .await;
-    assert_eq!(reply.status, StatusCode::SEE_OTHER, "{}", reply.text);
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.text);
     let cookie = reply.headers[header::SET_COOKIE]
         .to_str()
         .unwrap()
@@ -40,40 +34,41 @@ async fn get(app: &TestApp, path: &str, cookie: &str) -> Reply {
         .await
 }
 
-async fn post_form(app: &TestApp, path: &str, cookie: &str, fields: &[(&str, &str)]) -> Reply {
-    app.raw(
-        Method::POST,
-        path,
-        &[("cookie", cookie), FORM],
-        form(fields),
-    )
-    .await
+async fn send(app: &TestApp, method: Method, path: &str, cookie: &str, body: Value) -> Reply {
+    app.raw(method, path, &[("cookie", cookie), JSON], body.to_string())
+        .await
 }
 
-async fn sql(app: &TestApp, cookie: &str, query: &str) -> serde_json::Value {
-    app.raw(
+async fn sql(app: &TestApp, cookie: &str, query: &str) -> Value {
+    send(
+        app,
         Method::POST,
-        "/admin/sql",
-        &[("cookie", cookie), ("content-type", "application/json")],
-        json!({ "sql": query }).to_string(),
+        "/admin/api/sql",
+        cookie,
+        json!({ "sql": query }),
     )
     .await
     .body
 }
 
 #[tokio::test]
-async fn login_separado_e_rotas_protegidas() {
+async fn login_separado_e_api_protegida() {
     let app = TestApp::spawn().await;
 
-    let reply = app.raw(Method::GET, "/admin/", &[], String::new()).await;
-    assert_eq!(reply.status, StatusCode::SEE_OTHER);
-    assert_eq!(reply.headers[header::LOCATION], "/admin/login");
+    for path in [
+        "/admin/api/overview",
+        "/admin/api/tables/produtos",
+        "/admin/api/users",
+    ] {
+        let reply = app.raw(Method::GET, path, &[], String::new()).await;
+        assert_eq!(reply.status, StatusCode::UNAUTHORIZED, "{path}");
+    }
     let reply = app
         .raw(
             Method::POST,
-            "/admin/sql",
-            &[("content-type", "application/json")],
-            "{}".into(),
+            "/admin/api/sql",
+            &[JSON],
+            json!({ "sql": "select 1" }).to_string(),
         )
         .await;
     assert_eq!(reply.status, StatusCode::UNAUTHORIZED);
@@ -85,68 +80,64 @@ async fn login_separado_e_rotas_protegidas() {
         let reply = app
             .raw(
                 Method::POST,
-                "/admin/login",
-                &[FORM],
-                form(&[("email", email), ("password", password)]),
+                "/admin/api/login",
+                &[JSON],
+                json!({ "email": email, "password": password }).to_string(),
             )
             .await;
         assert_eq!(reply.status, StatusCode::UNAUTHORIZED);
-        assert!(reply.text.contains("Email ou senha inválidos"));
+        assert_eq!(reply.body["error"], "Email ou senha inválidos.");
     }
 
-    // Um JWT de usuário (nem de service_role) não abre o painel.
+    // Um JWT (nem de service_role) não abre o painel.
     let reply = app
         .raw(
             Method::GET,
-            "/admin/",
+            "/admin/api/overview",
             &[("authorization", &format!("Bearer {}", service_token()))],
             String::new(),
         )
         .await;
-    assert_eq!(reply.status, StatusCode::SEE_OTHER);
+    assert_eq!(reply.status, StatusCode::UNAUTHORIZED);
 
     let cookie = login(&app).await;
-    let reply = get(&app, "/admin/", &cookie).await;
-    assert_eq!(reply.status, StatusCode::OK);
-    let csp = reply.headers[header::CONTENT_SECURITY_POLICY]
-        .to_str()
-        .unwrap();
-    assert!(csp.contains("script-src 'self'"));
-    assert_eq!(reply.headers[header::X_FRAME_OPTIONS], "DENY");
-    // Regressão: com `no-referrer` o navegador manda `Origin: null` no POST do
-    // formulário e o login era recusado como CSRF.
-    assert_eq!(reply.headers[header::REFERRER_POLICY], "same-origin");
-    assert!(reply.text.contains("service_role"));
+    let reply = get(&app, "/admin/api/session", &cookie).await;
+    assert_eq!(reply.body["email"], ADMIN_EMAIL);
 
     // Login como o navegador faz (mesma origem) passa; `Origin: null` não.
     let browser = |origin: &'static str| {
         [
-            FORM,
+            JSON,
             ("host", "localhost"),
             ("origin", origin),
             ("sec-fetch-site", "same-origin"),
         ]
     };
-    let credentials = form(&[("email", ADMIN_EMAIL), ("password", ADMIN_PASSWORD)]);
+    let credentials = json!({ "email": ADMIN_EMAIL, "password": ADMIN_PASSWORD }).to_string();
     let reply = app
         .raw(
             Method::POST,
-            "/admin/login",
+            "/admin/api/login",
             &browser("https://localhost"),
             credentials.clone(),
         )
         .await;
-    assert_eq!(reply.status, StatusCode::SEE_OTHER);
+    assert_eq!(reply.status, StatusCode::OK);
     let reply = app
-        .raw(Method::POST, "/admin/login", &browser("null"), credentials)
+        .raw(
+            Method::POST,
+            "/admin/api/login",
+            &browser("null"),
+            credentials,
+        )
         .await;
     assert_eq!(reply.status, StatusCode::FORBIDDEN);
 
     // Logout invalida a sessão.
-    let reply = post_form(&app, "/admin/logout", &cookie, &[]).await;
-    assert_eq!(reply.status, StatusCode::SEE_OTHER);
-    let reply = get(&app, "/admin/", &cookie).await;
-    assert_eq!(reply.status, StatusCode::SEE_OTHER);
+    let reply = send(&app, Method::POST, "/admin/api/logout", &cookie, json!({})).await;
+    assert_eq!(reply.status, StatusCode::OK);
+    let reply = get(&app, "/admin/api/session", &cookie).await;
+    assert_eq!(reply.status, StatusCode::UNAUTHORIZED);
 }
 
 #[tokio::test]
@@ -154,18 +145,55 @@ async fn alerta_de_tabela_sem_rls() {
     let app = TestApp::spawn().await;
     let cookie = login(&app).await;
 
-    let dashboard = get(&app, "/admin/", &cookie).await.text;
-    assert!(dashboard.contains("Tabelas expostas sem RLS"));
-    assert!(dashboard.contains("<code>produtos</code>"));
-    // todos tem RLS + 4 policies; segredos não tem GRANT para anon/authenticated.
-    assert!(dashboard.contains("RLS · 4 policies"));
-    assert!(!dashboard.contains("<code>segredos</code>"));
+    let overview = get(&app, "/admin/api/overview", &cookie).await.body;
+    assert_eq!(overview["exposed_without_rls"], json!(["produtos"]));
+    let table = |name: &str| {
+        overview["tables"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|t| t["name"] == name)
+            .cloned()
+            .unwrap()
+    };
+    assert_eq!(table("produtos")["rls"]["state"], "danger");
+    assert_eq!(table("todos")["rls"]["state"], "ok");
+    assert_eq!(table("todos")["rls"]["label"], "RLS · 4 policies");
+    // segredos não tem GRANT para anon/authenticated: não é "exposta".
+    assert_eq!(table("segredos")["rls"]["state"], "none");
+    assert_eq!(table("produtos")["grants"]["anon"], json!(["SELECT"]));
+    assert_eq!(table("produtos")["rows"], 4);
+    assert_eq!(table("produtos")["rows_exact"], true);
+    assert!(overview["counts"]["functions"].as_u64().unwrap() >= 5);
 
-    let policies = get(&app, "/admin/policies", &cookie).await.text;
-    assert!(policies.contains("todos_dono_select"));
-    assert!(policies.contains("(user_id = auth.uid())"));
-    assert!(policies.contains("<code>produtos</code> está exposta sem RLS"));
-    assert!(policies.contains("Funções executáveis por anon"));
+    let policies = get(&app, "/admin/api/policies", &cookie).await.body;
+    let todos = policies["tables"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|t| t["name"] == "todos")
+        .unwrap();
+    let select = todos["policies"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["name"] == "todos_dono_select")
+        .unwrap();
+    assert_eq!(select["using"], "(user_id = auth.uid())");
+    assert_eq!(select["command"], "SELECT");
+    assert_eq!(select["roles"], json!(["authenticated"]));
+    assert!(
+        policies["anon_functions"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("soma"))
+    );
+    assert!(
+        !policies["anon_functions"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("so_servico"))
+    );
 
     // Corrigido o problema, o alerta some (o catálogo recarrega sozinho).
     app.admin_client
@@ -174,9 +202,16 @@ async fn alerta_de_tabela_sem_rls() {
         .unwrap();
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
     loop {
-        let text = get(&app, "/admin/", &cookie).await.text;
-        if !text.contains("Tabelas expostas sem RLS") {
-            assert!(text.contains("RLS sem policies"));
+        let overview = get(&app, "/admin/api/overview", &cookie).await.body;
+        if overview["exposed_without_rls"] == json!([]) {
+            let produtos = overview["tables"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|t| t["name"] == "produtos")
+                .unwrap()
+                .clone();
+            assert_eq!(produtos["rls"]["state"], "warn");
             break;
         }
         assert!(std::time::Instant::now() < deadline, "alerta não sumiu");
@@ -211,170 +246,171 @@ async fn editor_sql_isolado_e_com_erros_legiveis() {
     assert_eq!(out["results"][0]["rows"], json!([["postgres"]]));
 
     // CSRF: origem diferente é recusada.
-    let reply = app
-        .raw(
-            Method::POST,
-            "/admin/sql",
-            &[
-                ("cookie", &cookie),
-                ("content-type", "application/json"),
-                ("origin", "https://site-malicioso.com"),
-                ("host", "localhost"),
-            ],
-            json!({ "sql": "drop table public.todos" }).to_string(),
-        )
-        .await;
-    assert_eq!(reply.status, StatusCode::FORBIDDEN);
-    let reply = app
-        .raw(
-            Method::POST,
-            "/admin/sql",
-            &[
-                ("cookie", &cookie),
-                ("content-type", "application/json"),
-                ("sec-fetch-site", "cross-site"),
-            ],
-            json!({ "sql": "drop table public.todos" }).to_string(),
-        )
-        .await;
-    assert_eq!(reply.status, StatusCode::FORBIDDEN);
+    for extra in [
+        [
+            ("origin", "https://site-malicioso.com"),
+            ("host", "localhost"),
+        ],
+        [("sec-fetch-site", "cross-site"), ("host", "localhost")],
+    ] {
+        let mut headers = vec![("cookie", cookie.as_str()), JSON];
+        headers.extend(extra);
+        let reply = app
+            .raw(
+                Method::POST,
+                "/admin/api/sql",
+                &headers,
+                json!({ "sql": "drop table public.todos" }).to_string(),
+            )
+            .await;
+        assert_eq!(reply.status, StatusCode::FORBIDDEN);
+    }
     let out = sql(&app, &cookie, "select count(*) from public.todos").await;
     assert_eq!(out["results"][0]["rows"], json!([["2"]]));
+
+    // Schema para o autocomplete do editor.
+    let schema = get(&app, "/admin/api/schema", &cookie).await.body;
+    assert!(
+        schema["tables"]["produtos"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("preco"))
+    );
+    assert!(
+        schema["tables"]["auth.users"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("email"))
+    );
 }
 
 #[tokio::test]
-async fn editar_tabelas_pelo_painel_com_html_escapado() {
+async fn editar_tabelas_pelo_painel_com_valores_exatos() {
     let app = TestApp::spawn().await;
     let cookie = login(&app).await;
 
-    let page = get(&app, "/admin/tables/produtos", &cookie).await;
-    assert_eq!(page.status, StatusCode::OK);
-    assert!(page.text.contains("Caderno"));
-    assert!(page.text.contains("numeric(10,2)"));
+    let data = get(&app, "/admin/api/tables/produtos", &cookie).await.body;
+    assert_eq!(data["table"]["primary_key"], json!(["id"]));
+    assert_eq!(data["table"]["editable"], true);
+    let preco = data["table"]["columns"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["name"] == "preco")
+        .unwrap()
+        .clone();
+    assert_eq!(preco["full_type"], "numeric(10,2)");
+    assert!(
+        data["rows"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|r| r["nome"] == "Caderno")
+    );
+    // numeric chega como texto exato (sem passar por f64).
+    assert!(
+        data["rows"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|r| r["preco"] == "15.00")
+    );
+    assert_eq!(data["total"], 4);
 
-    // Inserção com tentativa de XSS: fica gravada como texto e é escapada.
+    // Ordenação por coluna (validada contra o catálogo).
+    let sorted = get(
+        &app,
+        "/admin/api/tables/produtos?sort=preco&desc=true",
+        &cookie,
+    )
+    .await
+    .body;
+    assert_eq!(sorted["rows"][0]["nome"], "Mochila");
+    let bad = get(&app, "/admin/api/tables/produtos?sort=preco;drop", &cookie).await;
+    assert_eq!(bad.status, StatusCode::BAD_REQUEST);
+
+    // Inserção: texto com cara de HTML é guardado como texto (o escape é do
+    // Svelte, que nunca usa {@html}); campo omitido usa o DEFAULT.
     let xss = "<script>alert(1)</script>";
-    let reply = post_form(
+    let reply = send(
         &app,
-        "/admin/tables/produtos/insert",
+        Method::POST,
+        "/admin/api/tables/produtos/rows",
         &cookie,
-        &[("nome", xss), ("preco", "9.90"), ("estoque", "")],
+        json!({ "values": { "nome": xss, "preco": "9.90" } }),
     )
     .await;
-    assert_eq!(reply.status, StatusCode::SEE_OTHER);
-    assert!(
-        reply.headers[header::LOCATION]
-            .to_str()
-            .unwrap()
-            .contains("ok=")
-    );
-    let page = get(&app, "/admin/tables/produtos", &cookie).await.text;
-    assert!(page.contains("&lt;script&gt;alert(1)&lt;/script&gt;"));
-    assert!(!page.contains(xss));
-
-    let id: i32 = app
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.text);
+    let row = app
         .admin_client
-        .query_one("SELECT id FROM public.produtos WHERE nome = $1", &[&xss])
+        .query_one(
+            "SELECT id, estoque, preco::text FROM public.produtos WHERE nome = $1",
+            &[&xss],
+        )
         .await
-        .unwrap()
-        .get(0);
-    let estoque: i32 = app
-        .admin_client
-        .query_one("SELECT estoque FROM public.produtos WHERE id = $1", &[&id])
-        .await
-        .unwrap()
-        .get(0);
-    assert_eq!(estoque, 0, "campo vazio na inserção usa o DEFAULT");
+        .unwrap();
+    let id: i32 = row.get(0);
+    assert_eq!(row.get::<_, i32>(1), 0, "campo omitido usa o DEFAULT");
+    assert_eq!(row.get::<_, String>(2), "9.90");
 
-    let edit = get(
+    let reply = send(
         &app,
-        &format!("/admin/tables/produtos/edit?id={id}"),
+        Method::PATCH,
+        "/admin/api/tables/produtos/rows",
         &cookie,
+        json!({ "pk": { "id": id.to_string() }, "values": { "nome": "Estojo", "estoque": "5" } }),
     )
     .await;
-    assert_eq!(edit.status, StatusCode::OK);
-    assert!(edit.text.contains("value=\"9.90\""));
-    let id_text = id.to_string();
-    let reply = post_form(
-        &app,
-        "/admin/tables/produtos/update",
-        &cookie,
-        &[
-            ("__pk__id", &id_text),
-            ("nome", "Estojo"),
-            ("preco", "12.00"),
-            ("estoque", "5"),
-        ],
-    )
-    .await;
-    assert!(
-        reply.headers[header::LOCATION]
-            .to_str()
-            .unwrap()
-            .contains("ok=")
-    );
-    let nome: String = app
-        .admin_client
-        .query_one("SELECT nome FROM public.produtos WHERE id = $1", &[&id])
-        .await
-        .unwrap()
-        .get(0);
-    assert_eq!(nome, "Estojo");
+    assert_eq!(reply.body["count"], 1, "{}", reply.text);
 
-    // Erro do banco volta como mensagem na página.
-    let reply = post_form(
+    // Erro do banco volta como 400 com a mensagem.
+    let reply = send(
         &app,
-        "/admin/tables/produtos/update",
+        Method::PATCH,
+        "/admin/api/tables/produtos/rows",
         &cookie,
-        &[("__pk__id", &id_text), ("preco", "-1")],
+        json!({ "pk": { "id": id.to_string() }, "values": { "preco": "-1" } }),
     )
     .await;
-    assert!(
-        reply.headers[header::LOCATION]
-            .to_str()
-            .unwrap()
-            .contains("erro=")
-    );
+    assert_eq!(reply.status, StatusCode::BAD_REQUEST);
+    assert!(reply.body["error"].as_str().unwrap().contains("check"));
 
-    let reply = post_form(
+    // Coluna desconhecida ou gerada é recusada.
+    for values in [
+        json!({ "\"; drop table produtos; --": "1" }),
+        json!({ "slug": "x" }),
+    ] {
+        let reply = send(
+            &app,
+            Method::POST,
+            "/admin/api/tables/produtos/rows",
+            &cookie,
+            json!({ "values": values }),
+        )
+        .await;
+        assert_eq!(reply.status, StatusCode::BAD_REQUEST);
+    }
+
+    // Apagar várias linhas numa transação.
+    let reply = send(
         &app,
-        "/admin/tables/produtos/delete",
+        Method::DELETE,
+        "/admin/api/tables/produtos/rows",
         &cookie,
-        &[("__pk__id", &id_text)],
+        json!({ "pks": [{ "id": id.to_string() }, { "id": "3" }] }),
     )
     .await;
-    assert!(
-        reply.headers[header::LOCATION]
-            .to_str()
-            .unwrap()
-            .contains("ok=")
-    );
+    assert_eq!(reply.body["count"], 2, "{}", reply.text);
     let count: i64 = app
         .admin_client
-        .query_one("SELECT count(*) FROM public.produtos WHERE id = $1", &[&id])
+        .query_one("SELECT count(*) FROM public.produtos", &[])
         .await
         .unwrap()
         .get(0);
-    assert_eq!(count, 0);
+    assert_eq!(count, 3);
 
-    // Coluna inexistente no formulário é recusada.
-    let reply = post_form(
-        &app,
-        "/admin/tables/produtos/insert",
-        &cookie,
-        &[
-            ("nome", "x"),
-            ("preco", "1"),
-            ("\"; drop table produtos; --", "1"),
-        ],
-    )
-    .await;
-    assert!(
-        reply.headers[header::LOCATION]
-            .to_str()
-            .unwrap()
-            .contains("erro=")
-    );
+    let reply = get(&app, "/admin/api/tables/nao_existe", &cookie).await;
+    assert_eq!(reply.status, StatusCode::NOT_FOUND);
 }
 
 #[tokio::test]
@@ -391,18 +427,20 @@ async fn usuarios_e_sessoes() {
     let user_id = session["user"]["id"].as_str().unwrap().to_owned();
     let cookie = login(&app).await;
 
-    let page = get(&app, "/admin/users", &cookie).await.text;
-    assert!(page.contains("painel@exemplo.com"));
-    assert!(!page.contains("argon2id$"), "hash nunca aparece no painel");
+    let users = get(&app, "/admin/api/users?q=painel", &cookie).await;
+    assert_eq!(users.body["users"][0]["email"], "painel@exemplo.com");
+    assert_eq!(users.body["users"][0]["sessions"], 1);
+    assert!(!users.text.contains("argon2id"), "hash nunca sai do banco");
 
-    let reply = post_form(
+    let reply = send(
         &app,
-        &format!("/admin/users/{user_id}/revoke"),
+        Method::POST,
+        &format!("/admin/api/users/{user_id}/revoke"),
         &cookie,
-        &[],
+        json!({}),
     )
     .await;
-    assert_eq!(reply.status, StatusCode::SEE_OTHER);
+    assert_eq!(reply.body["count"], 1);
     let refresh = app
         .post(
             "/auth/v1/token?grant_type=refresh_token",
@@ -412,35 +450,82 @@ async fn usuarios_e_sessoes() {
         .await;
     assert_eq!(refresh.status, StatusCode::BAD_REQUEST);
 
-    let reply = post_form(
+    let reply = send(
         &app,
-        &format!("/admin/users/{user_id}/delete"),
+        Method::DELETE,
+        &format!("/admin/api/users/{user_id}"),
         &cookie,
-        &[],
+        json!(null),
     )
     .await;
-    assert_eq!(reply.status, StatusCode::SEE_OTHER);
-    let page = get(&app, "/admin/users", &cookie).await.text;
-    assert!(!page.contains("painel@exemplo.com"));
+    assert_eq!(reply.status, StatusCode::OK);
+    let users = get(&app, "/admin/api/users", &cookie).await;
+    assert!(!users.text.contains("painel@exemplo.com"));
 
-    let reply = post_form(&app, "/admin/users/nao-e-uuid/delete", &cookie, &[]).await;
-    assert_eq!(reply.status, StatusCode::INTERNAL_SERVER_ERROR);
+    let reply = send(
+        &app,
+        Method::DELETE,
+        "/admin/api/users/nao-e-uuid",
+        &cookie,
+        json!(null),
+    )
+    .await;
+    assert_eq!(reply.status, StatusCode::BAD_REQUEST);
 }
 
 #[tokio::test]
-async fn assets_embutidos() {
+async fn spa_embutida_com_cabecalhos_de_seguranca() {
     let app = TestApp::spawn().await;
-    let reply = app
-        .raw(Method::GET, "/admin/assets/admin.js", &[], String::new())
-        .await;
-    assert_eq!(reply.status, StatusCode::OK);
+
+    let index = app.raw(Method::GET, "/admin/", &[], String::new()).await;
+    assert_eq!(index.status, StatusCode::OK);
+    assert!(index.text.contains("<div id=\"app\">"));
+    let csp = index.headers[header::CONTENT_SECURITY_POLICY]
+        .to_str()
+        .unwrap();
+    assert!(csp.contains("script-src 'self';"), "{csp}");
     assert!(
-        reply.headers[header::CONTENT_TYPE]
+        !csp.contains("script-src 'self' 'unsafe"),
+        "scripts nunca inline"
+    );
+    assert_eq!(index.headers[header::X_FRAME_OPTIONS], "DENY");
+    // Regressão: com `no-referrer` o navegador manda `Origin: null` nos POSTs.
+    assert_eq!(index.headers[header::REFERRER_POLICY], "same-origin");
+    assert!(
+        !index.text.contains("<script>"),
+        "sem script inline no index.html"
+    );
+
+    // Rotas do cliente devolvem o mesmo index.html.
+    let deep = app
+        .raw(Method::GET, "/admin/tables/qualquer", &[], String::new())
+        .await;
+    assert_eq!(deep.status, StatusCode::OK);
+    assert_eq!(deep.text, index.text);
+
+    // O bundle referenciado existe, com cache imutável.
+    let script = index
+        .text
+        .split("src=\"")
+        .nth(1)
+        .and_then(|s| s.split('"').next())
+        .expect("index.html referencia o bundle");
+    assert!(script.starts_with("/admin/assets/index-"), "{script}");
+    let js = app.raw(Method::GET, script, &[], String::new()).await;
+    assert_eq!(js.status, StatusCode::OK);
+    assert!(
+        js.headers[header::CONTENT_TYPE]
             .to_str()
             .unwrap()
             .starts_with("text/javascript")
     );
-    assert!(reply.text.len() < 8 * 1024, "JS do painel deve ser pequeno");
+    assert!(
+        js.headers[header::CACHE_CONTROL]
+            .to_str()
+            .unwrap()
+            .contains("immutable")
+    );
+
     let reply = app
         .raw(
             Method::GET,
@@ -450,8 +535,8 @@ async fn assets_embutidos() {
         )
         .await;
     assert_ne!(reply.status, StatusCode::OK);
-    let login_page = app
-        .raw(Method::GET, "/admin/login", &[], String::new())
+    let reply = app
+        .raw(Method::GET, "/admin/api/nao-existe", &[], String::new())
         .await;
-    assert!(login_page.text.contains("type=\"password\""));
+    assert_eq!(reply.status, StatusCode::NOT_FOUND);
 }

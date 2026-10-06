@@ -5,33 +5,15 @@
 use axum::{
     Json,
     extract::State,
-    response::{Html, IntoResponse, Response},
+    response::{IntoResponse, Response},
 };
 use serde::Deserialize;
 use serde_json::{Value, json};
 use tokio_postgres::{NoTls, SimpleQueryMessage};
 
-use crate::{
-    AdminState,
-    html::{icon, layout},
-};
+use crate::AdminState;
 
 const MAX_ROWS: usize = 1000;
-
-pub async fn editor(State(_): State<AdminState>) -> Html<String> {
-    let body = format!(
-        "<form id=\"sql-form\" class=\"sql\">\
-         <div class=\"toolbar\">{}<h1>Editor SQL</h1>\
-         <span class=\"badge warn\">dono do banco · ignora RLS</span><div class=\"spacer\"></div>\
-         <span class=\"muted\">timeout 30 s · até 1000 linhas</span>\
-         <button class=\"btn primary\">{}Executar <kbd>Ctrl ↵</kbd></button></div>\
-         <textarea id=\"sql\" name=\"sql\" class=\"code\" spellcheck=\"false\" autofocus>select now();</textarea>\
-         <div id=\"sql-result\" class=\"results\"><div class=\"empty\">Execute uma consulta para ver o resultado.</div></div></form>",
-        icon("sql"),
-        icon("play"),
-    );
-    layout("Editor SQL", "/admin/sql", &["Editor SQL"], &body)
-}
 
 #[derive(Deserialize)]
 pub struct SqlRequest {
