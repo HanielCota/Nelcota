@@ -97,7 +97,7 @@
 </script>
 
 <Sheet.Root bind:open>
-  <Sheet.Content class="flex w-full flex-col gap-0 p-0 sm:max-w-xl">
+  <Sheet.Content class="flex w-full flex-col gap-0 p-0 data-[side=right]:sm:max-w-xl">
     <Sheet.Header class="border-b px-6 py-4">
       <Sheet.Title>{row ? 'Editar linha' : 'Inserir linha'}</Sheet.Title>
       <Sheet.Description>
