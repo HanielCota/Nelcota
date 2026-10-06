@@ -110,3 +110,13 @@ Caddy do sistema funcionam hoje; o `init` só ainda não gera esses arquivos.
 ACCEPT_DOMAIN=api.exemplo.com ./scripts/acceptance.sh   # VM real
 ./scripts/acceptance.sh --local                          # simulação local
 ```
+
+Última execução local (2026-10-06, Windows 11 + Docker Desktop, imagens em
+cache): **HTTPS respondendo 18 s depois do `init`**. Também passaram: migrate
+(idempotente), signup e API sob RLS via Caddy, login no painel, `types`, backup
+→ escrita → restore e o rollback automático de um upgrade para uma versão
+inexistente. Memória em repouso: app 2,4 MiB, Postgres 56 MiB, Caddy 16 MiB.
+
+Numa VPS real, some o download das imagens (~100 MB: Postgres, Caddy e
+nelcota) e a emissão do certificado. O modo VM do script mede isso, mas ainda
+não foi executado (depende do repositório publicado e do primeiro release).
