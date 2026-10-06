@@ -44,7 +44,12 @@ pub async fn load_catalog(pool: &Pool, schema: &str) -> anyhow::Result<Arc<Catal
     Ok(Arc::new(CatalogHandle::new(catalog)))
 }
 
-pub fn app(state: AppState, auth: AuthState, request_timeout: Duration) -> Router {
+pub fn app(
+    state: AppState,
+    auth: AuthState,
+    admin: Option<nelcota_admin::AdminState>,
+    request_timeout: Duration,
+) -> Router {
     // A API é chamada direto do navegador, de qualquer origem; a proteção é
     // o JWT + RLS, não o CORS. Cookies não são usados (nada de credentials).
     let cors = CorsLayer::new()
@@ -62,11 +67,15 @@ pub fn app(state: AppState, auth: AuthState, request_timeout: Duration) -> Route
             HeaderName::from_static("prefer"),
         ]);
 
-    Router::new()
+    let mut router = Router::new()
         .route("/health", get(health))
         .merge(nelcota_api::router())
         .with_state(state)
-        .merge(nelcota_auth::router(auth))
+        .merge(nelcota_auth::router(auth));
+    if let Some(admin) = admin {
+        router = router.merge(nelcota_admin::router(admin));
+    }
+    router
         .layer(TimeoutLayer::with_status_code(
             StatusCode::GATEWAY_TIMEOUT,
             request_timeout,

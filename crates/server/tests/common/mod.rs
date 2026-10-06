@@ -29,6 +29,8 @@ use uuid::Uuid;
 
 pub const JWT_SECRET: &str = "segredo-de-teste-com-mais-de-32-caracteres";
 pub const AUTHENTICATOR_PASSWORD: &str = "senha-do-authenticator-de-teste";
+pub const ADMIN_EMAIL: &str = "admin@exemplo.com";
+pub const ADMIN_PASSWORD: &str = "senha-do-admin-de-teste";
 
 pub struct Options {
     pub pool_size: usize,
@@ -64,6 +66,7 @@ pub struct Reply {
     pub status: StatusCode,
     pub headers: HeaderMap,
     pub body: Value,
+    pub text: String,
 }
 
 impl TestApp {
@@ -140,6 +143,18 @@ impl TestApp {
                 max_rows: options.max_rows,
             }),
         };
+        let panel = nelcota_admin::AdminState {
+            db: db::admin_pool(&admin, 2),
+            db_config: admin.clone(),
+            catalog: catalog.clone(),
+            credentials: Arc::new(nelcota_admin::Credentials {
+                email: ADMIN_EMAIL.into(),
+                password_hash: nelcota_auth::hash_password(ADMIN_PASSWORD).unwrap(),
+            }),
+            sessions: Arc::default(),
+            limiter: Arc::new(RateLimiter::new(1000)),
+            secure_cookies: false,
+        };
         let auth = AuthState {
             pool: pool.clone(),
             keys: keys.clone(),
@@ -154,7 +169,7 @@ impl TestApp {
             }),
         };
         TestApp {
-            router: app(state, auth, Duration::from_secs(10)),
+            router: app(state, auth, Some(panel), Duration::from_secs(10)),
             pool,
             admin,
             admin_client,
@@ -212,6 +227,36 @@ impl TestApp {
             status,
             headers,
             body,
+            text: String::from_utf8_lossy(&bytes).into_owned(),
+        }
+    }
+
+    /// Request com corpo arbitrário (formulários do painel).
+    pub async fn raw(
+        &self,
+        method: Method,
+        path: &str,
+        headers: &[(&str, &str)],
+        body: String,
+    ) -> Reply {
+        let mut request = Request::builder().method(method).uri(encode_uri(path));
+        for (name, value) in headers {
+            request = request.header(*name, *value);
+        }
+        let response = self
+            .router
+            .clone()
+            .oneshot(request.body(Body::from(body)).unwrap())
+            .await
+            .unwrap();
+        let status = response.status();
+        let headers = response.headers().clone();
+        let bytes = response.into_body().collect().await.unwrap().to_bytes();
+        Reply {
+            status,
+            headers,
+            body: serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+            text: String::from_utf8_lossy(&bytes).into_owned(),
         }
     }
 
