@@ -285,6 +285,42 @@ curtos. Inter/JetBrains Mono trocadas por IBM Plex Sans/Mono, menos onipresentes
 e com cara de ferramenta técnica. Os avisos de segurança continuam, em texto
 simples.
 
+## Vários projetos por host
+
+**D56. Um host, N projetos isolados.** Um Caddy compartilhado (único a publicar
+80/443) e, por projeto, um app e um Postgres numa rede interna exclusiva. Um
+projeto só é um host com um projeto: não há dois modelos para manter. O
+registro (`nelcota-host.json`) é a fonte da verdade; Caddyfile e lista pública
+(`shared/projects.json`) são gerados dele.
+
+**D57. Um Postgres por projeto.** Roles do Postgres valem para o servidor
+inteiro; num Postgres compartilhado, os projetos dividiriam `anon`,
+`authenticated`, `service_role` e a senha do `authenticator`. O custo (~50 MB
+de RAM por projeto) compra isolamento físico, backup/restore e saída por
+projeto, e upgrade independente.
+
+**D58. Domínio próprio ou subdomínio do domínio base.** `init api.loja.com`
+deriva o nome "loja"; `init --project blog` usa `blog.<domínio-base>`. Local:
+`<projeto>.localhost` (os navegadores resolvem `*.localhost` para a máquina).
+
+**D59. Login único por handoff de SSO, com opção de login por projeto.**
+Cookies não atravessam domínios, então o painel de origem emite um JWT HS256
+(segredo compartilhado do host, `aud` = projeto destino, 60 s, `jti` de uso
+único) que vai no fragmento da URL e é trocado por uma sessão no destino. No
+modo por projeto não há segredo compartilhado e o handoff não existe. Só
+`panel_login.rs` escreve credenciais de admin nos `.env`; trocar de modo
+regenera e reinicia os apps.
+
+**D60. Lista de projetos montada como pasta, relida a cada request.** O app
+recebe `shared/` somente leitura (bind de pasta, não de arquivo, para o
+rename atômico do CLI ser visto). Projetos novos aparecem no seletor sem
+reiniciar ninguém. O estado de cada projeto vem de `GET /health` pela rede
+`nelcota_edge`, que agora inclui a versão.
+
+**D61. Remoção sempre com backup final** em `archive/` antes de apagar
+containers e volumes; o site sai do Caddy com `caddy reload` (sem derrubar os
+outros).
+
 ### Pendências conhecidas
 
 - Embed de relações, `or=`/`and=` e upsert ficam para depois do MVP.

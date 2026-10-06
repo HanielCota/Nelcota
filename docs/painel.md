@@ -1,7 +1,36 @@
 # Painel
 
-Em `https://<seu-domínio>/admin/`. Login próprio, separado dos usuários finais:
-email e senha gerados pelo `nelcota init` (a senha aparece uma única vez).
+Em `https://<domínio-do-projeto>/admin/`. Login próprio, separado dos usuários
+finais: email e senha gerados pelo primeiro `nelcota init` (a senha aparece uma
+única vez).
+
+## Vários projetos
+
+Cada projeto tem o próprio painel, no próprio domínio, mostrando só os dados
+dele. No topo, o **seletor de projetos** (nome do projeto atual) lista os outros
+projetos do host e leva a "Todos os projetos": nome, domínio, estado (no ar /
+fora do ar), versão e um botão para abrir cada painel.
+
+Com o **login único** (padrão), trocar de projeto pelo seletor não pede senha.
+Com o **login por projeto** (`nelcota panel-login per-project`), o seletor só
+leva ao outro painel, que pede o login dele. A tela de login sempre mostra de
+qual projeto é o painel.
+
+### Como funciona o login único
+
+Cookies não atravessam domínios diferentes (`api.loja.com` → `api.blog.com`),
+então o painel de origem faz um *handoff*:
+
+1. O admin, já logado no painel da loja, escolhe "blog" no seletor.
+2. O painel da loja emite um token para o blog: JWT HS256 assinado com o
+   segredo compartilhado do host, `aud` = blog, validade de 60 s, `jti` único.
+3. O navegador abre `https://<blog>/admin/#sso=<token>`. O token vai no
+   **fragmento** da URL, que não aparece em logs de servidor nem no `Referer`.
+4. O painel do blog valida assinatura, destino, validade e o email do admin,
+   recusa tokens já usados e cria a própria sessão. O token sai da URL na hora.
+
+No login por projeto não há segredo compartilhado: o handoff deixa de existir,
+e cada painel só aceita as próprias credenciais.
 
 SPA em **Svelte 5 + shadcn-svelte + Tailwind v4**, com **CodeMirror 6** no
 editor SQL e fontes IBM Plex Sans/Mono. O build fica embutido no binário: sem
@@ -39,7 +68,8 @@ ligado sem policies (âmbar), erros e ações destrutivas. O resto é neutro.
 ## Trocar a senha do admin
 
 ```sh
-nelcota admin-password      # gera senha nova, grava só o hash no .env e reinicia o app
+nelcota admin-password            # login único: senha nova do host, aplicada a todos os projetos
+nelcota -p loja admin-password    # login por projeto: senha nova só da loja
 ```
 
 Também dá para usar um hash argon2id (formato PHC) gerado por qualquer

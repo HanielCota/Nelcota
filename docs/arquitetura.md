@@ -15,7 +15,7 @@ cliente ──HTTPS──▶ Caddy ──▶ nelcota (binário único) ──▶
 | `nelcota-auth` | trait `JwtVerifier`, chaves EdDSA/HS256 e JWKS, extrator `Auth`, cadastro/login/refresh/logout, argon2id, rate limit |
 | `nelcota-api`  | introspecção do catálogo, construtor de SQL, CRUD/RPC, OpenAPI, tipos TS |
 | `nelcota-admin` | painel em `/admin`: API JSON (`/admin/api`) + SPA Svelte embutida (`ui/dist`) |
-| `nelcota-cli`  | comandos `init`, `up`, `migrate`, `backup`, `upgrade`, `dev`, `types`... |
+| `nelcota-cli`  | host com N projetos (`init`, `up`, `projects`, `remove`, `migrate`, `backup`, `upgrade`, `panel-login`...). Módulos: `host` (registro), `naming`, `scaffold`, `caddy`, `registry`, `panel_login`, `ops` |
 | `nelcota-server` | binário `nelcota`: despacha o CLI ou sobe o servidor (trace, timeout, CORS, gzip) |
 
 Tudo compila num binário só (~10 MB, estático com musl na imagem Docker).

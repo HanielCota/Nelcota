@@ -20,6 +20,16 @@ nelcota init api.seudominio.com
 nelcota up
 ```
 
+**Vários projetos na mesma VPS**, cada um isolado (Postgres, usuários, chaves,
+backups), com domínio próprio ou subdomínio e um login único para todos os
+painéis:
+
+```sh
+nelcota init api.loja.com                              # domínio próprio
+nelcota init --project blog --base-domain exemplo.com  # subdomínio: blog.exemplo.com
+nelcota up && nelcota projects
+```
+
 Detalhes em [docs/deploy.md](docs/deploy.md). Backup e restore em
 [docs/backup.md](docs/backup.md).
 
