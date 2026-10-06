@@ -232,6 +232,17 @@ contaminam o pool. O texto do SQL não vai para o log.
 **D48. Valores no painel preservam o texto do Postgres** (`RawValue`), sem
 passar por `f64`: `numeric(30,10)` aparece e é editado com todas as casas.
 
+## Design do painel
+
+**D49. Painel com estética de console de banco (escuro por padrão, acento
+esmeralda)**, inspirado no Supabase, mas com nome, marca e ícones próprios.
+Tipografia Inter + JetBrains Mono, embutidas no binário (~88 KB, OFL, ver
+`crates/admin/assets/FONTS.md`): nada de Google Fonts, para manter a CSP
+`'self'` e o funcionamento offline. Modo claro via `prefers-color-scheme`.
+Ícones SVG desenhados à mão (sem pacote de ícones). Na visão geral, a contagem
+de linhas é exata para tabelas com menos de 10 mil linhas estimadas e usa a
+estimativa do planejador (`≈`) nas grandes.
+
 ### Pendências conhecidas
 
 - Embed de relações, `or=`/`and=` e upsert ficam para depois do MVP.

@@ -3,9 +3,15 @@
 Em `https://<seu-domínio>/admin/`. Login próprio, separado dos usuários finais:
 email e senha gerados pelo `nelcota init` (a senha aparece uma única vez).
 
+Visual de console de banco: tema escuro por padrão (claro se o sistema estiver
+em modo claro), sidebar com seções, editor de tabelas com lista lateral e grade
+de dados, fontes Inter e JetBrains Mono embutidas. Tudo é servido pelo próprio
+binário: sem CDN e sem build de frontend.
+
 | Página | O que tem |
 |---|---|
-| **Tabelas** | todas as tabelas do schema exposto, linhas estimadas, GRANTs de `anon`/`authenticated` e status do RLS. Listar, inserir, editar e apagar linhas (tabelas com chave primária) |
+| **Visão geral** | contadores (tabelas, usuários, policies, funções), alerta de tabelas sem RLS e lista de tabelas com GRANTs |
+| **Editor de tabelas** | todas as tabelas do schema exposto, linhas estimadas, GRANTs de `anon`/`authenticated` e status do RLS. Listar, inserir, editar e apagar linhas (tabelas com chave primária) |
 | **SQL** | editor que roda como o dono do banco (ignora RLS); Ctrl+Enter executa; erros com código e posição |
 | **Usuários** | busca por email, último login, sessões ativas; encerrar sessões ou apagar usuário |
 | **Policies** | policies de cada tabela (`USING`/`WITH CHECK`), tabelas sem RLS, funções executáveis por `anon` |

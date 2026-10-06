@@ -95,6 +95,7 @@ pub struct AdminState {
 pub fn router(state: AdminState) -> Router {
     let protected = Router::new()
         .route("/admin/", get(pages::dashboard))
+        .route("/admin/tables", get(pages::tables_index))
         .route("/admin/tables/{name}", get(pages::table))
         .route("/admin/tables/{name}/new", get(pages::new_row))
         .route("/admin/tables/{name}/insert", post(pages::insert_row))
@@ -195,7 +196,9 @@ async fn security_headers(request: Request, next: Next) -> Response {
         header::REFERRER_POLICY,
         HeaderValue::from_static("same-origin"),
     );
-    headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    headers
+        .entry(header::CACHE_CONTROL)
+        .or_insert(HeaderValue::from_static("no-store"));
     response
 }
 
@@ -207,10 +210,15 @@ async fn asset(Path(file): Path<String>) -> Response {
         Some("css") => "text/css; charset=utf-8",
         Some("js") => "text/javascript; charset=utf-8",
         Some("svg") => "image/svg+xml",
+        Some("woff2") => "font/woff2",
         _ => "application/octet-stream",
     };
     (
-        [(header::CONTENT_TYPE, content_type)],
+        [
+            (header::CONTENT_TYPE, content_type),
+            // Assets só mudam com a versão do binário.
+            (header::CACHE_CONTROL, "public, max-age=86400"),
+        ],
         Body::from(content.data.into_owned()),
     )
         .into_response()
