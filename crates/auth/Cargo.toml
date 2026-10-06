@@ -1,0 +1,19 @@
+[package]
+name = "nelcota-auth"
+description = "Verificação de JWT (atrás de uma trait) e extrator de claims para o axum."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+nelcota-core.workspace = true
+axum.workspace = true
+jsonwebtoken.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[lints]
+workspace = true

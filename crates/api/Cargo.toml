@@ -1,0 +1,17 @@
+[package]
+name = "nelcota-api"
+description = "API REST sobre o catálogo do Postgres, sempre executada sob RLS."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+nelcota-core.workspace = true
+nelcota-auth.workspace = true
+axum.workspace = true
+deadpool-postgres.workspace = true
+
+[lints]
+workspace = true
