@@ -9,8 +9,8 @@ deploy em 5 minutos numa VPS.**
   dentro de uma transação.
 - **Padrões abertos.** JWT, argon2, SQL puro, S3-compatible.
 
-> Status: **Marco 1 (núcleo)**. Fluxo JWT → role → RLS funcionando e testado.
-> Auth completo, API automática, CLI e painel vêm nos próximos marcos.
+> Status: núcleo, auth e API automática prontos e testados contra Postgres real.
+> CLI de deploy e painel em andamento.
 
 ## Quickstart (desenvolvimento)
 
@@ -49,6 +49,9 @@ e que role/claims não vazam entre requests do pool.
 
 ## Documentação
 
+- [API REST](docs/api.md)
+- [Schema auth e endpoints de login](docs/schema-auth.md)
+- [Saindo do Nelcota](docs/saida.md)
 - [Arquitetura](docs/arquitetura.md)
 - [JWT e roles](docs/jwt-e-roles.md)
 - [Registro de decisões](docs/decisoes.md)

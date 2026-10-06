@@ -127,8 +127,51 @@ já eram dependências transitivas (`jsonwebtoken`/RustCrypto) e foram usadas
 diretamente nas mesmas versões, sem crescer a árvore. Licença ISC liberada no
 `cargo deny` (vem do `simple_asn1`, usado na leitura de PEM).
 
+## Marco 3
+
+**D29. SQL dinâmico com um builder próprio, sem `sea-query`.** Todo valor da
+URL vira parâmetro de **texto**, e o Postgres converte para o tipo da coluna
+(`$1::text::<tipo do catálogo>`); inserts e updates usam
+`json_populate_recordset`/`json_populate_record`, e RPC usa `json_to_record`.
+Assim o Postgres valida os tipos como num literal, e a aplicação não precisa
+mapear tipos. O `sea-query` amarra cada valor a um tipo Rust (e o
+`sea-query-postgres` exigiria esse mapeamento), além de não expressar bem esses
+padrões. O builder tem ~400 linhas com três regras auditáveis: identificador só
+do catálogo e sempre entre aspas; tipo de cast só do catálogo; valor sempre
+parâmetro. Testes unitários e de integração cobrem injeção nos dois lados.
+
+**D30. OpenAPI montado com `serde_json`, sem `utoipa`.** O `utoipa` gera
+especificação em tempo de compilação a partir de tipos Rust; a nossa vem do
+catálogo em tempo de execução. O documento é filtrado pelos privilégios da
+role do request (como o modo `follow-privileges` do PostgREST).
+
+**D31. Recarga do catálogo por event trigger + `LISTEN nelcota`.** O trigger
+roda em `ddl_command_end` e `sql_drop` (inclui GRANT/REVOKE). O listener
+agrupa rajadas (100 ms), reconecta com backoff e recarrega a cada reconexão.
+Sem superusuário, a migração segue sem o trigger e a recarga é manual (`NOTIFY`).
+
+**D32. PATCH/DELETE exigem filtro.** Diferente do PostgREST (que permite e
+deixa o RLS limitar), recusamos com 400. O custo é um filtro explícito quando
+a intenção é mesmo atingir tudo.
+
+**D33. Lotes com chaves diferentes respeitam o DEFAULT.** As linhas são
+agrupadas por conjunto de colunas e cada grupo vira um INSERT (CTEs numa
+instrução). No PostgREST, sem `Prefer: missing=default`, as colunas ausentes
+viram NULL; achamos o DEFAULT o comportamento menos surpreendente.
+
+**D34. `statement_timeout` na role `authenticator`.** `ALTER ROLE anon SET ...`
+não tem efeito com `SET ROLE` (o Postgres só aplica as configurações da role no
+login). O bootstrap aplica `NELCOTA_STATEMENT_TIMEOUT_SECS` (padrão 10 s) ao
+`authenticator`, e o erro vira 504.
+
+**D35. Mantido o padrão do Postgres para `EXECUTE` em funções (PUBLIC).**
+Mudar os default privileges esconderia um comportamento do Postgres puro; a
+documentação e o painel alertam.
+
+**D36. Libs novas.** `form_urlencoded`, `futures-util` e `bytes` já eram
+dependências transitivas (axum/tokio-postgres); `compression-gzip` do
+tower-http adiciona `flate2`.
+
 ### Pendências conhecidas
 
-- `CompressionLayer` (tower-http) entra junto com a API automática no Marco 3.
-- `statement_timeout` por role (ex.: `ALTER ROLE anon SET statement_timeout`)
-  a definir no Marco 3, junto com os testes de desempenho.
+- Embed de relações, `or=`/`and=` e upsert ficam para depois do MVP.
