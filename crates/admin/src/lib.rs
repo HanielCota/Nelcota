@@ -188,9 +188,12 @@ async fn security_headers(request: Request, next: Next) -> Response {
         header::X_CONTENT_TYPE_OPTIONS,
         HeaderValue::from_static("nosniff"),
     );
+    // `same-origin`, e não `no-referrer`: com `no-referrer` o navegador manda
+    // `Origin: null` nos POSTs de formulário e a checagem de CSRF recusaria o
+    // próprio painel. `same-origin` também não vaza a URL para outros sites.
     headers.insert(
         header::REFERRER_POLICY,
-        HeaderValue::from_static("no-referrer"),
+        HeaderValue::from_static("same-origin"),
     );
     headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     response

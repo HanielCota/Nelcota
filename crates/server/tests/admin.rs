@@ -113,7 +113,34 @@ async fn login_separado_e_rotas_protegidas() {
         .unwrap();
     assert!(csp.contains("script-src 'self'"));
     assert_eq!(reply.headers[header::X_FRAME_OPTIONS], "DENY");
+    // Regressão: com `no-referrer` o navegador manda `Origin: null` no POST do
+    // formulário e o login era recusado como CSRF.
+    assert_eq!(reply.headers[header::REFERRER_POLICY], "same-origin");
     assert!(reply.text.contains("service_role"));
+
+    // Login como o navegador faz (mesma origem) passa; `Origin: null` não.
+    let browser = |origin: &'static str| {
+        [
+            FORM,
+            ("host", "localhost"),
+            ("origin", origin),
+            ("sec-fetch-site", "same-origin"),
+        ]
+    };
+    let credentials = form(&[("email", ADMIN_EMAIL), ("password", ADMIN_PASSWORD)]);
+    let reply = app
+        .raw(
+            Method::POST,
+            "/admin/login",
+            &browser("https://localhost"),
+            credentials.clone(),
+        )
+        .await;
+    assert_eq!(reply.status, StatusCode::SEE_OTHER);
+    let reply = app
+        .raw(Method::POST, "/admin/login", &browser("null"), credentials)
+        .await;
+    assert_eq!(reply.status, StatusCode::FORBIDDEN);
 
     // Logout invalida a sessão.
     let reply = post_form(&app, "/admin/logout", &cookie, &[]).await;
