@@ -892,3 +892,72 @@ async fn colunas_indicam_a_chave_estrangeira() {
     );
     assert_eq!(column("nota")["references"], Value::Null);
 }
+
+#[tokio::test]
+async fn estrutura_da_tabela_lida_do_catalogo_do_postgres() {
+    let app = TestApp::spawn().await;
+    let cookie = login(&app).await;
+
+    let reply = get(&app, "/admin/api/tables/produtos/structure", &cookie).await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.text);
+    let data = reply.body;
+    assert_eq!(data["primary_key"], json!(["id"]));
+    assert_eq!(data["rls_enabled"], false);
+    assert_eq!(data["comment"], "Catálogo de produtos");
+    let column = |name: &str| {
+        data["columns"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["name"] == name)
+            .unwrap()
+            .clone()
+    };
+    assert_eq!(column("id")["identity"], "by default");
+    assert_eq!(column("id")["primary_key"], true);
+    assert_eq!(column("nome")["data_type"], "character varying(80)");
+    assert_eq!(column("nome")["nullable"], false);
+    assert_eq!(column("estoque")["default"], "0");
+    assert_eq!(column("criado_em")["default"], "now()");
+    assert_eq!(column("slug")["generated"], true);
+    assert_eq!(
+        data["grants"],
+        json!([
+            { "role": "anon", "privileges": ["select"] },
+            { "role": "authenticated", "privileges": ["select"] },
+            { "role": "service_role", "privileges": ["select", "insert", "update", "delete"] },
+        ])
+    );
+
+    app.admin_client
+        .batch_execute(
+            "CREATE TABLE public.itens (
+                 id int PRIMARY KEY,
+                 produto_id int REFERENCES public.produtos (id) ON DELETE CASCADE,
+                 codigo text CONSTRAINT itens_codigo_key UNIQUE
+             );",
+        )
+        .await
+        .unwrap();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    let itens = loop {
+        let reply = get(&app, "/admin/api/tables/itens/structure", &cookie).await;
+        if reply.status == StatusCode::OK {
+            break reply.body;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "tabela nova não apareceu"
+        );
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    };
+    let columns = itens["columns"].as_array().unwrap();
+    assert_eq!(
+        columns[1]["references"],
+        json!({ "table": "produtos", "column": "id", "on_delete": "cascade", "constraint": "itens_produto_id_fkey" })
+    );
+    assert_eq!(columns[2]["unique"], "itens_codigo_key");
+
+    let missing = get(&app, "/admin/api/tables/nao_existe/structure", &cookie).await;
+    assert_eq!(missing.status, StatusCode::NOT_FOUND);
+}

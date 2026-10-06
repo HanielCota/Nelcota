@@ -15,6 +15,7 @@ mod export;
 mod projects;
 mod sql;
 mod sso;
+mod structure;
 
 pub use projects::HostLink;
 pub use sso::Sso;
@@ -112,6 +113,10 @@ pub fn router(state: AdminState) -> Router {
         .route("/admin/api/tables", get(api::tables))
         .route("/admin/api/tables/{name}", get(api::table))
         .route("/admin/api/tables/{name}/export", get(export::export))
+        .route(
+            "/admin/api/tables/{name}/structure",
+            get(structure::structure),
+        )
         .route(
             "/admin/api/tables/{name}/rows",
             post(api::insert_row)
