@@ -1255,3 +1255,62 @@ async fn policies_criadas_editadas_e_apagadas_pelo_painel() {
         .await;
     assert_eq!(missing.status, StatusCode::BAD_REQUEST, "{}", missing.text);
 }
+
+#[tokio::test]
+async fn token_service_role_emitido_pelo_painel() {
+    let app = TestApp::spawn().await;
+    let cookie = login(&app).await;
+
+    let anon = app
+        .raw(Method::GET, "/rest/v1/segredos", &[], String::new())
+        .await;
+    assert_ne!(
+        anon.status,
+        StatusCode::OK,
+        "segredos só tem GRANT para service_role"
+    );
+
+    let reply = send(
+        &app,
+        Method::POST,
+        "/admin/api/tokens/service-role",
+        &cookie,
+        json!({ "days": 7 }),
+    )
+    .await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.text);
+    assert_eq!(reply.headers[header::CACHE_CONTROL], "no-store");
+    let token = reply.body["token"].as_str().unwrap().to_owned();
+    let bearer = format!("Bearer {token}");
+    let service = app
+        .raw(
+            Method::GET,
+            "/rest/v1/segredos",
+            &[("authorization", bearer.as_str())],
+            String::new(),
+        )
+        .await;
+    assert_eq!(service.status, StatusCode::OK, "{}", service.text);
+
+    for days in [0, 3651] {
+        let bad = send(
+            &app,
+            Method::POST,
+            "/admin/api/tokens/service-role",
+            &cookie,
+            json!({ "days": days }),
+        )
+        .await;
+        assert_eq!(bad.status, StatusCode::BAD_REQUEST);
+    }
+    // Sem sessão do painel, nada de token.
+    let outsider = app
+        .raw(
+            Method::POST,
+            "/admin/api/tokens/service-role",
+            &[JSON],
+            json!({ "days": 7 }).to_string(),
+        )
+        .await;
+    assert_eq!(outsider.status, StatusCode::UNAUTHORIZED);
+}

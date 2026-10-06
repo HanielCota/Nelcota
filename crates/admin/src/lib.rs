@@ -20,9 +20,11 @@ mod sql;
 mod sso;
 mod structure;
 mod tables_ddl;
+mod tokens;
 
 pub use projects::HostLink;
 pub use sso::Sso;
+pub use tokens::TokenIssuer;
 
 use std::{
     collections::HashMap,
@@ -106,6 +108,8 @@ pub struct AdminState {
     pub secure_cookies: bool,
     /// Projeto atual, lista do host e login único.
     pub host: Arc<HostLink>,
+    /// Emissão de tokens service_role pela página de API.
+    pub tokens: Arc<TokenIssuer>,
 }
 
 pub fn router(state: AdminState) -> Router {
@@ -152,6 +156,7 @@ pub fn router(state: AdminState) -> Router {
         .route("/admin/api/projects", get(projects::list))
         .route("/admin/api/projects/status", get(projects::status))
         .route("/admin/api/sso/handoff", post(sso::handoff))
+        .route("/admin/api/tokens/service-role", post(tokens::service_role))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             require_session,

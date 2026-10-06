@@ -61,7 +61,7 @@ async fn serve(config: Config) -> anyhow::Result<()> {
     };
     let auth = AuthState {
         pool,
-        keys,
+        keys: keys.clone(),
         passwords: Arc::new(Passwords::new(hash_concurrency())),
         limiter: Arc::new(RateLimiter::new(config.auth_rate_limit_per_minute)),
         settings: Arc::new(AuthSettings {
@@ -87,6 +87,10 @@ async fn serve(config: Config) -> anyhow::Result<()> {
                 limiter: Arc::new(RateLimiter::new(10)),
                 secure_cookies: config.trust_proxy,
                 host: Arc::new(host_link(&config)),
+                tokens: Arc::new(nelcota_admin::TokenIssuer {
+                    keys,
+                    issuer: config.jwt_issuer.clone(),
+                }),
             })
         }
         _ => {
