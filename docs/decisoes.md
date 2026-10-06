@@ -50,7 +50,7 @@ de negócio no banco de ninguém.
 ficam fora do `public`. `pg_stat_statements` exige
 `shared_preload_libraries=pg_stat_statements` (já no compose de dev e nos testes).
 
-**D12. JWT HS256 provisório.** O Marco 1 usa HS256 com segredo compartilhado
+**D12. JWT HS256 provisório** (substituída por D20). O Marco 1 usa HS256 com segredo compartilhado
 (≥ 32 caracteres) atrás da trait `JwtVerifier`. O Marco 2 adiciona EdDSA + JWKS
 como padrão, e HS256 fica como modo simples.
 
@@ -83,6 +83,49 @@ interna do Docker (ou localhost em dev). TLS para o banco fica para quando houve
 um cenário de banco remoto.
 
 **D19. Edition 2024, MSRV 1.88.** O `testcontainers-modules` atual já exige 1.88.
+
+## Marco 2
+
+**D20. EdDSA (Ed25519) como padrão; HS256 como legado.** A chave privada vem
+em `NELCOTA_JWT_PRIVATE_KEY` (PEM PKCS#8 ou o base64 de uma linha, que cabe num
+`.env`). Com chave EdDSA **e** segredo HS256 configurados, o servidor assina com
+EdDSA e aceita os dois na verificação (migração sem downtime). O `kid` é o
+thumbprint RFC 7638.
+
+**D21. Role interna `nelcota_auth` para o schema `auth`.** Os handlers de auth
+rodam com `SET LOCAL ROLE nelcota_auth` (string fixa). Nenhum JWT pode assumi-la
+(o enum `Role` não a contém), e as roles da API não têm GRANT em `auth.*`.
+Alternativa descartada: funções `SECURITY DEFINER`, que espalhariam lógica em
+PL/pgSQL sem ganho real.
+
+**D22. Refresh token opaco de 32 bytes, guardado só como SHA-256.** SHA-256 (e
+não argon2) porque o token já tem 256 bits de entropia; a busca é por índice
+único, sem comparação na aplicação.
+
+**D23. Detecção de reuso revoga a sessão (família), não o usuário.** As outras
+sessões continuam válidas. Sem janela de tolerância por enquanto (documentado).
+
+**D24. Logout revoga a sessão; o JWT de acesso vale até o `exp`.** Tokens de
+acesso são stateless e curtos (15 min por padrão). Checar revogação a cada
+request custaria uma ida ao banco a mais.
+
+**D25. Argon2id com os parâmetros padrão do RustCrypto (m=19 MiB, t=2, p=1).**
+Roda em `spawn_blocking`, com no máximo `min(núcleos, 4)` hashes simultâneos
+(pico < 80 MiB). Login de email inexistente verifica contra um hash fictício,
+para o tempo de resposta não revelar se a conta existe.
+
+**D26. Rate limit em memória, janela fixa de 1 min**, por IP (signup/token) e
+por email (login). Um binário por instalação dispensa Redis. O IP vem do
+`X-Forwarded-For` (entrada mais à direita) só com `NELCOTA_TRUST_PROXY=true`.
+
+**D27. Cadastro com email duplicado responde 409.** Sem confirmação de email no
+MVP, esconder a existência da conta no cadastro não traria proteção real
+(o login continua sem revelar).
+
+**D28. Libs novas.** `argon2` (estava na tabela); `sha2`, `base64` e `getrandom`
+já eram dependências transitivas (`jsonwebtoken`/RustCrypto) e foram usadas
+diretamente nas mesmas versões, sem crescer a árvore. Licença ISC liberada no
+`cargo deny` (vem do `simple_asn1`, usado na leitura de PEM).
 
 ### Pendências conhecidas
 
