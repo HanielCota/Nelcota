@@ -63,7 +63,7 @@ async fn service_role_ignora_rls() {
     let app = TestApp::spawn().await;
     let (status, body) = app
         .get(
-            "/rest/v1/todos",
+            "/rest/v1/todos?order=id",
             Some(&token(json!({ "role": "service_role" }))),
         )
         .await;
@@ -266,13 +266,26 @@ async fn bootstrap_e_idempotente() {
     );
     drop(client);
 
-    db::bootstrap(&app.admin, AUTHENTICATOR_PASSWORD)
+    db::bootstrap(&app.admin, AUTHENTICATOR_PASSWORD, 10)
         .await
         .unwrap();
-    db::bootstrap(&app.admin, AUTHENTICATOR_PASSWORD)
+    db::bootstrap(&app.admin, AUTHENTICATOR_PASSWORD, 10)
         .await
         .unwrap();
 
     let (status, _) = app.get("/health", None).await;
     assert_eq!(status, StatusCode::OK);
+
+    // Conexões novas do authenticator herdam o statement_timeout.
+    let (client, connection) = db::authenticator_config(&app.admin, AUTHENTICATOR_PASSWORD)
+        .connect(tokio_postgres::NoTls)
+        .await
+        .unwrap();
+    tokio::spawn(connection);
+    let timeout: String = client
+        .query_one("SHOW statement_timeout", &[])
+        .await
+        .unwrap()
+        .get(0);
+    assert_eq!(timeout, "10s");
 }

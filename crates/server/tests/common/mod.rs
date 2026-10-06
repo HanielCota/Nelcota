@@ -13,11 +13,12 @@ use axum::{
 };
 use http_body_util::BodyExt;
 use jsonwebtoken::{EncodingKey, Header, get_current_timestamp};
+use nelcota_api::{ApiSettings, CatalogHandle, spawn_reload_listener};
 use nelcota_auth::{
     AuthSettings, AuthState, Keys, Passwords, RateLimiter, generate_ed25519_private_key,
 };
 use nelcota_core::db;
-use nelcota_server::{AppState, app};
+use nelcota_server::{AppState, app, load_catalog};
 use serde_json::{Value, json};
 use testcontainers_modules::{
     postgres::Postgres,
@@ -33,6 +34,7 @@ pub struct Options {
     pub pool_size: usize,
     pub rate_limit_per_minute: u32,
     pub access_ttl_secs: u64,
+    pub max_rows: Option<i64>,
 }
 
 impl Default for Options {
@@ -41,6 +43,7 @@ impl Default for Options {
             pool_size: 4,
             rate_limit_per_minute: 10_000,
             access_ttl_secs: 900,
+            max_rows: None,
         }
     }
 }
@@ -51,6 +54,7 @@ pub struct TestApp {
     pub admin: tokio_postgres::Config,
     pub admin_client: tokio_postgres::Client,
     pub keys: Arc<Keys>,
+    pub catalog: Arc<CatalogHandle>,
     pub user_a: Uuid,
     pub user_b: Uuid,
     _container: ContainerAsync<Postgres>,
@@ -87,7 +91,9 @@ impl TestApp {
                 .parse()
                 .unwrap();
 
-        db::bootstrap(&admin, AUTHENTICATOR_PASSWORD).await.unwrap();
+        db::bootstrap(&admin, AUTHENTICATOR_PASSWORD, 10)
+            .await
+            .unwrap();
 
         // Fixture: tabela de exemplo + uma linha para cada usuário, inseridas
         // como superusuário (que ignora RLS).
@@ -96,6 +102,10 @@ impl TestApp {
         tokio::spawn(connection);
         admin_client
             .batch_execute(include_str!("../../../../examples/todos.sql"))
+            .await
+            .unwrap();
+        admin_client
+            .batch_execute(include_str!("../fixtures/api.sql"))
             .await
             .unwrap();
         admin_client
@@ -116,9 +126,19 @@ impl TestApp {
             .unwrap(),
         );
         let pool = db::api_pool(&admin, AUTHENTICATOR_PASSWORD, options.pool_size);
+        let catalog = load_catalog(&pool, "public").await.unwrap();
+        spawn_reload_listener(
+            catalog.clone(),
+            pool.clone(),
+            db::authenticator_config(&admin, AUTHENTICATOR_PASSWORD),
+        );
         let state = AppState {
             pool: pool.clone(),
             verifier: keys.clone(),
+            catalog: catalog.clone(),
+            api: Arc::new(ApiSettings {
+                max_rows: options.max_rows,
+            }),
         };
         let auth = AuthState {
             pool: pool.clone(),
@@ -139,6 +159,7 @@ impl TestApp {
             admin,
             admin_client,
             keys,
+            catalog,
             user_a,
             user_b,
             _container: container,
@@ -152,7 +173,21 @@ impl TestApp {
         token: Option<&str>,
         body: Option<Value>,
     ) -> Reply {
-        let mut request = Request::builder().method(method).uri(path);
+        self.request_with(method, path, token, body, &[]).await
+    }
+
+    pub async fn request_with(
+        &self,
+        method: Method,
+        path: &str,
+        token: Option<&str>,
+        body: Option<Value>,
+        extra_headers: &[(&str, &str)],
+    ) -> Reply {
+        let mut request = Request::builder().method(method).uri(encode_uri(path));
+        for (name, value) in extra_headers {
+            request = request.header(*name, *value);
+        }
         if let Some(token) = token {
             request = request.header(header::AUTHORIZATION, format!("Bearer {token}"));
         }
@@ -188,6 +223,19 @@ impl TestApp {
     pub async fn post(&self, path: &str, token: Option<&str>, body: Value) -> Reply {
         self.request(Method::POST, path, token, Some(body)).await
     }
+}
+
+/// Percent-encode dos bytes que não podem aparecer crus numa URI (espaço,
+/// aspas, acentos...), para os testes escreverem queries legíveis.
+pub fn encode_uri(path: &str) -> String {
+    path.bytes()
+        .map(|b| match b {
+            b' ' | b'"' | b'\\' | b'<' | b'>' | b'`' | b'{' | b'}' | b'|' | b'^' | 0x80.. => {
+                format!("%{b:02X}")
+            }
+            _ => (b as char).to_string(),
+        })
+        .collect()
 }
 
 /// JWT HS256 com as claims dadas (`exp` padrão: daqui a 1 h).
