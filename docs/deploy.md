@@ -3,7 +3,7 @@
 **Fresh VPS → HTTPS in 3 commands.**
 
 ```sh
-curl -fsSL https://nelcota.dev/install | sh     # binary (with checksum) + Docker if missing
+curl -fsSL https://nelcota.com/install | sh     # binary (with checksum) + Docker if missing
 mkdir -p /opt/nelcota && cd /opt/nelcota
 nelcota init api.yourdomain.com                 # creates the host and the first project
 nelcota up                                      # starts projects + Caddy, waits for the healthcheck

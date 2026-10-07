@@ -212,7 +212,11 @@ pub struct InitArgs {
     #[arg(long, short)]
     pub yes: bool,
     /// App image.
-    #[arg(long, env = "NELCOTA_IMAGE", default_value = "ghcr.io/nelcota/nelcota")]
+    #[arg(
+        long,
+        env = "NELCOTA_IMAGE",
+        default_value = "ghcr.io/hanielcota/nelcota"
+    )]
     pub image: String,
     /// Image tag (default: this binary's version).
     #[arg(long)]

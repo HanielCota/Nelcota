@@ -17,7 +17,7 @@ a 5-minute deploy on a VPS.**
 ## Deploy (fresh VPS → HTTPS)
 
 ```sh
-curl -fsSL https://nelcota.dev/install | sh
+curl -fsSL https://nelcota.com/install | sh
 nelcota init api.yourdomain.com
 nelcota up
 ```

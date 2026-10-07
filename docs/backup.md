@@ -51,7 +51,7 @@ app again.
 ### Restore on a new VPS
 
 ```sh
-curl -fsSL https://nelcota.dev/install | sh
+curl -fsSL https://nelcota.com/install | sh
 mkdir -p /opt/nelcota && cd /opt/nelcota
 nelcota init api.shop.com --yes
 cp /safe/place/shop.env projects/shop/.env   # optional: keeps the JWT key
