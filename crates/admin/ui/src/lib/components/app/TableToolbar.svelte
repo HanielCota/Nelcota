@@ -7,6 +7,7 @@
   import ChevronLeft from '@lucide/svelte/icons/chevron-left'
   import Funnel from '@lucide/svelte/icons/funnel'
   import Download from '@lucide/svelte/icons/download'
+  import Columns3 from '@lucide/svelte/icons/columns-3'
   import RlsBadge from './RlsBadge.svelte'
   import { enc } from '$lib/api'
   import { href } from '$lib/router.svelte'
@@ -20,6 +21,9 @@
     filterOpen = $bindable(false),
     loading,
     selectedCount,
+    hiddenColumns,
+    ontogglecolumn,
+    onshowallcolumns,
     exportHref,
     onreload,
     oninsert,
@@ -32,6 +36,9 @@
     filterOpen?: boolean
     loading: boolean
     selectedCount: number
+    hiddenColumns: string[]
+    ontogglecolumn: (column: string) => void
+    onshowallcolumns: () => void
     exportHref: (format: 'csv' | 'json') => string
     onreload: () => void
     oninsert: () => void
@@ -81,6 +88,35 @@
             >{filterCount}</span
           >{/if}
       </Button>
+      {#if data}
+        <DropdownMenu.Root>
+          <DropdownMenu.Trigger>
+            {#snippet child({ props })}
+              <Button variant={hiddenColumns.length ? 'secondary' : 'ghost'} size="sm" {...props}>
+                <Columns3 />Colunas{#if hiddenColumns.length}<span
+                    class="rounded-full bg-brand/15 px-1.5 text-3xs text-brand tabular-nums"
+                    title={`${hiddenColumns.length} oculta(s)`}>{hiddenColumns.length}</span
+                  >{/if}
+              </Button>
+            {/snippet}
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Content align="end" class="max-h-80 w-56 overflow-y-auto">
+            <DropdownMenu.Label class="text-xs font-normal text-muted-foreground">Colunas visíveis</DropdownMenu.Label>
+            {#each data.table.columns as column (column.name)}
+              <DropdownMenu.CheckboxItem
+                checked={!hiddenColumns.includes(column.name)}
+                closeOnSelect={false}
+                onCheckedChange={() => ontogglecolumn(column.name)}
+                class="font-mono text-xs">{column.name}</DropdownMenu.CheckboxItem
+              >
+            {/each}
+            {#if hiddenColumns.length}
+              <DropdownMenu.Separator />
+              <DropdownMenu.Item onclick={onshowallcolumns}>Mostrar todas</DropdownMenu.Item>
+            {/if}
+          </DropdownMenu.Content>
+        </DropdownMenu.Root>
+      {/if}
       <DropdownMenu.Root>
         <DropdownMenu.Trigger>
           {#snippet child({ props })}

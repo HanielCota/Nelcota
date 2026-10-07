@@ -15,6 +15,7 @@
   import CreateTableSheet from '$lib/components/app/CreateTableSheet.svelte'
   import StructureView from '$lib/components/app/StructureView.svelte'
   import { api, enc, isAbort } from '$lib/api'
+  import { HiddenColumns } from '$lib/hidden-columns.svelte'
   import { filtersParam, filtersToSearch, parseFilters, type TableFilter } from '$lib/filters'
   import { href, navigate, route } from '$lib/router.svelte'
   import { cn } from '$lib/utils'
@@ -35,7 +36,17 @@
   let sheetRow = $state<RowData | null>(null)
   let confirmOpen = $state(false)
   let filterOpen = $state(false)
+  let filterPreset = $state<string | undefined>(undefined)
   let createOpen = $state(false)
+
+  // Colunas ocultas, lembradas por tabela.
+  const hidden = new HiddenColumns()
+  $effect(() => {
+    if (name) hidden.load(name)
+  })
+  $effect(() => {
+    if (data) hidden.prune(data.table.columns.map((c) => c.name))
+  })
 
   // Filtros vêm da URL (`?preco=gte.10`): links compartilháveis e o voltar do
   // navegador funcionam. A chave em texto evita recarregar sem mudança real.
@@ -112,6 +123,7 @@
 
   function setFilters(next: TableFilter[]) {
     filterOpen = false
+    filterPreset = undefined
     page = 0
     const search = filtersToSearch(next)
     navigate(`/tables/${enc(name!)}${search ? `?${search}` : ''}`)
@@ -132,6 +144,17 @@
   function toggleSort(column: string) {
     sort = sort?.column === column ? (sort.desc ? null : { column, desc: true }) : { column, desc: false }
     page = 0
+  }
+
+  function setSort(column: string, direction: 'asc' | 'desc' | null) {
+    sort = direction ? { column, desc: direction === 'desc' } : null
+    page = 0
+  }
+
+  /** Menu da coluna: abre a barra de filtros com uma linha para ela. */
+  function filterBy(column: string) {
+    filterPreset = column
+    filterOpen = true
   }
 
   function pkOf(row: RowData) {
@@ -193,6 +216,9 @@
         bind:filterOpen
         {loading}
         selectedCount={selected.size}
+        hiddenColumns={hidden.names}
+        ontogglecolumn={(column) => hidden.toggle(column)}
+        onshowallcolumns={() => hidden.showAll()}
         {exportHref}
         onreload={load}
         oninsert={() => openSheet(null)}
@@ -205,9 +231,20 @@
         </div>
       {:else}
         {#if filterOpen && data}
-          <FilterBar columns={data.table.columns} {filters} onapply={setFilters} onclose={() => (filterOpen = false)} />
-        {:else if filters.length}
-          <FilterChips {filters} onchange={setFilters} />
+          {#key filterPreset}
+            <FilterBar
+              columns={data.table.columns}
+              {filters}
+              preset={filterPreset}
+              onapply={setFilters}
+              onclose={() => {
+                filterOpen = false
+                filterPreset = undefined
+              }}
+            />
+          {/key}
+        {:else if filters.length || sort}
+          <FilterChips {filters} {sort} onchange={setFilters} onclearsort={() => setSort('', null)} />
         {/if}
 
         {#if data?.table.exposed_without_rls}
@@ -229,8 +266,12 @@
             <DataGrid
               {data}
               {sort}
+              hidden={hidden.names}
               bind:selected
               onsort={toggleSort}
+              onsortset={setSort}
+              onfilter={filterBy}
+              onhide={(column) => hidden.hide(column)}
               onexpand={openSheet}
               oncommit={commitCell}
               {referenceHref}

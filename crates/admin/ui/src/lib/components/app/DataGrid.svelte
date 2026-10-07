@@ -11,23 +11,36 @@
   let {
     data,
     sort,
+    hidden,
     selected = $bindable(),
     onsort,
+    onsortset,
+    onfilter,
+    onhide,
     onexpand,
     oncommit,
     referenceHref,
   }: {
     data: TableData
     sort: { column: string; desc: boolean } | null
+    /** Colunas ocultas pelo usuário. */
+    hidden: string[]
     selected: Set<number>
     onsort: (column: string) => void
+    onsortset: (column: string, direction: 'asc' | 'desc' | null) => void
+    onfilter: (column: string) => void
+    onhide: (column: string) => void
     onexpand: (row: RowData) => void
     /** Salva uma célula; resolve depois de gravar (ou rejeita com o erro já avisado). */
     oncommit: (row: number, column: string, value: string | null) => Promise<void>
     referenceHref: (column: Column, value: string) => string
   } = $props()
 
-  const columns = $derived(data.table.columns.map((c) => ({ column: c, kind: columnKind(c), width: columnWidth(c) })))
+  const columns = $derived(
+    data.table.columns
+      .filter((c) => !hidden.includes(c.name))
+      .map((c) => ({ column: c, kind: columnKind(c), width: columnWidth(c) })),
+  )
   const editable = $derived(data.table.editable)
 
   // Edição inline: célula (linha, coluna) em edição e o rascunho.
@@ -100,7 +113,15 @@
       {/if}
       {#each columns as { column, kind } (column.name)}
         <th class="border-r border-b bg-card p-0 align-top font-normal">
-          <GridColumnHeader {column} {kind} sort={sortOf(column.name)} onsort={() => onsort(column.name)} />
+          <GridColumnHeader
+            {column}
+            {kind}
+            sort={sortOf(column.name)}
+            onsort={() => onsort(column.name)}
+            onsortset={(direction) => onsortset(column.name, direction)}
+            onfilter={() => onfilter(column.name)}
+            onhide={() => onhide(column.name)}
+          />
         </th>
       {/each}
       <th class="border-b bg-card" aria-hidden="true"></th>

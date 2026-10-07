@@ -30,7 +30,7 @@ export function columnWidth(
   // O cabeçalho precisa caber: nome (fonte normal) e linha do tipo (mono
   // pequena, com a tabela da chave estrangeira). Larguras médias por caractere.
   const typeLabel = column.full_type + (column.references ? ` → ${column.references.table}` : '')
-  const header = Math.max(column.name.length * 7.5 + (column.is_pk ? 64 : 48), typeLabel.length * 6.8 + 48, 96)
+  const header = Math.max(column.name.length * 7.5 + (column.is_pk ? 88 : 72), typeLabel.length * 6.8 + 72, 96)
   const base: Record<ColumnKind, number> = {
     number: column.is_pk ? 96 : 128,
     boolean: 104,

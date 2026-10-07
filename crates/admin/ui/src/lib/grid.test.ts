@@ -33,17 +33,20 @@ describe('categoria da coluna', () => {
 
 describe('largura e alinhamento', () => {
   it('largura por tipo, sem cortar o nome no cabeçalho', () => {
-    expect(columnWidth(col('id', 'bigint', { is_pk: true }))).toBe(96)
-    expect(columnWidth(col('feito', 'boolean'))).toBe(104)
+    // PK numérica é estreita, mas com espaço para o nome, o tipo e o menu da coluna.
+    const id = columnWidth(col('id', 'bigint', { is_pk: true }))
+    expect(id).toBeGreaterThanOrEqual(Math.ceil('bigint'.length * 6.8 + 72))
+    expect(id).toBeLessThan(columnWidth(col('descricao', 'text')))
+    expect(columnWidth(col('feito', 'boolean'))).toBeGreaterThanOrEqual(104)
     expect(columnWidth(col('um_nome_de_coluna_bem_comprido', 'boolean'))).toBeGreaterThan(104)
     expect(columnWidth(col('x'.repeat(80), 'text'))).toBe(420)
   })
 
   it('a linha do tipo também cabe (tipo completo e tabela da chave estrangeira)', () => {
     const fk = col('cliente_id', 'bigint', { references: { table: 'clientes', column: 'id' } })
-    expect(columnWidth(fk)).toBeGreaterThanOrEqual(Math.ceil('bigint → clientes'.length * 6.8 + 48))
+    expect(columnWidth(fk)).toBeGreaterThanOrEqual(Math.ceil('bigint → clientes'.length * 6.8 + 72))
     const numeric = col('total', 'numeric', { full_type: 'numeric(10,2)' })
-    expect(columnWidth(numeric)).toBeGreaterThanOrEqual(Math.ceil('numeric(10,2)'.length * 6.8 + 48))
+    expect(columnWidth(numeric)).toBeGreaterThanOrEqual(Math.ceil('numeric(10,2)'.length * 6.8 + 72))
     expect(columnWidth(col('criado_em', 'timestamp with time zone'))).toBeGreaterThanOrEqual(188)
   })
 
