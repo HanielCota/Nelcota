@@ -107,6 +107,9 @@ async fn serve(config: Config) -> anyhow::Result<()> {
                     keys,
                     issuer: config.jwt_issuer.clone(),
                 }),
+                migrations_dir: nelcota_admin::default_migrations_dir(
+                    config.migrations_dir.clone(),
+                ),
             })
         }
         _ => {

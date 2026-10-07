@@ -14,6 +14,7 @@ mod api;
 mod apply;
 mod ddl;
 mod export;
+mod migrations;
 mod policies_ddl;
 mod profile;
 mod projects;
@@ -24,6 +25,7 @@ mod tables_ddl;
 mod tokens;
 mod users;
 
+pub use migrations::default_dir as default_migrations_dir;
 pub use projects::HostLink;
 pub use sso::Sso;
 pub use tokens::TokenIssuer;
@@ -112,6 +114,9 @@ pub struct AdminState {
     pub host: Arc<HostLink>,
     /// Emissão de tokens service_role pela página de API.
     pub tokens: Arc<TokenIssuer>,
+    /// Pasta `migrations/` do projeto, quando acessível (para numerar as
+    /// migrações que o painel gera sem colidir com arquivos não aplicados).
+    pub migrations_dir: Option<std::path::PathBuf>,
 }
 
 pub fn router(state: AdminState) -> Router {
@@ -160,6 +165,14 @@ pub fn router(state: AdminState) -> Router {
         .route("/admin/api/projects/status", get(projects::status))
         .route("/admin/api/sso/handoff", post(sso::handoff))
         .route("/admin/api/tokens/service-role", post(tokens::service_role))
+        .route(
+            "/admin/api/migrations",
+            get(migrations::list).post(migrations::export),
+        )
+        .route(
+            "/admin/api/migrations/{version}/file",
+            get(migrations::file),
+        )
         .route("/admin/api/profile", get(profile::get))
         .route(
             "/admin/api/profile/avatar",

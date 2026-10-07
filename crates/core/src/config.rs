@@ -85,6 +85,9 @@ pub struct Config {
     pub project_name: Option<String>,
     /// Lista pública de projetos do host (nome + URL), para o seletor do painel.
     pub host_registry: Option<std::path::PathBuf>,
+    /// Pasta `migrations/` do projeto, lida pelo painel ao gerar migrações.
+    /// No container do projeto, `/migrations` é detectada sozinha.
+    pub migrations_dir: Option<std::path::PathBuf>,
     /// Schema exposto pela API REST.
     pub db_schema: String,
     /// Teto de linhas por leitura na API (`None` = sem teto).
@@ -128,6 +131,7 @@ impl Default for Config {
             admin_sso_secret: None,
             project_name: None,
             host_registry: None,
+            migrations_dir: None,
             db_schema: "public".into(),
             max_rows: None,
             listen: SocketAddr::from(([0, 0, 0, 0], 8000)),

@@ -96,6 +96,8 @@ pub struct Options {
     pub pool_size: usize,
     /// Recuperação de senha ligada (com o [`Outbox`] no lugar do SMTP).
     pub mail: bool,
+    /// Pasta `migrations/` que o painel enxerga.
+    pub migrations_dir: Option<std::path::PathBuf>,
     pub rate_limit_per_minute: u32,
     pub access_ttl_secs: u64,
     pub max_rows: Option<i64>,
@@ -106,6 +108,7 @@ impl Default for Options {
         Options {
             pool_size: 4,
             mail: true,
+            migrations_dir: None,
             rate_limit_per_minute: 10_000,
             access_ttl_secs: 900,
             max_rows: None,
@@ -227,6 +230,7 @@ impl TestApp {
                 keys: keys.clone(),
                 issuer: "nelcota-test".into(),
             }),
+            migrations_dir: options.migrations_dir.clone(),
         };
         let outbox = Arc::new(Outbox::default());
         let auth = AuthState {
