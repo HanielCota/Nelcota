@@ -21,6 +21,7 @@ mod sso;
 mod structure;
 mod tables_ddl;
 mod tokens;
+mod users;
 
 pub use projects::HostLink;
 pub use sso::Sso;
@@ -141,7 +142,8 @@ pub fn router(state: AdminState) -> Router {
                 .delete(api::delete_rows),
         )
         .route("/admin/api/sql", post(sql::run))
-        .route("/admin/api/users", get(api::users))
+        .route("/admin/api/users", get(api::users).post(users::create))
+        .route("/admin/api/users/{id}/password", put(users::set_password))
         .route("/admin/api/users/{id}/revoke", post(api::revoke_sessions))
         .route("/admin/api/users/{id}", delete(api::delete_user))
         .route("/admin/api/policies", get(api::policies))
@@ -191,6 +193,10 @@ impl ApiError {
 
     pub fn not_found(message: impl Into<String>) -> Self {
         ApiError(StatusCode::NOT_FOUND, message.into())
+    }
+
+    pub fn conflict(message: impl Into<String>) -> Self {
+        ApiError(StatusCode::CONFLICT, message.into())
     }
 }
 

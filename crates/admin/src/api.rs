@@ -700,7 +700,7 @@ pub async fn users(State(state): State<AdminState>, Query(params): Query<UsersQu
 }
 
 /// Validação de formato de uuid (8-4-4-4-12 hex).
-fn is_uuid(value: &str) -> bool {
+pub(crate) fn is_uuid(value: &str) -> bool {
     let parts: Vec<&str> = value.split('-').collect();
     parts.len() == 5
         && parts

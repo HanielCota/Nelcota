@@ -1314,3 +1314,120 @@ async fn token_service_role_emitido_pelo_painel() {
         .await;
     assert_eq!(outsider.status, StatusCode::UNAUTHORIZED);
 }
+
+async fn password_login(app: &TestApp, email: &str, password: &str) -> Reply {
+    app.raw(
+        Method::POST,
+        "/auth/v1/token?grant_type=password",
+        &[JSON],
+        json!({ "email": email, "password": password }).to_string(),
+    )
+    .await
+}
+
+#[tokio::test]
+async fn criar_usuario_e_redefinir_senha_pelo_painel() {
+    let app = TestApp::spawn().await;
+    let cookie = login(&app).await;
+
+    let created = send(
+        &app,
+        Method::POST,
+        "/admin/api/users",
+        &cookie,
+        json!({ "email": "  Nova@Exemplo.com ", "password": "senha-inicial-123" }),
+    )
+    .await;
+    assert_eq!(created.status, StatusCode::CREATED, "{}", created.text);
+    // Mesmas regras do cadastro público: email normalizado.
+    assert_eq!(created.body["email"], "nova@exemplo.com");
+    let id = created.body["id"].as_str().unwrap().to_owned();
+
+    // O usuário criado entra pela API pública, com o mesmo hash do cadastro.
+    let session = password_login(&app, "nova@exemplo.com", "senha-inicial-123").await;
+    assert_eq!(session.status, StatusCode::OK, "{}", session.text);
+    let refresh = session.body["refresh_token"].as_str().unwrap().to_owned();
+
+    for (body, status) in [
+        (
+            json!({ "email": "nova@exemplo.com", "password": "outra-senha-123" }),
+            StatusCode::CONFLICT,
+        ),
+        (
+            json!({ "email": "sem-arroba", "password": "senha-valida-123" }),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            json!({ "email": "curta@exemplo.com", "password": "1234567" }),
+            StatusCode::BAD_REQUEST,
+        ),
+    ] {
+        let reply = send(&app, Method::POST, "/admin/api/users", &cookie, body).await;
+        assert_eq!(reply.status, status, "{}", reply.text);
+    }
+
+    // Redefinir: a senha antiga para de valer e a sessão aberta é encerrada.
+    let reset = send(
+        &app,
+        Method::PUT,
+        &format!("/admin/api/users/{id}/password"),
+        &cookie,
+        json!({ "password": "senha-nova-456" }),
+    )
+    .await;
+    assert_eq!(reset.status, StatusCode::OK, "{}", reset.text);
+    assert_eq!(reset.body["sessions_revoked"], 1);
+    assert_eq!(
+        password_login(&app, "nova@exemplo.com", "senha-inicial-123")
+            .await
+            .status,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        password_login(&app, "nova@exemplo.com", "senha-nova-456")
+            .await
+            .status,
+        StatusCode::OK
+    );
+    let reused = app
+        .raw(
+            Method::POST,
+            "/auth/v1/token?grant_type=refresh_token",
+            &[JSON],
+            json!({ "refresh_token": refresh }).to_string(),
+        )
+        .await;
+    assert_ne!(
+        reused.status,
+        StatusCode::OK,
+        "sessão anterior à troca de senha não pode renovar"
+    );
+
+    let weak = send(
+        &app,
+        Method::PUT,
+        &format!("/admin/api/users/{id}/password"),
+        &cookie,
+        json!({ "password": "curta" }),
+    )
+    .await;
+    assert_eq!(weak.status, StatusCode::BAD_REQUEST);
+    let missing = send(
+        &app,
+        Method::PUT,
+        "/admin/api/users/00000000-0000-0000-0000-000000000000/password",
+        &cookie,
+        json!({ "password": "senha-valida-123" }),
+    )
+    .await;
+    assert_eq!(missing.status, StatusCode::NOT_FOUND);
+    let bad_id = send(
+        &app,
+        Method::PUT,
+        "/admin/api/users/nao-e-uuid/password",
+        &cookie,
+        json!({ "password": "senha-valida-123" }),
+    )
+    .await;
+    assert_eq!(bad_id.status, StatusCode::BAD_REQUEST);
+}
