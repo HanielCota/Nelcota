@@ -12,6 +12,7 @@
   import { api } from '$lib/api'
   import { downloadText } from '$lib/download'
   import type { ExportedMigration, MigrationsData } from '$lib/types'
+  import { errorMessage, hasMessage, i18n, intlLocale, t, translate } from '$lib/i18n/index.svelte'
 
   let data = $state<MigrationsData | null>(null)
   let error = $state('')
@@ -21,17 +22,17 @@
       data = await api.get<MigrationsData>('/migrations')
       error = ''
     } catch (e) {
-      error = (e as Error).message
+      error = errorMessage(e)
     }
   }
 
   onMount(load)
 
-  // Diálogo "Gerar migração".
+  // "Generate migration" dialog. The default name follows the panel language.
   let dialogOpen = $state(false)
-  let name = $state('alteracoes_do_painel')
+  let name = $state(t('migrations.dialog.defaultName'))
   let saving = $state(false)
-  // Última migração gerada nesta visita, para lembrar o próximo passo.
+  // Last migration generated in this visit, to remind the next step.
   let generated = $state<ExportedMigration | null>(null)
 
   const validName = $derived(/^[a-z0-9][a-z0-9_]{0,59}$/.test(name))
@@ -45,16 +46,16 @@
       downloadText(result.filename, result.sql, 'application/sql')
       generated = result
       dialogOpen = false
-      toast.success(result.message)
+      toast.success(t('migrations.generatedToast', { filename: result.filename }))
       await load()
     } catch (e) {
-      toast.error((e as Error).message)
+      toast.error(errorMessage(e))
     } finally {
       saving = false
     }
   }
 
-  const when = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+  const when = $derived(new Intl.DateTimeFormat(intlLocale(), { dateStyle: 'short', timeStyle: 'short' }))
   const date = (value: string | null) => {
     if (!value) return '—'
     const parsed = new Date(value)
@@ -62,20 +63,28 @@
   }
 
   type Row = MigrationsData['migrations'][number]
-  // Situação de cada migração; cor só para o que pede ação (D55).
+  // Status of each migration; colour only for what needs action (D55).
   function status(m: Row): { label: string; warn: boolean } {
-    if (!m.applied_on) return { label: 'Não aplicada neste banco', warn: true }
-    if (m.in_folder === false) return { label: 'Aplicada, mas fora da pasta', warn: true }
-    return { label: 'Aplicada', warn: false }
+    if (!m.applied_on) return { label: t('migrations.status.notApplied'), warn: true }
+    if (m.in_folder === false) return { label: t('migrations.status.outsideFolder'), warn: true }
+    return { label: t('migrations.status.applied'), warn: false }
+  }
+
+  // In the panel language when the server recorded the kind; else the stored text.
+  function describe(change: MigrationsData['pending'][number]): string {
+    const key = `migrations.changes.${change.kind}`
+    return change.kind && change.target !== null && hasMessage(key)
+      ? translate(i18n.locale, key, { name: change.target })
+      : change.summary
   }
 </script>
 
 <div class="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-10 lg:py-10">
-  <PageHeader title="Migrações" description="Arquivos de migrations/ e alterações de schema feitas pelo painel." />
+  <PageHeader title={t('migrations.title')} description={t('migrations.description')} />
 
   {#if error}
     <p class="text-sm text-destructive">
-      {error} <button type="button" class="ml-1 underline underline-offset-2" onclick={load}>Tentar de novo</button>
+      {error} <button type="button" class="ml-1 underline underline-offset-2" onclick={load}>{t('common.retry')}</button>
     </p>
   {:else if !data}
     <Skeleton class="h-40 rounded-lg" />
@@ -84,22 +93,20 @@
     <section class="grid gap-3">
       <div class="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 class="text-base font-semibold">Alterações do painel fora das migrações</h2>
-          <p class="mt-0.5 text-sm text-muted-foreground">
-            Tabelas, colunas e policies criadas aqui ainda não existem em outro ambiente até virarem arquivo.
-          </p>
+          <h2 class="text-base font-semibold">{t('migrations.pendingTitle')}</h2>
+          <p class="mt-0.5 text-sm text-muted-foreground">{t('migrations.pendingHint')}</p>
         </div>
         {#if data.pending.length}
-          <Button onclick={() => (dialogOpen = true)}>Gerar migração</Button>
+          <Button onclick={() => (dialogOpen = true)}>{t('migrations.generate')}</Button>
         {/if}
       </div>
 
       {#if generated}
         <div class="rounded-lg border px-4 py-3 text-sm">
           <p>
-            <span class="font-mono">{generated.filename}</span> foi baixada. Coloque em
-            <span class="font-mono">migrations/</span> e faça commit: neste banco ela já consta como aplicada, e o
-            <span class="font-mono">nelcota migrate</span> aplica nos outros ambientes.
+            <span class="font-mono">{generated.filename}</span> {t('migrations.generatedBefore')}
+            <span class="font-mono">migrations/</span> {t('migrations.generatedMiddle')}
+            <span class="font-mono">nelcota migrate</span> {t('migrations.generatedAfter')}
           </p>
         </div>
       {/if}
@@ -107,21 +114,20 @@
       {#if data.pending.length === 0}
         <EmptyState
           class="rounded-lg border"
-          title="Nada pendente"
-          description="O que você mudar pelo painel aparece aqui até ser exportado como migração."
+          title={t('migrations.nothingPending')}
+          description={t('migrations.nothingPendingHint')}
         />
       {:else}
         <ol class="divide-y rounded-lg border bg-card">
           {#each data.pending as change (change.id)}
             <li class="px-4 py-3">
               <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                <p class="text-sm font-medium">{change.summary}</p>
+                <p class="text-sm font-medium">{describe(change)}</p>
                 <p class="text-xs text-muted-foreground">{date(change.applied_at)}</p>
               </div>
               <details class="mt-1 text-sm">
                 <summary class="cursor-pointer text-muted-foreground hover:text-foreground">
-                  SQL ({change.statements.length}
-                  {change.statements.length === 1 ? 'comando' : 'comandos'})
+                  {t('migrations.statements', { count: change.statements.length })}
                 </summary>
                 <pre class="mt-2 overflow-x-auto rounded-md bg-muted/50 px-3 py-2 font-mono text-xs leading-relaxed">{change.statements
                     .map((s) => s.trim().replace(/;$/, '') + ';')
@@ -134,22 +140,22 @@
     </section>
 
     <section class="mt-10 grid gap-3">
-      <h2 class="text-base font-semibold">Migrações</h2>
+      <h2 class="text-base font-semibold">{t('migrations.listTitle')}</h2>
       {#if data.migrations.length === 0}
         <EmptyState
           class="rounded-lg border"
-          title="Nenhuma migração ainda"
-          description="Arquivos V1__nome.sql em migrations/, aplicados com nelcota migrate, aparecem aqui."
+          title={t('migrations.noMigrations')}
+          description={t('migrations.noMigrationsHint')}
         />
       {:else}
         <div class="overflow-hidden rounded-lg border bg-card">
           <Table.Root>
             <Table.Header>
               <Table.Row class="hover:bg-transparent">
-                <Table.Head class="w-20">Versão</Table.Head>
-                <Table.Head>Nome</Table.Head>
-                <Table.Head>Situação</Table.Head>
-                <Table.Head>Aplicada em</Table.Head>
+                <Table.Head class="w-20">{t('migrations.columns.version')}</Table.Head>
+                <Table.Head>{t('migrations.columns.name')}</Table.Head>
+                <Table.Head>{t('migrations.columns.status')}</Table.Head>
+                <Table.Head>{t('migrations.columns.appliedOn')}</Table.Head>
                 <Table.Head class="w-28"></Table.Head>
               </Table.Row>
             </Table.Header>
@@ -160,7 +166,7 @@
                   <Table.Cell class="font-mono text-xs tabular-nums">V{migration.version}</Table.Cell>
                   <Table.Cell>
                     <span class="font-mono text-xs">{migration.name}</span>
-                    {#if migration.from_panel}<span class="ml-2 text-xs text-muted-foreground">gerada pelo painel</span>{/if}
+                    {#if migration.from_panel}<span class="ml-2 text-xs text-muted-foreground">{t('migrations.fromPanel')}</span>{/if}
                   </Table.Cell>
                   <Table.Cell class={situation.warn ? 'text-warning' : 'text-muted-foreground'}>{situation.label}</Table.Cell>
                   <Table.Cell class="text-muted-foreground">{date(migration.applied_on)}</Table.Cell>
@@ -170,7 +176,7 @@
                         variant="ghost"
                         size="sm"
                         href={`/admin/api/migrations/${migration.version}/file`}
-                        download>Baixar</Button
+                        download>{t('common.download')}</Button
                       >
                     {/if}
                   </Table.Cell>
@@ -182,9 +188,9 @@
       {/if}
       <p class="text-sm text-muted-foreground">
         {#if data.folder}
-          Pasta lida: <span class="font-mono">{data.folder}</span>.
+          {t('migrations.folderRead')} <span class="font-mono">{data.folder}</span>.
         {:else}
-          A pasta migrations/ não está acessível a este servidor: a numeração considera só o banco.
+          {t('migrations.folderMissing')}
         {/if}
       </p>
     </section>
@@ -195,25 +201,25 @@
   <Dialog.Content class="sm:max-w-md">
     <form class="grid gap-5" onsubmit={generate}>
       <Dialog.Header>
-        <Dialog.Title>Gerar migração</Dialog.Title>
+        <Dialog.Title>{t('migrations.generate')}</Dialog.Title>
         <Dialog.Description>
-          Junta as {data?.pending.length ?? 0} alterações pendentes num arquivo e o registra como aplicado neste banco.
+          {t('migrations.dialog.description', { count: data?.pending.length ?? 0 })}
         </Dialog.Description>
       </Dialog.Header>
       <div class="grid gap-2">
-        <Label for="migration-name">Nome</Label>
+        <Label for="migration-name">{t('common.name')}</Label>
         <Input id="migration-name" bind:value={name} maxlength={60} autocomplete="off" aria-invalid={!validName} />
         <p class="text-sm text-muted-foreground">
           {#if validName}
-            Arquivo: <span class="font-mono">V{data?.next_version}__{name}.sql</span>
+            {t('migrations.dialog.file')} <span class="font-mono">V{data?.next_version}__{name}.sql</span>
           {:else}
-            Letras minúsculas, números e _ (ex.: criar_pedidos).
+            {t('migrations.dialog.nameRule')}
           {/if}
         </p>
       </div>
       <Dialog.Footer>
-        <Button variant="outline" onclick={() => (dialogOpen = false)}>Cancelar</Button>
-        <Button type="submit" disabled={!validName || saving}>{saving ? 'Gerando…' : 'Gerar e baixar'}</Button>
+        <Button variant="outline" onclick={() => (dialogOpen = false)}>{t('common.cancel')}</Button>
+        <Button type="submit" disabled={!validName || saving}>{saving ? t('migrations.dialog.generating') : t('migrations.dialog.submit')}</Button>
       </Dialog.Footer>
     </form>
   </Dialog.Content>

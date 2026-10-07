@@ -16,6 +16,7 @@
   import { ddl, toPolicyDef, type PolicyDef } from '$lib/ddl'
   import { href } from '$lib/router.svelte'
   import type { PoliciesData } from '$lib/types'
+  import { errorMessage, t } from '$lib/i18n/index.svelte'
 
   let data = $state<PoliciesData | null>(null)
   let error = $state('')
@@ -25,13 +26,13 @@
       data = await api.get<PoliciesData>('/policies')
       error = ''
     } catch (e) {
-      error = (e as Error).message
+      error = errorMessage(e)
     }
   }
 
   onMount(load)
 
-  // Formulário: tabela alvo e policy em edição (`null` = nova).
+  // Sheet: target table and the policy being edited (`null` = new).
   let sheetOpen = $state(false)
   let sheetTable = $state('')
   let editing = $state<PolicyDef | null>(null)
@@ -46,22 +47,22 @@
 
   async function enableRls(table: string) {
     try {
-      const result = await ddl.alterTable(table, [{ action: 'set_rls', enabled: true }])
-      toast.success(result.message ?? 'RLS ativado')
+      await ddl.alterTable(table, [{ action: 'set_rls', enabled: true }])
+      toast.success(t('policies.rlsEnabled', { table }))
       await load()
     } catch (e) {
-      toast.error((e as Error).message)
+      toast.error(errorMessage(e))
     }
   }
 
   async function dropPolicy() {
     if (!toDelete) return
     try {
-      const result = await ddl.dropPolicy(toDelete.table, toDelete.policy)
-      toast.success(result.message ?? 'Policy apagada')
+      await ddl.dropPolicy(toDelete.table, toDelete.policy)
+      toast.success(t('policies.deleted', { name: toDelete.policy }))
       await load()
     } catch (e) {
-      toast.error((e as Error).message)
+      toast.error(errorMessage(e))
       throw e
     }
   }
@@ -69,7 +70,7 @@
 </script>
 
 <div class="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-10 lg:py-10">
-  <PageHeader title="Policies" description="Row Level Security por tabela: quem lê e altera cada linha." />
+  <PageHeader title={t('policies.title')} description={t('policies.description')} />
 
   {#if error}
     <p class="text-sm text-destructive">{error}</p>
@@ -79,13 +80,13 @@
     </div>
   {:else}
     {#if data.exposed_without_rls.length}
-      <Callout variant="danger" title={`Expostas sem RLS: ${data.exposed_without_rls.join(', ')}`} class="mb-6">
-        Quem tem GRANT nessas tabelas lê e altera todas as linhas.
+      <Callout variant="danger" title={t('policies.exposed', { tables: data.exposed_without_rls.join(', ') })} class="mb-6">
+        {t('policies.exposedHint')}
       </Callout>
     {/if}
 
     {#if data.tables.length === 0}
-      <EmptyState title="Nenhuma tabela" description="Crie uma tabela para definir policies nela." />
+      <EmptyState title={t('policies.noTables')} description={t('policies.noTablesHint')} />
     {/if}
     <div class="grid gap-4">
       {#each data.tables as table (table.name)}
@@ -97,17 +98,17 @@
             <RlsBadge rls={table.rls} />
             <div class="ml-auto flex items-center gap-2">
               {#if !table.rls.enabled}
-                <Button variant="outline" size="sm" onclick={() => enableRls(table.name)}>Ativar RLS</Button>
+                <Button variant="outline" size="sm" onclick={() => enableRls(table.name)}>{t('policies.enableRls')}</Button>
               {/if}
-              <Button variant="outline" size="sm" onclick={() => openSheet(table.name, null)}><Plus />Nova policy</Button>
+              <Button variant="outline" size="sm" onclick={() => openSheet(table.name, null)}><Plus />{t('policies.newPolicy')}</Button>
             </div>
           </header>
           {#if table.policies.length === 0}
             <p class="px-4 py-5 text-sm text-muted-foreground">
               {#if table.rls.enabled}
-                Nenhuma policy: só <code class="text-xs text-foreground">service_role</code> e o dono acessam.
+                {t('policies.noPoliciesRlsBefore')} <code class="text-xs text-foreground">service_role</code> {t('policies.noPoliciesRlsAfter')}
               {:else}
-                Nenhuma policy.
+                {t('policies.noPolicies')}
               {/if}
             </p>
           {:else}
@@ -116,7 +117,7 @@
                 <div class="grid gap-3 px-4 py-3.5 text-sm md:grid-cols-[16rem_12rem_1fr_auto] md:items-start">
                   <p class="font-medium">
                     {policy.name}
-                    {#if !policy.permissive}<span class="ml-1 text-xs font-normal text-muted-foreground">(restritiva)</span>{/if}
+                    {#if !policy.permissive}<span class="ml-1 text-xs font-normal text-muted-foreground">{t('policies.restrictiveTag')}</span>{/if}
                   </p>
                   <p class="text-xs text-muted-foreground">
                     <span class="mr-1.5 rounded border px-1.5 py-px font-mono text-foreground">{policy.command}</span>
@@ -134,15 +135,15 @@
                     <Button
                       variant="ghost"
                       size="icon-sm"
-                      aria-label={`Editar ${policy.name}`}
-                      title="Editar"
+                      aria-label={t('policies.editLabel', { name: policy.name })}
+                      title={t('common.edit')}
                       onclick={() => openSheet(table.name, toPolicyDef(policy))}><Pencil /></Button
                     >
                     <Button
                       variant="ghost"
                       size="icon-sm"
-                      aria-label={`Apagar ${policy.name}`}
-                      title="Apagar"
+                      aria-label={t('policies.deleteLabel', { name: policy.name })}
+                      title={t('common.delete')}
                       onclick={() => {
                         toDelete = { table: table.name, policy: policy.name }
                         deleteOpen = true
@@ -159,10 +160,10 @@
 
     {#if data.anon_functions.length}
       <section class="mt-8 rounded-lg border bg-card p-5">
-        <h2 class="text-sm font-semibold">Funções que anon pode executar</h2>
+        <h2 class="text-sm font-semibold">{t('policies.anonFunctions')}</h2>
         <p class="mt-2 font-mono text-xs">{data.anon_functions.join(', ')}</p>
         <p class="mt-3 text-sm text-muted-foreground">
-          O Postgres dá EXECUTE a PUBLIC por padrão. Para restringir:
+          {t('policies.anonFunctionsHint')}
           <code class="text-xs text-foreground">revoke execute on function f() from public</code>.
         </p>
       </section>
@@ -174,9 +175,9 @@
 {#if toDelete}
   <ConfirmDialog
     bind:open={deleteOpen}
-    title={`Apagar a policy "${toDelete.policy}"?`}
-    description={`As linhas de ${toDelete.table} que só ela liberava deixam de ser acessíveis.`}
-    confirmLabel="Apagar policy"
+    title={t('policies.confirmDelete.title', { name: toDelete.policy })}
+    description={t('policies.confirmDelete.description', { table: toDelete.table })}
+    confirmLabel={t('policies.confirmDelete.confirm')}
     destructive
     onconfirm={dropPolicy}
   />

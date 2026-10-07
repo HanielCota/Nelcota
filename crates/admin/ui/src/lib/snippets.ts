@@ -1,12 +1,15 @@
-// Exemplos de uso da API (curl e JavaScript) gerados a partir da tabela.
-// Funções puras: recebem a URL base e as colunas, devolvem o código.
+// API usage examples (curl and JavaScript) generated from the table.
+// Pure functions: they take the base URL and the columns and return code.
+// Labels and descriptions live in the i18n catalog (`connect.snippets.<id>`).
 
 export type Lang = 'curl' | 'js'
 
+export type SnippetId = 'list' | 'filter' | 'insert' | 'update' | 'delete' | 'signup' | 'login' | 'refresh'
+
 export interface Snippet {
-  id: string
-  label: string
-  description: string
+  id: SnippetId
+  /** Values for the description (e.g. the column used in the filter example). */
+  params?: Record<string, string>
   code: Record<Lang, string>
 }
 
@@ -18,7 +21,7 @@ export interface SnippetColumn {
   nullable: boolean
 }
 
-/** Valor de exemplo plausível para o tipo da coluna. */
+/** Plausible sample value for the column type. */
 export function sampleValue(type: string): unknown {
   const t = type.toLowerCase()
   if (t.endsWith('[]')) return []
@@ -29,10 +32,10 @@ export function sampleValue(type: string): unknown {
   if (t.startsWith('timestamp')) return '2026-01-01T12:00:00Z'
   if (t === 'date') return '2026-01-01'
   if (t === 'json' || t === 'jsonb') return {}
-  return 'exemplo'
+  return 'example'
 }
 
-/** Corpo de inserção: colunas sem DEFAULT nem geradas (as obrigatórias primeiro). */
+/** Insert body: columns without DEFAULT that are not generated (required ones first). */
 export function sampleRow(columns: readonly SnippetColumn[]): Record<string, unknown> {
   const fillable = columns.filter((c) => !c.has_default && !c.generated)
   const ordered = [...fillable.filter((c) => !c.nullable), ...fillable.filter((c) => c.nullable)]
@@ -41,7 +44,7 @@ export function sampleRow(columns: readonly SnippetColumn[]): Record<string, unk
 
 const shellQuote = (text: string) => `'${text.replaceAll("'", `'\\''`)}'`
 
-/** Primeira coluna boa para o exemplo de filtro (texto, sem ser a PK numérica). */
+/** First column that makes a good filter example (text, not the numeric PK). */
 function filterColumn(columns: readonly SnippetColumn[]): SnippetColumn | undefined {
   return columns.find((c) => c.type === 'text' || c.type.startsWith('character varying')) ?? columns[0]
 }
@@ -59,19 +62,16 @@ export function tableSnippets(base: string, table: string, columns: readonly Sni
   return [
     {
       id: 'list',
-      label: 'Listar linhas',
-      description: 'As 20 primeiras (order=coluna.desc ordena). Sem token, vale o que a role anon pode ver.',
       code: {
         curl: `curl ${shellQuote(`${url}?select=*&limit=20`)} \\\n  ${auth}`,
-        js: `const res = await fetch('${url}?select=*&limit=20', {\n  ${authJs},\n})\nconst linhas = await res.json()`,
+        js: `const res = await fetch('${url}?select=*&limit=20', {\n  ${authJs},\n})\nconst rows = await res.json()`,
       },
     },
     ...(filter
       ? [
           {
-            id: 'filter',
-            label: 'Filtrar',
-            description: `Operadores: eq, neq, gt, gte, lt, lte, ilike, in, is (ex.: ${filter.name}=ilike.*abc*).`,
+            id: 'filter' as const,
+            params: { column: filter.name },
             code: {
               curl: `curl ${shellQuote(`${url}?${filterQuery}`)} \\\n  ${auth}`,
               js: `const res = await fetch('${url}?${filterQuery}', {\n  ${authJs},\n})`,
@@ -81,8 +81,6 @@ export function tableSnippets(base: string, table: string, columns: readonly Sni
       : []),
     {
       id: 'insert',
-      label: 'Inserir',
-      description: 'Colunas ausentes recebem o DEFAULT. Prefer: return=representation devolve a linha criada.',
       code: {
         curl: `curl -X POST ${shellQuote(url)} \\\n  ${auth} \\\n  -H "Content-Type: application/json" \\\n  -H "Prefer: return=representation" \\\n  -d ${shellQuote(body)}`,
         js: `const res = await fetch('${url}', {\n  method: 'POST',\n  headers: {\n    Authorization: \`Bearer \${token}\`,\n    'Content-Type': 'application/json',\n    Prefer: 'return=representation',\n  },\n  body: JSON.stringify(${bodyPretty}),\n})`,
@@ -90,8 +88,6 @@ export function tableSnippets(base: string, table: string, columns: readonly Sni
     },
     {
       id: 'update',
-      label: 'Atualizar',
-      description: 'PATCH exige filtro: sem ele a API recusa, para não alterar a tabela inteira.',
       code: {
         curl: `curl -X PATCH ${shellQuote(`${url}?id=eq.1`)} \\\n  ${auth} \\\n  -H "Content-Type: application/json" \\\n  -d ${shellQuote(body)}`,
         js: `await fetch('${url}?id=eq.1', {\n  method: 'PATCH',\n  headers: { Authorization: \`Bearer \${token}\`, 'Content-Type': 'application/json' },\n  body: JSON.stringify(${bodyPretty}),\n})`,
@@ -99,8 +95,6 @@ export function tableSnippets(base: string, table: string, columns: readonly Sni
     },
     {
       id: 'delete',
-      label: 'Apagar',
-      description: 'DELETE também exige filtro.',
       code: {
         curl: `curl -X DELETE ${shellQuote(`${url}?id=eq.1`)} \\\n  ${auth}`,
         js: `await fetch('${url}?id=eq.1', {\n  method: 'DELETE',\n  ${authJs},\n})`,
@@ -111,12 +105,10 @@ export function tableSnippets(base: string, table: string, columns: readonly Sni
 
 export function authSnippets(base: string): Snippet[] {
   const auth = `${base}/auth/v1`
-  const credentials = JSON.stringify({ email: 'ana@exemplo.com', password: 'uma-senha-forte' })
+  const credentials = JSON.stringify({ email: 'ana@example.com', password: 'a-strong-password' })
   return [
     {
       id: 'signup',
-      label: 'Criar conta',
-      description: 'Devolve a sessão (access_token e refresh_token) já logada.',
       code: {
         curl: `curl -X POST ${shellQuote(`${auth}/signup`)} \\\n  -H "Content-Type: application/json" \\\n  -d ${shellQuote(credentials)}`,
         js: `const res = await fetch('${auth}/signup', {\n  method: 'POST',\n  headers: { 'Content-Type': 'application/json' },\n  body: JSON.stringify({ email, password }),\n})\nconst { access_token, refresh_token } = await res.json()`,
@@ -124,8 +116,6 @@ export function authSnippets(base: string): Snippet[] {
     },
     {
       id: 'login',
-      label: 'Entrar',
-      description: 'O access_token vai no header Authorization das chamadas à API (role authenticated).',
       code: {
         curl: `curl -X POST ${shellQuote(`${auth}/token?grant_type=password`)} \\\n  -H "Content-Type: application/json" \\\n  -d ${shellQuote(credentials)}`,
         js: `const res = await fetch('${auth}/token?grant_type=password', {\n  method: 'POST',\n  headers: { 'Content-Type': 'application/json' },\n  body: JSON.stringify({ email, password }),\n})\nconst { access_token, refresh_token } = await res.json()`,
@@ -133,8 +123,6 @@ export function authSnippets(base: string): Snippet[] {
     },
     {
       id: 'refresh',
-      label: 'Renovar a sessão',
-      description: 'O access_token expira em minutos; troque o refresh_token por um par novo.',
       code: {
         curl: `curl -X POST ${shellQuote(`${auth}/token?grant_type=refresh_token`)} \\\n  -H "Content-Type: application/json" \\\n  -d '{"refresh_token": "..."}'`,
         js: `const res = await fetch('${auth}/token?grant_type=refresh_token', {\n  method: 'POST',\n  headers: { 'Content-Type': 'application/json' },\n  body: JSON.stringify({ refresh_token }),\n})`,

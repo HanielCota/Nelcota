@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Checkbox } from '$lib/components/ui/checkbox'
   import { API_ROLES, PRIVILEGES, type GrantDef, type Privilege, type ApiRole } from '$lib/ddl'
+  import { t } from '$lib/i18n/index.svelte'
 
   let { grants = $bindable() }: { grants: GrantDef[] } = $props()
 
@@ -16,19 +17,14 @@
     )
   }
 
-  const hint: Record<ApiRole, string> = {
-    anon: 'requests sem token',
-    authenticated: 'usuários logados',
-    service_role: 'seu backend (ignora RLS)',
-  }
 </script>
 
-<!-- Matriz role × privilégio. O RLS ainda filtra as linhas de anon e authenticated. -->
+<!-- Role × privilege matrix. RLS still filters the rows of anon and authenticated. -->
 <div class="overflow-x-auto rounded-lg border bg-card">
   <table class="w-full text-sm">
     <thead>
       <tr class="bg-muted/60 text-xs text-muted-foreground">
-        <th class="px-4 py-2.5 text-left font-medium">Role</th>
+        <th class="px-4 py-2.5 text-left font-medium">{t('policies.grants.role')}</th>
         {#each PRIVILEGES as privilege (privilege)}
           <th class="w-20 px-2 py-2.5 text-center font-mono font-medium uppercase">{privilege}</th>
         {/each}
@@ -39,14 +35,14 @@
         <tr class="border-t">
           <td class="px-4 py-3">
             <span class="font-mono text-xs font-medium">{role}</span>
-            <span class="block text-xs text-muted-foreground">{hint[role]}</span>
+            <span class="block text-xs text-muted-foreground">{t(`policies.grants.hints.${role}`)}</span>
           </td>
           {#each PRIVILEGES as privilege (privilege)}
             <td class="px-2 py-3 text-center">
               <Checkbox
                 checked={has(role, privilege)}
                 onCheckedChange={(v) => toggle(role, privilege, v === true)}
-                aria-label={`${privilege} para ${role}`}
+                aria-label={t('policies.grants.privilegeFor', { privilege, role })}
               />
             </td>
           {/each}

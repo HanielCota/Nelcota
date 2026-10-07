@@ -41,7 +41,7 @@ export interface Column {
   enum_values: string[]
   is_pk: boolean
   comment: string | null
-  /** Chave estrangeira de uma coluna para outra tabela exposta. */
+  /** Foreign key from a column to another exposed table. */
   references: { table: string; column: string } | null
 }
 
@@ -128,11 +128,20 @@ export type MigrationsData = {
     version: number
     name: string
     applied_on: string | null
-    /** `null` quando a pasta migrations/ não está acessível ao servidor. */
+    /** `null` when the migrations/ folder is not reachable by the server. */
     in_folder: boolean | null
     from_panel: boolean
   }[]
-  pending: { id: number; applied_at: string; summary: string; statements: string[] }[]
+  pending: {
+    id: number
+    applied_at: string
+    /** English text; older rows may hold the former Portuguese one. */
+    summary: string
+    statements: string[]
+    /** Kind of change and its table/policy name, for a description in the panel language. */
+    kind: string | null
+    target: string | null
+  }[]
   next_version: number
   folder: string | null
 }

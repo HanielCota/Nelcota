@@ -10,8 +10,9 @@
   import { toast } from 'svelte-sonner'
   import SqlPreview from './SqlPreview.svelte'
   import { ddl, policyFields, type ApiRole, type PolicyCommand, type PolicyDef } from '$lib/ddl'
-  import { POLICY_TEMPLATES, guessOwnerColumn, type PolicyTemplate } from '$lib/policy-templates'
+  import { POLICY_TEMPLATES, guessOwnerColumn, templateText, type PolicyTemplate } from '$lib/policy-templates'
   import { SqlPreview as Preview } from '$lib/preview.svelte'
+  import { errorMessage, t } from '$lib/i18n/index.svelte'
 
   let {
     open = $bindable(false),
@@ -21,23 +22,13 @@
   }: {
     open?: boolean
     table: string
-    /** Policy sendo editada; `null` = nova. */
+    /** Policy being edited; `null` = new. */
     original?: PolicyDef | null
     onsaved: () => void
   } = $props()
 
-  const COMMANDS: { value: PolicyCommand; label: string }[] = [
-    { value: 'select', label: 'SELECT (ler)' },
-    { value: 'insert', label: 'INSERT (criar)' },
-    { value: 'update', label: 'UPDATE (alterar)' },
-    { value: 'delete', label: 'DELETE (apagar)' },
-    { value: 'all', label: 'ALL (tudo)' },
-  ]
-  const ROLES: { value: ApiRole; hint: string }[] = [
-    { value: 'anon', hint: 'sem login' },
-    { value: 'authenticated', hint: 'logados' },
-    { value: 'service_role', hint: 'backend' },
-  ]
+  const COMMANDS: PolicyCommand[] = ['select', 'insert', 'update', 'delete', 'all']
+  const ROLES: ApiRole[] = ['anon', 'authenticated', 'service_role']
 
   const blank = (): PolicyDef => ({
     name: '',
@@ -57,14 +48,14 @@
   $effect(() => {
     if (!open) return
     policy = original ? { ...original, roles: [...original.roles] } : blank()
-    // A coluna do dono (uuid) alimenta os modelos.
+    // The owner column (uuid) feeds the templates.
     ddl
       .structure(table)
       .then((s) => (ownerColumn = guessOwnerColumn(s.columns)))
       .catch(() => (ownerColumn = 'user_id'))
   })
 
-  /** Só manda as expressões que o comando aceita. */
+  /** Only sends the expressions the command accepts. */
   const payload = $derived<PolicyDef>({
     ...policy,
     name: policy.name.trim(),
@@ -85,7 +76,13 @@
 
   function applyTemplate(template: PolicyTemplate) {
     const built = template.build(ownerColumn)
-    policy = { ...built, permissive: true, using: built.using ?? '', check: built.check ?? '' }
+    policy = {
+      ...built,
+      name: templateText(template.id).name,
+      permissive: true,
+      using: built.using ?? '',
+      check: built.check ?? '',
+    }
   }
 
   function toggleRole(role: ApiRole, on: boolean) {
@@ -97,44 +94,44 @@
     saving = true
     try {
       const snapshot = $state.snapshot(payload)
-      const result = original
-        ? await ddl.replacePolicy(table, original.name, snapshot)
-        : await ddl.createPolicy(table, snapshot)
-      toast.success(result.message ?? 'Policy salva')
+      if (original) await ddl.replacePolicy(table, original.name, snapshot)
+      else await ddl.createPolicy(table, snapshot)
+      toast.success(t('policies.sheet.saved', { name: snapshot.name }))
       open = false
       onsaved()
     } catch (e) {
-      toast.error((e as Error).message)
+      toast.error(errorMessage(e))
     } finally {
       saving = false
     }
   }
 
-  const commandLabel = (value: PolicyCommand) => COMMANDS.find((c) => c.value === value)?.label ?? value
+  const commandLabel = (value: PolicyCommand) => t(`policies.sheet.commands.${value}`)
 </script>
 
 <Sheet.Root bind:open>
   <Sheet.Content class="flex w-full flex-col gap-0 p-0 data-[side=right]:sm:max-w-2xl">
     <Sheet.Header class="border-b px-6 py-4">
-      <Sheet.Title>{original ? `Editar policy` : 'Nova policy'}</Sheet.Title>
-      <Sheet.Description>na tabela <code class="font-mono text-xs text-foreground">{table}</code></Sheet.Description>
+      <Sheet.Title>{original ? t('policies.sheet.edit') : t('policies.sheet.new')}</Sheet.Title>
+      <Sheet.Description>{t('policies.sheet.onTable')} <code class="font-mono text-xs text-foreground">{table}</code></Sheet.Description>
     </Sheet.Header>
 
     <form id="policy-form" class="flex-1 space-y-6 overflow-y-auto px-6 py-6" onsubmit={submit}>
       <DropdownMenu.Root>
         <DropdownMenu.Trigger>
           {#snippet child({ props })}
-            <Button variant="outline" {...props}>Começar de um modelo</Button>
+            <Button variant="outline" {...props}>{t('policies.sheet.fromTemplate')}</Button>
           {/snippet}
         </DropdownMenu.Trigger>
         <DropdownMenu.Content align="start" class="w-96 max-w-[calc(100vw-2rem)]">
           <DropdownMenu.Label class="text-xs font-normal text-muted-foreground">
-            Modelos de dono usam a coluna <code class="text-foreground">{ownerColumn}</code>
+            {t('policies.sheet.templatesOwnerColumn')} <code class="text-foreground">{ownerColumn}</code>
           </DropdownMenu.Label>
-          {#each POLICY_TEMPLATES as template (template.label)}
+          {#each POLICY_TEMPLATES as template (template.id)}
+            {@const text = templateText(template.id)}
             <DropdownMenu.Item onclick={() => applyTemplate(template)} class="flex-col items-start gap-0.5 py-2">
-              <span class="font-medium">{template.label}</span>
-              <span class="text-xs text-muted-foreground">{template.description}</span>
+              <span class="font-medium">{text.label}</span>
+              <span class="text-xs text-muted-foreground">{text.description}</span>
             </DropdownMenu.Item>
           {/each}
         </DropdownMenu.Content>
@@ -142,16 +139,16 @@
 
       <div class="grid gap-4 sm:grid-cols-2">
         <div class="grid gap-1.5">
-          <Label for="policy-name">Nome</Label>
-          <Input id="policy-name" bind:value={policy.name} placeholder="ex.: dono lê as próprias notas" required />
+          <Label for="policy-name">{t('policies.sheet.name')}</Label>
+          <Input id="policy-name" bind:value={policy.name} placeholder={t('policies.sheet.namePlaceholder')} required />
         </div>
         <div class="grid gap-1.5">
-          <Label>Comando</Label>
+          <Label>{t('policies.sheet.command')}</Label>
           <Select.Root type="single" bind:value={policy.command}>
             <Select.Trigger class="w-full">{commandLabel(policy.command)}</Select.Trigger>
             <Select.Content>
-              {#each COMMANDS as command (command.value)}
-                <Select.Item value={command.value}>{command.label}</Select.Item>
+              {#each COMMANDS as command (command)}
+                <Select.Item value={command}>{commandLabel(command)}</Select.Item>
               {/each}
             </Select.Content>
           </Select.Root>
@@ -159,39 +156,37 @@
       </div>
 
       <fieldset class="grid gap-2">
-        <legend class="mb-1 text-sm font-medium">Vale para</legend>
+        <legend class="mb-1 text-sm font-medium">{t('policies.sheet.appliesTo')}</legend>
         <div class="grid gap-2 sm:grid-cols-3">
-          {#each ROLES as role (role.value)}
+          {#each ROLES as role (role)}
             <label
               class="flex cursor-pointer items-center gap-3 rounded-md border bg-card px-3 py-2.5 text-sm transition-colors hover:border-border-strong has-data-checked:border-brand/50"
             >
-              <Checkbox checked={policy.roles.includes(role.value)} onCheckedChange={(v) => toggleRole(role.value, v === true)} />
+              <Checkbox checked={policy.roles.includes(role)} onCheckedChange={(v) => toggleRole(role, v === true)} />
               <span class="grid">
-                <span class="font-mono text-xs font-medium">{role.value}</span>
-                <span class="text-xs text-muted-foreground">{role.hint}</span>
+                <span class="font-mono text-xs font-medium">{role}</span>
+                <span class="text-xs text-muted-foreground">{t(`policies.sheet.roles.${role}`)}</span>
               </span>
             </label>
           {/each}
         </div>
         {#if policy.roles.length === 0}
-          <p class="text-xs text-muted-foreground">Nenhuma marcada: vale para todas as roles (PUBLIC).</p>
+          <p class="text-xs text-muted-foreground">{t('policies.sheet.noRoles')}</p>
         {/if}
       </fieldset>
 
       <label class="flex cursor-pointer items-start gap-3 text-sm">
         <Checkbox checked={!policy.permissive} onCheckedChange={(v) => (policy.permissive = v !== true)} class="mt-0.5" />
         <span>
-          <span class="font-medium">Restritiva</span>
-          <span class="mt-0.5 block text-xs text-muted-foreground">
-            Permissivas somam acesso (basta uma liberar). Restritivas são exigidas além delas.
-          </span>
+          <span class="font-medium">{t('policies.sheet.restrictive')}</span>
+          <span class="mt-0.5 block text-xs text-muted-foreground">{t('policies.sheet.restrictiveHint')}</span>
         </span>
       </label>
 
       {#if fields.using}
         <div class="grid gap-1.5">
           <Label for="policy-using" class="flex-wrap">
-            <span class="font-mono">USING</span> <span class="font-normal text-muted-foreground">quais linhas existentes a role {policy.command === 'delete' ? 'pode apagar' : 'enxerga'}</span>
+            <span class="font-mono">USING</span> <span class="font-normal text-muted-foreground">{policy.command === 'delete' ? t('policies.sheet.usingDeletes') : t('policies.sheet.usingSees')}</span>
           </Label>
           <Textarea
             id="policy-using"
@@ -204,28 +199,28 @@
       {#if fields.check}
         <div class="grid gap-1.5">
           <Label for="policy-check" class="flex-wrap">
-            <span class="font-mono">WITH CHECK</span> <span class="font-normal text-muted-foreground">quais linhas novas ou alteradas são aceitas</span>
+            <span class="font-mono">WITH CHECK</span> <span class="font-normal text-muted-foreground">{t('policies.sheet.checkHint')}</span>
           </Label>
           <Textarea
             id="policy-check"
             bind:value={() => policy.check ?? '', (v) => (policy.check = v)}
-            placeholder={policy.command === 'insert' ? `${ownerColumn} = auth.uid()` : 'vazio = mesma regra do USING'}
+            placeholder={policy.command === 'insert' ? `${ownerColumn} = auth.uid()` : t('policies.sheet.checkPlaceholder')}
             class="min-h-24 font-mono text-xs"
           />
         </div>
       {/if}
       <p class="text-xs text-muted-foreground">
-        Use <code class="text-foreground">auth.uid()</code> para o id do usuário logado e
-        <code class="text-foreground">auth.jwt()</code> para as claims do token.
+        {t('policies.sheet.helpBefore')} <code class="text-foreground">auth.uid()</code> {t('policies.sheet.helpMiddle')}
+        <code class="text-foreground">auth.jwt()</code> {t('policies.sheet.helpAfter')}
       </p>
 
-      <SqlPreview {preview} placeholder="Dê um nome e escreva a expressão para ver o SQL." />
+      <SqlPreview {preview} placeholder={t('policies.sheet.previewPlaceholder')} />
     </form>
 
     <Sheet.Footer class="flex-row justify-end gap-2 border-t bg-muted/40 px-6 py-4">
-      <Button variant="outline" onclick={() => (open = false)}>Cancelar</Button>
+      <Button variant="outline" onclick={() => (open = false)}>{t('common.cancel')}</Button>
       <Button type="submit" form="policy-form" disabled={saving || !ready}>
-        {saving ? 'Salvando…' : original ? 'Salvar policy' : 'Criar policy'}
+        {saving ? t('common.saving') : original ? t('policies.sheet.savePolicy') : t('policies.sheet.createPolicy')}
       </Button>
     </Sheet.Footer>
   </Sheet.Content>

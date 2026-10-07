@@ -10,8 +10,9 @@
   import { api, enc, isAbort } from '$lib/api'
   import { authSnippets, tableSnippets, type Lang, type Snippet } from '$lib/snippets'
   import type { TableData, TableSummary } from '$lib/types'
+  import { t } from '$lib/i18n/index.svelte'
 
-  // O painel é servido pelo mesmo host da API.
+  // The panel is served from the same host as the API.
   const base = location.origin
 
   let tables = $state<TableSummary[]>([])
@@ -29,7 +30,7 @@
     }
   })
 
-  // Exemplos da tabela escolhida, com as colunas reais (tipo, DEFAULT, gerada).
+  // Examples for the chosen table, with its real columns (type, DEFAULT, generated).
   $effect(() => {
     if (topic === 'auth') {
       snippets = authSnippets(base)
@@ -62,28 +63,12 @@
   })
 
   const endpoints = [
-    { label: 'REST', path: '/rest/v1/', hint: 'tabelas, views e funções (rpc) do schema exposto' },
-    { label: 'Auth', path: '/auth/v1/', hint: 'cadastro, login, sessão e usuário atual' },
-    { label: 'JWKS', path: '/auth/v1/.well-known/jwks.json', hint: 'chave pública para validar os JWTs' },
-  ]
+    { id: 'rest', label: 'REST', path: '/rest/v1/' },
+    { id: 'auth', label: 'Auth', path: '/auth/v1/' },
+    { id: 'jwks', label: 'JWKS', path: '/auth/v1/.well-known/jwks.json' },
+  ] as const
 
-  const roles = [
-    {
-      role: 'anon',
-      title: 'Visitante',
-      text: 'Request sem header Authorization. Vê o que os GRANTs e as policies liberam para anon.',
-    },
-    {
-      role: 'authenticated',
-      title: 'Usuário logado',
-      text: 'Authorization: Bearer com o access_token do login. auth.uid() é o id dele nas policies.',
-    },
-    {
-      role: 'service_role',
-      title: 'Seu backend',
-      text: 'Bearer com o token service_role. Ignora o RLS (mas precisa de GRANT na tabela): só em código que roda no servidor.',
-    },
-  ]
+  const roles = ['anon', 'authenticated', 'service_role'] as const
 
   const tab = (active: boolean) =>
     [
@@ -93,42 +78,39 @@
 </script>
 
 <div class="mx-auto grid max-w-5xl gap-10 px-4 py-8 *:min-w-0 sm:px-6 lg:px-10 lg:py-10">
-  <PageHeader title="API" description="Como o seu app conversa com este projeto.">
+  <PageHeader title={t('connect.title')} description={t('connect.description')}>
     {#snippet actions()}
       <Button variant="outline" href="/rest/v1/" target="_blank" rel="noopener">
-        <BookOpen />Documentação OpenAPI<ArrowUpRight class="text-muted-foreground" />
+        <BookOpen />{t('connect.openapi')}<ArrowUpRight class="text-muted-foreground" />
       </Button>
     {/snippet}
   </PageHeader>
 
   <section class="-mt-2 grid gap-4">
-    <h2 class="text-base font-semibold">Endereço do projeto</h2>
-    <CodeBlock code={base} label="Copiar endereço" />
+    <h2 class="text-base font-semibold">{t('connect.address')}</h2>
+    <CodeBlock code={base} label={t('connect.copyAddress')} />
     <dl class="grid gap-2 text-sm sm:grid-cols-[6rem_auto_1fr] sm:gap-x-4">
       {#each endpoints as endpoint (endpoint.path)}
         <dt class="font-medium">{endpoint.label}</dt>
         <dd><code class="text-xs">{endpoint.path}</code></dd>
-        <dd class="text-muted-foreground max-sm:mb-2">{endpoint.hint}</dd>
+        <dd class="text-muted-foreground max-sm:mb-2">{t(`connect.endpoints.${endpoint.id}`)}</dd>
       {/each}
     </dl>
   </section>
 
   <section class="grid gap-4">
     <div>
-      <h2 class="text-base font-semibold">Quem faz a chamada</h2>
-      <p class="mt-1 text-sm text-muted-foreground">
-        Não existe chave anon: quem não manda token já é anon. O acesso de cada role é definido por tabela, nos GRANTs
-        (aba Estrutura) e nas policies.
-      </p>
+      <h2 class="text-base font-semibold">{t('connect.caller')}</h2>
+      <p class="mt-1 text-sm text-muted-foreground">{t('connect.callerHint')}</p>
     </div>
     <div class="grid gap-3 md:grid-cols-3">
-      {#each roles as item (item.role)}
+      {#each roles as role (role)}
         <div class="rounded-lg border bg-card p-4">
-          <p class="text-sm font-medium">{item.title}</p>
-          <code class="text-xs text-muted-foreground">{item.role}</code>
-          <p class="mt-2 text-sm text-muted-foreground">{item.text}</p>
-          {#if item.role === 'service_role'}
-            <p class="mt-2 text-sm text-warning">Nunca use no navegador.</p>
+          <p class="text-sm font-medium">{t(`connect.roles.${role}.title`)}</p>
+          <code class="text-xs text-muted-foreground">{role}</code>
+          <p class="mt-2 text-sm text-muted-foreground">{t(`connect.roles.${role}.text`)}</p>
+          {#if role === 'service_role'}
+            <p class="mt-2 text-sm text-warning">{t('connect.neverInBrowser')}</p>
           {/if}
         </div>
       {/each}
@@ -138,19 +120,19 @@
   <ServiceTokenCard />
 
   <section class="grid gap-4">
-    <h2 class="text-base font-semibold">Exemplos</h2>
+    <h2 class="text-base font-semibold">{t('connect.examples')}</h2>
     <div class="flex flex-wrap items-center gap-3">
-      <nav class="flex h-9 items-center gap-1 rounded-md bg-muted p-1" aria-label="Assunto">
+      <nav class="flex h-9 items-center gap-1 rounded-md bg-muted p-1" aria-label={t('connect.topic')}>
         <button type="button" class={tab(topic === 'tables')} aria-pressed={topic === 'tables'} onclick={() => (topic = 'tables')}
-          >Tabelas</button
+          >{t('connect.topics.tables')}</button
         >
         <button type="button" class={tab(topic === 'auth')} aria-pressed={topic === 'auth'} onclick={() => (topic = 'auth')}
-          >Autenticação</button
+          >{t('connect.topics.auth')}</button
         >
       </nav>
       {#if topic === 'tables' && tables.length}
         <Select.Root type="single" bind:value={table}>
-          <Select.Trigger class="w-52 font-mono text-xs" aria-label="Tabela">{table}</Select.Trigger>
+          <Select.Trigger class="w-52 font-mono text-xs" aria-label={t('connect.table')}>{table}</Select.Trigger>
           <Select.Content>
             {#each tables as t (t.name)}
               <Select.Item value={t.name} class="font-mono text-xs">{t.name}</Select.Item>
@@ -158,7 +140,7 @@
           </Select.Content>
         </Select.Root>
       {/if}
-      <nav class="flex h-9 items-center gap-1 rounded-md bg-muted p-1 sm:ml-auto" aria-label="Linguagem">
+      <nav class="flex h-9 items-center gap-1 rounded-md bg-muted p-1 sm:ml-auto" aria-label={t('connect.language')}>
         <button type="button" class={tab(lang === 'curl')} aria-pressed={lang === 'curl'} onclick={() => (lang = 'curl')}
           >curl</button
         >
@@ -170,15 +152,15 @@
 
     {#if topic === 'tables' && !tables.length}
       <p class="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
-        Crie uma tabela para ver exemplos com as colunas dela.
+        {t('connect.noTables')}
       </p>
     {:else}
       <div class="grid gap-6 *:min-w-0">
         {#each snippets as snippet (snippet.id)}
           <article class="grid gap-2 *:min-w-0">
             <div>
-              <h3 class="text-sm font-medium">{snippet.label}</h3>
-              <p class="text-sm text-muted-foreground">{snippet.description}</p>
+              <h3 class="text-sm font-medium">{t(`connect.snippets.${snippet.id}.label`)}</h3>
+              <p class="text-sm text-muted-foreground">{t(`connect.snippets.${snippet.id}.description`, snippet.params)}</p>
             </div>
             <CodeBlock code={snippet.code[lang]} />
           </article>
@@ -186,7 +168,7 @@
       </div>
     {/if}
     <p class="text-sm text-muted-foreground">
-      Tipos TypeScript das tabelas: <code class="text-xs text-foreground">nelcota types -o database.ts</code>
+      {t('connect.types')} <code class="text-xs text-foreground">nelcota types -o database.ts</code>
     </p>
   </section>
 </div>
