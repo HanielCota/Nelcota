@@ -87,11 +87,15 @@ impl ApiError {
             SqlState::QUERY_CANCELED => StatusCode::GATEWAY_TIMEOUT,
             // Incompatible type/operator, generated column, RAISE EXCEPTION in a
             // user function: a client error, not a server one.
+            // Upserts: `on_conflict` matching no unique constraint, or a batch
+            // that hits the same key twice.
             SqlState::UNDEFINED_FUNCTION
             | SqlState::UNDEFINED_COLUMN
             | SqlState::DATATYPE_MISMATCH
             | SqlState::GENERATED_ALWAYS
-            | SqlState::RAISE_EXCEPTION => StatusCode::BAD_REQUEST,
+            | SqlState::RAISE_EXCEPTION
+            | SqlState::INVALID_COLUMN_REFERENCE
+            | SqlState::CARDINALITY_VIOLATION => StatusCode::BAD_REQUEST,
             // Class 22 (invalid data) and 23 (integrity): 400.
             _ if code.starts_with("22") || code.starts_with("23") => StatusCode::BAD_REQUEST,
             _ => {
