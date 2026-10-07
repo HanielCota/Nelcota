@@ -6,6 +6,7 @@
   import FilePlus from '@lucide/svelte/icons/file-plus'
   import { SQL_SNIPPETS } from '$lib/sql-snippets'
   import { sqlStore, type SavedQuery } from '$lib/sql-store.svelte'
+  import { cn } from '$lib/utils'
 
   let {
     onrename,
@@ -38,7 +39,7 @@
     </p>
     {#each sqlStore.sorted as query (query.id)}
       {@const active = query.id === sqlStore.currentId}
-      <div class={[item, 'pr-1', active && 'bg-accent text-foreground']}>
+      <div class={cn(item, 'pr-1', active && 'bg-accent text-foreground')}>
         <button class="flex min-w-0 flex-1 items-center gap-2" onclick={() => sqlStore.openSaved(query.id)}>
           <FileCode class={['size-3.5 shrink-0', active && 'text-brand']} strokeWidth={1.6} />
           <span class="truncate">{query.name}</span>

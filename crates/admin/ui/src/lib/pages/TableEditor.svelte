@@ -30,6 +30,7 @@
   import { api, enc, isAbort } from '$lib/api'
   import { describe, filtersParam, filtersToSearch, parseFilters, type TableFilter } from '$lib/filters'
   import { href, navigate, route } from '$lib/router.svelte'
+  import { cn } from '$lib/utils'
   import type { Column, RowData, TableData, TableSummary } from '$lib/types'
 
   let { name, view = 'data' }: { name?: string; view?: 'data' | 'structure' } = $props()
@@ -256,10 +257,11 @@
         <a
           href={href(`/tables/${encodeURIComponent(table.name)}`)}
           title={table.rls.label}
-          class={[
+          aria-current={table.name === name ? 'page' : undefined}
+          class={cn(
             'flex h-8 items-center gap-2 rounded-md px-2 text-sm text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground',
             table.name === name && 'bg-accent text-foreground',
-          ]}
+          )}
         >
           <Table2 class={['size-3.5 shrink-0', table.name === name && 'text-brand']} strokeWidth={1.6} />
           <span class="truncate">{table.name}</span>
