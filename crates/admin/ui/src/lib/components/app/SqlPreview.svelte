@@ -17,31 +17,31 @@
 </script>
 
 <!-- O SQL que será executado, gerado pelo servidor. -->
-<section class="rounded-lg border bg-muted/30">
-  <header class="flex items-center gap-2 px-3 py-2">
+<section class="overflow-hidden rounded-xl border bg-muted/30">
+  <header class="flex items-center gap-2 px-4 py-2.5">
     <button
       type="button"
-      class="flex flex-1 items-center gap-1.5 text-left text-xs font-medium text-muted-foreground hover:text-foreground"
+      class="flex flex-1 cursor-pointer items-center gap-2 text-left text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground"
       aria-expanded={open}
       onclick={() => (open = !open)}
     >
-      <ChevronRight class={['size-3.5 transition-transform', open && 'rotate-90']} />
+      <ChevronRight class={['size-4 transition-transform', open && 'rotate-90']} />
       SQL que será executado
-      {#if preview.loading}<span class="font-normal">· atualizando…</span>{/if}
+      {#if preview.loading}<span class="text-xs font-normal">· atualizando…</span>{/if}
     </button>
     {#if text}
       <button
         type="button"
-        class="grid size-6 place-items-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+        class="grid size-8 cursor-pointer place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         aria-label="Copiar SQL"
-        onclick={copy}><Copy class="size-3.5" /></button
+        onclick={copy}><Copy class="size-4" /></button
       >
     {/if}
   </header>
   {#if preview.error}
-    <p class="border-t px-3 py-2 text-xs text-destructive">{preview.error}</p>
+    <p class="border-t border-destructive/20 bg-destructive/5 px-4 py-2.5 text-sm text-destructive">{preview.error}</p>
   {:else if open}
-    <pre class="max-h-64 overflow-auto border-t px-3 py-2 font-mono text-2xs leading-relaxed whitespace-pre-wrap">{text ||
+    <pre class="max-h-72 overflow-auto border-t bg-card/60 px-4 py-3 font-mono text-xs leading-relaxed whitespace-pre-wrap">{text ||
         placeholder}</pre>
   {/if}
 </section>

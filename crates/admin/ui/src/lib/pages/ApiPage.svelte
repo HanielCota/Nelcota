@@ -5,9 +5,15 @@
   import UserRound from '@lucide/svelte/icons/user-round'
   import Server from '@lucide/svelte/icons/server'
   import BookOpen from '@lucide/svelte/icons/book-open'
+  import Plug from '@lucide/svelte/icons/plug'
+  import Table2 from '@lucide/svelte/icons/table-2'
+  import ArrowUpRight from '@lucide/svelte/icons/arrow-up-right'
+  import { Button } from '$lib/components/ui/button'
   import PageHeader from '$lib/components/app/PageHeader.svelte'
   import CodeBlock from '$lib/components/app/CodeBlock.svelte'
   import ServiceTokenCard from '$lib/components/app/ServiceTokenCard.svelte'
+  import EmptyState from '$lib/components/app/EmptyState.svelte'
+  import Callout from '$lib/components/app/Callout.svelte'
   import { api, enc, isAbort } from '$lib/api'
   import { authSnippets, tableSnippets, type Lang, type Snippet } from '$lib/snippets'
   import type { TableData, TableSummary } from '$lib/types'
@@ -90,65 +96,93 @@
   ]
 
   const tab = (active: boolean) =>
-    ['rounded px-2.5 py-1 text-xs transition-colors', active ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground']
+    [
+      'h-7 cursor-pointer rounded-md px-3 text-sm font-medium transition-colors',
+      active ? 'bg-card text-foreground shadow-card' : 'text-muted-foreground hover:text-foreground',
+    ]
 </script>
 
-<div class="mx-auto grid max-w-5xl gap-8 px-6 py-10 *:min-w-0 lg:px-10">
-  <PageHeader title="API" description="Como o seu app conversa com este projeto." />
+<div class="mx-auto grid max-w-5xl gap-10 px-4 py-8 *:min-w-0 sm:px-6 lg:px-10 lg:py-12">
+  <PageHeader title="API" icon={Plug} description="Como o seu app conversa com este projeto.">
+    {#snippet actions()}
+      <Button variant="outline" href="/rest/v1/" target="_blank" rel="noopener">
+        <BookOpen />Documentação OpenAPI<ArrowUpRight class="text-muted-foreground" />
+      </Button>
+    {/snippet}
+  </PageHeader>
 
-  <section class="grid gap-3 rounded-lg border bg-card p-5">
-    <div class="flex flex-wrap items-center justify-between gap-2">
-      <h2 class="text-sm font-medium">Endereço do projeto</h2>
-      <a
-        href="/rest/v1/"
-        target="_blank"
-        rel="noopener"
-        class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-brand"
-        ><BookOpen class="size-4" />Documentação OpenAPI</a
-      >
+  <section class="-mt-2 grid gap-5 rounded-xl border bg-card p-5 shadow-card sm:p-6">
+    <div>
+      <h2 class="text-lg font-semibold">Endereço do projeto</h2>
+      <p class="mt-1 text-sm text-muted-foreground">Base de todas as chamadas do seu app.</p>
     </div>
     <CodeBlock code={base} label="Copiar endereço" />
-    <dl class="grid gap-2 text-sm sm:grid-cols-[6rem_1fr]">
+    <dl class="grid gap-px overflow-hidden rounded-lg border bg-border">
       {#each endpoints as endpoint (endpoint.path)}
-        <dt class="font-medium">{endpoint.label}</dt>
-        <dd class="flex flex-wrap gap-x-3">
-          <code class="text-xs">{endpoint.path}</code>
-          <span class="text-xs font-light text-muted-foreground">{endpoint.hint}</span>
-        </dd>
+        <div class="grid gap-1 bg-card px-4 py-3 sm:grid-cols-[6rem_minmax(0,16rem)_1fr] sm:items-center sm:gap-4">
+          <dt class="text-sm font-semibold">{endpoint.label}</dt>
+          <dd class="min-w-0">
+            <code class="rounded-md bg-muted px-2 py-0.5 text-xs break-all">{endpoint.path}</code>
+          </dd>
+          <dd class="text-sm text-muted-foreground">{endpoint.hint}</dd>
+        </div>
       {/each}
     </dl>
   </section>
 
-  <section class="grid gap-3">
-    <h2 class="text-sm font-medium">Quem faz a chamada</h2>
-    <div class="grid gap-3 md:grid-cols-3">
+  <section class="grid gap-4">
+    <div>
+      <h2 class="text-lg font-semibold">Quem faz a chamada</h2>
+      <p class="mt-1 text-sm text-muted-foreground">
+        Não existe chave anon: quem não manda token já é anon. O acesso de cada role é definido por tabela, nos GRANTs
+        (aba Estrutura) e nas policies.
+      </p>
+    </div>
+    <div class="grid gap-4 md:grid-cols-3">
       {#each roles as item (item.role)}
-        <div class="rounded-lg border bg-card p-4">
-          <item.icon class="size-4 text-muted-foreground" strokeWidth={1.6} />
-          <p class="mt-3 text-sm font-medium">{item.title}</p>
-          <code class="text-xs text-brand">{item.role}</code>
-          <p class="mt-2 text-xs leading-relaxed font-light text-muted-foreground">{item.text}</p>
+        <div
+          class={[
+            'flex flex-col rounded-xl border bg-card p-5 shadow-card',
+            item.role === 'service_role' && 'border-warning/30',
+          ]}
+        >
+          <span
+            class={[
+              'grid size-10 place-items-center rounded-xl border',
+              item.role === 'service_role'
+                ? 'border-warning/25 bg-warning/10 text-warning'
+                : 'border-brand/20 bg-brand-soft text-brand',
+            ]}
+          >
+            <item.icon class="size-5" strokeWidth={1.75} />
+          </span>
+          <p class="mt-4 text-base font-semibold">{item.title}</p>
+          <code class="mt-0.5 text-xs text-muted-foreground">{item.role}</code>
+          <p class="mt-3 text-sm leading-relaxed text-muted-foreground">{item.text}</p>
         </div>
       {/each}
     </div>
-    <p class="text-xs font-light text-muted-foreground">
-      Não existe chave anon: quem não manda token já é anon. O acesso de cada role é definido por tabela, nos GRANTs
-      (aba Estrutura) e nas policies.
-    </p>
   </section>
 
   <ServiceTokenCard />
 
-  <section class="grid gap-4">
+  <section class="grid gap-5">
+    <div>
+      <h2 class="text-lg font-semibold">Exemplos</h2>
+      <p class="mt-1 text-sm text-muted-foreground">Prontos para copiar, com as colunas reais das suas tabelas.</p>
+    </div>
     <div class="flex flex-wrap items-center gap-3">
-      <h2 class="text-sm font-medium">Exemplos</h2>
-      <nav class="flex items-center gap-0.5 rounded-md bg-muted p-0.5" aria-label="Assunto">
-        <button type="button" class={tab(topic === 'tables')} onclick={() => (topic = 'tables')}>Tabelas</button>
-        <button type="button" class={tab(topic === 'auth')} onclick={() => (topic = 'auth')}>Autenticação</button>
+      <nav class="flex h-9 items-center gap-1 rounded-lg bg-muted p-1" aria-label="Assunto">
+        <button type="button" class={tab(topic === 'tables')} aria-pressed={topic === 'tables'} onclick={() => (topic = 'tables')}
+          >Tabelas</button
+        >
+        <button type="button" class={tab(topic === 'auth')} aria-pressed={topic === 'auth'} onclick={() => (topic = 'auth')}
+          >Autenticação</button
+        >
       </nav>
       {#if topic === 'tables' && tables.length}
         <Select.Root type="single" bind:value={table}>
-          <Select.Trigger size="sm" class="w-48 font-mono text-xs" aria-label="Tabela">{table}</Select.Trigger>
+          <Select.Trigger class="w-52 font-mono text-xs" aria-label="Tabela">{table}</Select.Trigger>
           <Select.Content>
             {#each tables as t (t.name)}
               <Select.Item value={t.name} class="font-mono text-xs">{t.name}</Select.Item>
@@ -156,31 +190,37 @@
           </Select.Content>
         </Select.Root>
       {/if}
-      <nav class="ml-auto flex items-center gap-0.5 rounded-md bg-muted p-0.5" aria-label="Linguagem">
-        <button type="button" class={tab(lang === 'curl')} onclick={() => (lang = 'curl')}>curl</button>
-        <button type="button" class={tab(lang === 'js')} onclick={() => (lang = 'js')}>JavaScript</button>
+      <nav class="flex h-9 items-center gap-1 rounded-lg bg-muted p-1 sm:ml-auto" aria-label="Linguagem">
+        <button type="button" class={tab(lang === 'curl')} aria-pressed={lang === 'curl'} onclick={() => (lang = 'curl')}
+          >curl</button
+        >
+        <button type="button" class={tab(lang === 'js')} aria-pressed={lang === 'js'} onclick={() => (lang = 'js')}
+          >JavaScript</button
+        >
       </nav>
     </div>
 
     {#if topic === 'tables' && !tables.length}
-      <p class="rounded-lg border border-dashed px-4 py-8 text-center text-sm font-light text-muted-foreground">
-        Crie uma tabela para ver exemplos com as colunas dela.
-      </p>
+      <EmptyState
+        icon={Table2}
+        title="Nenhuma tabela ainda"
+        description="Crie uma tabela para ver exemplos com as colunas dela."
+      />
     {:else}
-      <div class="grid gap-5 *:min-w-0">
+      <div class="grid gap-6 *:min-w-0">
         {#each snippets as snippet (snippet.id)}
-          <article class="grid gap-2 *:min-w-0">
+          <article class="grid gap-3 *:min-w-0">
             <div>
-              <h3 class="text-sm">{snippet.label}</h3>
-              <p class="text-xs font-light text-muted-foreground">{snippet.description}</p>
+              <h3 class="text-base font-semibold">{snippet.label}</h3>
+              <p class="mt-0.5 text-sm text-muted-foreground">{snippet.description}</p>
             </div>
             <CodeBlock code={snippet.code[lang]} />
           </article>
         {/each}
       </div>
     {/if}
-    <p class="text-xs font-light text-muted-foreground">
+    <Callout>
       Tipos TypeScript das tabelas: <code class="text-foreground">nelcota types -o database.ts</code>
-    </p>
+    </Callout>
   </section>
 </div>

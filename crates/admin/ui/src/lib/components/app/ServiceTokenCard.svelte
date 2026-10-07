@@ -33,13 +33,15 @@
 </script>
 
 <!-- O token não é guardado: aparece uma vez, aqui, para copiar. -->
-<section class="grid gap-4 rounded-lg border border-warning/30 bg-card p-5">
-  <div class="flex gap-3">
-    <KeyRound class="mt-0.5 size-5 shrink-0 text-warning" />
+<section class="grid gap-5 rounded-xl border border-warning/30 bg-card p-5 shadow-card sm:p-6">
+  <div class="flex gap-4">
+    <span class="grid size-10 shrink-0 place-items-center rounded-xl border border-warning/25 bg-warning/10 text-warning">
+      <KeyRound class="size-5" />
+    </span>
     <div>
-      <h2 class="text-sm font-medium">Token service_role</h2>
-      <p class="mt-1 text-sm font-light text-muted-foreground">
-        Para o seu backend: <strong class="font-medium text-foreground">ignora todo o RLS</strong>. Nunca coloque no
+      <h2 class="text-base font-semibold">Token <code class="font-mono">service_role</code></h2>
+      <p class="mt-1 text-sm leading-relaxed text-muted-foreground">
+        Para o seu backend: <strong class="font-semibold text-foreground">ignora todo o RLS</strong>. Nunca coloque no
         frontend, num app mobile ou num repositório. Cada token vale até expirar. Ainda depende de GRANT em cada
         tabela (as criadas pelo painel já dão acesso total ao service_role).
       </p>
@@ -49,15 +51,15 @@
   {#if issued}
     <div class="grid gap-2">
       <CodeBlock code={issued.token} label="Copiar token" wrap />
-      <p class="flex items-center gap-1.5 text-xs text-warning">
-        <ShieldAlert class="size-3.5" />Copie agora: ele não será mostrado de novo. Vale até {expires(issued.expires_at)}.
+      <p class="flex items-center gap-2 text-sm font-medium text-warning">
+        <ShieldAlert class="size-4 shrink-0" />Copie agora: ele não será mostrado de novo. Vale até {expires(issued.expires_at)}.
       </p>
     </div>
   {/if}
 
   <div class="flex flex-wrap items-center gap-2">
     <Select.Root type="single" bind:value={days}>
-      <Select.Trigger size="sm" class="w-32" aria-label="Validade">
+      <Select.Trigger class="w-36" aria-label="Validade">
         {DURATIONS.find((d) => d.value === days)?.label}
       </Select.Trigger>
       <Select.Content>
@@ -66,10 +68,10 @@
         {/each}
       </Select.Content>
     </Select.Root>
-    <Button size="sm" variant="outline" disabled={busy} onclick={issue}>
+    <Button variant="outline" disabled={busy} onclick={issue}>
       {busy ? 'Gerando…' : issued ? 'Gerar outro' : 'Gerar token'}
     </Button>
-    <span class="text-xs font-light text-muted-foreground">
+    <span class="text-sm text-muted-foreground">
       ou no servidor: <code class="text-foreground">nelcota token service-role</code>
     </span>
   </div>
