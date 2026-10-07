@@ -20,16 +20,17 @@
   import { session } from '$lib/session.svelte'
   import { match, route } from '$lib/router.svelte'
   import { crumbsFor, documentTitle } from '$lib/titles'
+  import { t } from '$lib/i18n/index.svelte'
 
   onMount(async () => {
-    // Vindo de outro painel do host (login único): troca o token por sessão.
+    // Coming from another panel on the host (single sign-on): trade the token for a session.
     const token = takeHandoffToken()
     if (token) {
       try {
         session.email = (await api.post<{ email: string }>('/sso', { token })).email
         return
       } catch {
-        // Token vencido ou já usado: segue para o login normal.
+        // Expired or already used token: fall back to the normal login.
       }
     }
     try {
@@ -43,13 +44,13 @@
   const path = $derived(route.path.replace(/\/$/, '') || '/')
   const structureName = $derived(match('/tables/:name/structure', path)?.name)
   const tableName = $derived(match('/tables/:name', path)?.name ?? structureName)
-  // Trocar de aba (Dados/Estrutura) não remonta o editor; trocar de tabela sim
-  // (ordenação, página e seleção são de cada tabela).
+  // Switching tabs (Data/Structure) keeps the editor mounted; switching tables
+  // does not (sort, page and selection belong to each table).
   const pageKey = $derived(tableName ? `/tables/${tableName}` : route.path)
 
-  // Título da aba: a página atual (ou o login) seguida do nome do produto.
+  // Tab title: the current page (or the login) followed by the product name.
   const title = $derived(
-    session.email === null ? 'Entrar · Nelcota' : session.email ? documentTitle(crumbsFor(route.path)) : 'Nelcota',
+    session.email === null ? `${t('shell.pages.signIn')} · Nelcota` : session.email ? documentTitle(crumbsFor(route.path)) : 'Nelcota',
   )
 </script>
 
@@ -62,20 +63,20 @@
   <div class="grid h-screen place-items-center">
     <div class="flex flex-col items-center gap-4" role="status">
       <span class="size-7 animate-spin rounded-full border-[2.5px] border-border-strong border-t-brand"></span>
-      <span class="text-sm font-medium text-muted-foreground">Carregando painel…</span>
+      <span class="text-sm font-medium text-muted-foreground">{t('shell.app.loading')}</span>
     </div>
   </div>
 {:else if session.email === null}
   <Login />
 {:else}
   <Tooltip.Provider delayDuration={200}>
-    <!-- Primeira parada do Tab: pula topbar e menu. -->
+    <!-- First Tab stop: skips the topbar and menu. -->
     <a
       href="#conteudo"
       class="sr-only z-50 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-raised focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
-      >Pular para o conteúdo</a
+      >{t('shell.app.skipToContent')}</a
     >
-    <!-- Barra lateral de altura total à esquerda; topbar e página à direita. -->
+    <!-- Full-height sidebar on the left; topbar and page on the right. -->
     <div class="flex h-screen overflow-hidden bg-background">
       <AppSidebar />
       <div class="flex min-w-0 flex-1 flex-col">
@@ -87,7 +88,7 @@
             {:else if path === '/tables' || tableName}
               <TableEditor name={tableName} view={structureName ? 'structure' : 'data'} />
             {:else if path === '/sql'}
-              <!-- CodeMirror só é baixado quando o editor SQL é aberto. -->
+              <!-- CodeMirror is only downloaded when the SQL editor opens. -->
               {#await import('$lib/pages/SqlEditor.svelte') then m}
                 <m.default />
               {/await}

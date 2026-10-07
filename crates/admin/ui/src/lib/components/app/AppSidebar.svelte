@@ -9,15 +9,16 @@
   import { href } from '$lib/router.svelte'
   import { isActive, navGroups } from '$lib/nav'
   import { sidebar, togglePinned } from '$lib/sidebar.svelte'
+  import { t } from '$lib/i18n/index.svelte'
 
-  // Coluna de altura total: projeto no topo, páginas no meio, conta no rodapé.
-  // Fixada: largura cheia a partir de xl, com rótulos sempre visíveis.
-  // Recolhida (ou telas médias): trilho de ícones que se expande por cima do
-  // conteúdo ao passar o mouse ou receber foco.
+  // Full-height column: project at the top, pages in the middle, account at
+  // the bottom. Pinned: full width from xl up, labels always visible.
+  // Collapsed (or medium screens): an icon rail that expands over the
+  // content on hover or focus.
   const pinned = $derived(sidebar.pinned)
 
-  // Com um menu aberto (projeto, conta) o trilho fica expandido: o menu é
-  // renderizado fora dele e, sem isso, fecharia o trilho ao ser usado.
+  // While a menu (project, account) is open the rail stays expanded: the
+  // menu renders outside it and would otherwise collapse it while in use.
   let projectOpen = $state(false)
   let accountOpen = $state(false)
   const held = $derived(projectOpen || accountOpen)
@@ -41,15 +42,15 @@
       pinned && 'xl:w-60 xl:shadow-none xl:hover:shadow-none xl:focus-within:shadow-none',
     ]}
   >
-    <!-- Mesma altura da topbar: a borda inferior continua a dela. -->
+    <!-- Same height as the topbar: the bottom border continues it. -->
     <div class="flex h-14 shrink-0 items-center gap-1 border-b border-sidebar-border pr-3">
-      <a href={href('/')} class="grid w-16 shrink-0 place-items-center" aria-label="Visão geral"><Logo mark size="lg" /></a>
+      <a href={href('/')} class="grid w-16 shrink-0 place-items-center" aria-label={t('shell.pages.overview')}><Logo mark size="lg" /></a>
       <div class={['min-w-0 flex-1 transition-opacity duration-150', reveal]}>
         <ProjectSwitcher bind:menuOpen={projectOpen} />
       </div>
     </div>
 
-    <nav aria-label="Navegação principal" class="flex flex-1 flex-col gap-4 overflow-x-hidden overflow-y-auto py-3">
+    <nav aria-label={t('shell.nav.main')} class="flex flex-1 flex-col gap-4 overflow-x-hidden overflow-y-auto py-3">
       {#each navGroups as group, g (g)}
         <div>
           {#if group.label}
@@ -59,7 +60,7 @@
                 reveal,
               ]}
             >
-              {group.label}
+              {t(group.label)}
             </p>
           {/if}
           <ul class="flex flex-col gap-0.5 px-3">
@@ -69,7 +70,7 @@
                 <a
                   href={href(item.path)}
                   aria-current={active ? 'page' : undefined}
-                  title={item.title}
+                  title={t(item.title)}
                   class={[
                     'flex h-9 items-center gap-3 overflow-hidden rounded-md px-[11px] text-sm whitespace-nowrap transition-colors',
                     active
@@ -78,7 +79,7 @@
                   ]}
                 >
                   <item.icon class={['size-[18px] shrink-0', active && 'text-brand']} strokeWidth={1.6} />
-                  <span class={['transition-opacity duration-150', reveal]}>{item.title}</span>
+                  <span class={['transition-opacity duration-150', reveal]}>{t(item.title)}</span>
                 </a>
               </li>
             {/each}
@@ -92,28 +93,28 @@
         href="/rest/v1/"
         target="_blank"
         rel="noopener"
-        title="Docs (OpenAPI)"
+        title={t('shell.nav.docs')}
         class="flex h-9 items-center gap-3 overflow-hidden rounded-md px-[11px] text-sm whitespace-nowrap text-sidebar-foreground transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
       >
         <BookOpen class="size-[18px] shrink-0" strokeWidth={1.6} />
         <span class={['flex flex-1 items-center justify-between transition-opacity duration-150', reveal]}
-          >Docs (OpenAPI)<ArrowUpRight class="size-3.5 text-muted-foreground" /></span
+          >{t('shell.nav.docs')}<ArrowUpRight class="size-3.5 text-muted-foreground" /></span
         >
       </a>
-      <!-- Largura da barra aberta: recolhida, ela só corta a direita (fica o avatar). -->
+      <!-- Width of the open sidebar: collapsed, it only clips the right side (the avatar stays). -->
       <div class="flex w-[216px] items-center gap-1">
         <div class="min-w-0 flex-1"><AccountMenu bind:open={accountOpen} {reveal} /></div>
-        <!-- Controle da interface, não uma página: só ícone, ao lado da conta. -->
+        <!-- An interface control, not a page: icon only, next to the account. -->
         <button
           type="button"
           onclick={(e) => {
             togglePinned()
-            // O foco no botão seguraria o trilho aberto (focus-within) e o clique
-            // pareceria não ter efeito: ao recolher, solta o foco.
+            // Focus on the button would keep the rail open (focus-within) and the
+            // click would seem to do nothing: release focus when collapsing.
             if (!sidebar.pinned) e.currentTarget.blur()
           }}
-          title={pinned ? 'Recolher barra lateral' : 'Fixar barra lateral aberta'}
-          aria-label={pinned ? 'Recolher barra lateral' : 'Fixar barra lateral aberta'}
+          title={pinned ? t('shell.nav.collapse') : t('shell.nav.pin')}
+          aria-label={pinned ? t('shell.nav.collapse') : t('shell.nav.pin')}
           aria-pressed={pinned}
           class={[
             'hidden size-8 shrink-0 cursor-pointer place-items-center rounded-md text-muted-foreground transition-[color,background-color,opacity] duration-150 hover:bg-sidebar-accent/60 hover:text-foreground xl:grid',

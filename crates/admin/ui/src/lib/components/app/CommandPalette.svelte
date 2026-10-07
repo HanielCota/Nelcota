@@ -10,6 +10,7 @@
   import { api } from '$lib/api'
   import { logout } from '$lib/auth'
   import { navItems } from '$lib/nav'
+  import { t } from '$lib/i18n/index.svelte'
   import { palette } from '$lib/palette.svelte'
   import { navigate } from '$lib/router.svelte'
   import { commandScore } from '$lib/search'
@@ -74,8 +75,8 @@
 
     <Command.Group heading="Páginas">
       {#each pages as page (page.path)}
-        <Command.Item value={`página ${page.title}`} onSelect={() => run(() => navigate(page.path))}>
-          <page.icon />{page.title}
+        <Command.Item value={`página ${t(page.title)}`} onSelect={() => run(() => navigate(page.path))}>
+          <page.icon />{t(page.title)}
         </Command.Item>
       {/each}
     </Command.Group>
