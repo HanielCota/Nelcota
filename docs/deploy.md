@@ -41,6 +41,8 @@ Internet ──80/443──▶ Caddy (shared)
 
 - Only Caddy publishes ports. Each project's Postgres sits on its own
   `internal: true` network; apps talk to Caddy over the `nelcota_edge` network.
+  Postgres also joins an `egress` network of its own, outbound only, to
+  archive WAL to S3 when PITR is on.
 - One Postgres per project, not a shared one: Postgres roles (`anon`,
   `authenticated`, `authenticator`...) apply to the whole server, and separate
   servers keep the physical isolation and a per-project `pg_dump` for leaving.
@@ -76,6 +78,7 @@ project ask for `-p <name>`.
 | `nelcota -p shop token service-role` | service JWT (**bypasses RLS**) |
 | `nelcota -p shop backup [--upload]` / `backup --all` | dump into `backups/` (and to S3) |
 | `nelcota -p shop restore <file>` | restores a dump |
+| `nelcota -p shop pitr enable` / `status` / `restore --time ...` | point-in-time recovery with WAL archived to S3 ([backup.md](backup.md#pitr-point-in-time-recovery)) |
 | `nelcota -p shop upgrade` / `upgrade --all` | upgrades with a backup and automatic rollback |
 | `nelcota -p shop remove` | final backup in `archive/`, removes containers, data and the Caddy site |
 | `nelcota panel-login shared` / `per-project` | panel login: single or per project |

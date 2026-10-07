@@ -474,10 +474,28 @@ are aliased by their path (`_e0_1`) so a child never shadows its parent.
 Self-references stay refused, and filtering parents by their embeds
 (PostgREST's `!inner`) is not implemented.
 
+**D74. PITR with pgBackRest, inside the project's Postgres container.**
+pgBackRest instead of WAL-G: Alpine packages it (2.58), so the image stays
+`postgres:17-alpine` plus one `apk add`. WAL-G only ships glibc binaries, and
+moving to a Debian image would change the libc and with it text collation,
+silently invalidating the indexes of existing projects. The image is built
+locally from `postgres/Dockerfile` (no second image to publish). Settings
+travel as `PGBACKREST_*` variables from `pgbackrest.env` (mode 600) through
+`env_file` with `required: false`, so no config file has to be readable by the
+container's postgres user and "PITR on" is just that file existing; archiving
+itself is `ALTER SYSTEM` (archive_mode, archive_command, `archive_timeout =
+60s`), which the profile's `-c` flags do not touch. Postgres gets a
+per-project `egress` network: the `internal` one has no route out, and nothing
+can connect in through either. Base backups ride on the existing daily
+`backup --all` (full on Sundays, differential otherwise, two fulls kept). A
+restore recreates the Postgres container, so its restart count tells a failed
+recovery (a target past the archive makes Postgres exit) apart, and ends with
+a full backup: the new timeline forks before any later backup on the old one,
+which pgBackRest would otherwise refuse to restore from.
+
 ### Known pending items
 
 - Filtering parent rows by their embeds (`!inner`) and self-referencing embeds.
-- PITR with WAL-G (or pgBackRest) archiving WAL to S3.
 - Install without Docker (systemd): the binary no longer depends on Docker;
   `init` still has to generate the units.
 - The release workflow (musl binaries + image on GHCR) is written, but only

@@ -18,6 +18,7 @@ mod machine;
 mod naming;
 mod ops;
 mod panel_login;
+mod pitr;
 mod project;
 mod projects;
 mod registry;
@@ -131,6 +132,11 @@ pub enum Command {
         #[arg(long)]
         yes: bool,
     },
+    /// Point-in-time recovery: WAL archived to S3 with pgBackRest.
+    Pitr {
+        #[command(subcommand)]
+        action: PitrAction,
+    },
     /// Generates TypeScript types from the exposed schema.
     Types {
         #[arg(long, short)]
@@ -158,6 +164,27 @@ pub enum TokenKind {
     ServiceRole {
         #[arg(long, default_value_t = 3650)]
         days: u64,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum PitrAction {
+    /// Archives every WAL segment to the host's S3 and takes a first full backup.
+    Enable,
+    /// Stops archiving (the backups already in S3 are kept).
+    Disable,
+    /// Base backups and the time range that can be restored.
+    Status,
+    /// Takes a base backup now (full on Sundays, differential otherwise).
+    Backup,
+    /// Restores the database to a moment (REPLACES the current data).
+    Restore {
+        /// Target moment, e.g. "2026-10-07 14:30:00+00" (default: the last archived write).
+        #[arg(long)]
+        time: Option<String>,
+        /// Does not ask for confirmation.
+        #[arg(long)]
+        yes: bool,
     },
 }
 
@@ -314,7 +341,13 @@ pub fn run(cli: Cli) -> anyhow::Result<Outcome> {
             let mut failed = Vec::new();
             for project in &targets {
                 // A project with a problem does not stop the others from being backed up.
-                if let Err(err) = ops::backup(&host, project, upload, keep) {
+                let result = ops::backup(&host, project, upload, keep).and_then(|_| {
+                    if pitr::enabled(project) {
+                        pitr::backup(project)?;
+                    }
+                    Ok(())
+                });
+                if let Err(err) = result {
                     util::warn(&format!("{err:#}"));
                     failed.push(project.name.clone());
                 }
@@ -331,6 +364,17 @@ pub fn run(cli: Cli) -> anyhow::Result<Outcome> {
                 &file,
                 yes,
             ))
+        }
+        Command::Pitr { action } => {
+            let manifest = host.require()?;
+            let project = host.select(&manifest, selection)?;
+            done(match action {
+                PitrAction::Enable => pitr::enable(&host, &project),
+                PitrAction::Disable => pitr::disable(&project),
+                PitrAction::Status => pitr::status(&project),
+                PitrAction::Backup => pitr::backup(&project),
+                PitrAction::Restore { time, yes } => pitr::restore(&project, time.as_deref(), yes),
+            })
         }
         Command::Types { out } => done(db::types(&host, selection, out.as_deref())),
         Command::Token {

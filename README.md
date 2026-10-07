@@ -33,7 +33,8 @@ nelcota up && nelcota projects
 ```
 
 Details in [docs/deploy.md](docs/deploy.md). Backup and restore in
-[docs/backup.md](docs/backup.md).
+[docs/backup.md](docs/backup.md), including point-in-time recovery
+(`nelcota -p shop pitr enable`: WAL archived to S3, restore to any second).
 
 ## Usage in 1 minute
 
