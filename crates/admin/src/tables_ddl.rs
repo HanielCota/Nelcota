@@ -12,7 +12,7 @@ use tokio_postgres::Client;
 use crate::{
     AdminState, ApiError,
     api::table_or_404,
-    apply::apply,
+    apply::{ChangeKind, apply},
     ddl::{
         BASE_TYPES,
         table::{self, AlterAction, Context, CreateTable},
@@ -66,7 +66,8 @@ pub async fn create(State(state): State<AdminState>, Json(body): Json<CreateRequ
         &state,
         statements,
         body.preview,
-        &format!("table '{}' created", body.table.name),
+        ChangeKind::TableCreated,
+        &body.table.name,
     )
     .await
 }
@@ -108,7 +109,8 @@ pub async fn alter(
         &state,
         statements,
         body.preview,
-        &format!("table '{name}' altered"),
+        ChangeKind::TableAltered,
+        &name,
     )
     .await
 }
@@ -134,7 +136,8 @@ pub async fn drop(
         &state,
         statements,
         params.preview,
-        &format!("table '{name}' dropped"),
+        ChangeKind::TableDropped,
+        &name,
     )
     .await
 }

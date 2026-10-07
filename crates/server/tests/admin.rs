@@ -1624,6 +1624,11 @@ async fn panel_changes_become_a_migration_recognised_by_migrate() {
     let list = get(&app, "/admin/api/migrations", &cookie).await.body;
     let pending = list["pending"].as_array().unwrap();
     assert_eq!(pending.len(), 2);
+    // Kind and target let the panel describe the change in its own language.
+    assert_eq!(
+        (&pending[0]["kind"], &pending[0]["target"]),
+        (&json!("table_created"), &json!("orders"))
+    );
     // ISO 8601 with the full offset ("+00:00"), which the browser understands.
     let at = pending[0]["applied_at"].as_str().unwrap();
     let offset = &at[at.len() - 6..];

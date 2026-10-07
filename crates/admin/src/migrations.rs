@@ -163,7 +163,8 @@ pub async fn list(State(state): State<AdminState>) -> Result<Json<Value>, ApiErr
 
     let pending: Vec<Value> = client
         .query(
-            "SELECT id, to_char(applied_at, 'YYYY-MM-DD\"T\"HH24:MI:SSTZH:TZM'), summary, statements
+            "SELECT id, to_char(applied_at, 'YYYY-MM-DD\"T\"HH24:MI:SSTZH:TZM'), summary, statements,
+                    kind, target
                FROM nelcota.panel_changes WHERE exported_in IS NULL ORDER BY id",
             &[],
         )
@@ -175,6 +176,10 @@ pub async fn list(State(state): State<AdminState>) -> Result<Json<Value>, ApiErr
                 "applied_at": r.get::<_, String>(1),
                 "summary": r.get::<_, String>(2),
                 "statements": r.get::<_, Vec<String>>(3),
+                // The panel describes the change in its own language from these;
+                // `summary` (English, or the old Portuguese) is the fallback.
+                "kind": r.get::<_, Option<String>>(4),
+                "target": r.get::<_, Option<String>>(5),
             })
         })
         .collect();

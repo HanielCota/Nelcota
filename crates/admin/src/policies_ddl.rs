@@ -12,7 +12,7 @@ use serde_json::Value;
 use crate::{
     AdminState, ApiError,
     api::table_or_404,
-    apply::apply,
+    apply::{ChangeKind, apply},
     ddl::policy::{self, PolicyDef},
 };
 
@@ -34,8 +34,14 @@ pub async fn create(
     let table = table_or_404(&state, &name)?;
     let schema = state.catalog.get().schema.clone();
     let statements = policy::create(&schema, &table.name, &body.policy)?;
-    let message = format!("policy '{}' created", body.policy.name);
-    apply(&state, statements, body.preview, &message).await
+    apply(
+        &state,
+        statements,
+        body.preview,
+        ChangeKind::PolicyCreated,
+        &body.policy.name,
+    )
+    .await
 }
 
 /// `PUT /admin/api/tables/{name}/policies/{policy}`
@@ -47,8 +53,14 @@ pub async fn replace(
     let table = table_or_404(&state, &name)?;
     let schema = state.catalog.get().schema.clone();
     let statements = policy::replace(&schema, &table.name, &original, &body.policy)?;
-    let message = format!("policy '{}' updated", body.policy.name);
-    apply(&state, statements, body.preview, &message).await
+    apply(
+        &state,
+        statements,
+        body.preview,
+        ChangeKind::PolicyUpdated,
+        &body.policy.name,
+    )
+    .await
 }
 
 #[derive(Deserialize)]
@@ -66,6 +78,12 @@ pub async fn drop(
     let table = table_or_404(&state, &name)?;
     let schema = state.catalog.get().schema.clone();
     let statements = policy::drop(&schema, &table.name, &policy_name);
-    let message = format!("policy '{policy_name}' dropped");
-    apply(&state, statements, params.preview, &message).await
+    apply(
+        &state,
+        statements,
+        params.preview,
+        ChangeKind::PolicyDropped,
+        &policy_name,
+    )
+    .await
 }

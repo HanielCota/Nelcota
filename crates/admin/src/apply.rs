@@ -5,6 +5,45 @@ use serde_json::{Value, json};
 
 use crate::{AdminState, ApiError, api::user_query_error};
 
+/// What a DDL batch did. Recorded in `nelcota.panel_changes` as kind and
+/// target, so the panel describes the change in the viewer's language; the
+/// English summary goes into generated migration files and API responses.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ChangeKind {
+    TableCreated,
+    TableAltered,
+    TableDropped,
+    PolicyCreated,
+    PolicyUpdated,
+    PolicyDropped,
+}
+
+impl ChangeKind {
+    /// Value of `panel_changes.kind` (CHECK constraint in migration V7).
+    pub fn code(self) -> &'static str {
+        match self {
+            ChangeKind::TableCreated => "table_created",
+            ChangeKind::TableAltered => "table_altered",
+            ChangeKind::TableDropped => "table_dropped",
+            ChangeKind::PolicyCreated => "policy_created",
+            ChangeKind::PolicyUpdated => "policy_updated",
+            ChangeKind::PolicyDropped => "policy_dropped",
+        }
+    }
+
+    pub fn summary(self, target: &str) -> String {
+        let (object, verb) = match self {
+            ChangeKind::TableCreated => ("table", "created"),
+            ChangeKind::TableAltered => ("table", "altered"),
+            ChangeKind::TableDropped => ("table", "dropped"),
+            ChangeKind::PolicyCreated => ("policy", "created"),
+            ChangeKind::PolicyUpdated => ("policy", "updated"),
+            ChangeKind::PolicyDropped => ("policy", "dropped"),
+        };
+        format!("{object} '{target}' {verb}")
+    }
+}
+
 /// With `preview`, returns the SQL without running it. Without, runs it all in
 /// one transaction and reloads the catalog before answering: the caller
 /// already sees the new table/column in the API (no waiting for NOTIFY).
@@ -16,11 +55,13 @@ pub async fn apply(
     state: &AdminState,
     statements: Vec<String>,
     preview: bool,
-    message: &str,
+    kind: ChangeKind,
+    target: &str,
 ) -> Result<Json<Value>, ApiError> {
     if preview {
         return Ok(Json(json!({ "sql": statements })));
     }
+    let message = kind.summary(target);
     {
         let mut client = state.db.get().await?;
         let tx = client.transaction().await?;
@@ -32,8 +73,9 @@ pub async fn apply(
         // Record for "Generate migration" (see migrations.rs), in the same
         // transaction: a failed DDL is not recorded, and vice versa.
         tx.execute(
-            "INSERT INTO nelcota.panel_changes (summary, statements) VALUES ($1, $2)",
-            &[&message, &statements],
+            "INSERT INTO nelcota.panel_changes (summary, statements, kind, target)
+             VALUES ($1, $2, $3, $4)",
+            &[&message, &statements, &kind.code(), &target],
         )
         .await?;
         tx.commit().await.map_err(user_query_error)?;
@@ -47,4 +89,23 @@ pub async fn apply(
         .await
         .map_err(|e| ApiError::from(format!("DDL applied, but the catalog did not reload: {e}")))?;
     Ok(Json(json!({ "message": message, "sql": statements })))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ChangeKind;
+
+    #[test]
+    fn summary_matches_the_v7_backfill_patterns() {
+        // V7 recovers kind/target from summaries in this exact shape.
+        assert_eq!(
+            ChangeKind::TableCreated.summary("orders"),
+            "table 'orders' created"
+        );
+        assert_eq!(
+            ChangeKind::PolicyUpdated.summary("owner reads"),
+            "policy 'owner reads' updated"
+        );
+        assert_eq!(ChangeKind::PolicyDropped.code(), "policy_dropped");
+    }
 }
