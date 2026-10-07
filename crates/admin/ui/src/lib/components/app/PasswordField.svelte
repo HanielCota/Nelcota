@@ -4,7 +4,6 @@
   import Eye from '@lucide/svelte/icons/eye'
   import EyeOff from '@lucide/svelte/icons/eye-off'
   import Copy from '@lucide/svelte/icons/copy'
-  import Wand from '@lucide/svelte/icons/wand-sparkles'
   import { toast } from 'svelte-sonner'
   import { generatePassword, passwordProblem } from '$lib/password'
 
@@ -47,7 +46,7 @@
         {#if visible}<EyeOff class="size-4" />{:else}<Eye class="size-4" />{/if}
       </button>
     </div>
-    <Button variant="outline" class="h-10" onclick={generate}><Wand />Gerar</Button>
+    <Button variant="outline" class="h-10" onclick={generate}>Gerar</Button>
     <Button variant="outline" size="icon" class="size-10" aria-label="Copiar senha" disabled={!value} onclick={copy}><Copy /></Button>
   </div>
   <p id={`${id}-hint`} class={['text-xs', problem ? 'text-destructive' : 'text-muted-foreground']}>

@@ -2,7 +2,6 @@
   import * as Dialog from '$lib/components/ui/dialog'
   import { Button } from '$lib/components/ui/button'
   import { Label } from '$lib/components/ui/label'
-  import KeyRound from '@lucide/svelte/icons/key-round'
   import { toast } from 'svelte-sonner'
   import PasswordField from './PasswordField.svelte'
   import { api, enc } from '$lib/api'
@@ -37,13 +36,10 @@
 <Dialog.Root bind:open>
   <Dialog.Content class="sm:max-w-lg">
     <form class="grid gap-5" onsubmit={submit}>
-      <Dialog.Header class="gap-2">
-        <span class="grid size-11 place-items-center mb-1 rounded-xl border border-brand/20 bg-brand-soft text-brand" aria-hidden="true">
-          <KeyRound class="size-5" />
-        </span>
+      <Dialog.Header>
         <Dialog.Title>Redefinir a senha</Dialog.Title>
         <Dialog.Description>
-          de <span class="font-semibold text-foreground">{user.email}</span>. As sessões abertas dele são encerradas.
+          de <span class="font-medium text-foreground">{user.email}</span>. As sessões abertas dele são encerradas.
         </Dialog.Description>
       </Dialog.Header>
       <div class="grid gap-2">

@@ -3,7 +3,6 @@
   import { Button } from '$lib/components/ui/button'
   import { Input } from '$lib/components/ui/input'
   import { Label } from '$lib/components/ui/label'
-  import UserPlus from '@lucide/svelte/icons/user-plus'
   import { toast } from 'svelte-sonner'
   import PasswordField from './PasswordField.svelte'
   import { api } from '$lib/api'
@@ -43,10 +42,7 @@
 <Dialog.Root bind:open>
   <Dialog.Content class="sm:max-w-lg">
     <form class="grid gap-5" onsubmit={submit}>
-      <Dialog.Header class="gap-2">
-        <span class="grid size-11 place-items-center mb-1 rounded-xl border border-brand/20 bg-brand-soft text-brand" aria-hidden="true">
-          <UserPlus class="size-5" />
-        </span>
+      <Dialog.Header>
         <Dialog.Title>Novo usuário</Dialog.Title>
         <Dialog.Description>
           A conta já pode entrar pela API (<code>/auth/v1/token</code>) com o email e a senha abaixo.
