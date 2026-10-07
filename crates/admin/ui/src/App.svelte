@@ -11,6 +11,7 @@
   import TableEditor from '$lib/pages/TableEditor.svelte'
   import Users from '$lib/pages/Users.svelte'
   import Policies from '$lib/pages/Policies.svelte'
+  import Migrations from '$lib/pages/Migrations.svelte'
   import NotFound from '$lib/pages/NotFound.svelte'
   import Projects from '$lib/pages/Projects.svelte'
   import ApiPage from '$lib/pages/ApiPage.svelte'
@@ -90,6 +91,8 @@
               {#await import('$lib/pages/SqlEditor.svelte') then m}
                 <m.default />
               {/await}
+            {:else if path === '/migrations'}
+              <Migrations />
             {:else if path === '/users'}
               <Users />
             {:else if path === '/policies'}
