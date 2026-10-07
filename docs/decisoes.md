@@ -321,6 +321,35 @@ reiniciar ninguém. O estado de cada projeto vem de `GET /health` pela rede
 containers e volumes; o site sai do Caddy com `caddy reload` (sem derrubar os
 outros).
 
+## Identidade e conta no painel
+
+**D62. O mascote é a identidade do painel, a única exceção à D55.** Vem do
+atlas do NelcotaScreenShare (`src/assets/mascot/`), recortado com as poses
+ancoradas nos pés e no braço direito para a figura não pular ao trocar de
+expressão. Não é enfeite porque reage ao estado da tela de login: acena ao
+abrir, segue o ponteiro com os olhos, fecha os olhos enquanto a senha é
+digitada e fica triste depois de um login recusado. Os olhos são uma camada
+vetorial sobre os do PNG (só a pupila se move); com
+`prefers-reduced-motion` o olhar pula direto para o alvo.
+
+**D63. Barra lateral de altura total.** Projeto no topo (mesma altura e borda
+da topbar), páginas no meio, conta no rodapé; a topbar cobre só a área de
+conteúdo. Fixada, ocupa 240px a partir de `xl`; recolhida, vira trilho de
+ícones que se expande por cima do conteúdo. "Projetos" saiu do menu: o
+seletor de projeto já leva lá.
+
+**D64. Foto do admin no banco do projeto, no schema `nelcota`** (migração V4,
+`nelcota.admin_avatar`). O login do admin só existe em variáveis de ambiente,
+então não havia onde guardar dados dele; o schema interno não tem USAGE para
+nenhuma role da API. A foto é por projeto (cada um tem o próprio Postgres). O
+navegador recorta o centro e reduz para 256px em WebP; o servidor aceita só
+PNG, JPEG ou WebP reconhecidos pelos bytes iniciais, até 256 KB. A URL leva a
+versão (`?v=`), então a imagem pode ficar em cache.
+
+**D65. `nelcota-core` recompila quando `migrations/` muda.** O
+`embed_migrations!` lê a pasta sem avisar o compilador; um `build.rs` com
+`rerun-if-changed` evita builds incrementais com a lista antiga.
+
 ### Pendências conhecidas
 
 - Embed de relações, `or=`/`and=` e upsert ficam para depois do MVP.

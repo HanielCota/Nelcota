@@ -17,7 +17,6 @@
 	toastOptions={{
 		classes: {
 			toast: "cn-toast shadow-overlay! text-sm! gap-3! px-4! py-3!",
-			success: "[&_[data-icon]]:text-brand!",
 			error: "[&_[data-icon]]:text-destructive!",
 			warning: "[&_[data-icon]]:text-warning!",
 		},
