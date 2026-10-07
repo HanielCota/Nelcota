@@ -412,7 +412,7 @@
                           >{column.name}{#if column.is_pk}<span class="ml-1.5 font-mono text-3xs font-normal text-muted-foreground">pk</span>{/if}</span
                         >
                         <span class="font-mono text-3xs font-normal text-muted-foreground"
-                          >{column.full_type}{#if column.references}<span class="text-brand/80"
+                          >{column.full_type}{#if column.references}<span class="text-brand"
                               >{` → ${column.references.table}`}</span
                             >{/if}</span
                         >

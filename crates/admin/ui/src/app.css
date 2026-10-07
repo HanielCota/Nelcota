@@ -12,7 +12,9 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Claro: superfícies quase brancas, bordas suaves e verde da marca. */
+/* Claro: superfícies quase brancas, bordas suaves e verde da marca.
+   Cores de texto calibradas para contraste WCAG AA (4,5:1) sobre o fundo e
+   sobre os selos tingidos (fundo da cor com 10% de opacidade). */
 :root {
 	--background: #fcfcfc;
 	--foreground: #171717;
@@ -20,14 +22,14 @@
 	--card-foreground: #171717;
 	--popover: #ffffff;
 	--popover-foreground: #171717;
-	--primary: #1f9d63;
+	--primary: #137a4b;
 	--primary-foreground: #ffffff;
-	--primary-border: #1a8754;
-	--brand: #1f9d63;
+	--primary-border: #0f6b3e;
+	--brand: #137a4b;
 	--secondary: #f3f3f3;
 	--secondary-foreground: #171717;
 	--muted: #f3f3f3;
-	--muted-foreground: #6f6f6f;
+	--muted-foreground: #636363;
 	--accent: #ededed;
 	--accent-foreground: #171717;
 	--destructive: #dc2626;
@@ -35,7 +37,7 @@
 	--border-strong: #d4d4d4;
 	--input: #e0e0e0;
 	--ring: #a3a3a3;
-	--chart-1: #1f9d63;
+	--chart-1: #137a4b;
 	--chart-2: #6f6f6f;
 	--chart-3: #a3a3a3;
 	--chart-4: #c4c4c4;
@@ -43,13 +45,13 @@
 	--radius: 0.5rem;
 	--sidebar: #f7f7f7;
 	--sidebar-foreground: #525252;
-	--sidebar-primary: #1f9d63;
+	--sidebar-primary: #137a4b;
 	--sidebar-primary-foreground: #ffffff;
 	--sidebar-accent: #ececec;
 	--sidebar-accent-foreground: #171717;
 	--sidebar-border: #e4e4e4;
 	--sidebar-ring: #a3a3a3;
-	--warning: #b45309;
+	--warning: #9a4708;
 }
 
 /* Escuro (padrão): grafite em camadas, como o console do Supabase. */
@@ -67,7 +69,7 @@
 	--secondary: #242424;
 	--secondary-foreground: #ededed;
 	--muted: #212121;
-	--muted-foreground: #8f8f8f;
+	--muted-foreground: #9b9b9b;
 	--accent: #2a2a2a;
 	--accent-foreground: #fafafa;
 	--destructive: #f2555a;

@@ -182,7 +182,7 @@
 
         <Button size="sm" onclick={run} disabled={running} title="Ctrl+Enter">
           <Play />{running ? 'Executando…' : 'Executar'}
-          <kbd class="ml-1 hidden rounded border border-white/20 px-1 font-sans text-3xs font-normal opacity-80 sm:inline"
+          <kbd class="ml-1 hidden rounded border border-white/30 px-1 font-sans text-3xs font-normal sm:inline"
             >Ctrl ↵</kbd
           >
         </Button>
