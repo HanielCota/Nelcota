@@ -7,7 +7,7 @@
 #   NELCOTA_VERSION=0.1.0     version (default: the latest)
 #   NELCOTA_REPO=owner/repo   GitHub repository (default: nelcota/nelcota)
 #   PREFIX=/usr/local/bin     where to install
-#   NELCOTA_SKIP_DOCKER=1     do not install Docker if it is missing
+#   NELCOTA_SKIP_DOCKER=1     do not install Docker (for `nelcota init --runtime systemd`)
 #
 # Rather not run `curl | sh`? Download the binary and the .sha256 from the
 # releases page and check them with `sha256sum -c`. This script does exactly that.
@@ -55,7 +55,7 @@ say "nelcota installed at $PREFIX/nelcota ($("$PREFIX/nelcota" --version))"
 
 if ! command -v docker >/dev/null 2>&1; then
   if [ "${NELCOTA_SKIP_DOCKER:-0}" = "1" ]; then
-    say "Docker not found (NELCOTA_SKIP_DOCKER=1): install it before 'nelcota init'"
+    say "Docker not installed (NELCOTA_SKIP_DOCKER=1): use 'nelcota init --runtime systemd', or install Docker first"
   else
     say "Docker not found: installing it with the official script (get.docker.com)"
     curl -fsSL https://get.docker.com | $SUDO sh

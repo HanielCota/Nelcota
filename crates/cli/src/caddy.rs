@@ -1,11 +1,13 @@
-//! Shared Caddy: one site per project, generated from the registry.
+//! Caddy: one site per project, generated from the registry. On Docker hosts
+//! it is a shared container; on systemd hosts, the distribution's service.
 
 use std::{fs, process::Command};
 
 use anyhow::{Context, bail};
 
 use crate::{
-    host::{Host, Manifest},
+    host::{Host, Manifest, Runtime},
+    native,
     project::compose_command,
     util::ok,
 };
@@ -22,24 +24,30 @@ pub fn render(manifest: &Manifest) -> String {
          # use `nelcota init` / `nelcota remove`.\n",
     );
     for project in &manifest.projects {
+        let upstream = match manifest.runtime {
+            Runtime::Docker => format!("app-{}:8000", project.name),
+            Runtime::Systemd => native::APP_LISTEN.to_owned(),
+        };
         let tls = if manifest.local {
             "\ttls internal\n"
         } else {
             ""
         };
         out.push_str(&format!(
-            "\n{domain} {{\n{tls}\tencode zstd gzip\n\treverse_proxy app-{name}:8000\n\theader {{\n\
+            "\n{domain} {{\n{tls}\tencode zstd gzip\n\treverse_proxy {upstream}\n\theader {{\n\
              \t\t-Server\n\t\tStrict-Transport-Security \"max-age=31536000\"\n\
              \t\tX-Content-Type-Options \"nosniff\"\n\t}}\n}}\n",
             domain = project.domain,
-            name = project.name,
         ));
     }
     out
 }
 
-/// Writes the Caddy compose (if it does not exist yet) and the Caddyfile.
+/// Writes the Caddyfile (and, on Docker, Caddy's compose if it does not exist yet).
 pub fn write(host: &Host, manifest: &Manifest) -> anyhow::Result<()> {
+    if manifest.runtime == Runtime::Systemd {
+        return native::write_caddyfile(&render(manifest));
+    }
     let dir = host.caddy_dir();
     fs::create_dir_all(dir.join("config"))?;
     let compose = dir.join("docker-compose.yml");
@@ -80,9 +88,13 @@ fn running(host: &Host) -> bool {
 }
 
 /// Starts Caddy (or reloads the configuration if it is already up).
-pub fn up(host: &Host) -> anyhow::Result<()> {
+pub fn up(host: &Host, runtime: Runtime) -> anyhow::Result<()> {
+    if runtime == Runtime::Systemd {
+        native::systemctl(&["enable".into(), "--now".into(), "caddy".into()])?;
+        return reload(host, runtime);
+    }
     if running(host) {
-        return reload(host);
+        return reload(host, runtime);
     }
     let status = compose_command(&host.caddy_dir())
         .args(["up", "-d"])
@@ -95,7 +107,14 @@ pub fn up(host: &Host) -> anyhow::Result<()> {
 }
 
 /// Applies the new Caddyfile without dropping connections (if Caddy is up).
-pub fn reload(host: &Host) -> anyhow::Result<()> {
+pub fn reload(host: &Host, runtime: Runtime) -> anyhow::Result<()> {
+    if runtime == Runtime::Systemd {
+        if native::unit_state("caddy").as_deref() == Some("active") {
+            native::systemctl(&["reload".into(), "caddy".into()])?;
+            ok("caddy reloaded");
+        }
+        return Ok(());
+    }
     if !running(host) {
         return Ok(());
     }
@@ -119,7 +138,10 @@ pub fn reload(host: &Host) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn down(host: &Host, volumes: bool) -> anyhow::Result<()> {
+pub fn down(host: &Host, runtime: Runtime, volumes: bool) -> anyhow::Result<()> {
+    if runtime == Runtime::Systemd {
+        return native::systemctl(&["stop".into(), "caddy".into()]);
+    }
     let mut args = vec!["down"];
     if volumes {
         args.push("--volumes");
@@ -139,6 +161,7 @@ mod tests {
             panel_login: PanelLogin::Shared,
             base_domain: None,
             local,
+            runtime: crate::host::Runtime::Docker,
             image: "nelcota".into(),
             projects: vec![
                 ProjectEntry {

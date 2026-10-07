@@ -43,6 +43,7 @@ mod tests {
             panel_login: PanelLogin::PerProject,
             base_domain: Some("example.com".into()),
             local: false,
+            runtime: crate::host::Runtime::Docker,
             image: "nelcota".into(),
             projects: vec![ProjectEntry {
                 name: "shop".into(),

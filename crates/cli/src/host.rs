@@ -41,6 +41,16 @@ impl PanelLogin {
     }
 }
 
+/// How the projects run: containers (N projects per host) or systemd units
+/// on the machine itself (one project).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, clap::ValueEnum)]
+#[serde(rename_all = "kebab-case")]
+pub enum Runtime {
+    #[default]
+    Docker,
+    Systemd,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProjectEntry {
     pub name: String,
@@ -63,6 +73,9 @@ pub struct Manifest {
     /// Local install: HTTPS with Caddy's internal certificate.
     #[serde(default)]
     pub local: bool,
+    /// Hosts from before this field are Docker hosts.
+    #[serde(default)]
+    pub runtime: Runtime,
     /// App image (the tag lives in each project's `.env`).
     pub image: String,
     #[serde(default)]
@@ -134,18 +147,26 @@ impl Host {
         self.root.join("projects").join(name)
     }
 
-    pub fn project(&self, entry: &ProjectEntry) -> Project {
-        Project::new(&entry.name, &self.project_dir(&entry.name))
+    pub fn project(&self, manifest: &Manifest, entry: &ProjectEntry) -> Project {
+        Project::new(
+            &entry.name,
+            &self.project_dir(&entry.name),
+            manifest.runtime,
+        )
     }
 
     pub fn projects(&self, manifest: &Manifest) -> Vec<Project> {
-        manifest.projects.iter().map(|e| self.project(e)).collect()
+        manifest
+            .projects
+            .iter()
+            .map(|e| self.project(manifest, e))
+            .collect()
     }
 
     /// The project from `-p`; without `-p`, the host's only project.
     pub fn select(&self, manifest: &Manifest, name: Option<&str>) -> anyhow::Result<Project> {
         let entry = select_entry(manifest, name)?;
-        Ok(self.project(entry))
+        Ok(self.project(manifest, entry))
     }
 }
 
@@ -183,6 +204,7 @@ mod tests {
             panel_login: PanelLogin::Shared,
             base_domain: None,
             local: true,
+            runtime: Runtime::Docker,
             image: "nelcota".into(),
             projects: names
                 .iter()

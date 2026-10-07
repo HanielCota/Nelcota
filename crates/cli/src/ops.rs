@@ -12,8 +12,9 @@ use anyhow::{Context, bail};
 
 use crate::{
     caddy,
-    host::{Host, Manifest},
-    project::Project,
+    host::{Host, Manifest, Runtime},
+    native,
+    project::{Project, Service},
     util::{self, ok, step, warn},
 };
 
@@ -21,15 +22,17 @@ const HEALTH_TIMEOUT: Duration = Duration::from_secs(120);
 
 /// Starts the projects (each one until its healthcheck passes) and Caddy.
 pub fn up(host: &Host, manifest: &Manifest, projects: &[Project]) -> anyhow::Result<()> {
-    caddy::ensure_network()?;
+    if manifest.runtime == Runtime::Docker {
+        caddy::ensure_network()?;
+    }
     caddy::write(host, manifest)?;
     for project in projects {
         step(&format!("Starting {}", project.name));
-        project.compose_ok(&["up", "-d"])?;
-        project.wait_healthy("app", HEALTH_TIMEOUT)?;
+        project.up()?;
+        project.wait_healthy(Service::App, HEALTH_TIMEOUT)?;
         ok(&format!("{} healthy", project.name));
     }
-    caddy::up(host)?;
+    caddy::up(host, manifest.runtime)?;
     println!();
     for entry in manifest
         .projects
@@ -42,15 +45,13 @@ pub fn up(host: &Host, manifest: &Manifest, projects: &[Project]) -> anyhow::Res
 }
 
 pub fn down(project: &Project, volumes: bool) -> anyhow::Result<()> {
-    if volumes {
+    if volumes && project.runtime == Runtime::Docker {
         warn(&format!(
             "--volumes: the data of {} will be DELETED",
             project.name
         ));
-        project.compose_ok(&["down", "--volumes"])
-    } else {
-        project.compose_ok(&["down"])
     }
+    project.down(volumes)
 }
 
 pub fn status(manifest: &Manifest, projects: &[Project]) -> anyhow::Result<()> {
@@ -61,7 +62,9 @@ pub fn status(manifest: &Manifest, projects: &[Project]) -> anyhow::Result<()> {
             .iter()
             .find(|e| e.name == project.name)
             .map_or("", |e| e.domain.as_str());
-        let health = project.health("app").unwrap_or_else(|| "stopped".into());
+        let health = project
+            .health(Service::App)
+            .unwrap_or_else(|| "stopped".into());
         let version = project.env().get("NELCOTA_VERSION")?.unwrap_or_default();
         println!(
             "{:<16} {:<32} {:<10} {}",
@@ -72,27 +75,20 @@ pub fn status(manifest: &Manifest, projects: &[Project]) -> anyhow::Result<()> {
 }
 
 pub fn logs(project: &Project, follow: bool, service: Option<&str>) -> anyhow::Result<()> {
-    let mut args = vec!["logs", "--tail", "200"];
-    if follow {
-        args.push("-f");
-    }
-    if let Some(service) = service {
-        args.push(service);
-    }
-    project.compose_ok(&args)
+    project.logs(follow, service)
 }
 
 /// Recreates the apps that already exist (to apply `.env` changes).
 pub fn recreate_apps(projects: &[Project]) -> anyhow::Result<()> {
-    for project in projects.iter().filter(|p| p.has_container("app")) {
+    for project in projects.iter().filter(|p| p.has_app()) {
         step(&format!("Restarting the {} app", project.name));
-        project.compose_ok(&["up", "-d", "--force-recreate", "app"])?;
-        project.wait_healthy("app", HEALTH_TIMEOUT)?;
+        project.recreate(Service::App)?;
+        project.wait_healthy(Service::App, HEALTH_TIMEOUT)?;
     }
     Ok(())
 }
 
-/// `pg_dump -Fc` inside the Postgres container, written to `backups/`.
+/// `pg_dump -Fc` as the postgres user, written to `backups/`.
 pub fn backup(
     host: &Host,
     project: &Project,
@@ -106,13 +102,12 @@ pub fn backup(
     step(&format!("Backup of {}: {name}", project.name));
 
     let file = fs::File::create(&path)?;
-    let status = project.compose_piped(
-        &[
-            "exec", "-T", "postgres", "pg_dump", "-U", "postgres", "-Fc", "postgres",
-        ],
-        Stdio::null(),
-        Stdio::from(file),
-    )?;
+    let status = project
+        .as_postgres(&["pg_dump", "-Fc", "postgres"])
+        .stdin(Stdio::null())
+        .stdout(Stdio::from(file))
+        .status()
+        .context("could not run pg_dump")?;
     let size = fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
     if !status.success() || size == 0 {
         let _ = fs::remove_file(&path);
@@ -205,37 +200,32 @@ pub fn restore(project: &Project, file: &Path, yes: bool) -> anyhow::Result<()> 
         bail!("restore cancelled (use --yes to skip the question)");
     }
     step(&format!("Stopping the {} app", project.name));
-    project.compose_ok(&["stop", "app"])?;
+    project.stop(&[Service::App])?;
     step(&format!("Restoring {}", file.display()));
     let result = restore_dump(project, file);
     step("Starting the app");
-    project.compose_ok(&["up", "-d", "app"])?;
+    project.start(&[Service::App])?;
     result?;
-    project.wait_healthy("app", HEALTH_TIMEOUT)?;
+    project.wait_healthy(Service::App, HEALTH_TIMEOUT)?;
     ok("restore finished and app healthy");
     Ok(())
 }
 
 fn restore_dump(project: &Project, file: &Path) -> anyhow::Result<()> {
     let input = fs::File::open(file)?;
-    let status = project.compose_piped(
-        &[
-            "exec",
-            "-T",
-            "postgres",
+    let status = project
+        .as_postgres(&[
             "pg_restore",
-            "-U",
-            "postgres",
             "-d",
             "postgres",
             "--clean",
             "--if-exists",
             "--single-transaction",
             "--exit-on-error",
-        ],
-        Stdio::from(input),
-        Stdio::inherit(),
-    )?;
+        ])
+        .stdin(Stdio::from(input))
+        .status()
+        .context("could not run pg_restore")?;
     if !status.success() {
         bail!("pg_restore failed ({status}); the database was not changed (single transaction)");
     }
@@ -243,32 +233,46 @@ fn restore_dump(project: &Project, file: &Path) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Backup → new image → healthcheck. On failure: goes back to the previous
-/// image and restores the backup (the new version may have applied migrations).
+/// Backup → new version → healthcheck. On failure: goes back to the previous
+/// version and restores the backup (the new version may have applied
+/// migrations). On Docker the version is the image tag; on systemd, this
+/// binary replaces the one the unit runs.
 pub fn upgrade(host: &Host, project: &Project, version: Option<&str>) -> anyhow::Result<()> {
     let env = project.env();
     let current = env
         .get("NELCOTA_VERSION")?
         .context("NELCOTA_VERSION missing from .env")?;
-    let target = version.map_or_else(|| env!("CARGO_PKG_VERSION").to_owned(), str::to_owned);
+    let this_binary = env!("CARGO_PKG_VERSION");
+    if project.runtime == Runtime::Systemd && version.is_some_and(|v| v != this_binary) {
+        bail!(
+            "on a systemd host the project runs this binary ({this_binary}): install the version \
+             you want first (NELCOTA_VERSION=x.y.z install.sh), then run `nelcota upgrade`"
+        );
+    }
+    let target = version.map_or_else(|| this_binary.to_owned(), str::to_owned);
     println!("Upgrading {}: {current} → {target}", project.name);
 
     let dump = backup(host, project, false, None)
         .context("pre-upgrade backup failed; nothing was changed")?;
 
     env.set("NELCOTA_VERSION", &target)?;
-    step("Pulling the new image");
-    if !project
-        .compose(&["pull", "app"])
-        .map(|s| s.success())
-        .unwrap_or(false)
-    {
-        warn("could not pull the image (continuing with the local image, if any)");
+    match project.runtime {
+        Runtime::Docker => {
+            step("Pulling the new image");
+            if !project
+                .compose(&["pull", "app"])
+                .map(|s| s.success())
+                .unwrap_or(false)
+            {
+                warn("could not pull the image (continuing with the local image, if any)");
+            }
+        }
+        Runtime::Systemd => native::deploy_binary()?,
     }
     step("Restarting the app on the new version");
     let healthy = project
-        .compose_ok(&["up", "-d", "app"])
-        .and_then(|()| project.wait_healthy("app", HEALTH_TIMEOUT));
+        .recreate(Service::App)
+        .and_then(|()| project.wait_healthy(Service::App, HEALTH_TIMEOUT));
 
     match healthy {
         Ok(()) => {
@@ -280,10 +284,13 @@ pub fn upgrade(host: &Host, project: &Project, version: Option<&str>) -> anyhow:
             warn(&format!("version {target} did not become healthy: {err}"));
             step(&format!("Rolling back to {current}"));
             env.set("NELCOTA_VERSION", &current)?;
-            project.compose_ok(&["stop", "app"])?;
+            if project.runtime == Runtime::Systemd {
+                native::rollback_binary()?;
+            }
+            project.stop(&[Service::App])?;
             restore_dump(project, &dump)?;
-            project.compose_ok(&["up", "-d", "app"])?;
-            project.wait_healthy("app", HEALTH_TIMEOUT)?;
+            project.recreate(Service::App)?;
+            project.wait_healthy(Service::App, HEALTH_TIMEOUT)?;
             ok(&format!(
                 "rollback finished: version {current}, database restored"
             ));

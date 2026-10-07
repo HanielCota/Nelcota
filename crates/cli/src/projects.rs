@@ -7,8 +7,10 @@ use anyhow::bail;
 
 use crate::{
     caddy,
-    host::{Host, PanelLogin},
-    naming, ops, panel_login, registry,
+    host::{Host, PanelLogin, Runtime},
+    naming, native, ops, panel_login,
+    project::Service,
+    registry,
     util::{self, ok, step, warn},
 };
 
@@ -50,8 +52,8 @@ pub fn remove(host: &Host, name: &str, yes: bool, keep_files: bool) -> anyhow::R
         bail!("removal cancelled (use --yes to skip the question)");
     }
 
-    let project = host.project(&entry);
-    if project.health("postgres").is_some() {
+    let project = host.project(&manifest, &entry);
+    if project.health(Service::Postgres).is_some() {
         let dump = ops::backup(host, &project, false, None)?;
         fs::create_dir_all(host.archive_dir())?;
         let archived = host
@@ -62,15 +64,17 @@ pub fn remove(host: &Host, name: &str, yes: bool, keep_files: bool) -> anyhow::R
     } else {
         warn("Postgres stopped: removing without a final backup");
     }
-    if project.exists() {
-        ops::down(&project, true)?;
+    match manifest.runtime {
+        Runtime::Docker if project.exists() => ops::down(&project, true)?,
+        Runtime::Docker => {}
+        Runtime::Systemd => native::remove(&project)?,
     }
 
     manifest.projects.retain(|p| p.name != name);
     host.save(&manifest)?;
     registry::write(host, &manifest)?;
     caddy::write(host, &manifest)?;
-    caddy::reload(host)?;
+    caddy::reload(host, manifest.runtime)?;
 
     if keep_files {
         ok(&format!("files kept at {}", project.dir.display()));

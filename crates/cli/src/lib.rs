@@ -1,11 +1,11 @@
 //! Commands of the `nelcota` binary.
 //!
 //! The same binary serves the API (`nelcota serve`, the default) and operates
-//! the host: a folder with a shared Caddy and N isolated projects (each with its
-//! own Postgres, app, keys and backups). Commands that need the database run
-//! directly when `NELCOTA_DATABASE_URL` is in the environment (inside the
-//! container or in a dev shell) and, on a host, are forwarded to the project's
-//! `app` container with `docker compose exec`.
+//! the host: a folder with Caddy and the projects (each with its own Postgres,
+//! app, keys and backups), as containers (N projects) or systemd units (one).
+//! Commands that need the database run directly when `NELCOTA_DATABASE_URL` is
+//! in the environment (inside the container or in a dev shell) and, on a host,
+//! run with the project's app configuration.
 
 mod caddy;
 mod checks;
@@ -16,6 +16,7 @@ mod host;
 mod init;
 mod machine;
 mod naming;
+mod native;
 mod ops;
 mod panel_login;
 mod pitr;
@@ -31,7 +32,7 @@ use anyhow::bail;
 use clap::{Args, Parser, Subcommand};
 use nelcota_core::Config;
 
-pub use host::PanelLogin;
+pub use host::{PanelLogin, Runtime};
 
 #[derive(Parser, Debug)]
 #[command(
@@ -230,6 +231,10 @@ pub struct InitArgs {
     pub s3_secret_key: Option<String>,
     #[arg(long, default_value = "us-east-1")]
     pub s3_region: String,
+    /// How projects run: docker (N per host) or systemd (one, on Debian/Ubuntu,
+    /// with Postgres and Caddy from apt). Only when the host is created.
+    #[arg(long, value_enum, default_value_t = Runtime::Docker)]
+    pub runtime: Runtime,
     /// Configures ufw (allows SSH, 80 and 443 and enables it).
     #[arg(long)]
     pub firewall: bool,
@@ -282,7 +287,7 @@ pub fn run(cli: Cli) -> anyhow::Result<Outcome> {
                 for project in host.projects(&manifest) {
                     ops::down(&project, volumes)?;
                 }
-                done(caddy::down(&host, volumes))
+                done(caddy::down(&host, manifest.runtime, volumes))
             } else {
                 done(ops::down(&host.select(&manifest, selection)?, volumes))
             }

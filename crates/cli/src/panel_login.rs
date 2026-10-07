@@ -168,6 +168,7 @@ mod tests {
             panel_login: PanelLogin::Shared,
             base_domain: None,
             local: true,
+            runtime: crate::host::Runtime::Docker,
             image: "nelcota".into(),
             projects: vec![
                 ProjectEntry {

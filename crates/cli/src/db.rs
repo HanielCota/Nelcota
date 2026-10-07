@@ -1,8 +1,8 @@
 //! Commands that talk to the database: migrate, types and token.
 //!
 //! They run directly when the environment has a configuration (container,
-//! dev); on a `nelcota init` host they are forwarded to the project's `app`
-//! container.
+//! dev); on a `nelcota init` host they run with the project's app
+//! configuration (in its container, or with its `.env` on systemd hosts).
 
 use std::{fs, path::Path};
 
@@ -88,11 +88,10 @@ fn load_migrations(dir: &Path) -> anyhow::Result<Vec<Migration>> {
 pub fn migrate(host: &Host, selection: Option<&str>, dir: &Path) -> anyhow::Result<()> {
     match target(host, selection)? {
         Target::Container(project) => {
-            // The compose mounts ./migrations at /migrations (read-only).
             if dir != Path::new("migrations") {
                 bail!("in a `nelcota init` project, migrations live in ./migrations");
             }
-            project.in_app(&["migrate", "--path", "/migrations"])
+            project.in_app(&["migrate", "--path", &project.app_migrations_dir()])
         }
         Target::Direct(config) => {
             let migrations = load_migrations(dir)?;
