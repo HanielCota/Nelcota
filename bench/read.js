@@ -1,4 +1,4 @@
-// Leitura simples: filtro indexado + ordem + página de 20 linhas.
+// Simple read: indexed filter + order + a page of 20 rows.
 import http from 'k6/http';
 import { check } from 'k6';
 
@@ -13,7 +13,7 @@ export const options = {
 };
 
 export default function () {
-  const estoque = Math.floor(Math.random() * 50);
-  const res = http.get(`${BASE}/rest/v1/bench_produtos?estoque=eq.${estoque}&order=id&limit=20`);
+  const stock = Math.floor(Math.random() * 50);
+  const res = http.get(`${BASE}/rest/v1/bench_products?stock=eq.${stock}&order=id&limit=20`);
   check(res, { 'status 200': (r) => r.status === 200 });
 }

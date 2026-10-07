@@ -1,12 +1,12 @@
-# cargo deny check — licenças, advisories, origens e duplicatas.
+# cargo deny check — licenses, advisories, sources and duplicates.
 
 [graph]
 all-features = false
 
 [advisories]
-# Mesma justificativa de .cargo/audit.toml (ver docs/decisoes.md).
+# Same rationale as .cargo/audit.toml (see docs/decisions.md).
 ignore = [
-    { id = "RUSTSEC-2023-0071", reason = "rsa só usada para verificar (nunca assinamos com RSA)" },
+    { id = "RUSTSEC-2023-0071", reason = "rsa only used to verify (we never sign with RSA)" },
 ]
 
 [licenses]
@@ -19,11 +19,11 @@ allow = [
     "ISC",
     "Unicode-3.0",
     "Zlib",
-    # webpki-roots: a lista de autoridades certificadoras da Mozilla (dados), usada
-    # pelo envio de email por SMTP com TLS. Licença permissiva para dados.
+    # webpki-roots: Mozilla's list of certificate authorities (data), used by
+    # sending email over SMTP with TLS. A permissive license for data.
     "CDLA-Permissive-2.0",
-    # quoted_printable (codificação do corpo do email, via lettre). Aprovada pela
-    # OSI; mais permissiva que a MIT (nem exige manter o aviso de copyright).
+    # quoted_printable (email body encoding, via lettre). OSI approved; more
+    # permissive than MIT (does not even require keeping the copyright notice).
     "0BSD",
 ]
 confidence-threshold = 0.9

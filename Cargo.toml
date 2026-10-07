@@ -30,8 +30,8 @@ figment = { version = "0.10.19", features = ["env", "toml"] }
 getrandom = "0.3.4"
 http-body-util = "0.1.5"
 jsonwebtoken = { version = "11.1.0", default-features = false, features = ["rust_crypto", "use_pem"] }
-# SMTP com rustls + ring e as raízes da Mozilla embutidas (imagem scratch não tem
-# certificados do sistema). Sem native-tls/OpenSSL: o build musl continua estático.
+# SMTP over rustls + ring with Mozilla's roots bundled (the scratch image has no
+# system certificates). No native-tls/OpenSSL: the musl build stays static.
 lettre = { version = "0.11.23", default-features = false, features = ["builder", "hostname", "smtp-transport", "tokio1-rustls-tls"] }
 postgres-protocol = "0.6.12"
 refinery = { version = "0.10.0", default-features = false, features = ["tokio-postgres"] }
