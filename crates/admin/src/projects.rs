@@ -8,14 +8,17 @@
 
 use std::{path::PathBuf, time::Duration};
 
-use axum::{Json, extract::State};
+use axum::{
+    Json,
+    extract::State,
+    http::{StatusCode, Uri},
+};
+use bytes::Bytes;
+use http_body_util::{BodyExt, Empty};
+use hyper_util::{client::legacy::Client, rt::TokioExecutor};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
-    net::TcpStream,
-    time::timeout,
-};
+use tokio::time::timeout;
 
 use crate::{AdminState, ApiError, sso::Sso};
 
@@ -89,30 +92,34 @@ pub async fn list(State(state): State<AdminState>) -> Json<Value> {
 
 /// Calls `GET /health` on a project's app over the host's internal network.
 async fn probe(name: &str) -> Value {
+    probe_url(&format!("http://app-{name}:8000/health")).await
+}
+
+/// Healthy = `200` within 2 s. The version comes from the JSON body when the
+/// app answers at all, so an unhealthy app still shows which version it runs.
+async fn probe_url(url: &str) -> Value {
+    let down = json!({ "healthy": false, "version": null, "latency_ms": null });
+    let Ok(uri) = url.parse::<Uri>() else {
+        return down;
+    };
     let started = std::time::Instant::now();
-    let result = timeout(Duration::from_secs(2), async {
-        let mut stream = TcpStream::connect((format!("app-{name}").as_str(), 8000)).await?;
-        stream
-            .write_all(b"GET /health HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
-            .await?;
-        let mut buf = Vec::with_capacity(512);
-        stream.read_to_end(&mut buf).await?;
-        Ok::<_, std::io::Error>(buf)
+    let client = Client::builder(TokioExecutor::new()).build_http::<Empty<Bytes>>();
+    let response = timeout(Duration::from_secs(2), async {
+        let response = client.get(uri).await.ok()?;
+        let status = response.status();
+        let body = response.into_body().collect().await.ok()?.to_bytes();
+        Some((status, body))
     })
     .await;
-    let Ok(Ok(bytes)) = result else {
-        return json!({ "healthy": false, "version": null, "latency_ms": null });
+    let Ok(Some((status, body))) = response else {
+        return down;
     };
-    let text = String::from_utf8_lossy(&bytes);
-    let healthy = text.starts_with("HTTP/1.1 200");
-    let version = text
-        .split("\r\n\r\n")
-        .nth(1)
-        .and_then(|body| serde_json::from_str::<Value>(body).ok())
+    let version = serde_json::from_slice::<Value>(&body)
+        .ok()
         .and_then(|v| v.get("version").cloned())
         .unwrap_or(Value::Null);
     json!({
-        "healthy": healthy,
+        "healthy": status == StatusCode::OK,
         "version": version,
         "latency_ms": started.elapsed().as_millis() as u64,
     })
@@ -151,6 +158,77 @@ pub async fn status(State(state): State<AdminState>) -> Result<Json<Value>, ApiE
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Serves `app` on a free local port and returns its base URL.
+    async fn serve(app: axum::Router) -> String {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        format!("http://{addr}")
+    }
+
+    #[tokio::test]
+    async fn healthy_app_reports_its_version_even_with_a_chunked_body() {
+        // A streamed body goes out chunked: the old hand-written parser read the
+        // chunk sizes as part of the JSON and lost the version.
+        let app = axum::Router::new().route(
+            "/health",
+            axum::routing::get(|| async {
+                let chunks = futures_util::stream::iter([
+                    Ok::<_, std::convert::Infallible>(Bytes::from_static(b"{\"status\":\"ok\",")),
+                    Ok(Bytes::from_static(b"\"version\":\"1.2.3\"}")),
+                ]);
+                axum::body::Body::from_stream(chunks)
+            }),
+        );
+        let status = probe_url(&format!("{}/health", serve(app).await)).await;
+        assert_eq!(status["healthy"], true);
+        assert_eq!(status["version"], "1.2.3");
+        assert!(status["latency_ms"].is_u64());
+    }
+
+    #[tokio::test]
+    async fn an_error_status_is_unhealthy_but_still_answers() {
+        let app = axum::Router::new().route(
+            "/health",
+            axum::routing::get(|| async {
+                (StatusCode::SERVICE_UNAVAILABLE, r#"{"version":"1.2.3"}"#)
+            }),
+        );
+        let status = probe_url(&format!("{}/health", serve(app).await)).await;
+        assert_eq!(status["healthy"], false);
+        assert_eq!(status["version"], "1.2.3");
+        assert!(status["latency_ms"].is_u64());
+    }
+
+    #[tokio::test]
+    async fn unreachable_or_slow_apps_are_down() {
+        // Nothing listens on this port.
+        let closed = {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            listener.local_addr().unwrap()
+        };
+        let status = probe_url(&format!("http://{closed}/health")).await;
+        assert_eq!(
+            status,
+            json!({ "healthy": false, "version": null, "latency_ms": null })
+        );
+
+        let slow = axum::Router::new().route(
+            "/health",
+            axum::routing::get(|| async {
+                tokio::time::sleep(Duration::from_secs(10)).await;
+                "late"
+            }),
+        );
+        let started = std::time::Instant::now();
+        let status = probe_url(&format!("{}/health", serve(slow).await)).await;
+        assert_eq!(status["healthy"], false);
+        assert!(
+            started.elapsed() < Duration::from_secs(4),
+            "gave up after the 2 s timeout"
+        );
+    }
 
     #[test]
     fn only_safe_names_become_internal_addresses() {

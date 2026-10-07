@@ -33,6 +33,8 @@ getrandom = "0.3.4"
 # Keyed GCRA rate limiter, in memory. std clock only: no quanta, no jitter (rand).
 governor = { version = "0.10.4", default-features = false, features = ["std", "dashmap"] }
 http-body-util = "0.1.5"
+# HTTP client for the panel's project health probes (hyper is already in the tree via axum).
+hyper-util = { version = "0.1.21", default-features = false, features = ["client-legacy", "http1", "tokio"] }
 jsonwebtoken = { version = "11.1.0", default-features = false, features = ["rust_crypto", "use_pem"] }
 # SMTP over rustls + ring with Mozilla's roots bundled (the scratch image has no
 # system certificates). No native-tls/OpenSSL: the musl build stays static.
