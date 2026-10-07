@@ -49,22 +49,22 @@
   {#if error}
     <p class="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</p>
   {:else if !data}
-    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div class="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
       {#each [0, 1, 2, 3] as i (i)}<Skeleton class="h-28 rounded-lg" />{/each}
     </div>
     <Skeleton class="mt-8 h-64 rounded-lg" />
   {:else}
-    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div class="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
       {#each stats as stat (stat.label)}
         <a
           href={href(stat.path)}
-          class="group rounded-lg border bg-card p-5 transition-colors hover:border-border-strong hover:bg-muted/40"
+          class="group rounded-lg border bg-card p-4 transition-colors hover:border-border-strong hover:bg-muted/40 sm:p-5"
         >
           <div class="flex items-center justify-between text-muted-foreground">
             <span class="text-sm">{stat.label}</span>
             <stat.icon class="size-4 transition-colors group-hover:text-brand" strokeWidth={1.6} />
           </div>
-          <p class="mt-4 text-3xl font-light tracking-tight tabular-nums">{fmt.format(stat.value)}</p>
+          <p class="mt-3 text-2xl font-light tracking-tight tabular-nums sm:mt-4 sm:text-3xl">{fmt.format(stat.value)}</p>
         </a>
       {/each}
     </div>

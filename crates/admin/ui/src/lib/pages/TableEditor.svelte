@@ -236,10 +236,11 @@
 
 <div class="flex h-full min-h-0">
   <!-- Lista de tabelas -->
-  <aside class="hidden w-64 shrink-0 flex-col border-r bg-sidebar md:flex">
+  <!-- No celular, sem tabela escolhida a lista ocupa a tela; com tabela, só a grade. -->
+  <aside class={cn('w-full shrink-0 flex-col border-r bg-sidebar md:flex md:w-64', name ? 'hidden' : 'flex')}>
     <div class="grid gap-3 border-b p-3">
       <div class="flex items-center justify-between">
-        <p class="px-1 text-sm font-medium">Editor de tabelas</p>
+        <svelte:element this={name ? 'p' : 'h1'} class="px-1 text-sm font-medium">Editor de tabelas</svelte:element>
         <Button variant="ghost" size="icon-sm" title="Nova tabela" aria-label="Nova tabela" onclick={() => (createOpen = true)}>
           <Plus />
         </Button>
@@ -259,7 +260,7 @@
           title={table.rls.label}
           aria-current={table.name === name ? 'page' : undefined}
           class={cn(
-            'flex h-8 items-center gap-2 rounded-md px-2 text-sm text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground',
+            'flex h-10 items-center gap-2 rounded-md px-2 text-sm text-muted-foreground md:h-8 transition-colors hover:bg-accent/60 hover:text-foreground',
             table.name === name && 'bg-accent text-foreground',
           )}
         >
@@ -275,19 +276,24 @@
   </aside>
 
   <!-- Área principal -->
-  <section class="flex min-w-0 flex-1 flex-col">
+  <section class={cn('min-w-0 flex-1 flex-col', name ? 'flex' : 'hidden md:flex')}>
     {#if !name}
       <div class="grid flex-1 place-items-center p-8 text-center">
         <div>
           <Table2 class="mx-auto size-7 text-muted-foreground" strokeWidth={1.3} />
-          <p class="mt-3 text-sm font-medium">Escolha uma tabela</p>
+          <h2 class="mt-3 text-sm font-medium">Escolha uma tabela</h2>
           <p class="mt-1 text-sm font-light text-muted-foreground">Selecione na lista ao lado para ver e editar as linhas.</p>
           <Button variant="outline" size="sm" class="mt-4" onclick={() => (createOpen = true)}><Plus />Criar tabela</Button>
         </div>
       </div>
     {:else}
-      <div class="flex h-12 shrink-0 flex-wrap items-center gap-3 border-b px-4">
-        <h1 class="text-sm font-medium">{name}</h1>
+      <div class="flex min-h-12 shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b px-4 py-2">
+        <a
+          href={href('/tables')}
+          class="-ml-1 grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground md:hidden"
+          aria-label="Voltar para a lista de tabelas"><ChevronLeft class="size-4" /></a
+        >
+        <h1 class="min-w-0 truncate text-sm font-medium">{name}</h1>
         {#if data}<RlsBadge rls={data.table.rls} />{/if}
         <nav class="ml-1 flex items-center gap-0.5 rounded-md bg-muted p-0.5 text-xs" aria-label="Visão da tabela">
           {#each tabs as tab (tab.view)}
@@ -302,7 +308,7 @@
           {/each}
         </nav>
         {#if view === 'data'}
-          <div class="ml-auto flex items-center gap-2">
+          <div class="ml-auto flex flex-wrap items-center gap-2">
             {#if selected.size > 0}
               <Button variant="destructive" size="sm" onclick={() => (confirmOpen = true)}>
                 <Trash2 />Apagar {selected.size}

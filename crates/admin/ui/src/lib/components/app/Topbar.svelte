@@ -60,18 +60,22 @@
     </Button>
   </div>
 
-  <ProjectSwitcher {slash} />
+  <div class="hidden min-w-0 items-center gap-1.5 sm:flex"><ProjectSwitcher {slash} /></div>
 
-  <nav class="flex min-w-0 items-center gap-1.5 text-sm">
+  <nav class="flex min-w-0 items-center gap-1.5 text-sm" aria-label="Trilha">
     {#each crumbs as crumb, i (i)}
-      {#if i > 0}{@render slash()}{/if}
-      {#if crumb.path}
-        <a href={href(crumb.path)} class="truncate text-muted-foreground transition-colors hover:text-foreground"
-          >{crumb.label}</a
-        >
-      {:else}
-        <span class="truncate text-foreground">{crumb.label}</span>
-      {/if}
+      {@const last = i === crumbs.length - 1}
+      <!-- No celular só a página atual cabe sem cortar. -->
+      <span class={['min-w-0 items-center gap-1.5', last ? 'flex' : 'hidden sm:flex']}>
+        {#if i > 0}<span class="hidden sm:inline">{@render slash()}</span>{/if}
+        {#if crumb.path}
+          <a href={href(crumb.path)} class="truncate text-muted-foreground transition-colors hover:text-foreground"
+            >{crumb.label}</a
+          >
+        {:else}
+          <span class="truncate text-foreground" aria-current="page">{crumb.label}</span>
+        {/if}
+      </span>
     {/each}
   </nav>
 
