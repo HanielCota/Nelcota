@@ -6,3 +6,4 @@ nelcota.toml
 .nelcota/
 backups/
 crates/admin/ui/node_modules/
+/dist
