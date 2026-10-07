@@ -48,3 +48,21 @@ export const alignRight = (kind: ColumnKind) => kind === 'number'
 
 /** Fonte mono só onde ajuda a ler (números, ids, JSON); texto em fonte normal. */
 export const monospace = (kind: ColumnKind) => kind === 'number' || kind === 'uuid' || kind === 'json'
+
+export interface PageInfo {
+  /** Primeira e última linha mostradas (1-based); 0 e 0 sem linhas. */
+  from: number
+  to: number
+  /** Última página (0-based), só com total exato; `null` se desconhecida. */
+  lastPage: number | null
+  pageCount: number | null
+}
+
+/** Faixa de linhas e total de páginas para o rodapé da grade. */
+export function pageInfo(page: number, size: number, rowsOnPage: number, total: number | null, exact: boolean): PageInfo {
+  const from = rowsOnPage ? page * size + 1 : 0
+  const to = rowsOnPage ? page * size + rowsOnPage : 0
+  if (total === null || !exact) return { from, to, lastPage: null, pageCount: null }
+  const pageCount = Math.max(1, Math.ceil(total / size))
+  return { from, to, lastPage: pageCount - 1, pageCount }
+}

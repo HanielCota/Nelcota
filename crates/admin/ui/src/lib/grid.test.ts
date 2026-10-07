@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { alignRight, columnKind, columnWidth, monospace } from './grid'
+import { alignRight, columnKind, columnWidth, monospace, pageInfo } from './grid'
 
 const col = (
   name: string,
@@ -56,5 +56,21 @@ describe('largura e alinhamento', () => {
     expect(monospace('number')).toBe(true)
     expect(monospace('text')).toBe(false)
     expect(monospace('enum')).toBe(false)
+  })
+})
+
+describe('paginação', () => {
+  it('faixa e total de páginas com total exato', () => {
+    expect(pageInfo(0, 50, 40, 40, true)).toEqual({ from: 1, to: 40, lastPage: 0, pageCount: 1 })
+    expect(pageInfo(2, 25, 25, 120, true)).toEqual({ from: 51, to: 75, lastPage: 4, pageCount: 5 })
+  })
+
+  it('total estimado ou desconhecido não arrisca a última página', () => {
+    expect(pageInfo(1, 50, 50, 12000, false)).toEqual({ from: 51, to: 100, lastPage: null, pageCount: null })
+    expect(pageInfo(0, 50, 10, null, false).lastPage).toBeNull()
+  })
+
+  it('sem linhas', () => {
+    expect(pageInfo(0, 50, 0, 0, true)).toEqual({ from: 0, to: 0, lastPage: 0, pageCount: 1 })
   })
 })
