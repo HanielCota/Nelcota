@@ -13,10 +13,10 @@
 <Sonner
 	theme={mode.current}
 	class="toaster group"
-	style="--normal-bg: var(--color-popover); --normal-text: var(--color-popover-foreground); --normal-border: var(--color-border-strong); --border-radius: 0.875rem;"
+	style="--normal-bg: var(--color-popover); --normal-text: var(--color-popover-foreground); --normal-border: var(--color-border-strong); --border-radius: 0.5rem;"
 	toastOptions={{
 		classes: {
-			toast: "cn-toast shadow-overlay! text-sm! font-medium! gap-3! px-4! py-3.5!",
+			toast: "cn-toast shadow-overlay! text-sm! gap-3! px-4! py-3!",
 			success: "[&_[data-icon]]:text-brand!",
 			error: "[&_[data-icon]]:text-destructive!",
 			warning: "[&_[data-icon]]:text-warning!",
