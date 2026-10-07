@@ -23,6 +23,8 @@ axum = { version = "0.8.9", default-features = false, features = ["http1", "json
 deadpool-postgres = { version = "0.14.2", default-features = false, features = ["rt_tokio_1"] }
 base64 = "0.22.1"
 bytes = "1"
+# Cookie parsing and Set-Cookie building for the panel session (no signing/encryption features).
+cookie = { version = "0.18.2", default-features = false }
 clap = { version = "4.6.7", default-features = false, features = ["std", "derive", "help", "usage", "error-context", "suggestions", "color", "env"] }
 form_urlencoded = "1.2.2"
 futures-util = { version = "0.3.34", default-features = false, features = ["std"] }

@@ -13,6 +13,7 @@ nelcota-auth.workspace = true
 nelcota-api.workspace = true
 axum.workspace = true
 base64.workspace = true
+cookie.workspace = true
 deadpool-postgres.workspace = true
 futures-util.workspace = true
 getrandom.workspace = true
