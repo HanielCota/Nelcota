@@ -429,9 +429,18 @@ secret generation, image sniffing) and replaced four:
   doubling: `escape_literal` would emit ` E'...'` for backslashes and change the
   text of panel-generated migrations.
 
+**D70. `or=`/`and=` as PostgREST logic trees.** The request's filters are
+a tree (`Condition`): leaves are the existing filters and groups join their
+items with OR/AND, optionally negated; the top level stays ANDed, so existing
+URLs mean the same. Each group renders as a parenthesized expression, so
+precedence never depends on its surroundings, and leaves keep the D29 rules
+(catalog columns, quoted identifiers, values as parameters). Depth is capped at
+8 and a tree at 100 filters, which bounds the recursive parser on hostile
+input. As in PostgREST, `or`/`and` are reserved query keys.
+
 ### Known pending items
 
-- Relation embedding, `or=`/`and=` and upsert wait until after the MVP.
+- Relation embedding and upsert wait until after the MVP.
 - PITR with WAL-G (or pgBackRest) archiving WAL to S3.
 - Install without Docker (systemd): the binary no longer depends on Docker;
   `init` still has to generate the units.

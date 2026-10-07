@@ -20,6 +20,7 @@ rows each user sees.
 |---|---|---|
 | `select` | `select=id,title` | columns (default `*`) |
 | `{column}` | `price=gt.10` | filter (several are combined with AND) |
+| `or`, `and` | `or=(status.eq.paid,status.eq.shipped)` | group of filters, see below |
 | `order` | `order=created_at.desc.nullslast,id` | ordering |
 | `limit`, `offset` | `limit=20&offset=40` | pagination |
 
@@ -36,6 +37,29 @@ rows each user sees.
 
 Values reach Postgres as parameters and Postgres itself converts them to the
 column type (`$1::text::<type>`). A value invalid for the type gives 400.
+
+### Combining filters: `or` and `and`
+
+Same syntax as PostgREST. Inside the parentheses each filter is written
+`column.operator.value`:
+
+```
+?or=(status.eq.paid,status.eq.shipped)
+?or=(stock.eq.0,and(price.gt.100,featured.is.true))
+?not.or=(status.eq.cancelled,deleted_at.not.is.null)
+?or=(price.gt.100,price.lt.3)&stock=gt.0      # the group is ANDed with the rest
+```
+
+- `and(...)` and `or(...)` nest; `not.` before a group negates it, and
+  `column.not.operator.value` negates one filter.
+- A value with commas or parentheses goes in double quotes, with `\"` and `\\`
+  as escapes: `or=(name.eq."Ruler, 30cm",name.eq."f(x)")`. `in` lists keep
+  their own quoting.
+- At most 8 nested levels and 100 filters per group; beyond that, 400.
+- A column literally named `or` or `and` cannot be used as a direct filter,
+  only inside a group (`and=(or.eq.1)`), as in PostgREST.
+- RLS still applies: a group can only narrow what the policies allow, never
+  widen it, on reads and on `PATCH`/`DELETE`.
 
 ### Responses
 
@@ -111,5 +135,5 @@ NOTIFY nelcota, 'reload schema';
 
 ## Out of the MVP
 
-Relation embedding (`select=*,orders(*)`), `or=`/`and=`, upsert
-(`on_conflict`), `GET` on `/rpc`, `Accept: application/vnd.pgrst.object+json`.
+Relation embedding (`select=*,orders(*)`), upsert (`on_conflict`), `GET` on
+`/rpc`, `Accept: application/vnd.pgrst.object+json`.

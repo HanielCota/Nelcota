@@ -534,7 +534,7 @@ fn to_values(table: &Table, values: Map<String, Value>) -> Result<Map<String, Va
 }
 
 /// `column=eq.value` pairs of the primary key.
-fn pk_filters(table: &Table, pk: &Map<String, Value>) -> Result<Vec<query::Filter>, ApiError> {
+fn pk_filters(table: &Table, pk: &Map<String, Value>) -> Result<Vec<query::Condition>, ApiError> {
     if table.primary_key.is_empty() {
         return Err(ApiError::bad_request(
             "no_primary_key",
