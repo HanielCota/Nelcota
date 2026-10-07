@@ -729,3 +729,155 @@ async fn rls_still_filters_inside_or() {
     let (_, theirs) = app.get("/rest/v1/todos", Some(&b)).await;
     assert_eq!(theirs[0]["done"], false, "B's row is untouched");
 }
+
+#[tokio::test]
+async fn upsert_merges_or_ignores_duplicates() {
+    let app = TestApp::spawn().await;
+    let service = token(json!({ "role": "service_role" }));
+    let post = |path: &'static str, prefer: &'static str, body: Value| {
+        let app = &app;
+        let service = service.clone();
+        async move {
+            app.request_with(
+                Method::POST,
+                path,
+                Some(&service),
+                Some(body),
+                &[("prefer", prefer)],
+            )
+            .await
+        }
+    };
+    let product = |name: &'static str| {
+        let app = &app;
+        async move {
+            let (_, b) = app
+                .get(&format!("/rest/v1/products?name=eq.{name}"), None)
+                .await;
+            b[0].clone()
+        }
+    };
+
+    // Merge on the primary key: Pen (id 1) is updated, Eraser is created; the
+    // stock not sent keeps its value.
+    let reply = post(
+        "/rest/v1/products",
+        "resolution=merge-duplicates,return=representation",
+        json!([
+            { "id": 1, "name": "Pen", "price": 3.00 },
+            { "id": 99, "name": "Eraser", "price": 1.00 },
+        ]),
+    )
+    .await;
+    assert_eq!(reply.status, StatusCode::CREATED, "{}", reply.body);
+    assert_eq!(
+        reply.headers["preference-applied"],
+        "resolution=merge-duplicates"
+    );
+    assert_eq!(names(&reply.body), ["Pen", "Eraser"]);
+    let pen = product("Pen").await;
+    assert_eq!(
+        (pen["price"].as_f64(), pen["stock"].as_i64()),
+        (Some(3.0), Some(100))
+    );
+
+    // Ignore: the existing row stays as it was and nothing comes back.
+    let reply = post(
+        "/rest/v1/products",
+        "resolution=ignore-duplicates,return=representation",
+        json!({ "id": 1, "name": "Pen", "price": 9.99 }),
+    )
+    .await;
+    assert_eq!(reply.status, StatusCode::CREATED);
+    assert_eq!(reply.body, json!([]));
+    assert_eq!(product("Pen").await["price"].as_f64(), Some(3.0));
+
+    // on_conflict on a unique column.
+    app.admin_client
+        .batch_execute("CREATE UNIQUE INDEX products_name_key ON public.products (name)")
+        .await
+        .unwrap();
+    let reply = post(
+        "/rest/v1/products?on_conflict=name",
+        "resolution=merge-duplicates",
+        json!({ "name": "Notebook", "price": 20.00 }),
+    )
+    .await;
+    assert_eq!(reply.status, StatusCode::CREATED, "{}", reply.body);
+    assert_eq!(product("Notebook").await["price"].as_f64(), Some(20.0));
+
+    // Mistakes are 400, not 500.
+    for (path, prefer, body) in [
+        // no unique constraint on stock
+        (
+            "/rest/v1/products?on_conflict=stock",
+            "resolution=merge-duplicates",
+            json!({ "name": "A", "price": 1, "stock": 0 }),
+        ),
+        // on_conflict without a resolution
+        (
+            "/rest/v1/products?on_conflict=name",
+            "return=minimal",
+            json!({ "name": "A", "price": 1 }),
+        ),
+        // the same key twice in one batch
+        (
+            "/rest/v1/products",
+            "resolution=merge-duplicates",
+            json!([{ "id": 2, "name": "A", "price": 1 }, { "id": 2, "name": "B", "price": 1 }]),
+        ),
+    ] {
+        let reply = post(path, prefer, body).await;
+        assert_eq!(
+            reply.status,
+            StatusCode::BAD_REQUEST,
+            "{path} {prefer}: {}",
+            reply.body
+        );
+    }
+    let (status, _) = app.get("/rest/v1/products?on_conflict=name", None).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
+/// An upsert cannot take over someone else's row: on a conflict, Postgres
+/// checks the UPDATE policy against the existing row, which belongs to B.
+#[tokio::test]
+async fn upsert_respects_rls() {
+    let app = TestApp::spawn().await;
+    let a = user_token(app.user_a);
+    let b = user_token(app.user_b);
+    // `todos.id` is GENERATED ALWAYS, so it cannot be sent; resolve on a
+    // unique title instead.
+    app.admin_client
+        .batch_execute("CREATE UNIQUE INDEX todos_title_key ON public.todos (title)")
+        .await
+        .unwrap();
+    let upsert = |token: String, body: Value| {
+        let app = &app;
+        async move {
+            app.request_with(
+                Method::POST,
+                "/rest/v1/todos?on_conflict=title",
+                Some(&token),
+                Some(body),
+                &[(
+                    "prefer",
+                    "resolution=merge-duplicates,return=representation",
+                )],
+            )
+            .await
+        }
+    };
+
+    let reply = upsert(a.clone(), json!({ "title": "task of B", "done": true })).await;
+    assert_eq!(reply.status, StatusCode::FORBIDDEN, "{}", reply.body);
+    let (_, theirs) = app.get("/rest/v1/todos", Some(&b)).await;
+    assert_eq!(theirs[0]["done"], false, "B's row is untouched");
+
+    // On their own rows, the upsert works as usual.
+    let reply = upsert(a.clone(), json!({ "title": "task of A", "done": true })).await;
+    assert_eq!(reply.status, StatusCode::CREATED, "{}", reply.body);
+    assert_eq!(reply.body[0]["done"], true);
+    let (_, mine) = app.get("/rest/v1/todos", Some(&a)).await;
+    assert_eq!(mine.as_array().unwrap().len(), 1, "updated, not duplicated");
+}

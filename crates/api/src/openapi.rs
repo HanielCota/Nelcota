@@ -80,7 +80,7 @@ fn json_response(description: &str, schema: Value) -> Value {
 pub fn document(catalog: &Catalog, role: Role) -> Value {
     let prefer = json!({
         "name": "Prefer", "in": "header", "schema": { "type": "string" },
-        "description": "return=representation | return=minimal; count=exact",
+        "description": "return=representation | return=minimal; count=exact; on POST, resolution=merge-duplicates | resolution=ignore-duplicates (upsert)",
     });
     let mut paths = Map::new();
     let mut schemas = Map::new();
@@ -136,7 +136,12 @@ pub fn document(catalog: &Catalog, role: Role) -> Value {
             item.insert(
                 "post".into(),
                 json!({
-                    "tags": [table.name], "parameters": [prefer],
+                    "tags": [table.name],
+                    "parameters": [prefer, {
+                        "name": "on_conflict", "in": "query", "required": false,
+                        "schema": { "type": "string" },
+                        "description": "Upsert key: col1,col2 (a unique constraint); defaults to the primary key. Needs Prefer: resolution=...",
+                    }],
                     "requestBody": { "required": true, "content": { "application/json": { "schema": {
                         "oneOf": [reference(&table.name), array_of(&table.name)] } } } },
                     "responses": {

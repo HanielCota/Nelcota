@@ -171,6 +171,73 @@ pub struct Request {
     pub order: Vec<OrderTerm>,
     pub limit: Option<i64>,
     pub offset: Option<i64>,
+    /// `on_conflict=col1,col2`: the unique key an upsert resolves on.
+    pub on_conflict: Option<Vec<String>>,
+}
+
+/// What `Prefer: resolution=...` asks a POST to do with a row whose key
+/// already exists.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Resolution {
+    /// `merge-duplicates`: update the existing row with the sent columns.
+    Merge,
+    /// `ignore-duplicates`: keep the existing row.
+    Ignore,
+}
+
+/// `INSERT ... ON CONFLICT (columns)` and what to do on a conflict.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Upsert {
+    pub columns: Vec<String>,
+    pub resolution: Resolution,
+}
+
+impl Upsert {
+    /// Conflict target: `on_conflict` when given, else the primary key.
+    pub fn new(
+        table: &Table,
+        on_conflict: Option<&[String]>,
+        resolution: Resolution,
+    ) -> Result<Self, QueryError> {
+        let columns = match on_conflict {
+            Some(columns) => columns.to_vec(),
+            None if !table.primary_key.is_empty() => table.primary_key.clone(),
+            None => {
+                return Err(invalid(
+                    "upsert needs a primary key or on_conflict=col1,col2",
+                ));
+            }
+        };
+        Ok(Upsert {
+            columns,
+            resolution,
+        })
+    }
+
+    /// Merge updates only the columns the row sent, never the key itself;
+    /// with nothing left to update, a merge behaves like ignore.
+    fn clause(&self, columns: &[String]) -> String {
+        let target = self
+            .columns
+            .iter()
+            .map(|c| ident(c))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let updates: Vec<String> = columns
+            .iter()
+            .filter(|c| !self.columns.contains(c))
+            .map(|c| format!("{0} = EXCLUDED.{0}", ident(c)))
+            .collect();
+        match self.resolution {
+            Resolution::Merge if !updates.is_empty() => {
+                format!(
+                    " ON CONFLICT ({target}) DO UPDATE SET {}",
+                    updates.join(", ")
+                )
+            }
+            _ => format!(" ON CONFLICT ({target}) DO NOTHING"),
+        }
+    }
 }
 
 fn column<'a>(table: &'a Table, name: &str) -> Result<&'a Column, QueryError> {
@@ -466,6 +533,23 @@ fn split_top_level(input: &str) -> Result<Vec<&str>, QueryError> {
     Ok(parts)
 }
 
+/// `on_conflict=a,b`: catalog columns, no repeats. Whether they form a unique
+/// key is Postgres' call (a mismatch is a 400).
+fn parse_on_conflict(value: &str, table: &Table) -> Result<Vec<String>, QueryError> {
+    let mut columns: Vec<String> = Vec::new();
+    for name in value.split(',').map(str::trim) {
+        if name.is_empty() {
+            return Err(invalid("empty or malformed on_conflict"));
+        }
+        let name = column(table, name)?.name.clone();
+        if columns.contains(&name) {
+            return Err(invalid(format!("column '{name}' repeated in on_conflict")));
+        }
+        columns.push(name);
+    }
+    Ok(columns)
+}
+
 /// Parses the query string. Every column mentioned is validated against the table.
 pub fn parse_request(pairs: &[(String, String)], table: &Table) -> Result<Request, QueryError> {
     let mut request = Request {
@@ -474,6 +558,7 @@ pub fn parse_request(pairs: &[(String, String)], table: &Table) -> Result<Reques
         order: Vec::new(),
         limit: None,
         offset: None,
+        on_conflict: None,
     };
     for (key, value) in pairs {
         match key.as_str() {
@@ -481,6 +566,7 @@ pub fn parse_request(pairs: &[(String, String)], table: &Table) -> Result<Reques
             "order" => request.order = parse_order(value, table)?,
             "limit" => request.limit = Some(parse_non_negative("limit", value)?),
             "offset" => request.offset = Some(parse_non_negative("offset", value)?),
+            "on_conflict" => request.on_conflict = Some(parse_on_conflict(value, table)?),
             // Logic trees, as in PostgREST: a column named `or`/`and` cannot
             // be filtered directly (it still can inside a tree).
             "or" | "and" | "not.or" | "not.and" => {
@@ -709,6 +795,7 @@ pub fn insert(
     table: &Table,
     body: Value,
     representation: Option<&Select>,
+    upsert: Option<&Upsert>,
 ) -> Result<Sql, QueryError> {
     let rows = match body {
         Value::Array(rows) => rows,
@@ -744,8 +831,11 @@ pub fn insert(
     for (columns, rows) in groups {
         if columns.is_empty() {
             // Empty objects: one all-DEFAULT row for each.
+            let conflict = upsert.map(|u| u.clause(&[])).unwrap_or_default();
             for _ in rows {
-                statements.push(format!("INSERT INTO {target} AS _t DEFAULT VALUES"));
+                statements.push(format!(
+                    "INSERT INTO {target} AS _t DEFAULT VALUES{conflict}"
+                ));
             }
             continue;
         }
@@ -755,8 +845,9 @@ pub fn insert(
             .collect::<Vec<_>>()
             .join(", ");
         let p = sql.param(Param::Json(Value::Array(rows)));
+        let conflict = upsert.map(|u| u.clause(&columns)).unwrap_or_default();
         statements.push(format!(
-            "INSERT INTO {target} AS _t ({list}) SELECT {list} FROM json_populate_recordset(NULL::{target}, {p}::json)"
+            "INSERT INTO {target} AS _t ({list}) SELECT {list} FROM json_populate_recordset(NULL::{target}, {p}::json){conflict}"
         ));
     }
 
@@ -1050,11 +1141,12 @@ mod tests {
     fn insert_rejects_unknown_columns() {
         let t = table();
         let body = serde_json::json!({"title": "x", "\"; drop table todos; --": 1});
-        assert!(insert("public", &t, body, None).is_err());
+        assert!(insert("public", &t, body, None, None).is_err());
         let sql = insert(
             "public",
             &t,
             serde_json::json!([{"title": "a"}, {"title": "b"}]),
+            None,
             None,
         )
         .unwrap();
@@ -1067,6 +1159,7 @@ mod tests {
             "public",
             &t,
             serde_json::json!([{"title": "a"}, {"done": true}, {}]),
+            None,
             None,
         )
         .unwrap();
@@ -1175,5 +1268,83 @@ mod tests {
             ")".repeat(MAX_DEPTH - 1)
         );
         assert!(parse_request(&pairs(&[("or", &ok)]), &t).is_ok());
+    }
+
+    // ------------------------------------------------------------- upsert
+
+    fn upsert_sql(body: serde_json::Value, upsert: &Upsert) -> String {
+        insert("public", &table(), body, None, Some(upsert))
+            .unwrap()
+            .text
+    }
+
+    #[test]
+    fn merge_updates_only_the_sent_columns_never_the_key() {
+        let t = table();
+        let merge = Upsert::new(&t, None, Resolution::Merge).unwrap();
+        assert_eq!(merge.columns, ["id"]);
+        let text = upsert_sql(serde_json::json!({"id": 1, "title": "a"}), &merge);
+        assert!(
+            text.ends_with(" ON CONFLICT (\"id\") DO UPDATE SET \"title\" = EXCLUDED.\"title\""),
+            "{text}"
+        );
+        // Only the key sent: nothing to update, so the row is kept.
+        let text = upsert_sql(serde_json::json!({"id": 1}), &merge);
+        assert!(text.ends_with(" ON CONFLICT (\"id\") DO NOTHING"), "{text}");
+    }
+
+    #[test]
+    fn ignore_keeps_the_existing_row_and_groups_each_get_the_clause() {
+        let t = table();
+        let ignore = Upsert::new(&t, None, Resolution::Ignore).unwrap();
+        let text = upsert_sql(
+            serde_json::json!([{"id": 1, "title": "a"}, {"id": 2, "done": true}]),
+            &ignore,
+        );
+        assert_eq!(
+            text.matches(" ON CONFLICT (\"id\") DO NOTHING").count(),
+            2,
+            "{text}"
+        );
+    }
+
+    #[test]
+    fn on_conflict_picks_the_key() {
+        let t = table();
+        let req = parse_request(&pairs(&[("on_conflict", "title, done")]), &t).unwrap();
+        let cols = req.on_conflict.unwrap();
+        assert_eq!(cols, ["title", "done"]);
+        let merge = Upsert::new(&t, Some(&cols), Resolution::Merge).unwrap();
+        let text = upsert_sql(
+            serde_json::json!({"title": "a", "done": true, "id": 3}),
+            &merge,
+        );
+        assert!(
+            text.ends_with(
+                " ON CONFLICT (\"title\", \"done\") DO UPDATE SET \"id\" = EXCLUDED.\"id\""
+            ),
+            "{text}"
+        );
+    }
+
+    #[test]
+    fn bad_upsert_requests_are_rejected() {
+        let t = table();
+        for value in [
+            "",
+            "title,",
+            "nope",
+            "title,title",
+            "\"id\"; drop table todos",
+        ] {
+            assert!(
+                parse_request(&pairs(&[("on_conflict", value)]), &t).is_err(),
+                "{value}"
+            );
+        }
+        let mut no_pk = table();
+        no_pk.primary_key.clear();
+        assert!(Upsert::new(&no_pk, None, Resolution::Merge).is_err());
+        assert!(Upsert::new(&no_pk, Some(&["title".to_owned()]), Resolution::Merge).is_ok());
     }
 }

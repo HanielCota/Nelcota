@@ -438,9 +438,18 @@ precedence never depends on its surroundings, and leaves keep the D29 rules
 8 and a tree at 100 filters, which bounds the recursive parser on hostile
 input. As in PostgREST, `or`/`and` are reserved query keys.
 
+**D71. Upsert through `Prefer: resolution` and `on_conflict`, as in
+PostgREST.** Each INSERT group (D33) gets `ON CONFLICT (key)`: `DO UPDATE SET`
+for the columns the object sent, except the key, or `DO NOTHING`; a merge with
+nothing left to update falls back to `DO NOTHING`. The key is the primary key
+or `on_conflict`, whose columns are checked against the catalog; whether they
+form a unique key is left to Postgres, and its `42P10` and `21000` errors now
+map to 400 instead of 500. RLS needs no special handling: Postgres applies the
+INSERT policy to the new row and the UPDATE policy to the existing one.
+
 ### Known pending items
 
-- Relation embedding and upsert wait until after the MVP.
+- Relation embedding waits until after the MVP.
 - PITR with WAL-G (or pgBackRest) archiving WAL to S3.
 - Install without Docker (systemd): the binary no longer depends on Docker;
   `init` still has to generate the units.

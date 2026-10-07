@@ -586,7 +586,8 @@ pub async fn insert_row(
     let table = table_or_404(&state, &name)?;
     let schema = state.catalog.get().schema.clone();
     let values = to_values(&table, body.values)?;
-    let sql = query::insert(&schema, &table, Value::Object(values), None).map_err(invalid_query)?;
+    let sql =
+        query::insert(&schema, &table, Value::Object(values), None, None).map_err(invalid_query)?;
     execute(&state, &sql).await?;
     Ok(Json(json!({ "message": "row inserted" })))
 }
