@@ -59,6 +59,7 @@ O estado do RLS aparece como selo colorido: verde (RLS com policies), âmbar
 | Policies | "Nova policy" em cada tabela, com modelos (leitura pública, logados leem, dono lê/cria/altera/apaga); editar e apagar; "Ativar RLS" nas tabelas sem |
 | Token service_role | página **API**: gera um token com validade escolhida; aparece uma vez e não é guardado |
 | Criar usuário / redefinir senha | página **Usuários**: "Novo usuário" e "Redefinir senha…" no menu de cada um, com gerador de senha. Mesmas regras do cadastro público. Não há convite nem confirmação de email: o nelcota não envia emails e o login não exige confirmação |
+| Gerar migração | página **Migrações**: as alterações de schema feitas pelo painel (tabelas, colunas, policies) que ainda não estão em nenhum arquivo, e as migrações do projeto (aplicadas ou só na pasta). "Gerar migração" baixa `V<n>__<nome>.sql` e o registra como aplicado neste banco; o arquivo vai para `migrations/` (ver [deploy](deploy.md#alterações-feitas-pelo-painel)) |
 | Foto de perfil | menu da conta, no rodapé da barra lateral: "Adicionar foto…". A imagem é recortada no centro e reduzida para 256px no navegador; o servidor aceita PNG, JPEG ou WebP de até 256 KB. Fica no banco do projeto (`nelcota.admin_avatar`, fora do alcance das roles da API), então vale em qualquer navegador, mas é por projeto |
 | Datas na grade | `timestamptz` aparece no fuso de quem vê (`06/10/2026, 19:26:15`); `timestamp` e `date` como gravados. O valor exato fica no tooltip, na edição e na exportação |
 

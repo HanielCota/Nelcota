@@ -363,6 +363,18 @@ rustls + ring, com as raízes da Mozilla embutidas (`webpki-roots`): a imagem
 Isso trouxe duas licenças permissivas para o `deny.toml`: CDLA-Permissive-2.0
 (a lista de raízes, que é dado) e 0BSD (`quoted_printable`).
 
+**D67. DDL do painel vira migração, registrada como já aplicada.** Todo DDL
+que o painel aplica passa por `apply.rs` e fica em `nelcota.panel_changes`
+(migração V6), na mesma transação. "Gerar migração" junta os pendentes num
+arquivo e insere a linha correspondente em `nelcota.user_migrations` com o
+checksum do refinery (`Migration::unapplied(..).checksum()`): o `migrate` não
+reaplica o arquivo e, com `abort_divergent`, recusa a versão editada. O texto
+gerado é guardado (`nelcota.panel_migrations`) para ser baixado de novo
+idêntico. A versão passa do maior número do banco, da pasta e das já geradas;
+a pasta vem de `NELCOTA_MIGRATIONS_DIR` ou do `/migrations` montado no
+container. O editor SQL fica de fora: pode rodar qualquer coisa, inclusive DML,
+e separar o que é schema exigiria interpretar o SQL.
+
 ### Pendências conhecidas
 
 - Embed de relações, `or=`/`and=` e upsert ficam para depois do MVP.

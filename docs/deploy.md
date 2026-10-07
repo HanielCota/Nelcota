@@ -126,6 +126,22 @@ SQL puro em `projects/<nome>/migrations/`, nomeado `V1__criar_tabelas.sql`,
 aplicado for editado, o `migrate` recusa. Depois de aplicar, a API recarrega o
 catálogo sozinha.
 
+### Alterações feitas pelo painel
+
+Tabelas, colunas e policies criadas pelo painel vão direto para o banco do
+projeto, mas não existem em outro ambiente (staging, outra máquina, um banco
+novo) até virarem arquivo. O painel registra cada uma e lista as pendentes em
+**Migrações**; "Gerar migração" baixa `V<n>__<nome>.sql` com elas e já o
+registra como aplicado neste banco, com o mesmo checksum que o `migrate`
+calcula. Coloque o arquivo em `migrations/` e faça commit: aqui nada roda de
+novo, e nos outros ambientes o `migrate` aplica.
+
+O número escolhido passa de tudo que existe no banco e na pasta (o container
+lê `./migrations`, montada em `/migrations`), então um arquivo ainda não
+aplicado não é atropelado. Fora do container, aponte a pasta com
+`NELCOTA_MIGRATIONS_DIR`. O que é feito pelo editor SQL não entra no registro:
+copie esse SQL para uma migração à mão.
+
 ## Upgrade
 
 `nelcota -p loja upgrade` faz backup, troca `NELCOTA_VERSION` no `.env` do

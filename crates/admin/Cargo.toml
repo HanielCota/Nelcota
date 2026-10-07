@@ -17,6 +17,7 @@ deadpool-postgres.workspace = true
 futures-util.workspace = true
 getrandom.workspace = true
 jsonwebtoken.workspace = true
+refinery.workspace = true
 rust-embed.workspace = true
 serde.workspace = true
 serde_json = { workspace = true, features = ["raw_value"] }

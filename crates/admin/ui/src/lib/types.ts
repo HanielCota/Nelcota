@@ -121,3 +121,21 @@ export interface ProjectStatus extends ProjectLink {
   version: string | null
   latency_ms: number | null
 }
+
+/** `GET /admin/api/migrations` */
+export type MigrationsData = {
+  migrations: {
+    version: number
+    name: string
+    applied_on: string | null
+    /** `null` quando a pasta migrations/ não está acessível ao servidor. */
+    in_folder: boolean | null
+    from_panel: boolean
+  }[]
+  pending: { id: number; applied_at: string; summary: string; statements: string[] }[]
+  next_version: number
+  folder: string | null
+}
+
+/** `POST /admin/api/migrations` */
+export type ExportedMigration = { version: number; filename: string; sql: string; message: string }

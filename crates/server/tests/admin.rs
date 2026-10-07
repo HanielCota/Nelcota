@@ -1524,3 +1524,180 @@ async fn foto_de_perfil_do_admin() {
     let reply = get(&app, "/admin/api/profile/avatar", &cookie).await;
     assert_eq!(reply.status, StatusCode::NOT_FOUND);
 }
+
+fn simple_table(name: &str) -> Value {
+    json!({ "name": name, "columns": [
+        { "name": "id", "data_type": "bigint", "primary_key": true, "identity": true },
+        { "name": "texto", "data_type": "text" },
+    ] })
+}
+
+/// Roda migrações como o `nelcota migrate` (refinery, `abort_divergent`).
+async fn refinery_migrate(app: &TestApp, files: &[(&str, &str)]) -> Result<usize, String> {
+    let (mut client, connection) = app.admin.connect(tokio_postgres::NoTls).await.unwrap();
+    tokio::spawn(connection);
+    let migrations: Vec<_> = files
+        .iter()
+        .map(|(stem, sql)| refinery::Migration::unapplied(stem, sql).unwrap())
+        .collect();
+    let mut runner = refinery::Runner::new(&migrations).set_abort_divergent(true);
+    runner.set_migration_table_name("nelcota.user_migrations");
+    runner
+        .run_async(&mut client)
+        .await
+        .map(|report| report.applied_migrations().len())
+        .map_err(|e| e.to_string())
+}
+
+#[tokio::test]
+async fn alteracoes_do_painel_viram_migracao_reconhecida_pelo_migrate() {
+    let app = TestApp::spawn().await;
+    let cookie = login(&app).await;
+    let create = |table: Value| send(&app, Method::POST, "/admin/api/tables", &cookie, table);
+    let export = |name: &str| {
+        send(
+            &app,
+            Method::POST,
+            "/admin/api/migrations",
+            &cookie,
+            json!({ "name": name }),
+        )
+    };
+
+    // Prévia e DDL recusado pelo banco não contam como alteração.
+    create(json!({ "table": simple_table("pedidos"), "preview": true })).await;
+    let bad = create(
+        json!({ "table": { "name": "x", "columns": [{ "name": "a", "data_type": "money" }] } }),
+    )
+    .await;
+    assert_eq!(bad.status, StatusCode::BAD_REQUEST);
+    let list = get(&app, "/admin/api/migrations", &cookie).await.body;
+    assert_eq!(list["pending"], json!([]));
+    assert_eq!(list["next_version"], 1);
+    assert!(list["folder"].is_null());
+
+    for name in ["pedidos", "itens"] {
+        let reply = create(json!({ "table": simple_table(name) })).await;
+        assert_eq!(reply.status, StatusCode::OK, "{}", reply.text);
+    }
+    let list = get(&app, "/admin/api/migrations", &cookie).await.body;
+    let pending = list["pending"].as_array().unwrap();
+    assert_eq!(pending.len(), 2);
+    // ISO 8601 com o offset completo ("+00:00"), que o navegador entende.
+    let at = pending[0]["applied_at"].as_str().unwrap();
+    let offset = &at[at.len() - 6..];
+    assert!(
+        at.contains('T')
+            && (offset.starts_with('+') || offset.starts_with('-'))
+            && offset.as_bytes()[3] == b':',
+        "{at}"
+    );
+    assert!(
+        pending[0]["statements"][0]
+            .as_str()
+            .unwrap()
+            .starts_with("CREATE TABLE \"public\".\"pedidos\"")
+    );
+
+    assert_eq!(
+        export("Criar Pedidos").await.status,
+        StatusCode::BAD_REQUEST
+    );
+    let reply = export("criar_pedidos").await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.text);
+    assert_eq!(reply.body["version"], 1);
+    assert_eq!(reply.body["filename"], "V1__criar_pedidos.sql");
+    let sql = reply.body["sql"].as_str().unwrap().to_owned();
+    assert!(sql.contains("CREATE TABLE \"public\".\"pedidos\""));
+    assert!(sql.contains("CREATE TABLE \"public\".\"itens\""));
+
+    let list = get(&app, "/admin/api/migrations", &cookie).await.body;
+    assert_eq!(list["pending"], json!([]));
+    let first = &list["migrations"][0];
+    assert_eq!(
+        (&first["version"], &first["name"], &first["from_panel"]),
+        (&json!(1), &json!("criar_pedidos"), &json!(true))
+    );
+    assert!(first["applied_on"].is_string());
+    assert_eq!(export("de_novo").await.status, StatusCode::CONFLICT);
+
+    // O arquivo pode ser baixado de novo, idêntico.
+    let file = get(&app, "/admin/api/migrations/1/file", &cookie).await;
+    assert_eq!(file.status, StatusCode::OK);
+    assert_eq!(file.text, sql);
+    assert!(
+        file.headers[header::CONTENT_DISPOSITION]
+            .to_str()
+            .unwrap()
+            .contains("V1__criar_pedidos.sql")
+    );
+
+    // O migrate reconhece o arquivo como já aplicado (nada roda duas vezes)...
+    assert_eq!(
+        refinery_migrate(&app, &[("V1__criar_pedidos", &sql)]).await,
+        Ok(0)
+    );
+    // ...e recusa o arquivo editado.
+    let edited = format!("{sql}-- editado\n");
+    assert!(
+        refinery_migrate(&app, &[("V1__criar_pedidos", &edited)])
+            .await
+            .is_err()
+    );
+
+    // Depois de uma migração escrita à mão (V2), a próxima gerada é a V3.
+    let v2 = "CREATE INDEX pedidos_texto_idx ON public.pedidos (texto);";
+    assert_eq!(
+        refinery_migrate(&app, &[("V1__criar_pedidos", &sql), ("V2__indice", v2)]).await,
+        Ok(1)
+    );
+    create(json!({ "table": simple_table("clientes") })).await;
+    let reply = export("clientes").await;
+    assert_eq!(reply.body["version"], 3, "{}", reply.text);
+}
+
+#[tokio::test]
+async fn migracao_gerada_nao_colide_com_arquivo_ainda_nao_aplicado() {
+    let dir = std::env::temp_dir().join(format!("nelcota-migrations-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("V1__base.sql"), "select 1;").unwrap();
+    std::fs::write(dir.join("V4__ainda_nao_aplicada.sql"), "select 1;").unwrap();
+    std::fs::write(dir.join("LEIA-ME.md"), "não é migração").unwrap();
+    let app = TestApp::spawn_with(Options {
+        migrations_dir: Some(dir.clone()),
+        ..Options::default()
+    })
+    .await;
+    let cookie = login(&app).await;
+
+    send(
+        &app,
+        Method::POST,
+        "/admin/api/tables",
+        &cookie,
+        json!({ "table": simple_table("pedidos") }),
+    )
+    .await;
+    let list = get(&app, "/admin/api/migrations", &cookie).await.body;
+    assert_eq!(list["next_version"], 5);
+    assert_eq!(list["folder"], dir.display().to_string());
+    let v4 = list["migrations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|m| m["version"] == 4)
+        .unwrap();
+    assert_eq!(v4["in_folder"], true);
+    assert!(v4["applied_on"].is_null());
+
+    let reply = send(
+        &app,
+        Method::POST,
+        "/admin/api/migrations",
+        &cookie,
+        json!({ "name": "pedidos" }),
+    )
+    .await;
+    assert_eq!(reply.body["filename"], "V5__pedidos.sql", "{}", reply.text);
+    std::fs::remove_dir_all(&dir).ok();
+}

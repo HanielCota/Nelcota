@@ -2,6 +2,7 @@ import type { Component } from 'svelte'
 import House from '@lucide/svelte/icons/house'
 import Table2 from '@lucide/svelte/icons/table-2'
 import SquareTerminal from '@lucide/svelte/icons/square-terminal'
+import History from '@lucide/svelte/icons/history'
 import Users from '@lucide/svelte/icons/users'
 import ShieldCheck from '@lucide/svelte/icons/shield-check'
 import Boxes from '@lucide/svelte/icons/boxes'
@@ -19,6 +20,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { title: 'Tabelas', path: '/tables', icon: Table2 },
       { title: 'Editor SQL', path: '/sql', icon: SquareTerminal },
+      { title: 'Migrações', path: '/migrations', icon: History },
     ],
   },
   {

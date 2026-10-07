@@ -29,6 +29,13 @@ pub async fn apply(
                 .await
                 .map_err(user_query_error)?;
         }
+        // Registro para "Gerar migração" (ver migrations.rs), na mesma
+        // transação: DDL que falha não é registrado, e vice-versa.
+        tx.execute(
+            "INSERT INTO nelcota.panel_changes (summary, statements) VALUES ($1, $2)",
+            &[&message, &statements],
+        )
+        .await?;
         tx.commit().await.map_err(user_query_error)?;
         // A conexão volta ao pool aqui; a recarga usa outra.
     }

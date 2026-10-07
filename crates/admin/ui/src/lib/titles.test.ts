@@ -7,6 +7,7 @@ describe('documentTitle', () => {
   it('nomeia cada página com o produto no fim', () => {
     expect(title('/')).toBe('Visão geral · Nelcota')
     expect(title('/sql')).toBe('Editor SQL · Nelcota')
+    expect(title('/migrations')).toBe('Migrações · Nelcota')
     expect(title('/users/')).toBe('Usuários · Nelcota')
   })
 
