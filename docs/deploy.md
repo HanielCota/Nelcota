@@ -72,7 +72,7 @@ project ask for `-p <name>`.
 | `nelcota up` | starts every project and Caddy (`-p` for just one) |
 | `nelcota status` | project state |
 | `nelcota -p shop logs -f [app]` | logs |
-| `nelcota -p shop down` / `down --all` | stops (`--volumes` DELETES the data) |
+| `nelcota -p shop down` / `down --all` | stops (`--volumes` DELETES the data; Docker only) |
 | `nelcota -p shop migrate` | applies `projects/shop/migrations/V<n>__<name>.sql` |
 | `nelcota -p shop types -o database.ts` | TypeScript types of the schema |
 | `nelcota -p shop token service-role` | service JWT (**bypasses RLS**) |
@@ -87,6 +87,41 @@ project ask for `-p <name>`.
 On a host, `migrate`, `types` and `token` run inside the project's `app`
 container, which is what can reach Postgres. Outside a host, they use
 `NELCOTA_DATABASE_URL`.
+
+## Without Docker (systemd)
+
+On a small VPS that will only ever hold one project, Nelcota can skip Docker:
+
+```sh
+curl -fsSL https://nelcota.com/install | NELCOTA_SKIP_DOCKER=1 sh
+mkdir -p /opt/nelcota && cd /opt/nelcota
+nelcota init api.yourdomain.com --runtime systemd
+nelcota up
+```
+
+As root on Debian or Ubuntu, `init` installs Postgres 17 and pgBackRest from
+the PostgreSQL project's apt repository (PGDG) and Caddy from its own, then:
+
+| What | Where |
+|---|---|
+| Postgres profile (by RAM) | `/etc/postgresql/17/main/conf.d/nelcota.conf` |
+| The app | `nelcota-<name>.service`, running `/usr/local/lib/nelcota/nelcota serve` on `127.0.0.1:8000` with the project's `.env` |
+| Caddy | the `caddy` service, `/etc/caddy/Caddyfile` generated from the registry |
+| PITR settings | `/etc/pgbackrest/pgbackrest.conf` (with `pitr enable`) |
+
+- Every command works the same way (`up`, `down`, `status`, `logs`, `migrate`,
+  `backup`, `restore`, `pitr`, `upgrade`, `remove`); they drive `systemctl`,
+  `journalctl` and `runuser -u postgres` instead of `docker compose`.
+- One project per machine: a second `init` is refused. For more, use Docker.
+- The app's unit runs as a throwaway user (`DynamicUser`) with no write
+  access to the system (`ProtectSystem=strict`) and no capabilities.
+- `upgrade` swaps the binary the unit runs for the one you are running (so
+  install the new version first: `NELCOTA_VERSION=x.y.z install.sh`), keeps the
+  previous one and, if the app does not become healthy, puts it back and
+  restores the pre-upgrade backup.
+- `remove` takes the final backup, then deletes the unit and the Postgres
+  cluster with its data (`pg_dropcluster`).
+- `down --volumes` is Docker-only.
 
 ## Panel login
 

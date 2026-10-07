@@ -479,10 +479,27 @@ recovery (a target past the archive makes Postgres exit) apart, and ends with
 a full backup: the new timeline forks before any later backup on the old one,
 which pgBackRest would otherwise refuse to restore from.
 
+**D75. Hosts without Docker: one project, systemd units, apt packages.**
+`init --runtime systemd` (Debian/Ubuntu, as root) gets Postgres 17 and
+pgBackRest from PGDG and Caddy from its repository: the versions match the
+Docker hosts and security updates come with `apt upgrade`. One project per
+machine: N isolated projects would mean N clusters on N ports and N system
+users, and that isolation is what Docker already gives. The runtime lives in
+the registry (`"runtime"`, Docker when absent), and every operation goes
+through `Project`, which turns "start the app", "run this as postgres",
+"is Postgres healthy" into `docker compose` or `systemctl`/`runuser`/
+`journalctl`; `ops` and `pitr` no longer know which. The app runs a copy of
+the binary (`/usr/local/lib/nelcota/nelcota`) so `upgrade` can swap it and
+keep the previous one for the rollback, in a unit with `DynamicUser`,
+`ProtectSystem=strict`, no capabilities and only the loopback port. Commands
+that need the app's configuration (`migrate`, `types`, `token`) run this
+binary as a child process with the project's `.env`, rather than setting
+variables in the CLI's own process. pgBackRest reads the same settings as on
+Docker, written as `/etc/pgbackrest/pgbackrest.conf` (archive_command runs
+under the Postgres unit, which does not get the `.env`).
+
 ### Known pending items
 
 - Embedding more than one level deep, and filtering embedded rows.
-- Install without Docker (systemd): the binary no longer depends on Docker;
-  `init` still has to generate the units.
 - The release workflow (musl binaries + image on GHCR) is written, but only
   runs once the repository is on GitHub; `install.sh` depends on it.
