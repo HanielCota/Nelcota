@@ -1,11 +1,11 @@
 #!/bin/sh
 # nelcota installer: downloads the binary, checks the checksum and installs it.
 #
-#   curl -fsSL https://nelcota.dev/install | sh
+#   curl -fsSL https://nelcota.com/install | sh
 #
 # Optional variables:
 #   NELCOTA_VERSION=0.1.0     version (default: the latest)
-#   NELCOTA_REPO=owner/repo   GitHub repository (default: nelcota/nelcota)
+#   NELCOTA_REPO=owner/repo   GitHub repository (default: HanielCota/Nelcota)
 #   PREFIX=/usr/local/bin     where to install
 #   NELCOTA_SKIP_DOCKER=1     do not install Docker if it is missing
 #
@@ -13,7 +13,7 @@
 # releases page and check them with `sha256sum -c`. This script does exactly that.
 set -eu
 
-REPO="${NELCOTA_REPO:-nelcota/nelcota}"
+REPO="${NELCOTA_REPO:-HanielCota/Nelcota}"
 VERSION="${NELCOTA_VERSION:-latest}"
 PREFIX="${PREFIX:-/usr/local/bin}"
 
