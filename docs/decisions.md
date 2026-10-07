@@ -460,9 +460,23 @@ nesting and self-references are refused for now. The panel's parser keeps
 refusing embeds (`parse_request`), the API uses
 `parse_request_with_relations`.
 
+**D73. Nested embeds and per-embed filters, as in PostgREST.** An embed's
+column list is a full `select`, so embeds nest, at most 4 levels (each level
+is one more correlated subquery per parent row; the cap bounds what a single
+URL can stack). Parameters prefixed with an embed's key (`items.qty=gt.1`,
+`orders.items.order=...`) go to that embed: filters and `or`/`and` trees join
+the foreign key in the subquery's `WHERE`, and `order`/`limit`/`offset` page
+the embedded array (refused on a single-row embed). They narrow the embedded
+rows only; the parent rows stay, with `null` or `[]`. `select` is parsed first,
+so the parameter order in the URL does not matter. Filters now carry their
+column type, so the same SQL builder serves any row alias. Nested subqueries
+are aliased by their path (`_e0_1`) so a child never shadows its parent.
+Self-references stay refused, and filtering parents by their embeds
+(PostgREST's `!inner`) is not implemented.
+
 ### Known pending items
 
-- Embedding more than one level deep, and filtering embedded rows.
+- Filtering parent rows by their embeds (`!inner`) and self-referencing embeds.
 - PITR with WAL-G (or pgBackRest) archiving WAL to S3.
 - Install without Docker (systemd): the binary no longer depends on Docker;
   `init` still has to generate the units.
