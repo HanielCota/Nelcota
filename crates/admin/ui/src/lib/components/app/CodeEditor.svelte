@@ -94,6 +94,7 @@
           syntaxHighlighting(highlight),
           theme,
           EditorView.lineWrapping,
+          EditorView.contentAttributes.of({ 'aria-label': 'Editor SQL' }),
           EditorView.updateListener.of((update) => {
             if (update.docChanged) value = update.state.doc.toString()
           }),

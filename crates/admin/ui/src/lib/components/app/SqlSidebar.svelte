@@ -20,7 +20,7 @@
     'group flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-sm text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground'
 </script>
 
-<aside class="hidden w-60 shrink-0 flex-col border-r bg-sidebar lg:flex">
+<aside class="hidden w-60 shrink-0 flex-col border-r bg-sidebar lg:flex" aria-label="Consultas salvas e modelos">
   <div class="flex h-12 items-center justify-between border-b px-4">
     <p class="text-sm font-medium">Editor SQL</p>
     <button

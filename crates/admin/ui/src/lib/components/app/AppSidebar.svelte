@@ -8,7 +8,8 @@
 
 <aside class="relative z-30 hidden w-14 shrink-0 md:block">
   <nav
-    class="group/rail absolute inset-y-0 left-0 flex w-14 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar py-2 transition-[width,box-shadow] duration-200 ease-out hover:w-52 hover:shadow-2xl hover:shadow-black/30"
+    aria-label="Navegação principal"
+    class="group/rail absolute inset-y-0 left-0 flex w-14 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar py-2 transition-[width,box-shadow] duration-200 ease-out hover:w-52 hover:shadow-2xl hover:shadow-black/30 focus-within:w-52 focus-within:shadow-2xl focus-within:shadow-black/30"
   >
     {#each navGroups as group, g (g)}
       {#if g > 0}<div class="mx-3 my-2 border-t border-sidebar-border"></div>{/if}
@@ -27,7 +28,7 @@
               ]}
             >
               <item.icon class={['size-[18px] shrink-0', active && 'text-brand']} strokeWidth={1.6} />
-              <span class="opacity-0 transition-opacity duration-150 group-hover/rail:opacity-100">{item.title}</span>
+              <span class="opacity-0 transition-opacity duration-150 group-hover/rail:opacity-100 group-focus-within/rail:opacity-100">{item.title}</span>
             </a>
           </li>
         {/each}
@@ -42,10 +43,10 @@
         class="flex h-9 items-center gap-3 overflow-hidden rounded-md px-[9px] text-sm whitespace-nowrap text-sidebar-foreground transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
       >
         <BookOpen class="size-[18px] shrink-0" strokeWidth={1.6} />
-        <span class="opacity-0 transition-opacity duration-150 group-hover/rail:opacity-100">Docs (OpenAPI)</span>
+        <span class="opacity-0 transition-opacity duration-150 group-hover/rail:opacity-100 group-focus-within/rail:opacity-100">Docs (OpenAPI)</span>
       </a>
       <p
-        class="mt-2 w-48 px-2 pb-1 text-2xs leading-snug font-light text-muted-foreground opacity-0 transition-opacity duration-150 group-hover/rail:opacity-100"
+        class="mt-2 w-48 px-2 pb-1 text-2xs leading-snug font-light text-muted-foreground opacity-0 transition-opacity duration-150 group-hover/rail:opacity-100 group-focus-within/rail:opacity-100"
       >
         A chave <span class="font-mono">service_role</span> ignora o RLS. Use só no backend.
       </p>

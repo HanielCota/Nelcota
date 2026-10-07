@@ -24,7 +24,12 @@
 
 <!-- min-w-0: dentro de grid/flex, sem ele uma linha longa alarga a página. -->
 <div class="group relative min-w-0 rounded-md border bg-muted/40">
+  <!-- Bloco que rola na horizontal precisa de foco para rolar com as setas
+       (WCAG 2.1.1); por isso o tabindex num elemento não interativo. -->
+  <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
   <pre
+    tabindex={wrap ? undefined : 0}
+    aria-label={wrap ? undefined : 'Código'}
     class={[
       'px-3 py-2.5 pr-10 font-mono text-xs leading-relaxed',
       wrap ? 'break-all whitespace-pre-wrap' : 'overflow-x-auto',

@@ -57,11 +57,17 @@
   <Login />
 {:else}
   <Tooltip.Provider delayDuration={200}>
+    <!-- Primeira parada do Tab: pula topbar e menu. -->
+    <a
+      href="#conteudo"
+      class="sr-only z-50 rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
+      >Pular para o conteúdo</a
+    >
     <div class="flex h-screen flex-col overflow-hidden bg-background">
       <Topbar />
       <div class="flex min-h-0 flex-1">
         <AppSidebar />
-        <main class="min-w-0 flex-1 overflow-auto">
+        <main id="conteudo" tabindex="-1" class="min-w-0 flex-1 overflow-auto outline-none">
           {#key pageKey}
             {#if path === '/'}
               <Overview />

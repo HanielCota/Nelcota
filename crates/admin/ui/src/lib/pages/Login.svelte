@@ -36,7 +36,7 @@
   }
 </script>
 
-<div class="grid min-h-screen bg-background lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+<main class="grid min-h-screen bg-background lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
   <div class="flex flex-col px-6 py-8 sm:px-10">
     <Logo />
     <div class="flex flex-1 items-center justify-center py-12">
@@ -105,4 +105,4 @@
       </div>
     </div>
   </aside>
-</div>
+</main>

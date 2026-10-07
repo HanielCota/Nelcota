@@ -127,7 +127,7 @@
 <Sheet.Root bind:open={mobileOpen}>
   <Sheet.Content side="left" class="w-64 gap-0 bg-sidebar p-0">
     <div class="flex h-12 items-center border-b border-sidebar-border px-4"><Logo /></div>
-    <nav class="p-2">
+    <nav class="p-2" aria-label="Navegação principal">
       {#each navGroups as group, g (g)}
         {#if g > 0}<div class="mx-2 my-2 border-t border-sidebar-border"></div>{/if}
         {#each group as item (item.path)}
