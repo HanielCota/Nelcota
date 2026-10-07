@@ -1,18 +1,18 @@
-// Olhar do mascote: geometria dos olhos e direção das pupilas.
-// Adaptado de features/mascot/domain/eye-tracking.ts do NelcotaScreenShare.
+// Mascot gaze: eye geometry and pupil direction.
+// Adapted from features/mascot/domain/eye-tracking.ts in NelcotaScreenShare.
 
 export type Point = { x: number; y: number }
 type Bounds = Pick<DOMRect, 'left' | 'top' | 'width' | 'height'>
 
-/** Lado dos quadros recortados do atlas (ver src/assets/mascot). */
+/** Side of the frames cropped from the atlas (see src/assets/mascot). */
 export const FRAME_SIZE = 480
-/** Os olhos do desenho são elipses inclinadas. */
+/** The drawn eyes are tilted ellipses. */
 export const EYE_ANGLE = 18
 
 /**
- * Centro de cada olho no quadro. As poses com olhos abertos foram recortadas
- * ancoradas nos pés e no braço direito, então o rosto cai no mesmo lugar em
- * todas (diferença abaixo de 1,5px).
+ * Centre of each eye in the frame. The open-eyed poses were cropped anchored
+ * at the feet and the right arm, so the face lands in the same place in all of
+ * them (under 1.5px apart).
  */
 export const EYES = [
   { x: 165.4, y: 222.1, rx: 39, ry: 50, pupilRx: 24.5, pupilRy: 35.5 },
@@ -22,8 +22,8 @@ export const EYES = [
 export type Eye = (typeof EYES)[number]
 
 /**
- * Direção (vetor de comprimento < 1) de cada olho até o ponto. A profundidade
- * faz o olhar saturar devagar: perto do rosto ele se move muito, longe quase nada.
+ * Direction (a vector shorter than 1) from each eye to the point. The depth
+ * makes the gaze saturate slowly: near the face it moves a lot, far away barely.
  */
 export function gazeAt(bounds: Bounds, point: Point): Point[] {
   const depth = Math.max(24, bounds.width * 0.42)
@@ -36,8 +36,8 @@ export function gazeAt(bounds: Bounds, point: Point): Point[] {
 }
 
 /**
- * Deslocamento da pupila no sistema do olho (já girado), sem encostar na borda.
- * O resultado é desenhado dentro de `rotate(EYE_ANGLE)`.
+ * Pupil offset in the eye's (already rotated) frame, never touching the edge.
+ * The result is drawn inside `rotate(EYE_ANGLE)`.
  */
 export function pupilOffset(gaze: Point, eye: Eye): Point {
   const angle = (EYE_ANGLE * Math.PI) / 180
@@ -52,7 +52,7 @@ export function pupilOffset(gaze: Point, eye: Eye): Point {
   }
 }
 
-/** Aproxima `from` de `to` numa fração por quadro (movimento suave). */
+/** Moves `from` towards `to` by a fraction per frame (smooth motion). */
 export function approach(from: Point, to: Point, factor: number): Point {
   return { x: from.x + (to.x - from.x) * factor, y: from.y + (to.y - from.y) * factor }
 }

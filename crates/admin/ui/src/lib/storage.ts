@@ -1,5 +1,5 @@
-// localStorage tolerante a falhas: modo privado, cota cheia ou dado corrompido
-// nunca derrubam o painel; voltam ao valor padrão.
+// Fault-tolerant localStorage: private mode, a full quota or corrupt data
+// never take the panel down; they fall back to the default value.
 
 export function readJson<T>(key: string, parse: (data: unknown) => T | null, fallback: T): T {
   try {
@@ -22,11 +22,11 @@ export function write(key: string, value: string) {
   try {
     localStorage.setItem(key, value)
   } catch {
-    // Armazenamento indisponível: segue só em memória.
+    // Storage unavailable: carry on in memory only.
   }
 }
 
-/** `crypto.randomUUID` só existe em contexto seguro (HTTPS ou localhost). */
+/** `crypto.randomUUID` only exists in a secure context (HTTPS or localhost). */
 export function newId(): string {
   return crypto.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
 }

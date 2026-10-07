@@ -1,5 +1,5 @@
-// Perfil do admin: versão da foto (ms da última troca) ou `null` sem foto.
-// A versão entra na URL, então o navegador guarda a imagem em cache até ela mudar.
+// Admin profile: photo version (ms of the last change) or `null` without a photo.
+// The version goes into the URL, so the browser caches the image until it changes.
 import { api } from './api'
 
 export const profile = $state<{ avatar: number | null; loaded: boolean }>({ avatar: null, loaded: false })

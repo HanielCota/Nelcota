@@ -1,4 +1,4 @@
-// Roteador mínimo da SPA, com base em /admin (history API).
+// Minimal SPA router based at /admin (history API).
 const BASE = '/admin'
 
 function current(): string {
@@ -22,7 +22,7 @@ function sync() {
 
 addEventListener('popstate', sync)
 
-// Links internos (<a href="/admin/...">) navegam sem recarregar a página.
+// Internal links (<a href="/admin/...">) navigate without reloading the page.
 addEventListener('click', (event) => {
   const anchor = (event.target as HTMLElement).closest('a')
   if (
@@ -43,7 +43,7 @@ addEventListener('click', (event) => {
   navigate(url.pathname.slice(BASE.length) + url.search)
 })
 
-// Casamento de rotas é puro (testável fora do navegador): mora em route-match.
+// Route matching is pure (testable outside the browser): it lives in route-match.
 export { match } from './route-match'
 
 export const href = (path: string) => BASE + path

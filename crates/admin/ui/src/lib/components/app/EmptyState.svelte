@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte'
 
-  // Estado vazio: uma frase curta e, se houver, a ação óbvia.
+  // Empty state: a short sentence and, if there is one, the obvious action.
   let {
     title,
     description,
@@ -11,7 +11,7 @@
   }: {
     title: string
     description?: string
-    /** Texto rico no lugar de `description` (links, código). */
+    /** Rich text instead of `description` (links, code). */
     children?: Snippet
     actions?: Snippet
     class?: string

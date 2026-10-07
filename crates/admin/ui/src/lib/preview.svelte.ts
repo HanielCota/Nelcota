@@ -1,9 +1,10 @@
-// Prévia do SQL enquanto o formulário muda. O servidor é a única fonte do
-// SQL gerado (as mesmas funções que executam): a interface não reimplementa
-// regra nenhuma. Pedidos em sequência rápida são agrupados (debounce) e o
-// anterior é cancelado.
+// SQL preview while a form changes. The server is the only source of the
+// generated SQL (the same functions that execute it): the interface does not
+// reimplement any rule. Rapid requests are debounced and the previous one is
+// cancelled.
 
 import { isAbort } from './api'
+import { errorMessage } from './i18n/index.svelte'
 import type { DdlResult } from './ddl'
 
 const DELAY_MS = 350
@@ -16,7 +17,7 @@ export class SqlPreview {
   #timer: ReturnType<typeof setTimeout> | undefined
   #controller: AbortController | undefined
 
-  /** Agenda a prévia; `request` recebe o sinal para poder ser cancelado. */
+  /** Schedules the preview; `request` gets the signal so it can be cancelled. */
   schedule(request: (signal: AbortSignal) => Promise<DdlResult>) {
     clearTimeout(this.#timer)
     this.#timer = setTimeout(() => this.#run(request), DELAY_MS)
@@ -32,13 +33,13 @@ export class SqlPreview {
     } catch (e) {
       if (isAbort(e)) return
       this.sql = null
-      this.error = (e as Error).message
+      this.error = errorMessage(e)
     } finally {
       if (this.#controller === controller) this.loading = false
     }
   }
 
-  /** Limpa (ex.: formulário incompleto) e cancela o que estiver pendente. */
+  /** Clears (e.g. an incomplete form) and cancels anything pending. */
   clear() {
     clearTimeout(this.#timer)
     this.#controller?.abort()

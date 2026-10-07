@@ -1,12 +1,13 @@
 <script lang="ts">
   import * as AlertDialog from '$lib/components/ui/alert-dialog'
   import { buttonVariants } from '$lib/components/ui/button'
+  import { t } from '$lib/i18n/index.svelte'
 
   let {
     open = $bindable(false),
     title,
     description,
-    confirmLabel = 'Confirmar',
+    confirmLabel,
     destructive = false,
     onconfirm,
   }: {
@@ -26,7 +27,7 @@
       await onconfirm()
       open = false
     } catch {
-      // Quem chamou já mostrou o erro; o diálogo fica aberto para tentar de novo.
+      // The caller already showed the error; the dialog stays open to try again.
     } finally {
       busy = false
     }
@@ -42,11 +43,11 @@
       {/if}
     </AlertDialog.Header>
     <AlertDialog.Footer>
-      <AlertDialog.Cancel disabled={busy}>Cancelar</AlertDialog.Cancel>
+      <AlertDialog.Cancel disabled={busy}>{t('common.cancel')}</AlertDialog.Cancel>
       <AlertDialog.Action
         class={destructive ? buttonVariants({ variant: 'destructive' }) : ''}
         disabled={busy}
-        onclick={confirm}>{confirmLabel}</AlertDialog.Action
+        onclick={confirm}>{confirmLabel ?? t('common.confirm')}</AlertDialog.Action
       >
     </AlertDialog.Footer>
   </AlertDialog.Content>

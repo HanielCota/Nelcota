@@ -8,7 +8,7 @@
   import { api } from '$lib/api'
   import { openProject } from '$lib/projects'
   import { navigate } from '$lib/router.svelte'
-  import { t } from '$lib/i18n/index.svelte'
+  import { errorMessage, t } from '$lib/i18n/index.svelte'
   import type { ProjectsData } from '$lib/types'
 
   let { menuOpen = $bindable(false) }: { menuOpen?: boolean } = $props()
@@ -29,7 +29,7 @@
     try {
       await openProject(project, data.sso)
     } catch (e) {
-      toast.error((e as Error).message)
+      toast.error(errorMessage(e))
     }
   }
 </script>

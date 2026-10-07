@@ -41,7 +41,7 @@ describe('errorMessage', () => {
     expect(errorMessage(new ApiError('relation "x" does not exist', 400, 'not_a_known_code'))).toBe(
       'relation "x" does not exist',
     )
-    expect(errorMessage(new Error('falhou'))).toBe('falhou')
-    expect(errorMessage('texto')).toBe('texto')
+    expect(errorMessage(new Error('failed'))).toBe('failed')
+    expect(errorMessage('text')).toBe('text')
   })
 })

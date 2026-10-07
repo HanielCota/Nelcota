@@ -1,10 +1,10 @@
-// Ações de sessão usadas em mais de um lugar (topbar, paleta de comandos).
+// Session actions used in more than one place (sidebar, command palette).
 import { api } from './api'
 import { profile } from './profile.svelte'
 import { session } from './session.svelte'
 
 export async function logout() {
-  // Mesmo se a requisição falhar, o painel volta para a tela de login.
+  // Even if the request fails, the panel returns to the login screen.
   await api.post('/logout').catch(() => {})
   session.email = null
   profile.avatar = null

@@ -7,6 +7,7 @@
   import { api, enc } from '$lib/api'
   import { passwordProblem } from '$lib/password'
   import type { User } from '$lib/types'
+  import { errorMessage, t } from '$lib/i18n/index.svelte'
 
   let { open = $bindable(false), user, onsaved }: { open?: boolean; user: User; onsaved: () => void } = $props()
 
@@ -21,12 +22,12 @@
     event.preventDefault()
     saving = true
     try {
-      const result = await api.put<{ message: string }>(`/users/${enc(user.id)}/password`, { password })
-      toast.success(result.message)
+      await api.put(`/users/${enc(user.id)}/password`, { password })
+      toast.success(t('users.setPassword.saved', { email: user.email }))
       open = false
       onsaved()
     } catch (e) {
-      toast.error((e as Error).message)
+      toast.error(errorMessage(e))
     } finally {
       saving = false
     }
@@ -37,19 +38,20 @@
   <Dialog.Content class="sm:max-w-lg">
     <form class="grid gap-5" onsubmit={submit}>
       <Dialog.Header>
-        <Dialog.Title>Redefinir a senha</Dialog.Title>
+        <Dialog.Title>{t('users.setPassword.title')}</Dialog.Title>
         <Dialog.Description>
-          de <span class="font-medium text-foreground">{user.email}</span>. As sessões abertas dele são encerradas.
+          {t('users.setPassword.descriptionBefore')} <span class="font-medium text-foreground">{user.email}</span>.
+          {t('users.setPassword.descriptionAfter')}
         </Dialog.Description>
       </Dialog.Header>
       <div class="grid gap-2">
-        <Label for="reset-password">Nova senha</Label>
+        <Label for="reset-password">{t('users.setPassword.newPassword')}</Label>
         <PasswordField id="reset-password" bind:value={password} />
       </div>
       <Dialog.Footer>
-        <Button variant="outline" onclick={() => (open = false)}>Cancelar</Button>
+        <Button variant="outline" onclick={() => (open = false)}>{t('common.cancel')}</Button>
         <Button type="submit" disabled={saving || !!passwordProblem(password)}>
-          {saving ? 'Salvando…' : 'Redefinir senha'}
+          {saving ? t('common.saving') : t('users.setPassword.submit')}
         </Button>
       </Dialog.Footer>
     </form>

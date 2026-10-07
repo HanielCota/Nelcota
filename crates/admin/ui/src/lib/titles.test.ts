@@ -15,13 +15,13 @@ describe('documentTitle', () => {
 
   it('puts the most specific part first (fits the tab)', () => {
     i18n.locale = 'pt-BR'
-    expect(title('/tables/pedidos')).toBe('pedidos · Tabelas · Nelcota')
-    expect(title('/tables/pedidos/structure')).toBe('Estrutura · pedidos · Tabelas · Nelcota')
+    expect(title('/tables/orders')).toBe('orders · Tabelas · Nelcota')
+    expect(title('/tables/orders/structure')).toBe('Estrutura · orders · Tabelas · Nelcota')
   })
 
   it('names unknown routes', () => {
     i18n.locale = 'pt-BR'
-    expect(title('/nao-existe')).toBe('Página não encontrada · Nelcota')
+    expect(title('/does-not-exist')).toBe('Página não encontrada · Nelcota')
   })
 
   it('follows the chosen language', () => {
