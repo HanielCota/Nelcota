@@ -21,7 +21,7 @@ now() { date +%s; }
 if [ "${1:-}" != "--local" ]; then
   : "${ACCEPT_DOMAIN:?set ACCEPT_DOMAIN or use --local}"
   start=$(now)
-  curl -fsSL "${NELCOTA_INSTALL_URL:-https://nelcota.dev/install}" | sh
+  curl -fsSL "${NELCOTA_INSTALL_URL:-https://nelcota.com/install}" | sh
   mkdir -p /opt/nelcota && cd /opt/nelcota
   nelcota init "$ACCEPT_DOMAIN" --yes
   nelcota up

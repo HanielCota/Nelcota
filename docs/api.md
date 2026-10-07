@@ -59,15 +59,35 @@ GET /rest/v1/orders?select=id,total,customers(name),items(product,qty)
   ambiguous: pick one with the column or the constraint name,
   `buyer:users!buyer_id(email),seller:users!seller_id(email)`. The error lists
   the options.
-- One level deep, and not a table into itself (self-reference); filters and
-  ordering apply to the main table. A key that repeats a selected column is a
-  400: rename it with an alias.
+- Embeds nest, up to 4 levels: `customers?select=name,orders(id,items(product))`.
+  A table cannot be embedded into itself (self-reference). A key that repeats
+  a selected column is a 400: rename it with an alias.
 - **RLS applies to the embedded table** too: each embed runs with the request's
   role, so it shows exactly what a direct read of that table would. A related
   row the user cannot see becomes `null` or is left out of the array.
 - Works in the representation of writes (`return=representation`).
 - Each embed is a correlated subquery: index the foreign key columns on the
   "many" side (Postgres does not create those indexes on its own).
+
+### Filtering, ordering and paging embedded rows
+
+A parameter prefixed with the embed's key (its alias, when it has one) applies
+to the embedded rows; a deeper embed adds its key to the path:
+
+```
+GET /rest/v1/customers?select=name,orders(id,total,items(product))
+    &orders.total=gte.5
+    &orders.order=total.desc
+    &orders.limit=2
+    &orders.items.or=(qty.eq.1,qty.gt.5)
+```
+
+- Every filter operator and `or`/`and` work, plus `order`, `limit` and
+  `offset`. Paging only applies to arrays: on a single-row embed it is a 400.
+- These narrow the **embedded rows only**: the parent rows stay, with `[]` or
+  `null` where nothing matched. Filters on the parent table (`?id=eq.1`) still
+  pick the parent rows.
+- The order of the parameters in the URL does not matter.
 
 ### Combining filters: `or` and `and`
 
@@ -189,5 +209,5 @@ NOTIFY nelcota, 'reload schema';
 
 ## Out of the MVP
 
-Embedding more than one level deep, filtering or ordering embedded rows,
-`GET` on `/rpc`, `Accept: application/vnd.pgrst.object+json`.
+Filtering parent rows by their embeds (PostgREST's `!inner`),
+self-referencing embeds, `GET` on `/rpc`, `Accept: application/vnd.pgrst.object+json`.

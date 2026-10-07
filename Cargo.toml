@@ -8,7 +8,7 @@ edition = "2024"
 license = "Apache-2.0"
 publish = false
 rust-version = "1.88"
-repository = "https://github.com/nelcota/nelcota"
+repository = "https://github.com/HanielCota/Nelcota"
 
 [workspace.dependencies]
 nelcota-core = { path = "crates/core" }
