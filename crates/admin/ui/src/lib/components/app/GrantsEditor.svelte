@@ -24,25 +24,25 @@
 </script>
 
 <!-- Matriz role × privilégio. O RLS ainda filtra as linhas de anon e authenticated. -->
-<div class="overflow-hidden rounded-lg border">
+<div class="overflow-x-auto rounded-lg border bg-card">
   <table class="w-full text-sm">
     <thead>
-      <tr class="bg-muted/50 text-xs text-muted-foreground">
-        <th class="px-3 py-2 text-left font-normal">Role</th>
+      <tr class="bg-muted/60 text-xs text-muted-foreground">
+        <th class="px-4 py-2.5 text-left font-medium">Role</th>
         {#each PRIVILEGES as privilege (privilege)}
-          <th class="w-20 px-2 py-2 text-center font-mono font-normal uppercase">{privilege}</th>
+          <th class="w-20 px-2 py-2.5 text-center font-mono font-medium uppercase">{privilege}</th>
         {/each}
       </tr>
     </thead>
     <tbody>
       {#each API_ROLES as role (role)}
         <tr class="border-t">
-          <td class="px-3 py-2">
-            <span class="font-mono text-xs">{role}</span>
-            <span class="block text-2xs font-light text-muted-foreground">{hint[role]}</span>
+          <td class="px-4 py-3">
+            <span class="font-mono text-xs font-medium">{role}</span>
+            <span class="block text-xs text-muted-foreground">{hint[role]}</span>
           </td>
           {#each PRIVILEGES as privilege (privilege)}
-            <td class="px-2 py-2 text-center">
+            <td class="px-2 py-3 text-center">
               <Checkbox
                 checked={has(role, privilege)}
                 onCheckedChange={(v) => toggle(role, privilege, v === true)}

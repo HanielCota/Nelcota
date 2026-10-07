@@ -18,6 +18,7 @@
   import { api } from '$lib/api'
   import { session } from '$lib/session.svelte'
   import { match, route } from '$lib/router.svelte'
+  import { crumbsFor, documentTitle } from '$lib/titles'
 
   onMount(async () => {
     // Vindo de outro painel do host (login único): troca o token por sessão.
@@ -44,14 +45,24 @@
   // Trocar de aba (Dados/Estrutura) não remonta o editor; trocar de tabela sim
   // (ordenação, página e seleção são de cada tabela).
   const pageKey = $derived(tableName ? `/tables/${tableName}` : route.path)
+
+  // Título da aba: a página atual (ou o login) seguida do nome do produto.
+  const title = $derived(
+    session.email === null ? 'Entrar · Nelcota' : session.email ? documentTitle(crumbsFor(route.path)) : 'Nelcota',
+  )
 </script>
+
+<svelte:head><title>{title}</title></svelte:head>
 
 <ModeWatcher defaultMode="dark" />
 <Toaster position="bottom-right" />
 
 {#if session.email === undefined}
   <div class="grid h-screen place-items-center">
-    <span class="size-5 animate-spin rounded-full border-2 border-border-strong border-t-brand"></span>
+    <div class="flex flex-col items-center gap-4" role="status">
+      <span class="size-7 animate-spin rounded-full border-[2.5px] border-border-strong border-t-brand"></span>
+      <span class="text-sm font-medium text-muted-foreground">Carregando painel…</span>
+    </div>
   </div>
 {:else if session.email === null}
   <Login />
@@ -60,14 +71,15 @@
     <!-- Primeira parada do Tab: pula topbar e menu. -->
     <a
       href="#conteudo"
-      class="sr-only z-50 rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
+      class="sr-only z-50 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-raised focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
       >Pular para o conteúdo</a
     >
-    <div class="flex h-screen flex-col overflow-hidden bg-background">
-      <Topbar />
-      <div class="flex min-h-0 flex-1">
-        <AppSidebar />
-        <main id="conteudo" tabindex="-1" class="min-w-0 flex-1 overflow-auto outline-none">
+    <!-- Barra lateral de altura total à esquerda; topbar e página à direita. -->
+    <div class="flex h-screen overflow-hidden bg-background">
+      <AppSidebar />
+      <div class="flex min-w-0 flex-1 flex-col">
+        <Topbar />
+        <main id="conteudo" tabindex="-1" class="min-h-0 min-w-0 flex-1 overflow-auto outline-none">
           {#key pageKey}
             {#if path === '/'}
               <Overview />

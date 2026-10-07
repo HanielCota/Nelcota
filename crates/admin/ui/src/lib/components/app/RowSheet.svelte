@@ -80,7 +80,7 @@
 
 <Sheet.Root bind:open>
   <Sheet.Content class="flex w-full flex-col gap-0 p-0 data-[side=right]:sm:max-w-xl">
-    <Sheet.Header class="border-b px-6 py-4">
+    <Sheet.Header class="border-b px-6 pt-6 pb-5">
       <Sheet.Title>{inserting ? 'Inserir linha' : 'Editar linha'}</Sheet.Title>
       <Sheet.Description>
         em <code class="font-mono text-foreground">{table}</code>{#if pkLabel}<span class="text-muted-foreground"
@@ -90,11 +90,11 @@
     </Sheet.Header>
 
     <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-    <form id="row-form" class="flex-1 space-y-5 overflow-y-auto px-6 py-5" onsubmit={save} onkeydown={onKeydown}>
+    <form id="row-form" class="flex-1 space-y-6 overflow-y-auto px-6 py-6" onsubmit={save} onkeydown={onKeydown}>
       {#if generated.length}
-        <div class="rounded-lg border bg-muted/30 px-3 py-2.5 text-xs">
+        <div class="rounded-lg border bg-muted/40 px-4 py-3 text-xs">
           <p class="font-medium text-muted-foreground">Gerado pelo Postgres, não editável</p>
-          <dl class="mt-1.5 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+          <dl class="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
             {#each generated as column (column.name)}
               <dt class="font-mono text-muted-foreground">{column.name}</dt>
               <dd class="truncate font-mono">{row ? (row[column.name] ?? 'NULL') : 'definido ao salvar'}</dd>
@@ -109,7 +109,7 @@
       {/each}
     </form>
 
-    <Sheet.Footer class="flex-row items-center gap-2 border-t px-6 py-4">
+    <Sheet.Footer class="flex-row items-center gap-2 border-t bg-muted/40 px-6 py-4">
       <span class="mr-auto text-xs text-muted-foreground">
         {#if !inserting}{changes === 0 ? 'Nenhuma alteração' : changes === 1 ? '1 campo alterado' : `${changes} campos alterados`}{/if}
         <span class="hidden sm:inline">{inserting ? '' : ' · '}Ctrl+Enter salva</span>

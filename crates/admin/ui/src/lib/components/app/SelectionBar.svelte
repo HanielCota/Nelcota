@@ -43,13 +43,13 @@
 
 <!-- Ações sobre a seleção; aparece só com linhas marcadas. -->
 <div
-  class="flex shrink-0 flex-wrap items-center gap-2 border-b border-brand/20 bg-brand/5 px-4 py-1.5 text-xs"
+  class="flex min-h-12 shrink-0 flex-wrap items-center gap-2 border-b border-brand/20 bg-brand/5 px-4 py-2 text-sm"
   role="region"
   aria-label="Linhas selecionadas"
 >
   <span class="font-medium text-foreground" aria-live="polite">{label}</span>
   <span class="text-muted-foreground">nesta página</span>
-  <div class="ml-auto flex flex-wrap items-center gap-1.5">
+  <div class="ml-auto flex flex-wrap items-center gap-2">
     <Button variant="ghost" size="sm" onclick={copyJson}><Copy />Copiar JSON</Button>
     <DropdownMenu.Root>
       <DropdownMenu.Trigger>

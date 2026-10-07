@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, type Snippet } from 'svelte'
+  import { onMount } from 'svelte'
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu'
   import ChevronsUpDown from '@lucide/svelte/icons/chevrons-up-down'
   import Check from '@lucide/svelte/icons/check'
@@ -10,7 +10,7 @@
   import { navigate } from '$lib/router.svelte'
   import type { ProjectsData } from '$lib/types'
 
-  let { slash }: { slash: Snippet } = $props()
+  let { menuOpen = $bindable(false) }: { menuOpen?: boolean } = $props()
 
   let data = $state<ProjectsData | null>(null)
 
@@ -34,23 +34,20 @@
 </script>
 
 {#if data}
-  <DropdownMenu.Root>
+  <DropdownMenu.Root bind:open={menuOpen}>
     <DropdownMenu.Trigger>
       {#snippet child({ props })}
         <button
           {...props}
-          class="flex h-7 min-w-0 items-center gap-2 rounded-md px-2 text-sm font-medium transition-colors hover:bg-accent aria-expanded:bg-accent"
+          class="flex h-9 w-full min-w-0 cursor-pointer items-center justify-between gap-2 rounded-md px-2.5 text-sm font-medium whitespace-nowrap transition-colors hover:bg-sidebar-accent/60 aria-expanded:bg-sidebar-accent/60"
+          title="Trocar de projeto"
         >
           <span class="truncate">{data!.current}</span>
-          <span
-            class="hidden rounded-full border border-brand/30 bg-brand/5 px-1.5 dark:bg-brand/10 py-px text-3xs font-medium tracking-wide text-brand uppercase sm:inline"
-            >projeto</span
-          >
-          <ChevronsUpDown class="size-3.5 shrink-0 text-muted-foreground" />
+          <ChevronsUpDown class="size-4 shrink-0 text-muted-foreground" />
         </button>
       {/snippet}
     </DropdownMenu.Trigger>
-    <DropdownMenu.Content align="start" class="w-64">
+    <DropdownMenu.Content align="start" class="w-72">
       <DropdownMenu.Label class="text-xs font-normal text-muted-foreground">
         Projetos{data.sso ? '' : ' (cada um pede o próprio login)'}
       </DropdownMenu.Label>
@@ -64,5 +61,4 @@
       <DropdownMenu.Item onclick={() => navigate('/projects')}><Boxes />Todos os projetos</DropdownMenu.Item>
     </DropdownMenu.Content>
   </DropdownMenu.Root>
-  {@render slash()}
 {/if}

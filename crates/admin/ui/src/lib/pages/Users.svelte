@@ -6,10 +6,10 @@
   import { Skeleton } from '$lib/components/ui/skeleton'
   import Ellipsis from '@lucide/svelte/icons/ellipsis'
   import Search from '@lucide/svelte/icons/search'
-  import UsersIcon from '@lucide/svelte/icons/users'
   import UserPlus from '@lucide/svelte/icons/user-plus'
   import { toast } from 'svelte-sonner'
   import PageHeader from '$lib/components/app/PageHeader.svelte'
+  import EmptyState from '$lib/components/app/EmptyState.svelte'
   import ConfirmDialog from '$lib/components/app/ConfirmDialog.svelte'
   import CreateUserDialog from '$lib/components/app/CreateUserDialog.svelte'
   import SetPasswordDialog from '$lib/components/app/SetPasswordDialog.svelte'
@@ -78,33 +78,52 @@
   const when = (value: string | null) => (value ? date.format(new Date(value)) : '—')
 </script>
 
-<div class="mx-auto max-w-6xl px-6 py-10 lg:px-10">
+<div class="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-10 lg:py-10">
   <PageHeader
     title="Usuários"
-    description={users ? `${total} ${total === 1 ? 'usuário cadastrado' : 'usuários cadastrados'} em auth.users.` : 'Contas de auth.users.'}
+    description={users ? `${total} ${total === 1 ? 'usuário' : 'usuários'} em auth.users.` : undefined}
   >
     {#snippet actions()}
-      <div class="relative">
-        <Search class="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
-        <Input bind:value={query} oninput={onSearch} placeholder="Buscar por email" class="h-8 w-64 bg-card pl-8" />
+      <div class="relative w-full sm:w-72">
+        <Search class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          type="search"
+          bind:value={query}
+          oninput={onSearch}
+          placeholder="Buscar por email"
+          aria-label="Buscar usuários por email"
+          class="pl-9"
+        />
       </div>
-      <Button size="sm" onclick={() => (createOpen = true)}><UserPlus />Novo usuário</Button>
+      <Button onclick={() => (createOpen = true)}><UserPlus />Novo usuário</Button>
     {/snippet}
   </PageHeader>
 
   {#if users === null}
     <Skeleton class="h-64 rounded-lg" />
   {:else if users.length === 0}
-    <div class="rounded-lg border border-dashed px-6 py-12 text-center">
-      <UsersIcon class="mx-auto size-6 text-muted-foreground" strokeWidth={1.4} />
-      <p class="mt-3 text-sm font-medium">Nenhum usuário</p>
-      <p class="mt-1 text-sm font-light text-muted-foreground">
-        {query.trim() ? 'Nada encontrado para essa busca.' : 'Cadastros feitos pela API aparecem aqui, ou crie um agora.'}
-      </p>
-      {#if !query.trim()}
-        <Button variant="outline" size="sm" class="mt-4" onclick={() => (createOpen = true)}><UserPlus />Novo usuário</Button>
-      {/if}
-    </div>
+    <EmptyState
+      class="rounded-lg border"
+      title={query.trim() ? 'Nenhum resultado' : 'Nenhum usuário'}
+      description={query.trim()
+        ? `Nada encontrado para "${query.trim()}".`
+        : 'Cadastros feitos pela API aparecem aqui.'}
+    >
+      {#snippet actions()}
+        {#if query.trim()}
+          <Button
+            variant="outline"
+            onclick={() => {
+              query = ''
+              page = 0
+              load()
+            }}>Limpar busca</Button
+          >
+        {:else}
+          <Button variant="outline" onclick={() => (createOpen = true)}>Novo usuário</Button>
+        {/if}
+      {/snippet}
+    </EmptyState>
   {:else}
     <div class="overflow-hidden rounded-lg border bg-card">
       <Table.Root>
@@ -114,7 +133,7 @@
             <Table.Head>Criado</Table.Head>
             <Table.Head>Último login</Table.Head>
             <Table.Head class="text-right">Sessões</Table.Head>
-            <Table.Head class="w-10"></Table.Head>
+            <Table.Head class="w-12"><span class="sr-only">Ações</span></Table.Head>
           </Table.Row>
         </Table.Header>
         <Table.Body>
@@ -124,7 +143,7 @@
                 <div class="flex items-center gap-3">
                   <span
                     class="grid size-8 shrink-0 place-items-center rounded-full border border-border-strong bg-muted text-xs font-medium"
-                    >{user.email.charAt(0).toUpperCase()}</span
+                    aria-hidden="true">{user.email.charAt(0).toUpperCase()}</span
                   >
                   <div class="min-w-0">
                     <p class="font-medium">{user.email}</p>
@@ -171,11 +190,11 @@
   {/if}
 
   {#if page > 0 || hasNext}
-    <div class="mt-4 flex items-center justify-end gap-2 text-xs text-muted-foreground">
-      <span class="mr-1">Página {page + 1}</span>
+    <nav class="mt-4 flex items-center justify-end gap-2" aria-label="Paginação">
+      <span class="mr-1 text-sm text-muted-foreground">Página {page + 1}</span>
       <Button variant="outline" size="sm" disabled={page === 0} onclick={() => page--}>Anterior</Button>
-      <Button variant="outline" size="sm" disabled={!hasNext} onclick={() => page++}>Próxima</Button>
-    </div>
+        <Button variant="outline" size="sm" disabled={!hasNext} onclick={() => page++}>Próxima</Button>
+    </nav>
   {/if}
 </div>
 

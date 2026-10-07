@@ -15,6 +15,7 @@ mod apply;
 mod ddl;
 mod export;
 mod policies_ddl;
+mod profile;
 mod projects;
 mod sql;
 mod sso;
@@ -159,6 +160,13 @@ pub fn router(state: AdminState) -> Router {
         .route("/admin/api/projects/status", get(projects::status))
         .route("/admin/api/sso/handoff", post(sso::handoff))
         .route("/admin/api/tokens/service-role", post(tokens::service_role))
+        .route("/admin/api/profile", get(profile::get))
+        .route(
+            "/admin/api/profile/avatar",
+            get(profile::image)
+                .put(profile::upload)
+                .delete(profile::remove),
+        )
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             require_session,
@@ -171,10 +179,6 @@ pub fn router(state: AdminState) -> Router {
         .merge(protected)
         .route("/admin/api/{*rest}", get(api_not_found).post(api_not_found))
         .route("/admin/assets/{*file}", get(asset))
-        .route(
-            "/admin/favicon.svg",
-            get(|| async { ui_file("favicon.svg") }),
-        )
         .route("/admin", get(|| async { Redirect::to("/admin/") }))
         .route("/admin/", get(spa))
         .route("/admin/{*route}", get(spa))

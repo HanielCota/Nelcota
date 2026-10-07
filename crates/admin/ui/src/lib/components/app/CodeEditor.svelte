@@ -28,10 +28,12 @@
   // Cores do tema vêm das variáveis CSS do painel: acompanham claro/escuro.
   const theme = EditorView.theme({
     '&': { height: '100%', fontSize: '14px', backgroundColor: 'transparent', color: 'var(--foreground)' },
-    '.cm-scroller': { fontFamily: 'var(--font-mono)', lineHeight: '1.65' },
+    '.cm-scroller': { fontFamily: 'var(--font-mono)', lineHeight: '1.75' },
     '.cm-content': { padding: '12px 0', caretColor: 'var(--foreground)' },
+    '.cm-line': { padding: '0 16px 0 8px' },
     '.cm-gutters': { backgroundColor: 'transparent', color: 'var(--muted-foreground)', border: 'none' },
-    '.cm-lineNumbers .cm-gutterElement': { padding: '0 12px 0 16px', opacity: '0.6' },
+    '.cm-lineNumbers .cm-gutterElement': { padding: '0 8px 0 16px', minWidth: '3em', opacity: '0.6' },
+    '.cm-lineNumbers .cm-gutterElement.cm-activeLineGutter': { color: 'var(--foreground)', opacity: '1' },
     '.cm-activeLine, .cm-activeLineGutter': { backgroundColor: 'color-mix(in oklch, var(--foreground) 4%, transparent)' },
     '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--foreground)' },
     '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection': {
@@ -43,11 +45,12 @@
       backgroundColor: 'var(--popover)',
       color: 'var(--popover-foreground)',
       border: '1px solid var(--border)',
-      borderRadius: '4px',
+      borderRadius: '6px',
+      boxShadow: 'var(--elev-overlay)',
       overflow: 'hidden',
     },
-    '.cm-tooltip-autocomplete > ul': { fontFamily: 'var(--font-mono)', fontSize: '13px', maxHeight: '16em' },
-    '.cm-tooltip-autocomplete > ul > li': { padding: '3px 10px !important' },
+    '.cm-tooltip-autocomplete > ul': { fontFamily: 'var(--font-mono)', fontSize: '13px', maxHeight: '18em', padding: '4px' },
+    '.cm-tooltip-autocomplete > ul > li': { padding: '5px 10px !important', borderRadius: '6px' },
     '.cm-tooltip-autocomplete > ul > li[aria-selected]': {
       backgroundColor: 'var(--accent)',
       color: 'var(--foreground)',

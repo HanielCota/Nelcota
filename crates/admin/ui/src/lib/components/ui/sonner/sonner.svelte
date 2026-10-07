@@ -13,10 +13,13 @@
 <Sonner
 	theme={mode.current}
 	class="toaster group"
-	style="--normal-bg: var(--color-popover); --normal-text: var(--color-popover-foreground); --normal-border: var(--color-border);"
+	style="--normal-bg: var(--color-popover); --normal-text: var(--color-popover-foreground); --normal-border: var(--color-border-strong); --border-radius: 0.5rem;"
 	toastOptions={{
 		classes: {
-			toast: "cn-toast",
+			toast: "cn-toast shadow-overlay! text-sm! gap-3! px-4! py-3!",
+			success: "[&_[data-icon]]:text-brand!",
+			error: "[&_[data-icon]]:text-destructive!",
+			warning: "[&_[data-icon]]:text-warning!",
 		},
 	}}
 	{...restProps}
@@ -25,15 +28,15 @@
 		<Loader2Icon class="size-4 animate-spin" />
 	{/snippet}
 	{#snippet successIcon()}
-		<CircleCheckIcon class="size-4" />
+		<CircleCheckIcon class="size-[18px]" />
 	{/snippet}
 	{#snippet errorIcon()}
-		<OctagonXIcon class="size-4" />
+		<OctagonXIcon class="size-[18px]" />
 	{/snippet}
 	{#snippet infoIcon()}
-		<InfoIcon class="size-4" />
+		<InfoIcon class="size-[18px]" />
 	{/snippet}
 	{#snippet warningIcon()}
-		<TriangleAlertIcon class="size-4" />
+		<TriangleAlertIcon class="size-[18px]" />
 	{/snippet}
 </Sonner>

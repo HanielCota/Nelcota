@@ -7,7 +7,6 @@
   import { Label } from '$lib/components/ui/label'
   import { Checkbox } from '$lib/components/ui/checkbox'
   import { Textarea } from '$lib/components/ui/textarea'
-  import Sparkles from '@lucide/svelte/icons/sparkles'
   import { toast } from 'svelte-sonner'
   import SqlPreview from './SqlPreview.svelte'
   import { ddl, policyFields, type ApiRole, type PolicyCommand, type PolicyDef } from '$lib/ddl'
@@ -118,24 +117,24 @@
   <Sheet.Content class="flex w-full flex-col gap-0 p-0 data-[side=right]:sm:max-w-2xl">
     <Sheet.Header class="border-b px-6 py-4">
       <Sheet.Title>{original ? `Editar policy` : 'Nova policy'}</Sheet.Title>
-      <Sheet.Description>em <code class="font-mono text-foreground">{table}</code></Sheet.Description>
+      <Sheet.Description>na tabela <code class="font-mono text-xs text-foreground">{table}</code></Sheet.Description>
     </Sheet.Header>
 
-    <form id="policy-form" class="flex-1 space-y-5 overflow-y-auto px-6 py-5" onsubmit={submit}>
+    <form id="policy-form" class="flex-1 space-y-6 overflow-y-auto px-6 py-6" onsubmit={submit}>
       <DropdownMenu.Root>
         <DropdownMenu.Trigger>
           {#snippet child({ props })}
-            <Button variant="outline" size="sm" {...props}><Sparkles />Começar de um modelo</Button>
+            <Button variant="outline" {...props}>Começar de um modelo</Button>
           {/snippet}
         </DropdownMenu.Trigger>
-        <DropdownMenu.Content align="start" class="w-80">
+        <DropdownMenu.Content align="start" class="w-96 max-w-[calc(100vw-2rem)]">
           <DropdownMenu.Label class="text-xs font-normal text-muted-foreground">
             Modelos de dono usam a coluna <code class="text-foreground">{ownerColumn}</code>
           </DropdownMenu.Label>
           {#each POLICY_TEMPLATES as template (template.label)}
-            <DropdownMenu.Item onclick={() => applyTemplate(template)} class="flex-col items-start gap-0">
-              <span>{template.label}</span>
-              <span class="text-xs font-light text-muted-foreground">{template.description}</span>
+            <DropdownMenu.Item onclick={() => applyTemplate(template)} class="flex-col items-start gap-0.5 py-2">
+              <span class="font-medium">{template.label}</span>
+              <span class="text-xs text-muted-foreground">{template.description}</span>
             </DropdownMenu.Item>
           {/each}
         </DropdownMenu.Content>
@@ -143,11 +142,11 @@
 
       <div class="grid gap-4 sm:grid-cols-2">
         <div class="grid gap-1.5">
-          <Label for="policy-name" class="font-normal text-muted-foreground">Nome</Label>
+          <Label for="policy-name">Nome</Label>
           <Input id="policy-name" bind:value={policy.name} placeholder="ex.: dono lê as próprias notas" required />
         </div>
         <div class="grid gap-1.5">
-          <Label class="font-normal text-muted-foreground">Comando</Label>
+          <Label>Comando</Label>
           <Select.Root type="single" bind:value={policy.command}>
             <Select.Trigger class="w-full">{commandLabel(policy.command)}</Select.Trigger>
             <Select.Content>
@@ -160,26 +159,30 @@
       </div>
 
       <fieldset class="grid gap-2">
-        <legend class="mb-1 text-sm text-muted-foreground">Vale para</legend>
-        <div class="flex flex-wrap gap-4">
+        <legend class="mb-1 text-sm font-medium">Vale para</legend>
+        <div class="grid gap-2 sm:grid-cols-3">
           {#each ROLES as role (role.value)}
-            <label class="flex items-center gap-2 text-sm">
+            <label
+              class="flex cursor-pointer items-center gap-3 rounded-md border bg-card px-3 py-2.5 text-sm transition-colors hover:border-border-strong has-data-checked:border-brand/50"
+            >
               <Checkbox checked={policy.roles.includes(role.value)} onCheckedChange={(v) => toggleRole(role.value, v === true)} />
-              <span class="font-mono text-xs">{role.value}</span>
-              <span class="text-xs font-light text-muted-foreground">{role.hint}</span>
+              <span class="grid">
+                <span class="font-mono text-xs font-medium">{role.value}</span>
+                <span class="text-xs text-muted-foreground">{role.hint}</span>
+              </span>
             </label>
           {/each}
         </div>
         {#if policy.roles.length === 0}
-          <p class="text-xs font-light text-muted-foreground">Nenhuma marcada: vale para todas as roles (PUBLIC).</p>
+          <p class="text-xs text-muted-foreground">Nenhuma marcada: vale para todas as roles (PUBLIC).</p>
         {/if}
       </fieldset>
 
-      <label class="flex items-start gap-3 text-sm">
+      <label class="flex cursor-pointer items-start gap-3 text-sm">
         <Checkbox checked={!policy.permissive} onCheckedChange={(v) => (policy.permissive = v !== true)} class="mt-0.5" />
         <span>
-          Restritiva
-          <span class="block text-xs font-light text-muted-foreground">
+          <span class="font-medium">Restritiva</span>
+          <span class="mt-0.5 block text-xs text-muted-foreground">
             Permissivas somam acesso (basta uma liberar). Restritivas são exigidas além delas.
           </span>
         </span>
@@ -187,31 +190,31 @@
 
       {#if fields.using}
         <div class="grid gap-1.5">
-          <Label for="policy-using" class="font-normal text-muted-foreground">
-            USING <span class="font-light">· quais linhas existentes a role {policy.command === 'delete' ? 'pode apagar' : 'enxerga'}</span>
+          <Label for="policy-using" class="flex-wrap">
+            <span class="font-mono">USING</span> <span class="font-normal text-muted-foreground">quais linhas existentes a role {policy.command === 'delete' ? 'pode apagar' : 'enxerga'}</span>
           </Label>
           <Textarea
             id="policy-using"
             bind:value={() => policy.using ?? '', (v) => (policy.using = v)}
             placeholder={`${ownerColumn} = auth.uid()`}
-            class="min-h-20 font-mono text-xs"
+            class="min-h-24 font-mono text-xs"
           />
         </div>
       {/if}
       {#if fields.check}
         <div class="grid gap-1.5">
-          <Label for="policy-check" class="font-normal text-muted-foreground">
-            WITH CHECK <span class="font-light">· quais linhas novas ou alteradas são aceitas</span>
+          <Label for="policy-check" class="flex-wrap">
+            <span class="font-mono">WITH CHECK</span> <span class="font-normal text-muted-foreground">quais linhas novas ou alteradas são aceitas</span>
           </Label>
           <Textarea
             id="policy-check"
             bind:value={() => policy.check ?? '', (v) => (policy.check = v)}
             placeholder={policy.command === 'insert' ? `${ownerColumn} = auth.uid()` : 'vazio = mesma regra do USING'}
-            class="min-h-20 font-mono text-xs"
+            class="min-h-24 font-mono text-xs"
           />
         </div>
       {/if}
-      <p class="text-xs font-light text-muted-foreground">
+      <p class="text-xs text-muted-foreground">
         Use <code class="text-foreground">auth.uid()</code> para o id do usuário logado e
         <code class="text-foreground">auth.jwt()</code> para as claims do token.
       </p>
@@ -219,7 +222,7 @@
       <SqlPreview {preview} placeholder="Dê um nome e escreva a expressão para ver o SQL." />
     </form>
 
-    <Sheet.Footer class="flex-row justify-end gap-2 border-t px-6 py-4">
+    <Sheet.Footer class="flex-row justify-end gap-2 border-t bg-muted/40 px-6 py-4">
       <Button variant="outline" onclick={() => (open = false)}>Cancelar</Button>
       <Button type="submit" form="policy-form" disabled={saving || !ready}>
         {saving ? 'Salvando…' : original ? 'Salvar policy' : 'Criar policy'}

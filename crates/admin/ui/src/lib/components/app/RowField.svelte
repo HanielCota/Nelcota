@@ -42,15 +42,15 @@
   }
 </script>
 
-<div class="grid gap-1.5">
+<div class="grid gap-2">
   <div class="flex items-center gap-2">
     <label for={id} class="flex items-center gap-1.5 text-sm font-medium">
-      {#if column.is_pk}<KeyRound class="size-3.5 text-brand" aria-label="chave primária" />{/if}{column.name}
+      {#if column.is_pk}<KeyRound class="size-3.5 text-muted-foreground" aria-label="chave primária" />{/if}{column.name}
     </label>
-    <span class="font-mono text-3xs text-muted-foreground">{column.full_type}</span>
-    {#if required}<span class="text-3xs text-muted-foreground">obrigatória</span>{/if}
+    <span class="rounded-md bg-muted px-1.5 py-0.5 font-mono text-3xs text-muted-foreground">{column.full_type}</span>
+    {#if required}<span class="text-2xs text-muted-foreground">obrigatória</span>{/if}
     {#if column.nullable}
-      <label class="ml-auto flex items-center gap-1.5 text-xs text-muted-foreground">
+      <label class="ml-auto flex cursor-pointer items-center gap-1.5 text-xs font-medium text-muted-foreground">
         <Checkbox checked={field.isNull} onCheckedChange={(v) => (field.isNull = v === true)} />
         NULL
       </label>
@@ -58,7 +58,7 @@
   </div>
 
   {#if field.isNull}
-    <div class="flex h-9 items-center rounded-md border border-dashed px-3 font-mono text-xs text-muted-foreground">NULL</div>
+    <div class="flex h-9 items-center rounded-lg border border-dashed border-border-strong bg-muted/40 px-3 font-mono text-xs text-muted-foreground">NULL</div>
   {:else if options.length}
     <Select.Root type="single" bind:value={field.value}>
       <Select.Trigger {id} class="w-full">{field.value || placeholder || 'Selecione'}</Select.Trigger>
@@ -88,10 +88,10 @@
   {#if problem}
     <p class="text-xs text-destructive">{problem}</p>
   {:else if preview && preview.text !== field.value}
-    <p class="text-xs font-light text-muted-foreground">= {preview.text}{column.type === 'timestamp with time zone' ? ' no seu fuso' : ''}</p>
+    <p class="text-xs text-muted-foreground">= {preview.text}{column.type === 'timestamp with time zone' ? ' no seu fuso' : ''}</p>
   {/if}
   {#if kind === 'json' && !field.isNull && field.value.trim()}
     <Button variant="ghost" size="xs" class="justify-self-start text-muted-foreground" onclick={formatJson}>Formatar JSON</Button>
   {/if}
-  {#if column.comment}<p class="text-xs font-light text-muted-foreground">{column.comment}</p>{/if}
+  {#if column.comment}<p class="text-xs text-muted-foreground">{column.comment}</p>{/if}
 </div>

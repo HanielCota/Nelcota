@@ -63,11 +63,11 @@
 </script>
 
 {#if error}
-  <p class="p-6 text-sm text-destructive">{error}</p>
+  <p class="p-6 text-sm text-destructive">Não deu para carregar a estrutura: {error}</p>
 {:else if !structure}
-  <div class="grid gap-4 p-6"><Skeleton class="h-64 rounded-lg" /><Skeleton class="h-32 rounded-lg" /></div>
+  <div class="mx-auto grid max-w-5xl gap-6 p-6 lg:p-8"><Skeleton class="h-72 rounded-lg" /><Skeleton class="h-36 rounded-lg" /></div>
 {:else}
-  <div class="mx-auto grid max-w-5xl gap-6 p-6">
+  <div class="mx-auto grid max-w-5xl gap-6 p-6 lg:p-8">
     <StructureColumns
       {structure}
       onadd={() => openColumn(null)}

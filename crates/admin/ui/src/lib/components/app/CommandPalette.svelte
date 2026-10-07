@@ -9,7 +9,7 @@
   import BookOpen from '@lucide/svelte/icons/book-open'
   import { api } from '$lib/api'
   import { logout } from '$lib/auth'
-  import { navGroups } from '$lib/nav'
+  import { navItems } from '$lib/nav'
   import { palette } from '$lib/palette.svelte'
   import { navigate } from '$lib/router.svelte'
   import { commandScore } from '$lib/search'
@@ -54,7 +54,9 @@
     }
   }
 
-  const pages = navGroups.flat()
+  const pages = navItems
+
+  // Ícone dentro de um quadrado, como nos itens da barra lateral.
 </script>
 
 <svelte:window onkeydown={onKeydown} />
@@ -64,10 +66,11 @@
   filter={commandScore}
   title="Paleta de comandos"
   description="Busque páginas, tabelas, consultas e ações"
+  class="sm:max-w-xl"
 >
   <Command.Input placeholder="Buscar páginas, tabelas, consultas…" />
   <Command.List class="max-h-[min(60vh,420px)]">
-    <Command.Empty>Nada encontrado.</Command.Empty>
+    <Command.Empty class="py-8 text-muted-foreground">Nada encontrado.</Command.Empty>
 
     <Command.Group heading="Páginas">
       {#each pages as page (page.path)}
@@ -84,7 +87,7 @@
             value={`tabela ${table.name}`}
             onSelect={() => run(() => navigate(`/tables/${encodeURIComponent(table.name)}`))}
           >
-            <Table2 />{table.name}
+            <Table2 /><span class="truncate">{table.name}</span>
             {#if table.kind !== 'table'}<Command.Shortcut>view</Command.Shortcut>{/if}
           </Command.Item>
         {/each}
@@ -95,7 +98,7 @@
       <Command.Group heading="Consultas salvas">
         {#each sqlStore.sorted as query (query.id)}
           <Command.Item value={`consulta ${query.name} ${query.id}`} onSelect={() => run(() => openSql(query.sql, query.id))}>
-            <FileCode />{query.name}
+            <FileCode /><span class="truncate">{query.name}</span>
           </Command.Item>
         {/each}
       </Command.Group>

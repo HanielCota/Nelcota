@@ -42,7 +42,7 @@
         <Dialog.Description>Fica salva neste navegador, para este projeto.</Dialog.Description>
       </Dialog.Header>
       <div class="grid gap-2">
-        <Label for="query-name" class="font-normal text-muted-foreground">Nome</Label>
+        <Label for="query-name">Nome</Label>
         <Input id="query-name" bind:value={name} placeholder="ex.: pedidos da semana" maxlength={120} />
       </div>
       <Dialog.Footer>

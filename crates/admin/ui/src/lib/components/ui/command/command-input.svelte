@@ -19,7 +19,7 @@
 		bind:ref
 		data-slot="command-input"
 		class={cn(
-			"h-12 w-full bg-transparent text-sm outline-hidden placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
+			"h-14 w-full bg-transparent text-base outline-hidden placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
 			className
 		)}
 		{...restProps}

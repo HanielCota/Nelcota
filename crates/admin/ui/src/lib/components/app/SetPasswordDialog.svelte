@@ -43,7 +43,7 @@
         </Dialog.Description>
       </Dialog.Header>
       <div class="grid gap-2">
-        <Label for="reset-password" class="font-normal text-muted-foreground">Nova senha</Label>
+        <Label for="reset-password">Nova senha</Label>
         <PasswordField id="reset-password" bind:value={password} />
       </div>
       <Dialog.Footer>

@@ -49,11 +49,11 @@
         </Dialog.Description>
       </Dialog.Header>
       <div class="grid gap-2">
-        <Label for="new-user-email" class="font-normal text-muted-foreground">Email</Label>
-        <Input id="new-user-email" type="email" bind:value={email} placeholder="ana@exemplo.com" autocomplete="off" required />
+        <Label for="new-user-email">Email</Label>
+        <Input id="new-user-email" type="email" bind:value={email} placeholder="ana@exemplo.com" autocomplete="off" class="h-10" required />
       </div>
       <div class="grid gap-2">
-        <Label for="new-user-password" class="font-normal text-muted-foreground">Senha</Label>
+        <Label for="new-user-password">Senha</Label>
         <PasswordField id="new-user-password" bind:value={password} />
       </div>
       <Dialog.Footer>

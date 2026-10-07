@@ -42,7 +42,7 @@
       {/if}
     </AlertDialog.Header>
     <AlertDialog.Footer>
-      <AlertDialog.Cancel>Cancelar</AlertDialog.Cancel>
+      <AlertDialog.Cancel disabled={busy}>Cancelar</AlertDialog.Cancel>
       <AlertDialog.Action
         class={destructive ? buttonVariants({ variant: 'destructive' }) : ''}
         disabled={busy}

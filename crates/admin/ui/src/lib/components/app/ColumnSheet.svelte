@@ -64,7 +64,7 @@
 
 <Sheet.Root bind:open>
   <Sheet.Content class="flex w-full flex-col gap-0 p-0 data-[side=right]:sm:max-w-2xl">
-    <Sheet.Header class="border-b px-6 py-4">
+    <Sheet.Header class="border-b px-6 pt-6 pb-5">
       <Sheet.Title>{original ? `Editar coluna ${original.name}` : 'Nova coluna'}</Sheet.Title>
       <Sheet.Description>
         em <code class="font-mono text-foreground">{table}</code>
@@ -72,10 +72,10 @@
       </Sheet.Description>
     </Sheet.Header>
 
-    <form id="column-form" class="flex-1 space-y-5 overflow-y-auto px-6 py-5" onsubmit={submit}>
+    <form id="column-form" class="flex-1 space-y-6 overflow-y-auto px-6 py-6" onsubmit={submit}>
       <ColumnFields bind:column {tables} mode={original ? 'edit' : 'add'} />
       {#if original && column.data_type.trim() !== original.data_type}
-        <p class="text-xs font-light text-muted-foreground">
+        <p class="rounded-lg border bg-muted/40 px-4 py-3 text-xs text-muted-foreground">
           Os valores atuais são convertidos com <code>{original.name}::{column.data_type}</code>. Se algum não converter, nada é
           alterado.
         </p>
@@ -83,7 +83,7 @@
       <SqlPreview {preview} placeholder={original ? 'Nenhuma alteração ainda.' : 'Dê nome e tipo à coluna.'} />
     </form>
 
-    <Sheet.Footer class="flex-row justify-end gap-2 border-t px-6 py-4">
+    <Sheet.Footer class="flex-row justify-end gap-2 border-t bg-muted/40 px-6 py-4">
       <Button variant="outline" onclick={() => (open = false)}>Cancelar</Button>
       <Button type="submit" form="column-form" disabled={saving || actions.length === 0}>
         {saving ? 'Salvando…' : original ? 'Salvar alterações' : 'Adicionar coluna'}
