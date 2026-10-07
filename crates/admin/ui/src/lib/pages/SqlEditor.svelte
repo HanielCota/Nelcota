@@ -3,24 +3,10 @@
   import { Button } from '$lib/components/ui/button'
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu'
   import Play from '@lucide/svelte/icons/play'
-  import Save from '@lucide/svelte/icons/save'
   import ChevronDown from '@lucide/svelte/icons/chevron-down'
-  import Download from '@lucide/svelte/icons/download'
-  import SquareTerminal from '@lucide/svelte/icons/square-terminal'
-  import FileCode from '@lucide/svelte/icons/file-code'
-  import FilePlus from '@lucide/svelte/icons/file-plus'
-  import FolderOpen from '@lucide/svelte/icons/folder-open'
-  import History from '@lucide/svelte/icons/history'
-  import Pencil from '@lucide/svelte/icons/pencil'
-  import Sparkles from '@lucide/svelte/icons/sparkles'
-  import ShieldOff from '@lucide/svelte/icons/shield-off'
-  import LoaderCircle from '@lucide/svelte/icons/loader-circle'
-  import CircleCheck from '@lucide/svelte/icons/circle-check'
-  import Timer from '@lucide/svelte/icons/timer'
   import { toast } from 'svelte-sonner'
   import CodeEditor from '$lib/components/app/CodeEditor.svelte'
   import EmptyState from '$lib/components/app/EmptyState.svelte'
-  import Callout from '$lib/components/app/Callout.svelte'
   import ConfirmDialog from '$lib/components/app/ConfirmDialog.svelte'
   import SaveQueryDialog from '$lib/components/app/SaveQueryDialog.svelte'
   import SqlSidebar from '$lib/components/app/SqlSidebar.svelte'
@@ -116,8 +102,6 @@
   const firstLine = (s: string) => s.trim().split('\n')[0].slice(0, 70)
 
   const mod = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl'
-  const kbd =
-    'inline-grid min-w-6 place-items-center rounded-md border border-border-strong bg-card px-1.5 py-0.5 font-sans text-2xs font-medium text-foreground shadow-card'
 </script>
 
 <svelte:window onkeydown={onKeydown} />
@@ -126,51 +110,46 @@
   <SqlSidebar onrename={(query) => openDialog({ mode: 'rename', query })} ondelete={askDelete} />
 
   <div class="flex min-w-0 flex-1 flex-col">
-    <div class="flex min-h-14 shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b bg-sidebar px-4 py-2.5">
-      <div class="flex min-w-0 items-center gap-2.5">
-        <FileCode class="hidden size-[18px] shrink-0 text-muted-foreground sm:block" strokeWidth={1.75} />
-        <h1 class="truncate text-base font-semibold">
+    <div class="flex min-h-14 shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b px-4 py-2.5">
+      <div class="flex min-w-0 items-center gap-2">
+        <h1 class="truncate text-sm font-semibold">
           {sqlStore.current?.name ?? 'Nova consulta'}
         </h1>
         {#if sqlStore.dirty}
-          <span class="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground" title="Alterações não salvas">
-            <span class="size-2 rounded-full bg-warning"></span><span class="hidden sm:inline">não salva</span>
-          </span>
+          <span class="shrink-0 text-xs text-muted-foreground" title="Alterações não salvas">(não salva)</span>
         {/if}
       </div>
       <span
-        class="hidden items-center gap-1.5 rounded-full border border-warning/30 bg-warning/10 px-2.5 py-0.5 text-xs font-semibold text-warning md:inline-flex"
+        class="hidden text-xs text-muted-foreground md:inline"
         title="As consultas rodam como dono do banco: o RLS não se aplica."
-        ><ShieldOff class="size-3.5" />dono do banco · sem RLS</span
+        >Roda como dono do banco, sem RLS</span
       >
       <div class="ml-auto flex flex-wrap items-center gap-2">
         <!-- Em telas sem a barra lateral, modelos e salvas ficam num menu. -->
         <DropdownMenu.Root>
           <DropdownMenu.Trigger>
             {#snippet child({ props })}
-              <Button variant="ghost" size="sm" class="lg:hidden" {...props}><FolderOpen />Abrir</Button>
+              <Button variant="ghost" size="sm" class="lg:hidden" {...props}>Abrir</Button>
             {/snippet}
           </DropdownMenu.Trigger>
           <DropdownMenu.Content align="end" class="w-64">
             {#if sqlStore.saved.length}
               <DropdownMenu.Label class="text-xs text-muted-foreground">Salvas</DropdownMenu.Label>
               {#each sqlStore.sorted as query (query.id)}
-                <DropdownMenu.Item onclick={() => sqlStore.openSaved(query.id)}><FileCode />{query.name}</DropdownMenu.Item>
+                <DropdownMenu.Item onclick={() => sqlStore.openSaved(query.id)}>{query.name}</DropdownMenu.Item>
               {/each}
               <DropdownMenu.Separator />
             {/if}
             <DropdownMenu.Label class="text-xs text-muted-foreground">Modelos</DropdownMenu.Label>
             {#each SQL_SNIPPETS as snippet (snippet.label)}
-              <DropdownMenu.Item onclick={() => sqlStore.open(snippet.sql)}><Sparkles />{snippet.label}</DropdownMenu.Item>
+              <DropdownMenu.Item onclick={() => sqlStore.open(snippet.sql)}>{snippet.label}</DropdownMenu.Item>
             {/each}
           </DropdownMenu.Content>
         </DropdownMenu.Root>
         <DropdownMenu.Root>
           <DropdownMenu.Trigger>
             {#snippet child({ props })}
-              <Button variant="ghost" size="sm" disabled={sqlStore.history.length === 0} {...props}>
-                <History />Histórico
-              </Button>
+              <Button variant="ghost" size="sm" disabled={sqlStore.history.length === 0} {...props}>Histórico</Button>
             {/snippet}
           </DropdownMenu.Trigger>
           <DropdownMenu.Content align="end" class="w-96">
@@ -185,7 +164,7 @@
 
         <div class="flex">
           <Button variant="outline" size="sm" class="rounded-r-none" onclick={save} title={`${mod}+S`}>
-            <Save />Salvar
+            Salvar
           </Button>
           <DropdownMenu.Root>
             <DropdownMenu.Trigger>
@@ -197,32 +176,24 @@
             </DropdownMenu.Trigger>
             <DropdownMenu.Content align="end" class="w-52">
               <DropdownMenu.Item disabled={!sqlStore.draft.trim()} onclick={() => openDialog({ mode: 'save' })}>
-                <FilePlus />Salvar como nova…
+                Salvar como nova…
               </DropdownMenu.Item>
               {#if sqlStore.current}
                 <DropdownMenu.Item onclick={() => openDialog({ mode: 'rename', query: sqlStore.current! })}>
-                  <Pencil />Renomear…
+                  Renomear…
                 </DropdownMenu.Item>
               {/if}
             </DropdownMenu.Content>
           </DropdownMenu.Root>
         </div>
 
-        <Button onclick={run} disabled={running} title={`${mod}+Enter`} class="min-w-32">
-          {#if running}
-            <LoaderCircle class="animate-spin" />Executando…
-          {:else}
-            <Play class="fill-current" />Executar
-            <kbd
-              class="ml-0.5 hidden rounded-md border border-white/25 bg-white/10 px-1.5 py-px font-sans text-2xs font-medium sm:inline"
-              >{mod} ↵</kbd
-            >
-          {/if}
+        <Button onclick={run} disabled={running} title={`Executar (${mod}+Enter)`} class="min-w-28">
+          <Play />{running ? 'Executando…' : 'Executar'}
         </Button>
       </div>
     </div>
 
-    <div class="h-[42%] min-h-44 shrink-0 border-b bg-card">
+    <div class="h-[42%] min-h-44 shrink-0 border-b">
       <CodeEditor
         bind:value={() => sqlStore.draft, (sql) => sqlStore.setDraft(sql)}
         {schema}
@@ -238,57 +209,40 @@
         </div>
       {/if}
       {#if !response}
-        <div class="grid h-full place-items-center p-6">
-          <EmptyState icon={SquareTerminal} title="Os resultados aparecem aqui" class="w-full max-w-lg border-0 bg-transparent">
-            Escreva uma consulta e execute. Limite de 30 s e 1000 linhas por resultado.
-            <span class="mt-4 flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs">
-              <span class="flex items-center gap-1.5"><kbd class={kbd}>{mod}</kbd><kbd class={kbd}>↵</kbd>executar</span>
-              <span class="flex items-center gap-1.5"><kbd class={kbd}>{mod}</kbd><kbd class={kbd}>S</kbd>salvar</span>
-              <span class="flex items-center gap-1.5"><kbd class={kbd}>{mod}</kbd><kbd class={kbd}>K</kbd>buscar</span>
-            </span>
-          </EmptyState>
-        </div>
+        <EmptyState
+          title="Nenhum resultado ainda"
+          description="Escreva uma consulta e execute. Limite de 30 s e 1000 linhas por resultado."
+        />
       {:else if response.error}
-        <div class="p-4 sm:p-6">
-          <Callout variant="danger" title={response.error.code ? `Erro ${response.error.code}` : 'A consulta falhou'}>
-            <p class="font-mono text-xs leading-relaxed text-foreground">{response.error.message}</p>
-            {#if response.error.position}<p class="mt-2">Posição {response.error.position} no texto.</p>{/if}
-            {#if response.error.detail}<p class="mt-2">{response.error.detail}</p>{/if}
-            {#if response.error.hint}<p class="mt-2"><span class="font-semibold text-foreground">Dica:</span> {response.error.hint}</p>{/if}
-          </Callout>
+        <div class="p-4" role="alert">
+          <div class="rounded-md border border-destructive/30 px-4 py-3 text-sm">
+            <p class="font-mono text-xs leading-relaxed text-destructive">
+              {#if response.error.code}{response.error.code}: {/if}{response.error.message}
+            </p>
+            {#if response.error.position}<p class="mt-2 text-muted-foreground">Posição {response.error.position} no texto.</p>{/if}
+            {#if response.error.detail}<p class="mt-2 text-muted-foreground">{response.error.detail}</p>{/if}
+            {#if response.error.hint}<p class="mt-2 text-muted-foreground">Dica: {response.error.hint}</p>{/if}
+          </div>
         </div>
       {:else if response.results}
         {#if response.results.length === 0}
-          <div class="flex items-center gap-2.5 border-b bg-sidebar px-4 py-2.5 text-sm text-muted-foreground">
-            <CircleCheck class="size-4 text-brand" />Executado, sem linhas.
-            <span class="ml-auto font-mono text-xs tabular-nums">{elapsed} ms</span>
-          </div>
+          <p class="border-b px-4 py-2.5 text-sm text-muted-foreground">
+            Executado, sem linhas · <span class="tabular-nums">{elapsed} ms</span>
+          </p>
         {/if}
         {#each response.results as result, r (r)}
-          <div class="flex min-h-11 items-center gap-3 border-b bg-sidebar px-4 py-1.5 text-sm">
-            <CircleCheck class="size-4 shrink-0 text-brand" />
-            <span class="font-semibold tabular-nums">
-              {result.count}
-              {result.count === 1 ? 'linha' : 'linhas'}
-            </span>
-            {#if result.truncated}
-              <span class="rounded-full border border-warning/30 bg-warning/10 px-2 py-px text-2xs font-semibold text-warning"
-                >mostrando 1000</span
-              >
-            {/if}
-            {#if response.results.length > 1}
-              <span class="text-xs text-muted-foreground">resultado {r + 1} de {response.results.length}</span>
-            {/if}
-            <span class="flex items-center gap-1 font-mono text-xs text-muted-foreground tabular-nums">
-              <Timer class="size-3.5" />{elapsed} ms
+          <div class="flex min-h-10 items-center gap-2 border-b px-4 py-1 text-sm text-muted-foreground">
+            <span class="tabular-nums">
+              {#if response.results.length > 1}Resultado {r + 1} de {response.results.length} · {/if}{result.count}
+              {result.count === 1 ? 'linha' : 'linhas'}{#if result.truncated}<span class="text-warning">
+                  (mostrando 1000)</span
+                >{/if} · {elapsed} ms
             </span>
             {#if result.columns.length}
               <DropdownMenu.Root>
                 <DropdownMenu.Trigger>
                   {#snippet child({ props })}
-                    <Button variant="ghost" size="sm" class="ml-auto" {...props}>
-                      <Download />Exportar
-                    </Button>
+                    <Button variant="ghost" size="sm" class="ml-auto" {...props}>Exportar</Button>
                   {/snippet}
                 </DropdownMenu.Trigger>
                 <DropdownMenu.Content align="end" class="w-40">
@@ -302,19 +256,17 @@
             <table class="w-max min-w-full border-separate border-spacing-0 text-sm">
               <thead class="sticky top-0 z-10">
                 <tr>
-                  <th class="w-12 border-r border-b bg-muted px-3 py-2.5 text-right text-xs font-medium text-muted-foreground">#</th>
                   {#each result.columns as column, c (c)}
-                    <th class="border-r border-b bg-muted px-4 py-2.5 text-left font-mono text-xs font-semibold">{column}</th>
+                    <th class="border-r border-b bg-muted px-3 py-2 text-left font-mono text-xs font-medium">{column}</th>
                   {/each}
                 </tr>
               </thead>
               <tbody>
                 {#each result.rows as row, i (i)}
-                  <tr class="transition-colors even:bg-muted/20 hover:bg-muted/50">
-                    <td class="border-r border-b px-3 py-2 text-right font-mono text-2xs text-muted-foreground tabular-nums">{i + 1}</td>
+                  <tr class="hover:bg-muted/40">
                     {#each row as cell, c (c)}
-                      <td class="max-w-96 truncate border-r border-b px-4 py-2 font-mono text-xs" title={cell ?? 'NULL'}>
-                        {#if cell === null}<span class="rounded bg-muted px-1 text-2xs text-muted-foreground">NULL</span>{:else}{cell}{/if}
+                      <td class="max-w-96 truncate border-r border-b px-3 py-2 font-mono text-xs" title={cell ?? 'NULL'}>
+                        {#if cell === null}<span class="text-muted-foreground italic">NULL</span>{:else}{cell}{/if}
                       </td>
                     {/each}
                   </tr>

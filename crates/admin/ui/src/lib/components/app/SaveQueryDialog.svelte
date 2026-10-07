@@ -42,9 +42,8 @@
         <Dialog.Description>Fica salva neste navegador, para este projeto.</Dialog.Description>
       </Dialog.Header>
       <div class="grid gap-2">
-        <Label for="query-name" class="font-semibold">Nome</Label>
-        <Input id="query-name" bind:value={name} placeholder="ex.: pedidos da semana" maxlength={120} class="h-10" />
-        <p class="text-xs text-muted-foreground">Aparece na barra lateral e na busca (Ctrl K).</p>
+        <Label for="query-name">Nome</Label>
+        <Input id="query-name" bind:value={name} placeholder="ex.: pedidos da semana" maxlength={120} />
       </div>
       <Dialog.Footer>
         <Button variant="outline" onclick={() => (open = false)}>Cancelar</Button>
