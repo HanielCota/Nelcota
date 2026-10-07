@@ -31,6 +31,7 @@
   import { describe, filtersParam, filtersToSearch, parseFilters, type TableFilter } from '$lib/filters'
   import { href, navigate, route } from '$lib/router.svelte'
   import { cn } from '$lib/utils'
+  import { formatCell } from '$lib/format'
   import type { Column, RowData, TableData, TableSummary } from '$lib/types'
 
   let { name, view = 'data' }: { name?: string; view?: 'data' | 'structure' } = $props()
@@ -474,7 +475,10 @@
                       {:else}
                         <div class="flex items-center gap-1 px-3 py-1.5" title={value ?? 'NULL'}>
                           <span class="truncate">
-                            {#if value === null}<span class="text-muted-foreground">NULL</span>{:else}{value}{/if}
+                            {#if value === null}<span class="text-muted-foreground">NULL</span>{:else}{formatCell(
+                                value,
+                                column.type,
+                              ).text}{/if}
                           </span>
                           {#if column.references && value !== null}
                             <a
