@@ -66,11 +66,12 @@
       class="sr-only z-50 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-raised focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
       >Pular para o conteúdo</a
     >
-    <div class="flex h-screen flex-col overflow-hidden bg-background">
-      <Topbar />
-      <div class="flex min-h-0 flex-1">
-        <AppSidebar />
-        <main id="conteudo" tabindex="-1" class="min-w-0 flex-1 overflow-auto outline-none">
+    <!-- Barra lateral de altura total à esquerda; topbar e página à direita. -->
+    <div class="flex h-screen overflow-hidden bg-background">
+      <AppSidebar />
+      <div class="flex min-w-0 flex-1 flex-col">
+        <Topbar />
+        <main id="conteudo" tabindex="-1" class="min-h-0 min-w-0 flex-1 overflow-auto outline-none">
           {#key pageKey}
             {#if path === '/'}
               <Overview />

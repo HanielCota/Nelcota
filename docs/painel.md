@@ -7,9 +7,9 @@ finais: email e senha gerados pelo primeiro `nelcota init` (a senha aparece uma
 ## Vários projetos
 
 Cada projeto tem o próprio painel, no próprio domínio, mostrando só os dados
-dele. No topo, o **seletor de projetos** (nome do projeto atual) lista os outros
-projetos do host e leva a "Todos os projetos": nome, domínio, estado (no ar /
-fora do ar), versão e um botão para abrir cada painel.
+dele. No topo da barra lateral, o **seletor de projetos** (nome do projeto
+atual) lista os outros projetos do host e leva a "Todos os projetos": nome,
+domínio, estado (no ar / fora do ar), versão e um botão para abrir cada painel.
 
 Com o **login único** (padrão), trocar de projeto pelo seletor não pede senha.
 Com o **login por projeto** (`nelcota panel-login per-project`), o seletor só

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, type Snippet } from 'svelte'
+  import { onMount } from 'svelte'
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu'
   import ChevronsUpDown from '@lucide/svelte/icons/chevrons-up-down'
   import Check from '@lucide/svelte/icons/check'
@@ -10,7 +10,7 @@
   import { navigate } from '$lib/router.svelte'
   import type { ProjectsData } from '$lib/types'
 
-  let { slash }: { slash: Snippet } = $props()
+  let { menuOpen = $bindable(false) }: { menuOpen?: boolean } = $props()
 
   let data = $state<ProjectsData | null>(null)
 
@@ -34,12 +34,13 @@
 </script>
 
 {#if data}
-  <DropdownMenu.Root>
+  <DropdownMenu.Root bind:open={menuOpen}>
     <DropdownMenu.Trigger>
       {#snippet child({ props })}
         <button
           {...props}
-          class="flex h-9 min-w-0 cursor-pointer items-center gap-2 rounded-md px-2.5 text-sm font-medium transition-colors hover:bg-accent aria-expanded:bg-accent"
+          class="flex h-9 w-full min-w-0 cursor-pointer items-center justify-between gap-2 rounded-md px-2.5 text-sm font-medium whitespace-nowrap transition-colors hover:bg-sidebar-accent/60 aria-expanded:bg-sidebar-accent/60"
+          title="Trocar de projeto"
         >
           <span class="truncate">{data!.current}</span>
           <ChevronsUpDown class="size-4 shrink-0 text-muted-foreground" />
@@ -60,5 +61,4 @@
       <DropdownMenu.Item onclick={() => navigate('/projects')}><Boxes />Todos os projetos</DropdownMenu.Item>
     </DropdownMenu.Content>
   </DropdownMenu.Root>
-  {@render slash()}
 {/if}
