@@ -5,10 +5,8 @@
   import { Label } from '$lib/components/ui/label'
   import { api } from '$lib/api'
   import { session } from '$lib/session.svelte'
-  import neutral from '../../assets/mascot/neutral.png'
-  import wave from '../../assets/mascot/wave.png'
-  import eyesClosed from '../../assets/mascot/eyes-closed.png'
-  import sad from '../../assets/mascot/sad.png'
+  import Mascot, { type Pose } from '$lib/components/app/Mascot.svelte'
+  import type { Point } from '$lib/mascot'
 
   let project = $state('')
   // O mascote acena ao abrir a tela e depois fica parado.
@@ -43,20 +41,22 @@
   }
 
   // Fecha os olhos enquanto a senha é digitada; fica triste se o login falha.
-  const frames = { neutral, wave, eyesClosed, sad }
-  const pose = $derived<keyof typeof frames>(
-    typingPassword ? 'eyesClosed' : error ? 'sad' : greeting ? 'wave' : 'neutral',
-  )
+  const pose = $derived<Pose>(typingPassword ? 'eyesClosed' : error ? 'sad' : greeting ? 'wave' : 'neutral')
+
+  // Enquanto o email é digitado, acompanha o texto em vez do ponteiro.
+  let caret = $state<Point | null>(null)
+  function followCaret(event: Event) {
+    const input = event.currentTarget as HTMLInputElement
+    const rect = input.getBoundingClientRect()
+    const chars = input.selectionStart ?? input.value.length
+    // Largura média de um caractere a 15px: aproximação suficiente para o olhar.
+    caret = { x: rect.left + Math.min(12 + chars * 8, rect.width - 12), y: rect.top + rect.height / 2 }
+  }
 </script>
 
-<main class="flex min-h-screen flex-col items-center justify-center bg-background px-4 pt-40 pb-12">
+<main class="flex min-h-screen flex-col items-center bg-background px-4 pt-[max(10rem,27vh)] pb-12">
   <div class="relative w-full max-w-[400px]">
-    <!-- Todas as poses ficam carregadas: trocar de expressão não pisca. -->
-    <div class="pointer-events-none absolute -top-[8.6rem] left-1/2 size-36 -translate-x-1/2 select-none" aria-hidden="true">
-      {#each Object.entries(frames) as [name, src] (name)}
-        <img {src} alt="" draggable="false" class={['absolute inset-0 size-full', pose !== name && 'invisible']} />
-      {/each}
-    </div>
+    <Mascot {pose} lookAt={caret} class="pointer-events-none absolute -top-[8.6rem] left-1/2 size-36 -translate-x-1/2" />
 
     <form class="grid gap-5 rounded-lg border bg-card px-6 pt-10 pb-6 sm:px-8 sm:pb-8" onsubmit={submit}>
       <div class="text-center">
@@ -74,7 +74,14 @@
           autocomplete="username"
           class="h-10"
           bind:value={email}
-          oninput={() => (error = '')}
+          onfocus={followCaret}
+          onkeyup={followCaret}
+          onclick={followCaret}
+          onblur={() => (caret = null)}
+          oninput={(e) => {
+            error = ''
+            followCaret(e)
+          }}
           required
         />
       </div>
