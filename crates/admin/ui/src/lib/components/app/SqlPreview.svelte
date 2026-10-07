@@ -41,7 +41,7 @@
   {#if preview.error}
     <p class="border-t px-3 py-2 text-xs text-destructive">{preview.error}</p>
   {:else if open}
-    <pre class="max-h-64 overflow-auto border-t px-3 py-2 font-mono text-[11.5px] leading-relaxed whitespace-pre-wrap">{text ||
+    <pre class="max-h-64 overflow-auto border-t px-3 py-2 font-mono text-2xs leading-relaxed whitespace-pre-wrap">{text ||
         placeholder}</pre>
   {/if}
 </section>

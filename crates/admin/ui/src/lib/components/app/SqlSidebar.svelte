@@ -33,7 +33,7 @@
   </div>
 
   <div class="flex-1 overflow-y-auto p-2">
-    <p class="px-2 pt-1 pb-1 text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
+    <p class="px-2 pt-1 pb-1 text-2xs font-medium tracking-wider text-muted-foreground uppercase">
       Salvas ({sqlStore.saved.length})
     </p>
     {#each sqlStore.sorted as query (query.id)}
@@ -69,7 +69,7 @@
       </p>
     {/each}
 
-    <p class="mt-4 px-2 pb-1 text-[11px] font-medium tracking-wider text-muted-foreground uppercase">Modelos</p>
+    <p class="mt-4 px-2 pb-1 text-2xs font-medium tracking-wider text-muted-foreground uppercase">Modelos</p>
     {#each SQL_SNIPPETS as snippet (snippet.label)}
       <button class={item} onclick={() => sqlStore.open(snippet.sql)}>
         <Sparkles class="size-3.5 shrink-0" strokeWidth={1.6} />

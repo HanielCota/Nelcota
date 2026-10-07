@@ -121,7 +121,7 @@
                   </p>
                   <div class="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
                     <span
-                      class="rounded border border-border-strong bg-muted px-1.5 py-px font-mono text-[11px] text-foreground uppercase"
+                      class="rounded border border-border-strong bg-muted px-1.5 py-px font-mono text-2xs text-foreground uppercase"
                       >{policy.command}</span
                     >
                     {policy.roles.join(', ')}

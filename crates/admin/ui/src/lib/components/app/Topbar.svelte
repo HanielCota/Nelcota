@@ -84,7 +84,7 @@
     >
       <Search class="size-3.5" />
       <span class="hidden flex-1 text-left sm:inline">Buscar…</span>
-      <kbd class="hidden rounded border bg-muted px-1 font-sans text-[10px] sm:inline">{isMac ? '⌘' : 'Ctrl'} K</kbd>
+      <kbd class="hidden rounded border bg-muted px-1 font-sans text-3xs sm:inline">{isMac ? '⌘' : 'Ctrl'} K</kbd>
     </button>
     <Button variant="outline" size="sm" href={href('/connect')} class="hidden sm:inline-flex">
       <Plug />API

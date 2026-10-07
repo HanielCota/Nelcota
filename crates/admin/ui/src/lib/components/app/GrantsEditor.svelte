@@ -39,7 +39,7 @@
         <tr class="border-t">
           <td class="px-3 py-2">
             <span class="font-mono text-xs">{role}</span>
-            <span class="block text-[11px] font-light text-muted-foreground">{hint[role]}</span>
+            <span class="block text-2xs font-light text-muted-foreground">{hint[role]}</span>
           </td>
           {#each PRIVILEGES as privilege (privilege)}
             <td class="px-2 py-2 text-center">

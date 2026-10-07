@@ -45,7 +45,7 @@
         <span class="opacity-0 transition-opacity duration-150 group-hover/rail:opacity-100">Docs (OpenAPI)</span>
       </a>
       <p
-        class="mt-2 w-48 px-2 pb-1 text-[11px] leading-snug font-light text-muted-foreground opacity-0 transition-opacity duration-150 group-hover/rail:opacity-100"
+        class="mt-2 w-48 px-2 pb-1 text-2xs leading-snug font-light text-muted-foreground opacity-0 transition-opacity duration-150 group-hover/rail:opacity-100"
       >
         A chave <span class="font-mono">service_role</span> ignora o RLS. Use só no backend.
       </p>

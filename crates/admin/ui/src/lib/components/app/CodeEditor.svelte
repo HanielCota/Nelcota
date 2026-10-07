@@ -27,7 +27,7 @@
 
   // Cores do tema vêm das variáveis CSS do painel: acompanham claro/escuro.
   const theme = EditorView.theme({
-    '&': { height: '100%', fontSize: '13px', backgroundColor: 'transparent', color: 'var(--foreground)' },
+    '&': { height: '100%', fontSize: '14px', backgroundColor: 'transparent', color: 'var(--foreground)' },
     '.cm-scroller': { fontFamily: 'var(--font-mono)', lineHeight: '1.65' },
     '.cm-content': { padding: '12px 0', caretColor: 'var(--foreground)' },
     '.cm-gutters': { backgroundColor: 'transparent', color: 'var(--muted-foreground)', border: 'none' },
@@ -46,7 +46,7 @@
       borderRadius: '4px',
       overflow: 'hidden',
     },
-    '.cm-tooltip-autocomplete > ul': { fontFamily: 'var(--font-mono)', fontSize: '12px', maxHeight: '16em' },
+    '.cm-tooltip-autocomplete > ul': { fontFamily: 'var(--font-mono)', fontSize: '13px', maxHeight: '16em' },
     '.cm-tooltip-autocomplete > ul > li': { padding: '3px 10px !important' },
     '.cm-tooltip-autocomplete > ul > li[aria-selected]': {
       backgroundColor: 'var(--accent)',

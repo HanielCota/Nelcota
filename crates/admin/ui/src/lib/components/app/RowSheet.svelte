@@ -112,7 +112,7 @@
           <div class="grid gap-1.5">
             <div class="flex items-center gap-2">
               <label for={`f-${column.name}`} class="text-sm font-medium">{column.name}</label>
-              <span class="font-mono text-[11px] text-muted-foreground"
+              <span class="font-mono text-2xs text-muted-foreground"
                 >{column.full_type}{column.is_pk ? ', pk' : ''}</span
               >
               {#if column.nullable}

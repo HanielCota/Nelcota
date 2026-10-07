@@ -92,6 +92,17 @@
 }
 
 @theme inline {
+	/* Escala tipográfica do painel (um ponto acima do padrão do Tailwind).
+	   Ajustes de tamanho são feitos aqui, não com text-[Npx] nos componentes. */
+	--text-3xs: 0.6875rem;
+	--text-3xs--line-height: 1rem;
+	--text-2xs: 0.75rem;
+	--text-2xs--line-height: 1rem;
+	--text-xs: 0.8125rem;
+	--text-sm: 0.9375rem;
+	--text-base: 1.0625rem;
+	--text-2xl: 1.625rem;
+	--text-3xl: 2rem;
 	--font-sans: 'Manrope Variable', 'Manrope', sans-serif;
 	--font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 	--color-warning: var(--warning);
@@ -157,7 +168,7 @@
 	}
 	body {
 		font-weight: 400;
-		font-size: 14px;
+		font-size: 15px;
 		-webkit-font-smoothing: antialiased;
 		-moz-osx-font-smoothing: grayscale;
 		font-feature-settings: 'cv11', 'ss01';

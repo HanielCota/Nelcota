@@ -43,7 +43,7 @@
         >
           <span class="truncate">{data!.current}</span>
           <span
-            class="hidden rounded-full border border-brand/30 bg-brand/10 px-1.5 py-px text-[10px] font-medium tracking-wide text-brand uppercase sm:inline"
+            class="hidden rounded-full border border-brand/30 bg-brand/10 px-1.5 py-px text-3xs font-medium tracking-wide text-brand uppercase sm:inline"
             >projeto</span
           >
           <ChevronsUpDown class="size-3.5 shrink-0 text-muted-foreground" />

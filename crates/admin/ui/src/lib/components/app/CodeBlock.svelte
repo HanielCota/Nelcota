@@ -26,7 +26,7 @@
 <div class="group relative min-w-0 rounded-md border bg-muted/40">
   <pre
     class={[
-      'px-3 py-2.5 pr-10 font-mono text-[12px] leading-relaxed',
+      'px-3 py-2.5 pr-10 font-mono text-xs leading-relaxed',
       wrap ? 'break-all whitespace-pre-wrap' : 'overflow-x-auto',
     ]}>{code}</pre>
   <button

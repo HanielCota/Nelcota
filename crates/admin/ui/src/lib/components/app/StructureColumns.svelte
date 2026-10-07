@@ -18,7 +18,7 @@
     ondelete: (column: ColumnInfo) => void
   } = $props()
 
-  const tag = 'rounded border border-border-strong bg-muted px-1.5 py-px text-[10.5px] text-muted-foreground'
+  const tag = 'rounded border border-border-strong bg-muted px-1.5 py-px text-3xs text-muted-foreground'
 </script>
 
 <section class="overflow-hidden rounded-lg border bg-card">
@@ -34,7 +34,7 @@
       <div class="group grid items-center gap-x-4 gap-y-1 px-4 py-2.5 text-sm md:grid-cols-[minmax(10rem,14rem)_minmax(8rem,12rem)_1fr_auto]">
         <div class="flex min-w-0 items-center gap-2">
           {#if column.primary_key}<KeyRound class="size-3.5 shrink-0 text-brand" aria-label="chave primária" />{/if}
-          <span class="truncate font-mono text-[13px]">{column.name}</span>
+          <span class="truncate font-mono text-sm">{column.name}</span>
         </div>
         <span class="truncate font-mono text-xs text-muted-foreground">{column.data_type}</span>
         <div class="flex min-w-0 flex-wrap items-center gap-1.5">
@@ -46,7 +46,7 @@
             <span class={[tag, 'text-brand']}>→ {column.references.table}.{column.references.column}</span>
           {/if}
           {#if column.default && !column.identity && !column.generated}
-            <span class="truncate font-mono text-[11px] text-muted-foreground" title={column.default}>= {column.default}</span>
+            <span class="truncate font-mono text-2xs text-muted-foreground" title={column.default}>= {column.default}</span>
           {/if}
           {#if column.comment}<span class="truncate text-xs font-light text-muted-foreground">{column.comment}</span>{/if}
         </div>

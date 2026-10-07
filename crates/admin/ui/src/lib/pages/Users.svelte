@@ -118,7 +118,7 @@
                   >
                   <div class="min-w-0">
                     <p class="font-medium">{user.email}</p>
-                    <p class="font-mono text-[11px] text-muted-foreground">{user.id}</p>
+                    <p class="font-mono text-2xs text-muted-foreground">{user.id}</p>
                   </div>
                 </div>
               </Table.Cell>
