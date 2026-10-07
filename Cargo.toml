@@ -28,6 +28,8 @@ form_urlencoded = "1.2.2"
 futures-util = { version = "0.3.34", default-features = false, features = ["std"] }
 figment = { version = "0.10.19", features = ["env", "toml"] }
 getrandom = "0.3.4"
+# Keyed GCRA rate limiter, in memory. std clock only: no quanta, no jitter (rand).
+governor = { version = "0.10.4", default-features = false, features = ["std", "dashmap"] }
 http-body-util = "0.1.5"
 jsonwebtoken = { version = "11.1.0", default-features = false, features = ["rust_crypto", "use_pem"] }
 # SMTP over rustls + ring with Mozilla's roots bundled (the scratch image has no
