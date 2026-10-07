@@ -892,3 +892,542 @@ async fn colunas_indicam_a_chave_estrangeira() {
     );
     assert_eq!(column("nota")["references"], Value::Null);
 }
+
+#[tokio::test]
+async fn estrutura_da_tabela_lida_do_catalogo_do_postgres() {
+    let app = TestApp::spawn().await;
+    let cookie = login(&app).await;
+
+    let reply = get(&app, "/admin/api/tables/produtos/structure", &cookie).await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.text);
+    let data = reply.body;
+    assert_eq!(data["primary_key"], json!(["id"]));
+    assert_eq!(data["rls_enabled"], false);
+    assert_eq!(data["comment"], "Catálogo de produtos");
+    let column = |name: &str| {
+        data["columns"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["name"] == name)
+            .unwrap()
+            .clone()
+    };
+    assert_eq!(column("id")["identity"], "by default");
+    assert_eq!(column("id")["primary_key"], true);
+    assert_eq!(column("nome")["data_type"], "character varying(80)");
+    assert_eq!(column("nome")["nullable"], false);
+    assert_eq!(column("estoque")["default"], "0");
+    assert_eq!(column("criado_em")["default"], "now()");
+    assert_eq!(column("slug")["generated"], true);
+    assert_eq!(
+        data["grants"],
+        json!([
+            { "role": "anon", "privileges": ["select"] },
+            { "role": "authenticated", "privileges": ["select"] },
+            { "role": "service_role", "privileges": ["select", "insert", "update", "delete"] },
+        ])
+    );
+
+    app.admin_client
+        .batch_execute(
+            "CREATE TABLE public.itens (
+                 id int PRIMARY KEY,
+                 produto_id int REFERENCES public.produtos (id) ON DELETE CASCADE,
+                 codigo text CONSTRAINT itens_codigo_key UNIQUE
+             );",
+        )
+        .await
+        .unwrap();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    let itens = loop {
+        let reply = get(&app, "/admin/api/tables/itens/structure", &cookie).await;
+        if reply.status == StatusCode::OK {
+            break reply.body;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "tabela nova não apareceu"
+        );
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    };
+    let columns = itens["columns"].as_array().unwrap();
+    assert_eq!(
+        columns[1]["references"],
+        json!({ "table": "produtos", "column": "id", "on_delete": "cascade", "constraint": "itens_produto_id_fkey" })
+    );
+    assert_eq!(columns[2]["unique"], "itens_codigo_key");
+
+    let missing = get(&app, "/admin/api/tables/nao_existe/structure", &cookie).await;
+    assert_eq!(missing.status, StatusCode::NOT_FOUND);
+}
+
+fn columns_of(structure: &Value) -> Vec<String> {
+    structure["columns"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| c["name"].as_str().unwrap().to_owned())
+        .collect()
+}
+
+#[tokio::test]
+async fn criar_alterar_e_apagar_tabelas_pelo_painel() {
+    let app = TestApp::spawn().await;
+    let cookie = login(&app).await;
+    let notas = json!({
+        "name": "notas",
+        "comment": "Notas da equipe",
+        "columns": [
+            { "name": "id", "data_type": "bigint", "primary_key": true, "identity": true },
+            { "name": "texto", "data_type": "text", "nullable": false },
+            { "name": "produto_id", "data_type": "integer",
+              "references": { "table": "produtos", "column": "id", "on_delete": "cascade" } },
+            { "name": "criada_em", "data_type": "timestamptz", "nullable": false, "default": "now()" },
+        ],
+        "grants": [{ "role": "anon", "privileges": ["select"] }],
+    });
+
+    // Prévia: devolve o SQL e não cria nada.
+    let preview = send(
+        &app,
+        Method::POST,
+        "/admin/api/tables",
+        &cookie,
+        json!({ "table": notas, "preview": true }),
+    )
+    .await;
+    assert_eq!(preview.status, StatusCode::OK, "{}", preview.text);
+    assert!(
+        preview.body["sql"][0]
+            .as_str()
+            .unwrap()
+            .starts_with("CREATE TABLE \"public\".\"notas\"")
+    );
+    assert_eq!(
+        get(&app, "/admin/api/tables/notas", &cookie).await.status,
+        StatusCode::NOT_FOUND
+    );
+
+    let created = send(
+        &app,
+        Method::POST,
+        "/admin/api/tables",
+        &cookie,
+        json!({ "table": notas }),
+    )
+    .await;
+    assert_eq!(created.status, StatusCode::OK, "{}", created.text);
+    // O catálogo já recarregou: a tabela está no painel e na API REST, sem espera.
+    let structure = get(&app, "/admin/api/tables/notas/structure", &cookie)
+        .await
+        .body;
+    assert_eq!(structure["rls_enabled"], true);
+    assert_eq!(
+        structure["grants"][0],
+        json!({ "role": "anon", "privileges": ["select"] })
+    );
+    let rest = app
+        .raw(Method::GET, "/rest/v1/notas", &[], String::new())
+        .await;
+    assert_eq!(rest.status, StatusCode::OK, "{}", rest.text);
+    assert_eq!(
+        rest.body,
+        json!([]),
+        "RLS ligado e sem policies: anon não vê nada"
+    );
+
+    // Várias alterações numa transação.
+    let altered = send(&app, Method::PATCH, "/admin/api/tables/notas", &cookie, json!({ "actions": [
+        { "action": "add_column", "column": { "name": "votos", "data_type": "integer", "default": "0", "nullable": false } },
+        { "action": "rename_column", "from": "texto", "to": "conteudo" },
+        { "action": "set_type", "column": "conteudo", "data_type": "varchar(500)" },
+        { "action": "set_unique", "column": "conteudo", "unique": true },
+        { "action": "set_grants", "grant": { "role": "authenticated", "privileges": ["select", "insert"] } },
+    ] })).await;
+    assert_eq!(altered.status, StatusCode::OK, "{}", altered.text);
+    let structure = get(&app, "/admin/api/tables/notas/structure", &cookie)
+        .await
+        .body;
+    assert_eq!(
+        columns_of(&structure),
+        ["id", "conteudo", "produto_id", "criada_em", "votos"]
+    );
+    let conteudo = &structure["columns"][1];
+    assert_eq!(conteudo["data_type"], "character varying(500)");
+    assert!(conteudo["unique"].is_string());
+    assert_eq!(
+        structure["grants"][1]["privileges"],
+        json!(["select", "insert"])
+    );
+
+    // Atomicidade: a segunda ação falha (cast impossível) e a primeira não fica.
+    let failed = send(
+        &app,
+        Method::PATCH,
+        "/admin/api/tables/notas",
+        &cookie,
+        json!({ "actions": [
+        { "action": "add_column", "column": { "name": "rascunho", "data_type": "boolean" } },
+        { "action": "set_type", "column": "criada_em", "data_type": "integer" },
+    ] }),
+    )
+    .await;
+    assert_eq!(failed.status, StatusCode::BAD_REQUEST, "{}", failed.text);
+    let structure = get(&app, "/admin/api/tables/notas/structure", &cookie)
+        .await
+        .body;
+    assert!(!columns_of(&structure).contains(&"rascunho".to_owned()));
+
+    // Expressão com um segundo comando: o protocolo estendido recusa.
+    let injection = send(
+        &app,
+        Method::PATCH,
+        "/admin/api/tables/notas",
+        &cookie,
+        json!({ "actions": [
+        { "action": "add_column", "column": { "name": "x", "data_type": "text",
+          "default": "'a'); DROP TABLE public.produtos; --" } },
+    ] }),
+    )
+    .await;
+    assert_eq!(
+        injection.status,
+        StatusCode::BAD_REQUEST,
+        "{}",
+        injection.text
+    );
+    assert_eq!(
+        get(&app, "/admin/api/tables/produtos", &cookie)
+            .await
+            .status,
+        StatusCode::OK
+    );
+
+    // Validação antes do banco.
+    let bad_type = send(
+        &app,
+        Method::POST,
+        "/admin/api/tables",
+        &cookie,
+        json!({ "table": {
+        "name": "t", "columns": [{ "name": "a", "data_type": "money" }] } }),
+    )
+    .await;
+    assert_eq!(bad_type.status, StatusCode::BAD_REQUEST);
+    assert!(
+        bad_type.text.contains("tipo desconhecido"),
+        "{}",
+        bad_type.text
+    );
+
+    // produtos é referenciada por notas: sem CASCADE o Postgres recusa.
+    let blocked = app
+        .raw(
+            Method::DELETE,
+            "/admin/api/tables/produtos",
+            &[("cookie", cookie.as_str())],
+            String::new(),
+        )
+        .await;
+    assert_eq!(blocked.status, StatusCode::BAD_REQUEST, "{}", blocked.text);
+    let dropped = app
+        .raw(
+            Method::DELETE,
+            "/admin/api/tables/notas",
+            &[("cookie", cookie.as_str())],
+            String::new(),
+        )
+        .await;
+    assert_eq!(dropped.status, StatusCode::OK, "{}", dropped.text);
+    assert_eq!(
+        get(&app, "/admin/api/tables/notas", &cookie).await.status,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        app.raw(Method::GET, "/rest/v1/notas", &[], String::new())
+            .await
+            .status,
+        StatusCode::NOT_FOUND
+    );
+
+    let types = get(&app, "/admin/api/types", &cookie).await.body;
+    assert!(
+        types["base"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("timestamptz"))
+    );
+    assert_eq!(types["enums"], json!(["prioridade"]));
+}
+
+async fn anon_rows(app: &TestApp) -> usize {
+    let reply = app
+        .raw(Method::GET, "/rest/v1/produtos", &[], String::new())
+        .await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.text);
+    reply.body.as_array().unwrap().len()
+}
+
+#[tokio::test]
+async fn policies_criadas_editadas_e_apagadas_pelo_painel() {
+    let app = TestApp::spawn().await;
+    let cookie = login(&app).await;
+    assert_eq!(anon_rows(&app).await, 4, "sem RLS, anon vê tudo");
+
+    let rls = send(
+        &app,
+        Method::PATCH,
+        "/admin/api/tables/produtos",
+        &cookie,
+        json!({ "actions": [{ "action": "set_rls", "enabled": true }] }),
+    )
+    .await;
+    assert_eq!(rls.status, StatusCode::OK, "{}", rls.text);
+    assert_eq!(anon_rows(&app).await, 0, "RLS sem policies: ninguém vê");
+
+    let policy = json!({ "name": "leitura pública", "command": "select", "roles": ["anon"], "using": "true" });
+    let created = send(
+        &app,
+        Method::POST,
+        "/admin/api/tables/produtos/policies",
+        &cookie,
+        json!({ "policy": policy }),
+    )
+    .await;
+    assert_eq!(created.status, StatusCode::OK, "{}", created.text);
+    assert_eq!(anon_rows(&app).await, 4);
+
+    // Editar: troca a expressão e o nome numa transação (DROP + CREATE).
+    let edited = send(&app, Method::PUT, "/admin/api/tables/produtos/policies/leitura%20p%C3%BAblica", &cookie,
+        json!({ "policy": { "name": "em estoque", "command": "select", "roles": ["anon"], "using": "estoque > 0" } })).await;
+    assert_eq!(edited.status, StatusCode::OK, "{}", edited.text);
+    assert_eq!(anon_rows(&app).await, 3, "Mochila tem estoque 0");
+    let listed = get(&app, "/admin/api/policies", &cookie).await.body;
+    let produtos = listed["tables"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|t| t["name"] == "produtos")
+        .unwrap()
+        .clone();
+    assert_eq!(produtos["policies"][0]["name"], "em estoque");
+    assert_eq!(produtos["policies"][0]["using"], "(estoque > 0)");
+
+    // Regras de cada comando validadas antes do banco.
+    let invalid = send(
+        &app,
+        Method::POST,
+        "/admin/api/tables/produtos/policies",
+        &cookie,
+        json!({ "policy": { "name": "x", "command": "insert", "using": "true" } }),
+    )
+    .await;
+    assert_eq!(invalid.status, StatusCode::BAD_REQUEST);
+    // Segundo comando escondido na expressão: recusado, e nada muda.
+    let injection = send(&app, Method::POST, "/admin/api/tables/produtos/policies", &cookie,
+        json!({ "policy": { "name": "y", "command": "select", "using": "true) ; DROP TABLE public.produtos; --" } })).await;
+    assert_eq!(
+        injection.status,
+        StatusCode::BAD_REQUEST,
+        "{}",
+        injection.text
+    );
+    assert_eq!(anon_rows(&app).await, 3);
+
+    let dropped = app
+        .raw(
+            Method::DELETE,
+            "/admin/api/tables/produtos/policies/em%20estoque",
+            &[("cookie", cookie.as_str())],
+            String::new(),
+        )
+        .await;
+    assert_eq!(dropped.status, StatusCode::OK, "{}", dropped.text);
+    assert_eq!(anon_rows(&app).await, 0);
+    let missing = app
+        .raw(
+            Method::DELETE,
+            "/admin/api/tables/produtos/policies/nao-existe",
+            &[("cookie", cookie.as_str())],
+            String::new(),
+        )
+        .await;
+    assert_eq!(missing.status, StatusCode::BAD_REQUEST, "{}", missing.text);
+}
+
+#[tokio::test]
+async fn token_service_role_emitido_pelo_painel() {
+    let app = TestApp::spawn().await;
+    let cookie = login(&app).await;
+
+    let anon = app
+        .raw(Method::GET, "/rest/v1/segredos", &[], String::new())
+        .await;
+    assert_ne!(
+        anon.status,
+        StatusCode::OK,
+        "segredos só tem GRANT para service_role"
+    );
+
+    let reply = send(
+        &app,
+        Method::POST,
+        "/admin/api/tokens/service-role",
+        &cookie,
+        json!({ "days": 7 }),
+    )
+    .await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.text);
+    assert_eq!(reply.headers[header::CACHE_CONTROL], "no-store");
+    let token = reply.body["token"].as_str().unwrap().to_owned();
+    let bearer = format!("Bearer {token}");
+    let service = app
+        .raw(
+            Method::GET,
+            "/rest/v1/segredos",
+            &[("authorization", bearer.as_str())],
+            String::new(),
+        )
+        .await;
+    assert_eq!(service.status, StatusCode::OK, "{}", service.text);
+
+    for days in [0, 3651] {
+        let bad = send(
+            &app,
+            Method::POST,
+            "/admin/api/tokens/service-role",
+            &cookie,
+            json!({ "days": days }),
+        )
+        .await;
+        assert_eq!(bad.status, StatusCode::BAD_REQUEST);
+    }
+    // Sem sessão do painel, nada de token.
+    let outsider = app
+        .raw(
+            Method::POST,
+            "/admin/api/tokens/service-role",
+            &[JSON],
+            json!({ "days": 7 }).to_string(),
+        )
+        .await;
+    assert_eq!(outsider.status, StatusCode::UNAUTHORIZED);
+}
+
+async fn password_login(app: &TestApp, email: &str, password: &str) -> Reply {
+    app.raw(
+        Method::POST,
+        "/auth/v1/token?grant_type=password",
+        &[JSON],
+        json!({ "email": email, "password": password }).to_string(),
+    )
+    .await
+}
+
+#[tokio::test]
+async fn criar_usuario_e_redefinir_senha_pelo_painel() {
+    let app = TestApp::spawn().await;
+    let cookie = login(&app).await;
+
+    let created = send(
+        &app,
+        Method::POST,
+        "/admin/api/users",
+        &cookie,
+        json!({ "email": "  Nova@Exemplo.com ", "password": "senha-inicial-123" }),
+    )
+    .await;
+    assert_eq!(created.status, StatusCode::CREATED, "{}", created.text);
+    // Mesmas regras do cadastro público: email normalizado.
+    assert_eq!(created.body["email"], "nova@exemplo.com");
+    let id = created.body["id"].as_str().unwrap().to_owned();
+
+    // O usuário criado entra pela API pública, com o mesmo hash do cadastro.
+    let session = password_login(&app, "nova@exemplo.com", "senha-inicial-123").await;
+    assert_eq!(session.status, StatusCode::OK, "{}", session.text);
+    let refresh = session.body["refresh_token"].as_str().unwrap().to_owned();
+
+    for (body, status) in [
+        (
+            json!({ "email": "nova@exemplo.com", "password": "outra-senha-123" }),
+            StatusCode::CONFLICT,
+        ),
+        (
+            json!({ "email": "sem-arroba", "password": "senha-valida-123" }),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            json!({ "email": "curta@exemplo.com", "password": "1234567" }),
+            StatusCode::BAD_REQUEST,
+        ),
+    ] {
+        let reply = send(&app, Method::POST, "/admin/api/users", &cookie, body).await;
+        assert_eq!(reply.status, status, "{}", reply.text);
+    }
+
+    // Redefinir: a senha antiga para de valer e a sessão aberta é encerrada.
+    let reset = send(
+        &app,
+        Method::PUT,
+        &format!("/admin/api/users/{id}/password"),
+        &cookie,
+        json!({ "password": "senha-nova-456" }),
+    )
+    .await;
+    assert_eq!(reset.status, StatusCode::OK, "{}", reset.text);
+    assert_eq!(reset.body["sessions_revoked"], 1);
+    assert_eq!(
+        password_login(&app, "nova@exemplo.com", "senha-inicial-123")
+            .await
+            .status,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        password_login(&app, "nova@exemplo.com", "senha-nova-456")
+            .await
+            .status,
+        StatusCode::OK
+    );
+    let reused = app
+        .raw(
+            Method::POST,
+            "/auth/v1/token?grant_type=refresh_token",
+            &[JSON],
+            json!({ "refresh_token": refresh }).to_string(),
+        )
+        .await;
+    assert_ne!(
+        reused.status,
+        StatusCode::OK,
+        "sessão anterior à troca de senha não pode renovar"
+    );
+
+    let weak = send(
+        &app,
+        Method::PUT,
+        &format!("/admin/api/users/{id}/password"),
+        &cookie,
+        json!({ "password": "curta" }),
+    )
+    .await;
+    assert_eq!(weak.status, StatusCode::BAD_REQUEST);
+    let missing = send(
+        &app,
+        Method::PUT,
+        "/admin/api/users/00000000-0000-0000-0000-000000000000/password",
+        &cookie,
+        json!({ "password": "senha-valida-123" }),
+    )
+    .await;
+    assert_eq!(missing.status, StatusCode::NOT_FOUND);
+    let bad_id = send(
+        &app,
+        Method::PUT,
+        "/admin/api/users/nao-e-uuid/password",
+        &cookie,
+        json!({ "password": "senha-valida-123" }),
+    )
+    .await;
+    assert_eq!(bad_id.status, StatusCode::BAD_REQUEST);
+}

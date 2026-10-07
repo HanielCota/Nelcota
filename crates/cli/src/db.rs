@@ -6,10 +6,8 @@
 use std::{fs, path::Path};
 
 use anyhow::{Context, bail};
-use jsonwebtoken::get_current_timestamp;
 use nelcota_core::Config;
 use refinery::{Migration, Runner};
-use serde_json::json;
 use tokio_postgres::NoTls;
 
 use crate::{
@@ -157,13 +155,7 @@ pub fn service_role_token(host: &Host, selection: Option<&str>, days: u64) -> an
                 config.jwt_private_key(),
                 config.jwt_secret().map(str::as_bytes),
             )?;
-            let now = get_current_timestamp();
-            let token = keys.sign(&json!({
-                "iss": config.jwt_issuer,
-                "role": "service_role",
-                "iat": now,
-                "exp": now + days * 86_400,
-            }))?;
+            let token = keys.service_role_token(&config.jwt_issuer, days)?;
             eprintln!(
                 "ATENÇÃO: este token ignora o RLS. Use só no seu backend, nunca no frontend."
             );

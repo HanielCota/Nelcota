@@ -8,9 +8,7 @@ use std::{
 };
 
 use anyhow::{Context, bail};
-use jsonwebtoken::get_current_timestamp;
 use nelcota_core::{Config, Secret, config::LogFormat};
-use serde_json::json;
 use tokio_postgres::NoTls;
 
 use std::path::Path;
@@ -131,10 +129,7 @@ pub fn run(root: &Path, args: DevArgs) -> anyhow::Result<Outcome> {
     ok(&format!("Postgres em 127.0.0.1:{}", state.db_port));
 
     let keys = nelcota_auth::Keys::new(config.jwt_private_key(), None)?;
-    let now = get_current_timestamp();
-    let service = keys.sign(&json!({
-        "iss": config.jwt_issuer, "role": "service_role", "iat": now, "exp": now + 30 * 86_400,
-    }))?;
+    let service = keys.service_role_token(&config.jwt_issuer, 30)?;
     println!();
     println!("  API:      http://{}/rest/v1/", args.listen);
     println!("  Auth:     http://{}/auth/v1/", args.listen);

@@ -6,6 +6,7 @@
   import FilePlus from '@lucide/svelte/icons/file-plus'
   import { SQL_SNIPPETS } from '$lib/sql-snippets'
   import { sqlStore, type SavedQuery } from '$lib/sql-store.svelte'
+  import { cn } from '$lib/utils'
 
   let {
     onrename,
@@ -19,7 +20,7 @@
     'group flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-sm text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground'
 </script>
 
-<aside class="hidden w-60 shrink-0 flex-col border-r bg-sidebar lg:flex">
+<aside class="hidden w-60 shrink-0 flex-col border-r bg-sidebar lg:flex" aria-label="Consultas salvas e modelos">
   <div class="flex h-12 items-center justify-between border-b px-4">
     <p class="text-sm font-medium">Editor SQL</p>
     <button
@@ -33,12 +34,12 @@
   </div>
 
   <div class="flex-1 overflow-y-auto p-2">
-    <p class="px-2 pt-1 pb-1 text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
+    <p class="px-2 pt-1 pb-1 text-2xs font-medium tracking-wider text-muted-foreground uppercase">
       Salvas ({sqlStore.saved.length})
     </p>
     {#each sqlStore.sorted as query (query.id)}
       {@const active = query.id === sqlStore.currentId}
-      <div class={[item, 'pr-1', active && 'bg-accent text-foreground']}>
+      <div class={cn(item, 'pr-1', active && 'bg-accent text-foreground')}>
         <button class="flex min-w-0 flex-1 items-center gap-2" onclick={() => sqlStore.openSaved(query.id)}>
           <FileCode class={['size-3.5 shrink-0', active && 'text-brand']} strokeWidth={1.6} />
           <span class="truncate">{query.name}</span>
@@ -69,7 +70,7 @@
       </p>
     {/each}
 
-    <p class="mt-4 px-2 pb-1 text-[11px] font-medium tracking-wider text-muted-foreground uppercase">Modelos</p>
+    <p class="mt-4 px-2 pb-1 text-2xs font-medium tracking-wider text-muted-foreground uppercase">Modelos</p>
     {#each SQL_SNIPPETS as snippet (snippet.label)}
       <button class={item} onclick={() => sqlStore.open(snippet.sql)}>
         <Sparkles class="size-3.5 shrink-0" strokeWidth={1.6} />

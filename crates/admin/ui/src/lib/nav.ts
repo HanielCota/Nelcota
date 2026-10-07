@@ -5,6 +5,7 @@ import SquareTerminal from '@lucide/svelte/icons/square-terminal'
 import Users from '@lucide/svelte/icons/users'
 import ShieldCheck from '@lucide/svelte/icons/shield-check'
 import Boxes from '@lucide/svelte/icons/boxes'
+import Plug from '@lucide/svelte/icons/plug'
 import { route } from './router.svelte'
 
 export type NavItem = { title: string; path: string; icon: Component }
@@ -20,7 +21,11 @@ export const navGroups: NavItem[][] = [
     { title: 'Usuários', path: '/users', icon: Users },
     { title: 'Policies', path: '/policies', icon: ShieldCheck },
   ],
-  [{ title: 'Projetos', path: '/projects', icon: Boxes }],
+  [
+    // /connect, não /api: /admin/api/* é o prefixo da API do painel.
+    { title: 'API', path: '/connect', icon: Plug },
+    { title: 'Projetos', path: '/projects', icon: Boxes },
+  ],
 ]
 
 export const isActive = (path: string) =>

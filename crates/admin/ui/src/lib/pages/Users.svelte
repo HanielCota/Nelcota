@@ -7,9 +7,12 @@
   import Ellipsis from '@lucide/svelte/icons/ellipsis'
   import Search from '@lucide/svelte/icons/search'
   import UsersIcon from '@lucide/svelte/icons/users'
+  import UserPlus from '@lucide/svelte/icons/user-plus'
   import { toast } from 'svelte-sonner'
   import PageHeader from '$lib/components/app/PageHeader.svelte'
   import ConfirmDialog from '$lib/components/app/ConfirmDialog.svelte'
+  import CreateUserDialog from '$lib/components/app/CreateUserDialog.svelte'
+  import SetPasswordDialog from '$lib/components/app/SetPasswordDialog.svelte'
   import { api, enc } from '$lib/api'
   import type { User } from '$lib/types'
 
@@ -20,6 +23,9 @@
   let query = $state('')
   let target = $state<{ user: User; action: 'revoke' | 'delete' } | null>(null)
   let confirmOpen = $state(false)
+  let createOpen = $state(false)
+  let passwordUser = $state<User | null>(null)
+  let passwordOpen = $state(false)
 
   async function load() {
     try {
@@ -82,6 +88,7 @@
         <Search class="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
         <Input bind:value={query} oninput={onSearch} placeholder="Buscar por email" class="h-8 w-64 bg-card pl-8" />
       </div>
+      <Button size="sm" onclick={() => (createOpen = true)}><UserPlus />Novo usuário</Button>
     {/snippet}
   </PageHeader>
 
@@ -92,8 +99,11 @@
       <UsersIcon class="mx-auto size-6 text-muted-foreground" strokeWidth={1.4} />
       <p class="mt-3 text-sm font-medium">Nenhum usuário</p>
       <p class="mt-1 text-sm font-light text-muted-foreground">
-        {query.trim() ? 'Nada encontrado para essa busca.' : 'Os cadastros feitos pela API aparecem aqui.'}
+        {query.trim() ? 'Nada encontrado para essa busca.' : 'Cadastros feitos pela API aparecem aqui, ou crie um agora.'}
       </p>
+      {#if !query.trim()}
+        <Button variant="outline" size="sm" class="mt-4" onclick={() => (createOpen = true)}><UserPlus />Novo usuário</Button>
+      {/if}
     </div>
   {:else}
     <div class="overflow-hidden rounded-lg border bg-card">
@@ -118,7 +128,7 @@
                   >
                   <div class="min-w-0">
                     <p class="font-medium">{user.email}</p>
-                    <p class="font-mono text-[11px] text-muted-foreground">{user.id}</p>
+                    <p class="font-mono text-2xs text-muted-foreground">{user.id}</p>
                   </div>
                 </div>
               </Table.Cell>
@@ -138,6 +148,12 @@
                         navigator.clipboard.writeText(user.id)
                         toast.success('ID copiado')
                       }}>Copiar ID</DropdownMenu.Item
+                    >
+                    <DropdownMenu.Item
+                      onclick={() => {
+                        passwordUser = user
+                        passwordOpen = true
+                      }}>Redefinir senha…</DropdownMenu.Item
                     >
                     <DropdownMenu.Item onclick={() => ask(user, 'revoke')}>Encerrar sessões</DropdownMenu.Item>
                     <DropdownMenu.Separator />
@@ -162,6 +178,11 @@
     </div>
   {/if}
 </div>
+
+<CreateUserDialog bind:open={createOpen} oncreated={load} />
+{#if passwordUser}
+  <SetPasswordDialog bind:open={passwordOpen} user={passwordUser} onsaved={load} />
+{/if}
 
 {#if target}
   <ConfirmDialog

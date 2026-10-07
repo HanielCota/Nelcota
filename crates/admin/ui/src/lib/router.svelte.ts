@@ -28,6 +28,7 @@ addEventListener('click', (event) => {
   if (
     !anchor ||
     anchor.target ||
+    anchor.getAttribute('href')?.startsWith('#') ||
     event.defaultPrevented ||
     event.button !== 0 ||
     event.metaKey ||

@@ -12,7 +12,9 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Claro: superfícies quase brancas, bordas suaves e verde da marca. */
+/* Claro: superfícies quase brancas, bordas suaves e verde da marca.
+   Cores de texto calibradas para contraste WCAG AA (4,5:1) sobre o fundo e
+   sobre os selos tingidos (fundo da cor com 10% de opacidade). */
 :root {
 	--background: #fcfcfc;
 	--foreground: #171717;
@@ -20,14 +22,14 @@
 	--card-foreground: #171717;
 	--popover: #ffffff;
 	--popover-foreground: #171717;
-	--primary: #1f9d63;
+	--primary: #137a4b;
 	--primary-foreground: #ffffff;
-	--primary-border: #1a8754;
-	--brand: #1f9d63;
+	--primary-border: #0f6b3e;
+	--brand: #137a4b;
 	--secondary: #f3f3f3;
 	--secondary-foreground: #171717;
 	--muted: #f3f3f3;
-	--muted-foreground: #6f6f6f;
+	--muted-foreground: #636363;
 	--accent: #ededed;
 	--accent-foreground: #171717;
 	--destructive: #dc2626;
@@ -35,7 +37,7 @@
 	--border-strong: #d4d4d4;
 	--input: #e0e0e0;
 	--ring: #a3a3a3;
-	--chart-1: #1f9d63;
+	--chart-1: #137a4b;
 	--chart-2: #6f6f6f;
 	--chart-3: #a3a3a3;
 	--chart-4: #c4c4c4;
@@ -43,13 +45,13 @@
 	--radius: 0.5rem;
 	--sidebar: #f7f7f7;
 	--sidebar-foreground: #525252;
-	--sidebar-primary: #1f9d63;
+	--sidebar-primary: #137a4b;
 	--sidebar-primary-foreground: #ffffff;
 	--sidebar-accent: #ececec;
 	--sidebar-accent-foreground: #171717;
 	--sidebar-border: #e4e4e4;
 	--sidebar-ring: #a3a3a3;
-	--warning: #b45309;
+	--warning: #9a4708;
 }
 
 /* Escuro (padrão): grafite em camadas, como o console do Supabase. */
@@ -67,7 +69,7 @@
 	--secondary: #242424;
 	--secondary-foreground: #ededed;
 	--muted: #212121;
-	--muted-foreground: #8f8f8f;
+	--muted-foreground: #9b9b9b;
 	--accent: #2a2a2a;
 	--accent-foreground: #fafafa;
 	--destructive: #f2555a;
@@ -92,6 +94,17 @@
 }
 
 @theme inline {
+	/* Escala tipográfica do painel (um ponto acima do padrão do Tailwind).
+	   Ajustes de tamanho são feitos aqui, não com text-[Npx] nos componentes. */
+	--text-3xs: 0.6875rem;
+	--text-3xs--line-height: 1rem;
+	--text-2xs: 0.75rem;
+	--text-2xs--line-height: 1rem;
+	--text-xs: 0.8125rem;
+	--text-sm: 0.9375rem;
+	--text-base: 1.0625rem;
+	--text-2xl: 1.625rem;
+	--text-3xl: 2rem;
 	--font-sans: 'Manrope Variable', 'Manrope', sans-serif;
 	--font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 	--color-warning: var(--warning);
@@ -152,12 +165,16 @@
 
 /* Ajustes globais do painel. */
 @layer base {
+	:focus-visible {
+		outline: 2px solid var(--brand);
+		outline-offset: 2px;
+	}
 	html {
 		font-family: 'Manrope Variable', 'Manrope', sans-serif;
 	}
 	body {
 		font-weight: 400;
-		font-size: 14px;
+		font-size: 15px;
 		-webkit-font-smoothing: antialiased;
 		-moz-osx-font-smoothing: grayscale;
 		font-feature-settings: 'cv11', 'ss01';
@@ -173,6 +190,27 @@
 	kbd,
 	pre {
 		font-family: var(--font-mono);
+	}
+}
+
+/* Barra de progresso indeterminada (recarga da grade). */
+@keyframes progress-indeterminate {
+	from {
+		transform: translateX(-100%);
+	}
+	to {
+		transform: translateX(250%);
+	}
+}
+.animate-progress {
+	animation: progress-indeterminate 1.1s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+	.animate-progress {
+		animation: none;
+		transform: none;
+		width: 100%;
+		opacity: 0.6;
 	}
 }
 

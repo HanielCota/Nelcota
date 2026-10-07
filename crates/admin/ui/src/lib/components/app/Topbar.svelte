@@ -6,7 +6,7 @@
   import Menu from '@lucide/svelte/icons/menu'
   import Sun from '@lucide/svelte/icons/sun'
   import Moon from '@lucide/svelte/icons/moon'
-  import BookOpen from '@lucide/svelte/icons/book-open'
+  import Plug from '@lucide/svelte/icons/plug'
   import LogOut from '@lucide/svelte/icons/log-out'
   import Search from '@lucide/svelte/icons/search'
   import Logo from './Logo.svelte'
@@ -24,11 +24,20 @@
     '/users': 'Usuários',
     '/policies': 'Policies',
     '/projects': 'Projetos',
+    '/connect': 'API',
   }
 
   const crumbs = $derived.by((): { label: string; path?: string }[] => {
     const table = match('/tables/:name', route.path)
     if (table) return [{ label: 'Tabelas', path: '/tables' }, { label: table.name }]
+    const structure = match('/tables/:name/structure', route.path)
+    if (structure) {
+      return [
+        { label: 'Tabelas', path: '/tables' },
+        { label: structure.name, path: `/tables/${encodeURIComponent(structure.name)}` },
+        { label: 'Estrutura' },
+      ]
+    }
     return [{ label: titles[route.path.replace(/\/$/, '') || '/'] ?? 'Página' }]
   })
 
@@ -51,18 +60,22 @@
     </Button>
   </div>
 
-  <ProjectSwitcher {slash} />
+  <div class="hidden min-w-0 items-center gap-1.5 sm:flex"><ProjectSwitcher {slash} /></div>
 
-  <nav class="flex min-w-0 items-center gap-1.5 text-sm">
+  <nav class="flex min-w-0 items-center gap-1.5 text-sm" aria-label="Trilha">
     {#each crumbs as crumb, i (i)}
-      {#if i > 0}{@render slash()}{/if}
-      {#if crumb.path}
-        <a href={href(crumb.path)} class="truncate text-muted-foreground transition-colors hover:text-foreground"
-          >{crumb.label}</a
-        >
-      {:else}
-        <span class="truncate text-foreground">{crumb.label}</span>
-      {/if}
+      {@const last = i === crumbs.length - 1}
+      <!-- No celular só a página atual cabe sem cortar. -->
+      <span class={['min-w-0 items-center gap-1.5', last ? 'flex' : 'hidden sm:flex']}>
+        {#if i > 0}<span class="hidden sm:inline">{@render slash()}</span>{/if}
+        {#if crumb.path}
+          <a href={href(crumb.path)} class="truncate text-muted-foreground transition-colors hover:text-foreground"
+            >{crumb.label}</a
+          >
+        {:else}
+          <span class="truncate text-foreground" aria-current="page">{crumb.label}</span>
+        {/if}
+      </span>
     {/each}
   </nav>
 
@@ -75,10 +88,10 @@
     >
       <Search class="size-3.5" />
       <span class="hidden flex-1 text-left sm:inline">Buscar…</span>
-      <kbd class="hidden rounded border bg-muted px-1 font-sans text-[10px] sm:inline">{isMac ? '⌘' : 'Ctrl'} K</kbd>
+      <kbd class="hidden rounded border bg-muted px-1 font-sans text-3xs sm:inline">{isMac ? '⌘' : 'Ctrl'} K</kbd>
     </button>
-    <Button variant="outline" size="sm" href="/rest/v1/" target="_blank" rel="noopener" class="hidden sm:inline-flex">
-      <BookOpen />API
+    <Button variant="outline" size="sm" href={href('/connect')} class="hidden sm:inline-flex">
+      <Plug />API
     </Button>
     <Button variant="ghost" size="icon-sm" onclick={toggleMode} aria-label="Alternar tema" title="Alternar tema">
       {#if mode.current === 'dark'}<Sun />{:else}<Moon />{/if}
@@ -114,7 +127,7 @@
 <Sheet.Root bind:open={mobileOpen}>
   <Sheet.Content side="left" class="w-64 gap-0 bg-sidebar p-0">
     <div class="flex h-12 items-center border-b border-sidebar-border px-4"><Logo /></div>
-    <nav class="p-2">
+    <nav class="p-2" aria-label="Navegação principal">
       {#each navGroups as group, g (g)}
         {#if g > 0}<div class="mx-2 my-2 border-t border-sidebar-border"></div>{/if}
         {#each group as item (item.path)}

@@ -13,6 +13,7 @@
   import Policies from '$lib/pages/Policies.svelte'
   import NotFound from '$lib/pages/NotFound.svelte'
   import Projects from '$lib/pages/Projects.svelte'
+  import ApiPage from '$lib/pages/ApiPage.svelte'
   import { takeHandoffToken } from '$lib/projects'
   import { api } from '$lib/api'
   import { session } from '$lib/session.svelte'
@@ -38,7 +39,11 @@
   })
 
   const path = $derived(route.path.replace(/\/$/, '') || '/')
-  const tableName = $derived(match('/tables/:name', path)?.name)
+  const structureName = $derived(match('/tables/:name/structure', path)?.name)
+  const tableName = $derived(match('/tables/:name', path)?.name ?? structureName)
+  // Trocar de aba (Dados/Estrutura) não remonta o editor; trocar de tabela sim
+  // (ordenação, página e seleção são de cada tabela).
+  const pageKey = $derived(tableName ? `/tables/${tableName}` : route.path)
 </script>
 
 <ModeWatcher defaultMode="dark" />
@@ -52,16 +57,22 @@
   <Login />
 {:else}
   <Tooltip.Provider delayDuration={200}>
+    <!-- Primeira parada do Tab: pula topbar e menu. -->
+    <a
+      href="#conteudo"
+      class="sr-only z-50 rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
+      >Pular para o conteúdo</a
+    >
     <div class="flex h-screen flex-col overflow-hidden bg-background">
       <Topbar />
       <div class="flex min-h-0 flex-1">
         <AppSidebar />
-        <main class="min-w-0 flex-1 overflow-auto">
-          {#key route.path}
+        <main id="conteudo" tabindex="-1" class="min-w-0 flex-1 overflow-auto outline-none">
+          {#key pageKey}
             {#if path === '/'}
               <Overview />
             {:else if path === '/tables' || tableName}
-              <TableEditor name={tableName} />
+              <TableEditor name={tableName} view={structureName ? 'structure' : 'data'} />
             {:else if path === '/sql'}
               <!-- CodeMirror só é baixado quando o editor SQL é aberto. -->
               {#await import('$lib/pages/SqlEditor.svelte') then m}
@@ -73,6 +84,8 @@
               <Policies />
             {:else if path === '/projects'}
               <Projects />
+            {:else if path === '/connect'}
+              <ApiPage />
             {:else}
               <NotFound />
             {/if}

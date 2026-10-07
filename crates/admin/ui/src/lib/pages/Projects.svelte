@@ -74,7 +74,7 @@
             </div>
             {#if project.current}
               <span
-                class="shrink-0 rounded-full border border-brand/30 bg-brand/10 px-2 py-px text-[11px] font-medium text-brand"
+                class="shrink-0 rounded-full border border-brand/30 bg-brand/10 px-2 py-px text-2xs font-medium text-brand"
                 >este</span
               >
             {/if}

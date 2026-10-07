@@ -115,7 +115,7 @@
         {sqlStore.current?.name ?? 'Nova consulta'}{#if sqlStore.dirty}<span class="text-muted-foreground"> •</span>{/if}
       </h1>
       <span
-        class="hidden rounded-full border border-warning/30 bg-warning/10 px-2 py-px text-[11px] font-medium text-warning sm:inline"
+        class="hidden rounded-full border border-warning/30 bg-warning/10 px-2 py-px text-2xs font-medium text-warning sm:inline"
         >dono do banco · sem RLS</span
       >
       <div class="ml-auto flex items-center gap-2">
@@ -182,7 +182,7 @@
 
         <Button size="sm" onclick={run} disabled={running} title="Ctrl+Enter">
           <Play />{running ? 'Executando…' : 'Executar'}
-          <kbd class="ml-1 hidden rounded border border-white/20 px-1 font-sans text-[10px] font-normal opacity-80 sm:inline"
+          <kbd class="ml-1 hidden rounded border border-white/30 px-1 font-sans text-3xs font-normal sm:inline"
             >Ctrl ↵</kbd
           >
         </Button>

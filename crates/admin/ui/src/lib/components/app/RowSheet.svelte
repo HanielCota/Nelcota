@@ -1,12 +1,10 @@
 <script lang="ts">
   import * as Sheet from '$lib/components/ui/sheet'
-  import * as Select from '$lib/components/ui/select'
   import { Button } from '$lib/components/ui/button'
-  import { Input } from '$lib/components/ui/input'
-  import { Textarea } from '$lib/components/ui/textarea'
-  import { Checkbox } from '$lib/components/ui/checkbox'
   import { toast } from 'svelte-sonner'
+  import RowField from './RowField.svelte'
   import { api, enc } from '$lib/api'
+  import { fieldProblem, initialFields, rowPayload, type FieldState } from '$lib/row-form'
   import type { Column, RowData } from '$lib/types'
 
   let {
@@ -26,66 +24,43 @@
     onsaved: () => void
   } = $props()
 
-  type Field = { value: string; isNull: boolean; touched: boolean }
-  let fields = $state<Record<string, Field>>({})
+  let fields = $state<Record<string, FieldState>>({})
   let saving = $state(false)
-
-  const editable = $derived(columns.filter((c) => !c.generated))
-  const isJson = (c: Column) => c.type === 'json' || c.type === 'jsonb'
-  const isBool = (c: Column) => c.type === 'boolean'
-  const isLong = (c: Column) => isJson(c) || c.type === 'text'
 
   // Recarrega os campos sempre que a sheet abre.
   $effect(() => {
-    if (!open) return
-    const next: Record<string, Field> = {}
-    for (const c of columns) {
-      const value = row ? row[c.name] : null
-      next[c.name] = {
-        value: value ?? '',
-        isNull: row ? value === null : false,
-        touched: false,
-      }
-    }
-    fields = next
+    if (open) fields = initialFields(columns, row)
   })
 
-  function placeholder(c: Column): string {
-    if (!row && c.has_default) return 'DEFAULT'
-    if (c.nullable) return 'NULL'
-    return ''
-  }
+  const inserting = $derived(row === null)
+  const editable = $derived(columns.filter((c) => !c.generated))
+  const generated = $derived(columns.filter((c) => c.generated))
+  const problems = $derived(
+    Object.fromEntries(editable.map((c) => [c.name, fields[c.name] ? fieldProblem(c, fields[c.name], inserting) : null])),
+  )
+  const valid = $derived(Object.values(problems).every((p) => p === null))
+  const payload = $derived(rowPayload(columns, fields, row))
+  const changes = $derived(Object.keys(payload).length)
+  /** `id = 1` (ou a chave composta) para saber qual linha está aberta. */
+  const pkLabel = $derived(row ? primaryKey.map((k) => `${k} = ${row![k] ?? 'NULL'}`).join(', ') : '')
 
-  async function save(event: SubmitEvent) {
-    event.preventDefault()
-    const values: Record<string, string | null> = {}
-    for (const c of editable) {
-      const f = fields[c.name]
-      if (!f) continue
-      if (row) {
-        // Edição: só o que mudou.
-        if (!f.touched) continue
-        values[c.name] = f.isNull ? null : f.value
-      } else {
-        // Inserção: vazio fica de fora (vale o DEFAULT), salvo NULL explícito.
-        if (f.isNull) values[c.name] = null
-        else if (f.value !== '') values[c.name] = f.value
-      }
-    }
-    if (row && Object.keys(values).length === 0) {
+  async function save(event?: SubmitEvent) {
+    event?.preventDefault()
+    if (!valid || saving) return
+    if (row && changes === 0) {
       open = false
       return
     }
     saving = true
     try {
-      if (row) {
-        const pk = Object.fromEntries(primaryKey.map((k) => [k, row![k]]))
-        const res = await api.patch<{ message: string }>(`/tables/${enc(table)}/rows`, { pk, values })
-        toast.success(res.message)
-      } else {
-        const res = await api.post<{ message: string }>(`/tables/${enc(table)}/rows`, { values })
-        toast.success(res.message)
-      }
+      const values = $state.snapshot(payload)
+      const res = row
+        ? await api.patch<{ message: string }>(`/tables/${enc(table)}/rows`, {
+            pk: Object.fromEntries(primaryKey.map((k) => [k, row![k]])),
+            values,
+          })
+        : await api.post<{ message: string }>(`/tables/${enc(table)}/rows`, { values })
+      toast.success(res.message)
       open = false
       onsaved()
     } catch (e) {
@@ -94,117 +69,54 @@
       saving = false
     }
   }
+
+  function onKeydown(event: KeyboardEvent) {
+    if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+      event.preventDefault()
+      save()
+    }
+  }
 </script>
 
 <Sheet.Root bind:open>
-  <Sheet.Content class="flex w-full flex-col gap-0 p-0 sm:max-w-xl">
+  <Sheet.Content class="flex w-full flex-col gap-0 p-0 data-[side=right]:sm:max-w-xl">
     <Sheet.Header class="border-b px-6 py-4">
-      <Sheet.Title>{row ? 'Editar linha' : 'Inserir linha'}</Sheet.Title>
+      <Sheet.Title>{inserting ? 'Inserir linha' : 'Editar linha'}</Sheet.Title>
       <Sheet.Description>
-        em <code class="font-mono text-foreground">{table}</code>
+        em <code class="font-mono text-foreground">{table}</code>{#if pkLabel}<span class="text-muted-foreground"
+            >{` · `}</span
+          ><code class="font-mono text-foreground">{pkLabel}</code>{/if}
       </Sheet.Description>
     </Sheet.Header>
 
-    <form id="row-form" class="flex-1 space-y-5 overflow-y-auto px-6 py-5" onsubmit={save}>
+    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+    <form id="row-form" class="flex-1 space-y-5 overflow-y-auto px-6 py-5" onsubmit={save} onkeydown={onKeydown}>
+      {#if generated.length}
+        <div class="rounded-lg border bg-muted/30 px-3 py-2.5 text-xs">
+          <p class="font-medium text-muted-foreground">Gerado pelo Postgres, não editável</p>
+          <dl class="mt-1.5 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+            {#each generated as column (column.name)}
+              <dt class="font-mono text-muted-foreground">{column.name}</dt>
+              <dd class="truncate font-mono">{row ? (row[column.name] ?? 'NULL') : 'definido ao salvar'}</dd>
+            {/each}
+          </dl>
+        </div>
+      {/if}
       {#each editable as column (column.name)}
-        {@const field = fields[column.name]}
-        {#if field}
-          <div class="grid gap-1.5">
-            <div class="flex items-center gap-2">
-              <label for={`f-${column.name}`} class="text-sm font-medium">{column.name}</label>
-              <span class="font-mono text-[11px] text-muted-foreground"
-                >{column.full_type}{column.is_pk ? ', pk' : ''}</span
-              >
-              {#if column.nullable}
-                <label class="ml-auto flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <Checkbox
-                    checked={field.isNull}
-                    onCheckedChange={(v) => {
-                      field.isNull = v === true
-                      field.touched = true
-                    }}
-                  />
-                  NULL
-                </label>
-              {/if}
-            </div>
-
-            {#if column.enum_values.length}
-              <Select.Root
-                type="single"
-                value={field.value}
-                disabled={field.isNull}
-                onValueChange={(v) => {
-                  field.value = v
-                  field.touched = true
-                }}
-              >
-                <Select.Trigger id={`f-${column.name}`} class="w-full">
-                  {field.isNull ? 'NULL' : field.value || placeholder(column) || 'Selecione'}
-                </Select.Trigger>
-                <Select.Content>
-                  {#each column.enum_values as option (option)}
-                    <Select.Item value={option}>{option}</Select.Item>
-                  {/each}
-                </Select.Content>
-              </Select.Root>
-            {:else if isBool(column)}
-              <Select.Root
-                type="single"
-                value={field.value}
-                disabled={field.isNull}
-                onValueChange={(v) => {
-                  field.value = v
-                  field.touched = true
-                }}
-              >
-                <Select.Trigger id={`f-${column.name}`} class="w-full">
-                  {field.isNull ? 'NULL' : field.value || placeholder(column) || 'Selecione'}
-                </Select.Trigger>
-                <Select.Content>
-                  <Select.Item value="true">true</Select.Item>
-                  <Select.Item value="false">false</Select.Item>
-                </Select.Content>
-              </Select.Root>
-            {:else if isLong(column)}
-              <Textarea
-                id={`f-${column.name}`}
-                class="min-h-20 font-mono text-xs"
-                placeholder={placeholder(column)}
-                disabled={field.isNull}
-                bind:value={field.value}
-                oninput={() => (field.touched = true)}
-              />
-            {:else}
-              <Input
-                id={`f-${column.name}`}
-                class="font-mono text-xs"
-                placeholder={placeholder(column)}
-                disabled={field.isNull}
-                bind:value={field.value}
-                oninput={() => (field.touched = true)}
-              />
-            {/if}
-            {#if column.comment}
-              <p class="text-xs text-muted-foreground">{column.comment}</p>
-            {/if}
-          </div>
+        {#if fields[column.name]}
+          <RowField {column} bind:field={fields[column.name]} {inserting} problem={problems[column.name]} />
         {/if}
       {/each}
-      {#if columns.some((c) => c.generated)}
-        <p class="text-xs text-muted-foreground">
-          {#each columns.filter((c) => c.generated) as c, i (c.name)}<code class="font-mono text-foreground"
-              >{c.name}</code
-            >{i < columns.filter((x) => x.generated).length - 1 ? ', ' : ''}{/each}: gerada(s) pelo Postgres
-          (identity ou GENERATED ALWAYS), não aparece(m) no formulário.
-        </p>
-      {/if}
     </form>
 
-    <Sheet.Footer class="flex-row justify-end gap-2 border-t px-6 py-4">
+    <Sheet.Footer class="flex-row items-center gap-2 border-t px-6 py-4">
+      <span class="mr-auto text-xs text-muted-foreground">
+        {#if !inserting}{changes === 0 ? 'Nenhuma alteração' : changes === 1 ? '1 campo alterado' : `${changes} campos alterados`}{/if}
+        <span class="hidden sm:inline">{inserting ? '' : ' · '}Ctrl+Enter salva</span>
+      </span>
       <Button variant="outline" onclick={() => (open = false)}>Cancelar</Button>
-      <Button type="submit" form="row-form" disabled={saving}>
-        {saving ? 'Salvando…' : 'Salvar'}
+      <Button type="submit" form="row-form" disabled={saving || !valid || (!inserting && changes === 0)}>
+        {saving ? 'Salvando…' : inserting ? 'Inserir' : 'Salvar'}
       </Button>
     </Sheet.Footer>
   </Sheet.Content>

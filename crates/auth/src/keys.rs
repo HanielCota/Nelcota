@@ -123,6 +123,22 @@ impl Keys {
         jsonwebtoken::encode(&self.signer.header, claims, &self.signer.key)
     }
 
+    /// JWT com `role: service_role`, válido por `days` dias. **Ignora o RLS**:
+    /// só para backends confiáveis. Único emissor (CLI e painel usam este).
+    pub fn service_role_token(
+        &self,
+        issuer: &str,
+        days: u64,
+    ) -> Result<String, jsonwebtoken::errors::Error> {
+        let now = jsonwebtoken::get_current_timestamp();
+        self.sign(&serde_json::json!({
+            "iss": issuer,
+            "role": "service_role",
+            "iat": now,
+            "exp": now + days * 86_400,
+        }))
+    }
+
     /// Algoritmo usado na assinatura (`EdDSA` ou `HS256`).
     pub fn algorithm(&self) -> Algorithm {
         self.signer.header.alg
@@ -197,6 +213,24 @@ mod tests {
             "sub": "7f9c24e8-3b12-4fef-91e0-3c7a5e4b9c1d",
             "exp": jsonwebtoken::get_current_timestamp() + 60,
         })
+    }
+
+    #[test]
+    fn token_service_role_verificavel_com_validade_pedida() {
+        let keys = Keys::new(Some(&generate_ed25519_private_key()), None).unwrap();
+        let token = keys.service_role_token("nelcota", 30).unwrap();
+        let claims = keys.verify(&token).unwrap();
+        assert_eq!(claims.role(), nelcota_core::Role::ServiceRole);
+
+        let payload: Value = serde_json::from_slice(
+            &URL_SAFE_NO_PAD
+                .decode(token.split('.').nth(1).unwrap())
+                .unwrap(),
+        )
+        .unwrap();
+        let ttl = payload["exp"].as_u64().unwrap() - payload["iat"].as_u64().unwrap();
+        assert_eq!(ttl, 30 * 86_400);
+        assert_eq!(payload["iss"], "nelcota");
     }
 
     #[test]

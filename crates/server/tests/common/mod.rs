@@ -180,6 +180,10 @@ impl TestApp {
                 registry: Some(registry_file()),
                 sso: Some(nelcota_admin::Sso::new(SSO_SECRET.as_bytes())),
             }),
+            tokens: Arc::new(nelcota_admin::TokenIssuer {
+                keys: keys.clone(),
+                issuer: "nelcota-test".into(),
+            }),
         };
         let auth = AuthState {
             pool: pool.clone(),

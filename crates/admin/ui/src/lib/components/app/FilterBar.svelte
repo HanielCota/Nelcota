@@ -11,11 +11,14 @@
   let {
     columns,
     filters,
+    preset,
     onapply,
     onclose,
   }: {
     columns: Column[]
     filters: TableFilter[]
+    /** Coluna para uma linha nova já preenchida (menu da coluna). */
+    preset?: string
     onapply: (filters: TableFilter[]) => void
     onclose: () => void
   } = $props()
@@ -24,11 +27,15 @@
 
   let nextKey = 0
   const toRow = (f: TableFilter): Row => ({ key: nextKey++, column: f.column, ...toUi(f) })
-  const blankRow = (): Row => ({ key: nextKey++, column: columns[0]?.name ?? '', op: 'eq', value: '' })
+  const blankRow = (column = columns[0]?.name ?? ''): Row => ({ key: nextKey++, column, op: 'eq', value: '' })
 
   // Rascunho local, copiado uma vez ao abrir: só vai para a URL (e para a
   // API) ao aplicar.
-  let rows = $state<Row[]>(untrack(() => (filters.length ? filters.map(toRow) : [blankRow()])))
+  let rows = $state<Row[]>(
+    untrack(() =>
+      preset ? [...filters.map(toRow), blankRow(preset)] : filters.length ? filters.map(toRow) : [blankRow()],
+    ),
+  )
 
   const opLabel = (op: UiOp) => UI_OPERATORS.find((o) => o.value === op)?.label ?? op
   const complete = (r: Row) => r.column !== '' && (!needsValue(r.op) || r.value !== '')

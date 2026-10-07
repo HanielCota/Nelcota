@@ -1,39 +1,31 @@
 <script lang="ts">
-  import { onMount, tick } from 'svelte'
+  import { onMount } from 'svelte'
   import { Button } from '$lib/components/ui/button'
-  import { Input } from '$lib/components/ui/input'
-  import { Checkbox } from '$lib/components/ui/checkbox'
-  import * as Select from '$lib/components/ui/select'
-  import * as DropdownMenu from '$lib/components/ui/dropdown-menu'
-  import Search from '@lucide/svelte/icons/search'
-  import RefreshCw from '@lucide/svelte/icons/refresh-cw'
-  import Trash2 from '@lucide/svelte/icons/trash-2'
-  import Pencil from '@lucide/svelte/icons/pencil'
   import Plus from '@lucide/svelte/icons/plus'
   import Table2 from '@lucide/svelte/icons/table-2'
-  import ArrowUp from '@lucide/svelte/icons/arrow-up'
-  import ArrowDown from '@lucide/svelte/icons/arrow-down'
-  import ChevronLeft from '@lucide/svelte/icons/chevron-left'
-  import ChevronRight from '@lucide/svelte/icons/chevron-right'
-  import Funnel from '@lucide/svelte/icons/funnel'
-  import Download from '@lucide/svelte/icons/download'
-  import ArrowUpRight from '@lucide/svelte/icons/arrow-up-right'
-  import X from '@lucide/svelte/icons/x'
   import { toast } from 'svelte-sonner'
-  import RlsBadge from '$lib/components/app/RlsBadge.svelte'
-  import RlsDot from '$lib/components/app/RlsDot.svelte'
+  import TableSidebar from '$lib/components/app/TableSidebar.svelte'
+  import TableToolbar from '$lib/components/app/TableToolbar.svelte'
+  import FilterChips from '$lib/components/app/FilterChips.svelte'
+  import DataGrid from '$lib/components/app/DataGrid.svelte'
+  import GridFooter from '$lib/components/app/GridFooter.svelte'
+  import SelectionBar from '$lib/components/app/SelectionBar.svelte'
+  import GridState from '$lib/components/app/GridState.svelte'
   import RowSheet from '$lib/components/app/RowSheet.svelte'
   import ConfirmDialog from '$lib/components/app/ConfirmDialog.svelte'
   import FilterBar from '$lib/components/app/FilterBar.svelte'
+  import CreateTableSheet from '$lib/components/app/CreateTableSheet.svelte'
+  import StructureView from '$lib/components/app/StructureView.svelte'
   import { api, enc, isAbort } from '$lib/api'
-  import { describe, filtersParam, filtersToSearch, parseFilters, type TableFilter } from '$lib/filters'
+  import { HiddenColumns } from '$lib/hidden-columns.svelte'
+  import { filtersParam, filtersToSearch, parseFilters, type TableFilter } from '$lib/filters'
   import { href, navigate, route } from '$lib/router.svelte'
+  import { cn } from '$lib/utils'
   import type { Column, RowData, TableData, TableSummary } from '$lib/types'
 
-  let { name }: { name?: string } = $props()
+  let { name, view = 'data' }: { name?: string; view?: 'data' | 'structure' } = $props()
 
   let tables = $state<TableSummary[]>([])
-  let filter = $state('')
   let data = $state<TableData | null>(null)
   let loading = $state(false)
   let error = $state('')
@@ -46,30 +38,47 @@
   let sheetRow = $state<RowData | null>(null)
   let confirmOpen = $state(false)
   let filterOpen = $state(false)
+  let filterPreset = $state<string | undefined>(undefined)
+  let createOpen = $state(false)
+
+  // Colunas ocultas, lembradas por tabela.
+  const hidden = new HiddenColumns()
+  $effect(() => {
+    if (name) hidden.load(name)
+  })
+  $effect(() => {
+    if (data) hidden.prune(data.table.columns.map((c) => c.name))
+  })
 
   // Filtros vêm da URL (`?preco=gte.10`): links compartilháveis e o voltar do
   // navegador funcionam. A chave em texto evita recarregar sem mudança real.
   const filters = $derived(parseFilters(route.query))
   const filtersKey = $derived(filtersToSearch(filters))
 
-  // Edição inline: célula (linha, coluna) em edição e o rascunho.
-  let editing = $state<{ row: number; column: string } | null>(null)
-  let draft = $state('')
-
-  const visibleTables = $derived(
-    tables.filter((t) => t.name.toLowerCase().includes(filter.trim().toLowerCase())),
-  )
-  const columns = $derived(data?.table.columns ?? [])
-  const editable = $derived(data?.table.editable ?? false)
-  const fmt = new Intl.NumberFormat('pt-BR')
-
-  onMount(async () => {
+  async function loadTables() {
     try {
       tables = (await api.get<{ tables: TableSummary[] }>('/tables')).tables
     } catch (e) {
       toast.error((e as Error).message)
     }
-  })
+  }
+
+  onMount(loadTables)
+
+  async function onCreated(table: string) {
+    await loadTables()
+    navigate(`/tables/${enc(table)}`)
+  }
+
+  async function onRenamed(table: string) {
+    await loadTables()
+    navigate(`/tables/${enc(table)}/structure`, true)
+  }
+
+  async function onDropped() {
+    await loadTables()
+    navigate('/tables')
+  }
 
   /** Ordem e filtros atuais, no formato da API (listagem e exportação). */
   function rowsParams(): URLSearchParams {
@@ -109,13 +118,14 @@
 
   // Recarrega ao trocar de tabela, página, tamanho, ordenação ou filtros.
   $effect(() => {
-    void [name, page, size, sort, filtersKey]
+    void [name, view, page, size, sort, filtersKey]
     load()
     return () => inflight?.abort()
   })
 
   function setFilters(next: TableFilter[]) {
     filterOpen = false
+    filterPreset = undefined
     page = 0
     const search = filtersToSearch(next)
     navigate(`/tables/${enc(name!)}${search ? `?${search}` : ''}`)
@@ -138,25 +148,23 @@
     page = 0
   }
 
+  function setSort(column: string, direction: 'asc' | 'desc' | null) {
+    sort = direction ? { column, desc: direction === 'desc' } : null
+    page = 0
+  }
+
+  /** Menu da coluna: abre a barra de filtros com uma linha para ela. */
+  function filterBy(column: string) {
+    filterPreset = column
+    filterOpen = true
+  }
+
   function pkOf(row: RowData) {
     return Object.fromEntries((data?.table.primary_key ?? []).map((k) => [k, row[k]]))
   }
 
-  async function startEdit(rowIndex: number, column: Column) {
-    if (!editable || column.generated) return
-    editing = { row: rowIndex, column: column.name }
-    draft = data!.rows[rowIndex][column.name] ?? ''
-    await tick()
-    document.getElementById('inline-editor')?.focus()
-  }
-
-  async function commitEdit(asNull = false) {
-    if (!editing || !data || !name) return
-    const { row, column } = editing
-    const original = data.rows[row][column]
-    const value = asNull ? null : draft
-    editing = null
-    if (value === original) return
+  async function commitCell(row: number, column: string, value: string | null) {
+    if (!data || !name) return
     try {
       const res = await api.patch<{ message: string }>(`/tables/${enc(name)}/rows`, {
         pk: pkOf(data.rows[row]),
@@ -166,27 +174,8 @@
       toast.success(res.message)
     } catch (e) {
       toast.error((e as Error).message)
+      throw e
     }
-  }
-
-  function onEditorKey(event: KeyboardEvent) {
-    if (event.key === 'Enter' && !event.shiftKey) {
-      event.preventDefault()
-      commitEdit()
-    } else if (event.key === 'Escape') {
-      editing = null
-    }
-  }
-
-  function toggleRow(index: number, on: boolean) {
-    const next = new Set(selected)
-    if (on) next.add(index)
-    else next.delete(index)
-    selected = next
-  }
-
-  function toggleAll(on: boolean) {
-    selected = on && data ? new Set(data.rows.map((_, i) => i)) : new Set()
   }
 
   async function deleteSelected() {
@@ -208,281 +197,122 @@
 </script>
 
 <div class="flex h-full min-h-0">
-  <!-- Lista de tabelas -->
-  <aside class="hidden w-64 shrink-0 flex-col border-r bg-sidebar md:flex">
-    <div class="grid gap-3 border-b p-3">
-      <p class="px-1 text-sm font-medium">Editor de tabelas</p>
-      <div class="relative">
-        <Search class="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
-        <Input bind:value={filter} placeholder="Buscar tabelas…" class="h-8 bg-card pl-8 text-sm" />
-      </div>
-    </div>
-    <p class="px-4 pt-3 pb-1 text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
-      Tabelas ({visibleTables.length})
-    </p>
-    <nav class="flex-1 overflow-y-auto px-2 pb-2">
-      {#each visibleTables as table (table.name)}
-        <a
-          href={href(`/tables/${encodeURIComponent(table.name)}`)}
-          title={table.rls.label}
-          class={[
-            'flex h-8 items-center gap-2 rounded-md px-2 text-sm text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground',
-            table.name === name && 'bg-accent text-foreground',
-          ]}
-        >
-          <Table2 class={['size-3.5 shrink-0', table.name === name && 'text-brand']} strokeWidth={1.6} />
-          <span class="truncate">{table.name}</span>
-          <span class="ml-auto flex"><RlsDot state={table.rls.state} /></span>
-          {#if table.kind !== 'table'}<span class="text-[11px]">view</span>{/if}
-        </a>
-      {:else}
-        <p class="px-2 py-4 text-sm text-muted-foreground">Nenhuma tabela.</p>
-      {/each}
-    </nav>
-  </aside>
+  <TableSidebar {tables} current={name} oncreate={() => (createOpen = true)} />
 
-  <!-- Área principal -->
-  <section class="flex min-w-0 flex-1 flex-col">
+  <section class={cn('min-w-0 flex-1 flex-col', name ? 'flex' : 'hidden md:flex')}>
     {#if !name}
       <div class="grid flex-1 place-items-center p-8 text-center">
         <div>
           <Table2 class="mx-auto size-7 text-muted-foreground" strokeWidth={1.3} />
-          <p class="mt-3 text-sm font-medium">Escolha uma tabela</p>
+          <h2 class="mt-3 text-sm font-medium">Escolha uma tabela</h2>
           <p class="mt-1 text-sm font-light text-muted-foreground">Selecione na lista ao lado para ver e editar as linhas.</p>
+          <Button variant="outline" size="sm" class="mt-4" onclick={() => (createOpen = true)}><Plus />Criar tabela</Button>
         </div>
       </div>
     {:else}
-      <div class="flex h-12 shrink-0 flex-wrap items-center gap-3 border-b px-4">
-        <h1 class="text-sm font-medium">{name}</h1>
-        {#if data}<RlsBadge rls={data.table.rls} />{/if}
-        <div class="ml-auto flex items-center gap-2">
-          {#if selected.size > 0}
-            <Button variant="destructive" size="sm" onclick={() => (confirmOpen = true)}>
-              <Trash2 />Apagar {selected.size}
-            </Button>
-          {/if}
-          <Button
-            variant={filterOpen || filters.length ? 'secondary' : 'ghost'}
-            size="sm"
-            onclick={() => (filterOpen = !filterOpen)}
-            aria-expanded={filterOpen}
-          >
-            <Funnel />Filtrar{#if filters.length}<span
-                class="rounded-full bg-brand/15 px-1.5 text-[10px] text-brand tabular-nums">{filters.length}</span
-              >{/if}
-          </Button>
-          <DropdownMenu.Root>
-            <DropdownMenu.Trigger>
-              {#snippet child({ props })}
-                <Button variant="ghost" size="sm" {...props}><Download />Exportar</Button>
-              {/snippet}
-            </DropdownMenu.Trigger>
-            <DropdownMenu.Content align="end" class="w-56">
-              <DropdownMenu.Label class="text-xs font-normal text-muted-foreground">
-                {filters.length ? 'Linhas filtradas, na ordem atual' : 'Todas as linhas, na ordem atual'}
-              </DropdownMenu.Label>
-              <DropdownMenu.Item>
-                {#snippet child({ props })}<a {...props} href={exportHref('csv')} download>CSV</a>{/snippet}
-              </DropdownMenu.Item>
-              <DropdownMenu.Item>
-                {#snippet child({ props })}<a {...props} href={exportHref('json')} download>JSON</a>{/snippet}
-              </DropdownMenu.Item>
-            </DropdownMenu.Content>
-          </DropdownMenu.Root>
-          <Button variant="ghost" size="icon-sm" onclick={load} aria-label="Recarregar" title="Recarregar">
-            <RefreshCw class={loading ? 'animate-spin' : ''} />
-          </Button>
-          {#if data?.table.insertable}
-            <Button size="sm" onclick={() => openSheet(null)}><Plus />Inserir linha</Button>
-          {/if}
+      <TableToolbar
+        {name}
+        {view}
+        {data}
+        filterCount={filters.length}
+        bind:filterOpen
+        {loading}
+        hiddenColumns={hidden.names}
+        ontogglecolumn={(column) => hidden.toggle(column)}
+        onshowallcolumns={() => hidden.showAll()}
+        {exportHref}
+        onreload={load}
+        oninsert={() => openSheet(null)}
+      />
+
+      {#if view === 'structure'}
+        <div class="min-h-0 flex-1 overflow-auto bg-muted/20">
+          <StructureView {name} onrenamed={onRenamed} ondropped={onDropped} />
         </div>
-      </div>
-
-      {#if filterOpen && data}
-        <FilterBar columns={data.table.columns} {filters} onapply={setFilters} onclose={() => (filterOpen = false)} />
-      {:else if filters.length}
-        <div class="flex shrink-0 flex-wrap items-center gap-1.5 border-b px-4 py-2">
-          {#each filters as filter, i (i)}
-            <span
-              class="inline-flex h-6 items-center gap-1 rounded-md border border-border-strong bg-muted pr-0.5 pl-2 font-mono text-[11px]"
-            >
-              {describe(filter)}
-              <button
-                class="grid size-5 place-items-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
-                aria-label="Remover filtro"
-                onclick={() => setFilters(filters.filter((_, j) => j !== i))}><X class="size-3" /></button
-              >
-            </span>
-          {/each}
-          <Button variant="ghost" size="xs" class="text-muted-foreground" onclick={() => setFilters([])}>Limpar</Button>
-        </div>
-      {/if}
-
-      {#if data?.table.exposed_without_rls}
-        <p class="border-b border-destructive/30 bg-destructive/5 px-4 py-2 text-xs text-destructive">
-          Sem RLS: quem tem GRANT nesta tabela lê e altera todas as linhas.
-        </p>
-      {:else if data && !data.table.editable && data.table.kind === 'table'}
-        <p class="border-b bg-muted/40 px-4 py-2 text-xs text-muted-foreground">
-          Sem chave primária: dá para ver as linhas, mas não editar por aqui.
-        </p>
-      {/if}
-
-      <div class="min-h-0 flex-1 overflow-auto">
-        {#if error}
-          <p class="p-4 text-sm text-destructive">{error}</p>
-        {:else if !data}
-          <p class="p-4 text-sm text-muted-foreground">Carregando…</p>
-        {:else}
-          <table class="w-max min-w-full border-separate border-spacing-0 text-xs">
-            <thead class="sticky top-0 z-10">
-              <tr>
-                {#if editable}
-                  <th class="w-10 border-r border-b bg-card px-3 py-2">
-                    <Checkbox
-                      checked={selected.size > 0 && selected.size === data.rows.length}
-                      indeterminate={selected.size > 0 && selected.size < data.rows.length}
-                      onCheckedChange={(v) => toggleAll(v === true)}
-                      aria-label="Selecionar todas"
-                    />
-                  </th>
-                {/if}
-                {#each columns as column (column.name)}
-                  <th class="border-r border-b bg-card p-0 text-left font-medium">
-                    <button
-                      class="group flex w-full min-w-36 items-start gap-1.5 px-3 py-2 text-left hover:bg-accent"
-                      onclick={() => toggleSort(column.name)}
-                      title={column.comment ?? `Ordenar por ${column.name}`}
-                    >
-                      <span class="grid">
-                        <span class="text-[12.5px] text-foreground"
-                          >{column.name}{#if column.is_pk}<span class="ml-1.5 font-mono text-[10px] font-normal text-muted-foreground">pk</span>{/if}</span
-                        >
-                        <span class="font-mono text-[10.5px] font-normal text-muted-foreground"
-                          >{column.full_type}{#if column.references}<span class="text-brand/80"
-                              >{` → ${column.references.table}`}</span
-                            >{/if}</span
-                        >
-                      </span>
-                      {#if sort?.column === column.name}
-                        {#if sort.desc}<ArrowDown class="ml-auto size-3.5" />{:else}<ArrowUp class="ml-auto size-3.5" />{/if}
-                      {/if}
-                    </button>
-                  </th>
-                {/each}
-                {#if editable}<th class="w-12 border-b bg-card"></th>{/if}
-              </tr>
-            </thead>
-            <tbody>
-              {#each data.rows as row, i (i)}
-                <tr class={['group', selected.has(i) ? 'bg-brand/5' : 'hover:bg-muted/50']}>
-                  {#if editable}
-                    <td class="border-r border-b px-3 py-1.5">
-                      <Checkbox checked={selected.has(i)} onCheckedChange={(v) => toggleRow(i, v === true)} aria-label="Selecionar linha" />
-                    </td>
-                  {/if}
-                  {#each columns as column (column.name)}
-                    {@const value = row[column.name]}
-                    <td
-                      class={[
-                        'group/cell max-w-96 border-r border-b p-0 font-mono',
-                        editable && !column.generated && 'cursor-text',
-                      ]}
-                      ondblclick={() => startEdit(i, column)}
-                    >
-                      {#if editing?.row === i && editing.column === column.name}
-                        <div class="flex items-center gap-1 bg-background p-0.5 ring-1 ring-brand/70 ring-inset">
-                          <input
-                            id="inline-editor"
-                            class="w-full min-w-40 bg-transparent px-2 py-1 font-mono text-xs outline-none"
-                            bind:value={draft}
-                            onkeydown={onEditorKey}
-                            onblur={() => (editing = null)}
-                          />
-                          {#if column.nullable}
-                            <button
-                              class="shrink-0 rounded border px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
-                              onmousedown={(e) => {
-                                e.preventDefault()
-                                commitEdit(true)
-                              }}>NULL</button
-                            >
-                          {/if}
-                        </div>
-                      {:else}
-                        <div class="flex items-center gap-1 px-3 py-1.5" title={value ?? 'NULL'}>
-                          <span class="truncate">
-                            {#if value === null}<span class="text-muted-foreground">NULL</span>{:else}{value}{/if}
-                          </span>
-                          {#if column.references && value !== null}
-                            <a
-                              href={referenceHref(column, value)}
-                              class="ml-auto grid size-5 shrink-0 place-items-center rounded text-muted-foreground opacity-0 group-hover/cell:opacity-100 hover:bg-accent hover:text-brand focus-visible:opacity-100"
-                              title={`Abrir em ${column.references.table}`}
-                              aria-label={`Abrir linha referenciada em ${column.references.table}`}
-                              ondblclick={(e) => e.stopPropagation()}
-                            >
-                              <ArrowUpRight class="size-3.5" />
-                            </a>
-                          {/if}
-                        </div>
-                      {/if}
-                    </td>
-                  {/each}
-                  {#if editable}
-                    <td class="border-b px-2 text-right">
-                      <Button
-                        variant="ghost"
-                        size="icon-xs"
-                        class="opacity-0 group-hover:opacity-100"
-                        onclick={() => openSheet(row)}
-                        aria-label="Editar linha"
-                      >
-                        <Pencil />
-                      </Button>
-                    </td>
-                  {/if}
-                </tr>
-              {/each}
-            </tbody>
-          </table>
-          {#if data.rows.length === 0}
-            <p class="py-12 text-center text-sm text-muted-foreground">
-              {filters.length ? 'Nenhuma linha para esses filtros.' : 'Nenhuma linha.'}
-            </p>
-          {/if}
+      {:else}
+        {#if filterOpen && data}
+          {#key filterPreset}
+            <FilterBar
+              columns={data.table.columns}
+              {filters}
+              preset={filterPreset}
+              onapply={setFilters}
+              onclose={() => {
+                filterOpen = false
+                filterPreset = undefined
+              }}
+            />
+          {/key}
+        {:else if filters.length || sort}
+          <FilterChips {filters} {sort} onchange={setFilters} onclearsort={() => setSort('', null)} />
         {/if}
-      </div>
 
-      {#if data}
-        <footer class="flex shrink-0 flex-wrap items-center gap-3 border-t bg-sidebar px-4 py-2 text-xs text-muted-foreground">
-          <span>
-            {#if data.total !== null}{data.total_exact ? '' : '~'}{fmt.format(data.total)} {data.total === 1 ? 'linha' : 'linhas'}{:else}{data.rows.length} nesta página{/if}
-          </span>
-          {#if editable}<span class="hidden lg:inline">Duplo clique numa célula para editar.</span>{/if}
-          <div class="ml-auto flex items-center gap-2">
-            <span>Por página</span>
-            <Select.Root type="single" bind:value={size} onValueChange={() => (page = 0)}>
-              <Select.Trigger size="sm" class="h-7 w-20">{size}</Select.Trigger>
-              <Select.Content>
-                {#each ['25', '50', '100', '500'] as option (option)}
-                  <Select.Item value={option}>{option}</Select.Item>
-                {/each}
-              </Select.Content>
-            </Select.Root>
-            <span class="px-1">Página {data.page + 1}</span>
-            <Button variant="outline" size="icon-sm" disabled={page === 0} onclick={() => page--} aria-label="Anterior">
-              <ChevronLeft />
-            </Button>
-            <Button variant="outline" size="icon-sm" disabled={!data.has_next} onclick={() => page++} aria-label="Próxima">
-              <ChevronRight />
-            </Button>
-          </div>
-        </footer>
+        {#if data && selected.size > 0}
+          <SelectionBar
+            table={name}
+            columns={data.table.columns.map((c) => c.name)}
+            rows={[...selected].sort((a, b) => a - b).map((i) => data!.rows[i])}
+            deletable={data.table.editable}
+            onclear={() => (selected = new Set())}
+            ondelete={() => (confirmOpen = true)}
+          />
+        {/if}
+
+        {#if data?.table.exposed_without_rls}
+          <p class="border-b border-destructive/30 bg-destructive/5 px-4 py-2 text-xs text-destructive">
+            Sem RLS: quem tem GRANT nesta tabela lê e altera todas as linhas.
+          </p>
+        {:else if data && !data.table.editable && data.table.kind === 'table'}
+          <p class="border-b bg-muted/40 px-4 py-2 text-xs text-muted-foreground">
+            Sem chave primária: dá para ver as linhas, mas não editar por aqui.
+          </p>
+        {/if}
+
+        <div class="relative min-h-0 flex-1 overflow-auto" aria-busy={loading}>
+          <!-- Recarga (ordem, filtro, página): barra no topo e grade esmaecida,
+               para os dados antigos não parecerem já os novos. -->
+          {#if loading && data}
+            <div class="pointer-events-none sticky top-0 z-20 h-0.5 overflow-hidden bg-brand/15" aria-hidden="true">
+              <div class="animate-progress h-full w-2/5 bg-brand"></div>
+            </div>
+          {/if}
+          {#if error}
+            <GridState state="error" message={error} onretry={load} />
+          {:else if !data}
+            <GridState state="loading" />
+          {:else}
+            <div class={['transition-opacity', loading && 'opacity-60']}>
+              <DataGrid
+                {data}
+                {sort}
+                hidden={hidden.names}
+                bind:selected
+                onsort={toggleSort}
+                onsortset={setSort}
+                onfilter={filterBy}
+                onhide={(column) => hidden.hide(column)}
+                onexpand={openSheet}
+                oncommit={commitCell}
+                {referenceHref}
+              />
+            </div>
+            {#if data.rows.length === 0}
+              {#if filters.length}
+                <GridState state="no-match" onclearfilters={() => setFilters([])} />
+              {:else}
+                <GridState state="empty" insertable={data.table.insertable} oninsert={() => openSheet(null)} />
+              {/if}
+            {/if}
+          {/if}
+        </div>
+
+        {#if data}<GridFooter {data} bind:page bind:size />{/if}
       {/if}
     {/if}
   </section>
 </div>
+
+<CreateTableSheet bind:open={createOpen} oncreated={onCreated} />
 
 {#if data && name}
   <RowSheet
@@ -495,7 +325,7 @@
   />
   <ConfirmDialog
     bind:open={confirmOpen}
-    title={`Apagar ${selected.size} linha(s)?`}
+    title={selected.size === 1 ? 'Apagar 1 linha?' : `Apagar ${selected.size} linhas?`}
     description="Esta ação não pode ser desfeita. As linhas são apagadas numa transação só."
     confirmLabel="Apagar"
     destructive

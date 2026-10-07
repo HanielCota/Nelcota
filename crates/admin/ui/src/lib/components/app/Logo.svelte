@@ -12,8 +12,8 @@
       stroke-width="2.2"
       stroke-linecap="round"
       stroke-linejoin="round"
-      class="text-[#0b2a1c]"
+      class="text-white dark:text-[#0b2a1c]"
     />
   </svg>
-  {#if !mark}<span class="text-[15px] font-medium tracking-tight">nelcota</span>{/if}
+  {#if !mark}<span class="text-base font-medium tracking-tight">nelcota</span>{/if}
 </span>
