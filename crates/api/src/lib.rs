@@ -2,7 +2,8 @@
 //!
 //! - `GET    /rest/v1/`                 OpenAPI (filtered by role)
 //! - `GET    /rest/v1/{table}`          read with filters, ordering and paging
-//! - `POST   /rest/v1/{table}`          insert (object or array)
+//! - `POST   /rest/v1/{table}`          insert (object or array); upsert with
+//!   `Prefer: resolution=merge-duplicates|ignore-duplicates` (+ `on_conflict`)
 //! - `PATCH  /rest/v1/{table}?filters`  update
 //! - `DELETE /rest/v1/{table}?filters`  delete
 //! - `POST   /rest/v1/rpc/{function}`   SQL function call
@@ -32,7 +33,7 @@ use nelcota_core::{ApiError, Claims, db};
 use serde_json::{Map, Value};
 
 pub use catalog::{Catalog, CatalogHandle, spawn_reload_listener};
-use query::{QueryError, Sql};
+use query::{QueryError, Resolution, Sql};
 
 #[derive(Clone, Debug, Default)]
 pub struct ApiSettings {
@@ -95,6 +96,7 @@ fn parse_body(bytes: &Bytes) -> Result<Value, ApiError> {
 struct Prefer {
     representation: bool,
     count_exact: bool,
+    resolution: Option<Resolution>,
 }
 
 impl Prefer {
@@ -106,6 +108,8 @@ impl Prefer {
                     "return=representation" => prefer.representation = true,
                     "return=minimal" => prefer.representation = false,
                     "count=exact" => prefer.count_exact = true,
+                    "resolution=merge-duplicates" => prefer.resolution = Some(Resolution::Merge),
+                    "resolution=ignore-duplicates" => prefer.resolution = Some(Resolution::Ignore),
                     _ => {}
                 }
             }
@@ -167,6 +171,7 @@ async fn read(
         .table(&name)
         .ok_or_else(|| not_found("table", &name))?;
     let request = query::parse_request(&pairs(raw), table).map_err(bad_query)?;
+    reject_on_conflict(&request)?;
     let prefer = Prefer::from_headers(&headers);
     let sql = query::select(&catalog.schema, table, &request, settings.max_rows);
     let count_sql = prefer
@@ -244,10 +249,28 @@ async fn create(
         )));
     }
     let prefer = Prefer::from_headers(&headers);
+    let upsert = match (prefer.resolution, &request.on_conflict) {
+        (Some(resolution), on_conflict) => {
+            Some(query::Upsert::new(table, on_conflict.as_deref(), resolution).map_err(bad_query)?)
+        }
+        (None, Some(_)) => {
+            return Err(bad_query(QueryError::Invalid(
+                "on_conflict needs Prefer: resolution=merge-duplicates or ignore-duplicates".into(),
+            )));
+        }
+        (None, None) => None,
+    };
     let body = parse_body(&bytes)?;
     let representation = prefer.representation.then_some(&request.select);
-    let sql = query::insert(&catalog.schema, table, body, representation).map_err(bad_query)?;
-    write(
+    let sql = query::insert(
+        &catalog.schema,
+        table,
+        body,
+        representation,
+        upsert.as_ref(),
+    )
+    .map_err(bad_query)?;
+    let mut response = write(
         &pool,
         &claims,
         sql,
@@ -255,7 +278,27 @@ async fn create(
         StatusCode::CREATED,
         StatusCode::CREATED,
     )
-    .await
+    .await?;
+    if let Some(upsert) = upsert {
+        let applied = match upsert.resolution {
+            Resolution::Merge => "resolution=merge-duplicates",
+            Resolution::Ignore => "resolution=ignore-duplicates",
+        };
+        response
+            .headers_mut()
+            .insert("preference-applied", HeaderValue::from_static(applied));
+    }
+    Ok(response)
+}
+
+/// `on_conflict` only means something to an upsert (POST).
+fn reject_on_conflict(request: &query::Request) -> Result<(), ApiError> {
+    if request.on_conflict.is_some() {
+        return Err(bad_query(QueryError::Invalid(
+            "on_conflict only applies to POST with Prefer: resolution=...".into(),
+        )));
+    }
+    Ok(())
 }
 
 /// PATCH/DELETE require at least one filter: prevents deleting/changing the
@@ -285,6 +328,7 @@ async fn update(
         .ok_or_else(|| not_found("table", &name))?;
     let request = query::parse_request(&pairs(raw), table).map_err(bad_query)?;
     require_filters(&request)?;
+    reject_on_conflict(&request)?;
     let prefer = Prefer::from_headers(&headers);
     let body = parse_body(&bytes)?;
     let representation = prefer.representation.then_some(&request.select);
@@ -321,6 +365,7 @@ async fn remove(
         .ok_or_else(|| not_found("table", &name))?;
     let request = query::parse_request(&pairs(raw), table).map_err(bad_query)?;
     require_filters(&request)?;
+    reject_on_conflict(&request)?;
     let prefer = Prefer::from_headers(&headers);
     let representation = prefer.representation.then_some(&request.select);
     let sql = query::delete(&catalog.schema, table, &request.filters, representation);
