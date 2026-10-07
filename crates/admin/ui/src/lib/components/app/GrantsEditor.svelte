@@ -24,19 +24,19 @@
 </script>
 
 <!-- Matriz role × privilégio. O RLS ainda filtra as linhas de anon e authenticated. -->
-<div class="overflow-x-auto rounded-xl border bg-card shadow-card">
+<div class="overflow-x-auto rounded-lg border bg-card">
   <table class="w-full text-sm">
     <thead>
       <tr class="bg-muted/60 text-xs text-muted-foreground">
-        <th class="px-4 py-2.5 text-left font-semibold tracking-wide">Role</th>
+        <th class="px-4 py-2.5 text-left font-medium">Role</th>
         {#each PRIVILEGES as privilege (privilege)}
-          <th class="w-20 px-2 py-2.5 text-center font-mono font-semibold uppercase">{privilege}</th>
+          <th class="w-20 px-2 py-2.5 text-center font-mono font-medium uppercase">{privilege}</th>
         {/each}
       </tr>
     </thead>
     <tbody>
       {#each API_ROLES as role (role)}
-        <tr class="border-t transition-colors hover:bg-muted/40">
+        <tr class="border-t">
           <td class="px-4 py-3">
             <span class="font-mono text-xs font-medium">{role}</span>
             <span class="block text-xs text-muted-foreground">{hint[role]}</span>

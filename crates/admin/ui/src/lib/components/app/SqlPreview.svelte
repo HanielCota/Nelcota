@@ -17,11 +17,11 @@
 </script>
 
 <!-- O SQL que será executado, gerado pelo servidor. -->
-<section class="overflow-hidden rounded-xl border bg-muted/30">
+<section class="overflow-hidden rounded-lg border bg-muted/30">
   <header class="flex items-center gap-2 px-4 py-2.5">
     <button
       type="button"
-      class="flex flex-1 cursor-pointer items-center gap-2 text-left text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground"
+      class="flex flex-1 cursor-pointer items-center gap-2 text-left text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
       aria-expanded={open}
       onclick={() => (open = !open)}
     >

@@ -6,7 +6,7 @@
 
 <!-- Só aparece quando há algo a corrigir. -->
 {#if state === 'danger' || state === 'warn'}
-  <span class={['size-2 shrink-0 rounded-full ring-2', state === 'danger' ? 'bg-destructive ring-destructive/20' : 'bg-warning ring-warning/20']}></span>
+  <span class={['size-1.5 shrink-0 rounded-full', state === 'danger' ? 'bg-destructive' : 'bg-warning']}></span>
 {:else}
-  <span class="size-2 shrink-0"></span>
+  <span class="size-1.5 shrink-0"></span>
 {/if}

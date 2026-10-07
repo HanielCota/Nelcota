@@ -1,8 +1,6 @@
 <script lang="ts">
   import * as Select from '$lib/components/ui/select'
   import { Button } from '$lib/components/ui/button'
-  import KeyRound from '@lucide/svelte/icons/key-round'
-  import ShieldAlert from '@lucide/svelte/icons/shield-alert'
   import { toast } from 'svelte-sonner'
   import CodeBlock from './CodeBlock.svelte'
   import { api } from '$lib/api'
@@ -33,26 +31,21 @@
 </script>
 
 <!-- O token não é guardado: aparece uma vez, aqui, para copiar. -->
-<section class="grid gap-5 rounded-xl border border-warning/30 bg-card p-5 shadow-card sm:p-6">
-  <div class="flex gap-4">
-    <span class="grid size-10 shrink-0 place-items-center rounded-xl border border-warning/25 bg-warning/10 text-warning">
-      <KeyRound class="size-5" />
-    </span>
-    <div>
-      <h2 class="text-base font-semibold">Token <code class="font-mono">service_role</code></h2>
-      <p class="mt-1 text-sm leading-relaxed text-muted-foreground">
-        Para o seu backend: <strong class="font-semibold text-foreground">ignora todo o RLS</strong>. Nunca coloque no
-        frontend, num app mobile ou num repositório. Cada token vale até expirar. Ainda depende de GRANT em cada
-        tabela (as criadas pelo painel já dão acesso total ao service_role).
-      </p>
-    </div>
+<section class="grid gap-4 rounded-lg border bg-card p-5">
+  <div>
+    <h2 class="text-base font-semibold">Token <code class="font-mono">service_role</code></h2>
+    <p class="mt-1 text-sm text-muted-foreground">
+      Para o seu backend. <span class="text-warning">Ignora todo o RLS</span>: nunca coloque no frontend, num app mobile
+      ou num repositório. Cada token vale até expirar e ainda depende de GRANT em cada tabela (as criadas pelo painel já
+      dão acesso total ao service_role).
+    </p>
   </div>
 
   {#if issued}
     <div class="grid gap-2">
       <CodeBlock code={issued.token} label="Copiar token" wrap />
-      <p class="flex items-center gap-2 text-sm font-medium text-warning">
-        <ShieldAlert class="size-4 shrink-0" />Copie agora: ele não será mostrado de novo. Vale até {expires(issued.expires_at)}.
+      <p class="text-sm text-warning">
+        Copie agora: ele não será mostrado de novo. Vale até {expires(issued.expires_at)}.
       </p>
     </div>
   {/if}
@@ -72,7 +65,7 @@
       {busy ? 'Gerando…' : issued ? 'Gerar outro' : 'Gerar token'}
     </Button>
     <span class="text-sm text-muted-foreground">
-      ou no servidor: <code class="text-foreground">nelcota token service-role</code>
+      ou no servidor: <code class="text-xs text-foreground">nelcota token service-role</code>
     </span>
   </div>
 </section>

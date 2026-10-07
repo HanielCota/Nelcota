@@ -7,7 +7,6 @@
   import { Label } from '$lib/components/ui/label'
   import { Checkbox } from '$lib/components/ui/checkbox'
   import { Textarea } from '$lib/components/ui/textarea'
-  import Sparkles from '@lucide/svelte/icons/sparkles'
   import { toast } from 'svelte-sonner'
   import SqlPreview from './SqlPreview.svelte'
   import { ddl, policyFields, type ApiRole, type PolicyCommand, type PolicyDef } from '$lib/ddl'
@@ -118,14 +117,14 @@
   <Sheet.Content class="flex w-full flex-col gap-0 p-0 data-[side=right]:sm:max-w-2xl">
     <Sheet.Header class="border-b px-6 py-4">
       <Sheet.Title>{original ? `Editar policy` : 'Nova policy'}</Sheet.Title>
-      <Sheet.Description>na tabela <code class="rounded-md bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground">{table}</code></Sheet.Description>
+      <Sheet.Description>na tabela <code class="font-mono text-xs text-foreground">{table}</code></Sheet.Description>
     </Sheet.Header>
 
     <form id="policy-form" class="flex-1 space-y-6 overflow-y-auto px-6 py-6" onsubmit={submit}>
       <DropdownMenu.Root>
         <DropdownMenu.Trigger>
           {#snippet child({ props })}
-            <Button variant="outline" {...props}><Sparkles class="text-brand" />Começar de um modelo</Button>
+            <Button variant="outline" {...props}>Começar de um modelo</Button>
           {/snippet}
         </DropdownMenu.Trigger>
         <DropdownMenu.Content align="start" class="w-96 max-w-[calc(100vw-2rem)]">
@@ -143,11 +142,11 @@
 
       <div class="grid gap-4 sm:grid-cols-2">
         <div class="grid gap-1.5">
-          <Label for="policy-name" class="font-semibold">Nome</Label>
+          <Label for="policy-name">Nome</Label>
           <Input id="policy-name" bind:value={policy.name} placeholder="ex.: dono lê as próprias notas" required />
         </div>
         <div class="grid gap-1.5">
-          <Label class="font-semibold">Comando</Label>
+          <Label>Comando</Label>
           <Select.Root type="single" bind:value={policy.command}>
             <Select.Trigger class="w-full">{commandLabel(policy.command)}</Select.Trigger>
             <Select.Content>
@@ -160,11 +159,11 @@
       </div>
 
       <fieldset class="grid gap-2">
-        <legend class="mb-1 text-sm font-semibold">Vale para</legend>
+        <legend class="mb-1 text-sm font-medium">Vale para</legend>
         <div class="grid gap-2 sm:grid-cols-3">
           {#each ROLES as role (role.value)}
             <label
-              class="flex cursor-pointer items-center gap-3 rounded-lg border bg-card px-3 py-2.5 text-sm shadow-card transition-colors hover:border-border-strong has-data-checked:border-brand/40 has-data-checked:bg-brand-soft/60"
+              class="flex cursor-pointer items-center gap-3 rounded-md border bg-card px-3 py-2.5 text-sm transition-colors hover:border-border-strong has-data-checked:border-brand/50"
             >
               <Checkbox checked={policy.roles.includes(role.value)} onCheckedChange={(v) => toggleRole(role.value, v === true)} />
               <span class="grid">
@@ -179,10 +178,10 @@
         {/if}
       </fieldset>
 
-      <label class="flex cursor-pointer items-start gap-3 rounded-lg border bg-card px-4 py-3 text-sm shadow-card transition-colors hover:border-border-strong">
+      <label class="flex cursor-pointer items-start gap-3 text-sm">
         <Checkbox checked={!policy.permissive} onCheckedChange={(v) => (policy.permissive = v !== true)} class="mt-0.5" />
         <span>
-          <span class="font-semibold">Restritiva</span>
+          <span class="font-medium">Restritiva</span>
           <span class="mt-0.5 block text-xs text-muted-foreground">
             Permissivas somam acesso (basta uma liberar). Restritivas são exigidas além delas.
           </span>
@@ -191,8 +190,8 @@
 
       {#if fields.using}
         <div class="grid gap-1.5">
-          <Label for="policy-using" class="flex-wrap font-semibold">
-            <span class="font-mono">USING</span> <span class="font-normal text-muted-foreground">· quais linhas existentes a role {policy.command === 'delete' ? 'pode apagar' : 'enxerga'}</span>
+          <Label for="policy-using" class="flex-wrap">
+            <span class="font-mono">USING</span> <span class="font-normal text-muted-foreground">quais linhas existentes a role {policy.command === 'delete' ? 'pode apagar' : 'enxerga'}</span>
           </Label>
           <Textarea
             id="policy-using"
@@ -204,8 +203,8 @@
       {/if}
       {#if fields.check}
         <div class="grid gap-1.5">
-          <Label for="policy-check" class="flex-wrap font-semibold">
-            <span class="font-mono">WITH CHECK</span> <span class="font-normal text-muted-foreground">· quais linhas novas ou alteradas são aceitas</span>
+          <Label for="policy-check" class="flex-wrap">
+            <span class="font-mono">WITH CHECK</span> <span class="font-normal text-muted-foreground">quais linhas novas ou alteradas são aceitas</span>
           </Label>
           <Textarea
             id="policy-check"

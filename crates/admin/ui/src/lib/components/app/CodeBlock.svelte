@@ -23,7 +23,7 @@
 </script>
 
 <!-- min-w-0: dentro de grid/flex, sem ele uma linha longa alarga a página. -->
-<div class="group relative min-w-0 rounded-xl border bg-muted/40 shadow-card">
+<div class="group relative min-w-0 rounded-md border bg-muted/40">
   <!-- Bloco que rola na horizontal precisa de foco para rolar com as setas
        (WCAG 2.1.1); por isso o tabindex num elemento não interativo. -->
   <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
@@ -36,7 +36,7 @@
     ]}>{code}</pre>
   <button
     type="button"
-    class="absolute top-2 right-2 grid size-8 cursor-pointer place-items-center rounded-lg border border-border-strong bg-card text-muted-foreground shadow-card transition-colors hover:border-ring hover:text-foreground"
+    class="absolute top-1.5 right-1.5 grid size-8 cursor-pointer place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
     aria-label={label}
     onclick={copy}
   >
