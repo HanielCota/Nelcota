@@ -8,8 +8,10 @@
 mod credentials;
 mod handlers;
 mod keys;
+mod mail;
 mod password;
 mod rate_limit;
+mod recovery;
 
 use std::sync::Arc;
 
@@ -22,6 +24,7 @@ use nelcota_core::{ApiError, Claims};
 pub use credentials::{InvalidCredential, normalize_email, validate_password};
 pub use handlers::{AuthSettings, AuthState, router};
 pub use keys::{KeyError, Keys, generate_ed25519_private_key};
+pub use mail::{Email, MailError, Mailer, SmtpMailer};
 pub use password::{Passwords, hash_password, verify_password};
 pub use rate_limit::RateLimiter;
 

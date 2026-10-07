@@ -1,5 +1,6 @@
 //! Testes do fluxo de autenticação contra Postgres real: cadastro, login,
-//! refresh com rotação e detecção de reuso, logout, JWKS e rate limit.
+//! refresh com rotação e detecção de reuso, logout, JWKS, rate limit e
+//! recuperação de senha por email.
 
 mod common;
 
@@ -290,17 +291,20 @@ async fn roles_da_api_nao_leem_o_schema_auth() {
         json!({ "role": "service_role" }),
     ] {
         let claims = Claims::from_payload(payload.clone()).unwrap();
-        let mut client = app.pool.get().await.unwrap();
-        let tx = db::begin_request(&mut client, &claims).await.unwrap();
-        let err = tx
-            .query("SELECT encrypted_password FROM auth.users", &[])
-            .await
-            .unwrap_err();
-        assert_eq!(
-            err.code(),
-            Some(&tokio_postgres::error::SqlState::INSUFFICIENT_PRIVILEGE),
-            "{payload}"
-        );
+        for query in [
+            "SELECT encrypted_password FROM auth.users",
+            "SELECT token_hash FROM auth.one_time_tokens",
+        ] {
+            // Uma transação por consulta: o erro aborta a transação inteira.
+            let mut client = app.pool.get().await.unwrap();
+            let tx = db::begin_request(&mut client, &claims).await.unwrap();
+            let err = tx.query(query, &[]).await.unwrap_err();
+            assert_eq!(
+                err.code(),
+                Some(&tokio_postgres::error::SqlState::INSUFFICIENT_PRIVILEGE),
+                "{payload}: {query}"
+            );
+        }
     }
 
     // E nenhum JWT consegue assumir a role interna do auth.
@@ -311,4 +315,201 @@ async fn roles_da_api_nao_leem_o_schema_auth() {
         )
         .await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
+}
+
+// ---------------------------------------------------------------- recuperação de senha
+
+async fn recover(app: &TestApp, email: &str) -> Reply {
+    app.post("/auth/v1/recover", None, json!({ "email": email }))
+        .await
+}
+
+async fn verify(app: &TestApp, token: &str, password: &str) -> Reply {
+    app.post(
+        "/auth/v1/verify",
+        None,
+        json!({ "type": "recovery", "token": token, "password": password }),
+    )
+    .await
+}
+
+/// Token do link do email (`...#type=recovery&token=<token>`).
+fn link_token(email: &nelcota_auth::Email) -> String {
+    let link = email
+        .text
+        .split_whitespace()
+        .find(|word| word.starts_with(RECOVERY_URL))
+        .unwrap_or_else(|| panic!("sem link em: {}", email.text));
+    link.strip_prefix(&format!("{RECOVERY_URL}#type=recovery&token="))
+        .unwrap_or_else(|| panic!("link fora do formato: {link}"))
+        .to_owned()
+}
+
+#[tokio::test]
+async fn recuperacao_de_senha_troca_a_senha_e_encerra_as_sessoes() {
+    let app = TestApp::spawn().await;
+    let old = signup(&app, "ana@exemplo.com", "senha-antiga-123")
+        .await
+        .body;
+    let old_refresh = str_field(&old, "refresh_token").to_owned();
+    assert!(old["user"]["email_confirmed_at"].is_null());
+
+    let reply = recover(&app, "Ana@Exemplo.com").await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+    assert_eq!(reply.body, json!({}));
+    let sent = app.outbox.wait_for(1).await;
+    assert_eq!(sent[0].to, "ana@exemplo.com");
+    let token = link_token(&sent[0]);
+
+    // Só o SHA-256 do token fica no banco.
+    let row = app
+        .admin_client
+        .query_one(
+            "SELECT count(*) FILTER (WHERE token_hash = sha256($1::text::bytea)),
+                    count(*) FILTER (WHERE position($1::text::bytea IN token_hash) > 0)
+             FROM auth.one_time_tokens",
+            &[&token],
+        )
+        .await
+        .unwrap();
+    assert_eq!((row.get::<_, i64>(0), row.get::<_, i64>(1)), (1, 0));
+
+    let reply = verify(&app, &token, "senha-nova-456").await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+    assert_eq!(reply.body["user"]["email"], "ana@exemplo.com");
+    // Abrir o link prova que a pessoa recebe os emails da conta.
+    assert!(reply.body["user"]["email_confirmed_at"].is_string());
+    assert!(reply.body["access_token"].is_string());
+
+    assert_eq!(
+        login(&app, "ana@exemplo.com", "senha-antiga-123")
+            .await
+            .status,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        login(&app, "ana@exemplo.com", "senha-nova-456")
+            .await
+            .status,
+        StatusCode::OK
+    );
+    // A sessão aberta com a senha antiga foi encerrada.
+    let reply = refresh(&app, &old_refresh).await;
+    assert_eq!(reply.status, StatusCode::BAD_REQUEST);
+    assert_eq!(reply.body["code"], "invalid_grant");
+
+    // O link vale uma vez só.
+    let reply = verify(&app, &token, "outra-senha-789").await;
+    assert_eq!(reply.status, StatusCode::BAD_REQUEST);
+    assert_eq!(reply.body["code"], "invalid_grant");
+}
+
+#[tokio::test]
+async fn recuperacao_nao_revela_se_a_conta_existe() {
+    let app = TestApp::spawn().await;
+    signup(&app, "bia@exemplo.com", "senha-forte-123").await;
+
+    let existing = recover(&app, "bia@exemplo.com").await;
+    let missing = recover(&app, "ninguem@exemplo.com").await;
+    assert_eq!(
+        (existing.status, &existing.body),
+        (missing.status, &missing.body)
+    );
+    app.outbox.wait_for(1).await;
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+    assert_eq!(app.outbox.sent().len(), 1, "só a conta que existe recebe");
+
+    let reply = recover(&app, "não é email").await;
+    assert_eq!(reply.status, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[tokio::test]
+async fn recuperacao_manda_um_email_por_minuto_e_so_o_ultimo_link_vale() {
+    let app = TestApp::spawn().await;
+    signup(&app, "caio@exemplo.com", "senha-forte-123").await;
+
+    recover(&app, "caio@exemplo.com").await;
+    let first = link_token(&app.outbox.wait_for(1).await[0]);
+    // Pedido repetido logo em seguida: mesma resposta, nenhum email novo.
+    assert_eq!(
+        recover(&app, "caio@exemplo.com").await.status,
+        StatusCode::OK
+    );
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+    assert_eq!(app.outbox.sent().len(), 1);
+
+    // Passado o intervalo, um novo pedido manda outro link e invalida o anterior.
+    app.admin_client
+        .execute(
+            "UPDATE auth.one_time_tokens SET created_at = now() - interval '2 minutes'",
+            &[],
+        )
+        .await
+        .unwrap();
+    recover(&app, "caio@exemplo.com").await;
+    let second = link_token(&app.outbox.wait_for(2).await[1]);
+    assert_ne!(first, second);
+    assert_eq!(
+        verify(&app, &first, "senha-nova-456").await.status,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        verify(&app, &second, "senha-nova-456").await.status,
+        StatusCode::OK
+    );
+}
+
+#[tokio::test]
+async fn link_expirado_invalido_ou_senha_fraca() {
+    let app = TestApp::spawn().await;
+    signup(&app, "davi@exemplo.com", "senha-forte-123").await;
+    recover(&app, "davi@exemplo.com").await;
+    let token = link_token(&app.outbox.wait_for(1).await[0]);
+
+    // Senha fora das regras não consome o link.
+    let reply = verify(&app, &token, "curta").await;
+    assert_eq!(reply.status, StatusCode::UNPROCESSABLE_ENTITY);
+
+    for bad in ["", "token-inventado", &"x".repeat(200)] {
+        let reply = verify(&app, bad, "senha-nova-456").await;
+        assert_eq!(reply.status, StatusCode::BAD_REQUEST, "{bad}");
+    }
+    let reply = app
+        .post(
+            "/auth/v1/verify",
+            None,
+            json!({ "type": "signup", "token": token, "password": "senha-nova-456" }),
+        )
+        .await;
+    assert_eq!(reply.body["code"], "unsupported_type");
+
+    app.admin_client
+        .execute(
+            "UPDATE auth.one_time_tokens SET expires_at = now() - interval '1 second'",
+            &[],
+        )
+        .await
+        .unwrap();
+    let reply = verify(&app, &token, "senha-nova-456").await;
+    assert_eq!(reply.status, StatusCode::BAD_REQUEST);
+    assert_eq!(
+        login(&app, "davi@exemplo.com", "senha-forte-123")
+            .await
+            .status,
+        StatusCode::OK,
+        "a senha antiga continua valendo"
+    );
+}
+
+#[tokio::test]
+async fn recuperacao_desligada_sem_smtp() {
+    let app = TestApp::spawn_with(Options {
+        mail: false,
+        ..Options::default()
+    })
+    .await;
+    signup(&app, "eva@exemplo.com", "senha-forte-123").await;
+    let reply = recover(&app, "eva@exemplo.com").await;
+    assert_eq!(reply.status, StatusCode::FORBIDDEN);
+    assert_eq!(reply.body["code"], "recovery_disabled");
 }

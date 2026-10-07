@@ -19,6 +19,12 @@ allow = [
     "ISC",
     "Unicode-3.0",
     "Zlib",
+    # webpki-roots: a lista de autoridades certificadoras da Mozilla (dados), usada
+    # pelo envio de email por SMTP com TLS. Licença permissiva para dados.
+    "CDLA-Permissive-2.0",
+    # quoted_printable (codificação do corpo do email, via lettre). Aprovada pela
+    # OSI; mais permissiva que a MIT (nem exige manter o aviso de copyright).
+    "0BSD",
 ]
 confidence-threshold = 0.9
 

@@ -15,7 +15,8 @@ use http_body_util::BodyExt;
 use jsonwebtoken::{EncodingKey, Header, get_current_timestamp};
 use nelcota_api::{ApiSettings, CatalogHandle, spawn_reload_listener};
 use nelcota_auth::{
-    AuthSettings, AuthState, Keys, Passwords, RateLimiter, generate_ed25519_private_key,
+    AuthSettings, AuthState, Email, Keys, MailError, Mailer, Passwords, RateLimiter,
+    generate_ed25519_private_key,
 };
 use nelcota_core::db;
 use nelcota_server::{AppState, app, load_catalog};
@@ -53,8 +54,48 @@ fn registry_file() -> std::path::PathBuf {
 }
 pub const ADMIN_PASSWORD: &str = "senha-do-admin-de-teste";
 
+/// Página do app que recebe o link de recuperação nos testes.
+pub const RECOVERY_URL: &str = "https://app.exemplo.com/nova-senha";
+
+/// Carteiro dos testes: guarda as mensagens em vez de mandar.
+#[derive(Default)]
+pub struct Outbox {
+    sent: std::sync::Mutex<Vec<Email>>,
+}
+
+impl Outbox {
+    pub fn sent(&self) -> Vec<Email> {
+        self.sent.lock().unwrap().clone()
+    }
+
+    /// Espera até haver `n` mensagens (o envio roda em segundo plano).
+    pub async fn wait_for(&self, n: usize) -> Vec<Email> {
+        for _ in 0..250 {
+            let sent = self.sent();
+            if sent.len() >= n {
+                return sent;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        panic!("esperava {n} email(s), chegaram {}", self.sent().len());
+    }
+}
+
+impl Mailer for Outbox {
+    fn send(
+        &self,
+        email: Email,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), MailError>> + Send + '_>>
+    {
+        self.sent.lock().unwrap().push(email);
+        Box::pin(async { Ok(()) })
+    }
+}
+
 pub struct Options {
     pub pool_size: usize,
+    /// Recuperação de senha ligada (com o [`Outbox`] no lugar do SMTP).
+    pub mail: bool,
     pub rate_limit_per_minute: u32,
     pub access_ttl_secs: u64,
     pub max_rows: Option<i64>,
@@ -64,6 +105,7 @@ impl Default for Options {
     fn default() -> Self {
         Options {
             pool_size: 4,
+            mail: true,
             rate_limit_per_minute: 10_000,
             access_ttl_secs: 900,
             max_rows: None,
@@ -80,6 +122,7 @@ pub struct TestApp {
     pub catalog: Arc<CatalogHandle>,
     pub user_a: Uuid,
     pub user_b: Uuid,
+    pub outbox: Arc<Outbox>,
     _container: ContainerAsync<Postgres>,
 }
 
@@ -185,7 +228,9 @@ impl TestApp {
                 issuer: "nelcota-test".into(),
             }),
         };
+        let outbox = Arc::new(Outbox::default());
         let auth = AuthState {
+            mailer: options.mail.then(|| outbox.clone() as Arc<dyn Mailer>),
             pool: pool.clone(),
             keys: keys.clone(),
             passwords: Arc::new(Passwords::new(2)),
@@ -196,6 +241,7 @@ impl TestApp {
                 refresh_ttl_days: 30,
                 signup_enabled: true,
                 trust_proxy: false,
+                recovery_url: options.mail.then(|| RECOVERY_URL.to_owned()),
             }),
         };
         TestApp {
@@ -207,6 +253,7 @@ impl TestApp {
             catalog,
             user_a,
             user_b,
+            outbox,
             _container: container,
         }
     }

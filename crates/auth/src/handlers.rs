@@ -24,8 +24,9 @@ use tokio_postgres::error::SqlState;
 use uuid::Uuid;
 
 use crate::{
-    Auth, JwtVerifier, Keys, Passwords, RateLimiter, SharedVerifier,
+    Auth, JwtVerifier, Keys, Mailer, Passwords, RateLimiter, SharedVerifier,
     credentials::{InvalidCredential, normalize_email, validate_password},
+    recovery,
 };
 
 /// Configuração dos endpoints de auth.
@@ -36,6 +37,8 @@ pub struct AuthSettings {
     pub refresh_ttl_days: u32,
     pub signup_enabled: bool,
     pub trust_proxy: bool,
+    /// Página do app que recebe o link de recuperação de senha.
+    pub recovery_url: Option<String>,
 }
 
 #[derive(Clone)]
@@ -45,6 +48,9 @@ pub struct AuthState {
     pub passwords: Arc<Passwords>,
     pub limiter: Arc<RateLimiter>,
     pub settings: Arc<AuthSettings>,
+    /// Envio de email; sem ele (ou sem `recovery_url`), a recuperação de
+    /// senha responde `recovery_disabled`.
+    pub mailer: Option<Arc<dyn Mailer>>,
 }
 
 impl FromRef<AuthState> for SharedVerifier {
@@ -59,17 +65,19 @@ pub fn router(state: AuthState) -> Router {
         .route("/auth/v1/token", post(token))
         .route("/auth/v1/logout", post(logout))
         .route("/auth/v1/user", get(user))
+        .route("/auth/v1/recover", post(recovery::recover))
+        .route("/auth/v1/verify", post(recovery::verify))
         .route("/auth/v1/.well-known/jwks.json", get(jwks))
         .with_state(state)
 }
 
 // ---------------------------------------------------------------- erros
 
-fn invalid_grant(message: &str) -> ApiError {
+pub(crate) fn invalid_grant(message: &str) -> ApiError {
     ApiError::new(StatusCode::BAD_REQUEST, "invalid_grant", message)
 }
 
-fn validation(message: &str) -> ApiError {
+pub(crate) fn validation(message: &str) -> ApiError {
     ApiError::new(
         StatusCode::UNPROCESSABLE_ENTITY,
         "validation_failed",
@@ -77,14 +85,14 @@ fn validation(message: &str) -> ApiError {
     )
 }
 
-fn db_error(err: tokio_postgres::Error) -> ApiError {
+pub(crate) fn db_error(err: tokio_postgres::Error) -> ApiError {
     ApiError::from_db(err, Role::ServiceRole)
 }
 
 // ---------------------------------------------------------------- helpers
 
 /// Endereço da conexão TCP, quando disponível (ausente em testes `oneshot`).
-struct PeerAddr(Option<SocketAddr>);
+pub(crate) struct PeerAddr(pub(crate) Option<SocketAddr>);
 
 impl<S: Send + Sync> FromRequestParts<S> for PeerAddr {
     type Rejection = std::convert::Infallible;
@@ -101,7 +109,7 @@ impl<S: Send + Sync> FromRequestParts<S> for PeerAddr {
 
 /// IP do cliente. Atrás de proxy (`trust_proxy`), usa a entrada mais à
 /// direita do `X-Forwarded-For` (a que o NOSSO proxy adicionou).
-fn client_ip(
+pub(crate) fn client_ip(
     settings: &AuthSettings,
     headers: &HeaderMap,
     peer: Option<SocketAddr>,
@@ -119,7 +127,7 @@ fn client_ip(
     peer.map(|addr| addr.ip())
 }
 
-fn limit(state: &AuthState, key: &str) -> Result<(), ApiError> {
+pub(crate) fn limit(state: &AuthState, key: &str) -> Result<(), ApiError> {
     state
         .limiter
         .check(key)
@@ -127,12 +135,13 @@ fn limit(state: &AuthState, key: &str) -> Result<(), ApiError> {
 }
 
 /// Credencial recusada pelas regras de `credentials` vira erro de validação.
-fn invalid(err: InvalidCredential) -> ApiError {
+pub(crate) fn invalid(err: InvalidCredential) -> ApiError {
     validation(err.0)
 }
 
-/// Refresh token opaco: 32 bytes aleatórios. Só o SHA-256 vai para o banco.
-fn new_refresh_token() -> (String, Vec<u8>) {
+/// Token opaco (refresh, link de recuperação): 32 bytes aleatórios. Só o
+/// SHA-256 vai para o banco.
+pub(crate) fn new_opaque_token() -> (String, Vec<u8>) {
     let mut bytes = [0u8; 32];
     getrandom::fill(&mut bytes).expect("fonte de aleatoriedade do sistema indisponível");
     let token = URL_SAFE_NO_PAD.encode(bytes);
@@ -140,7 +149,7 @@ fn new_refresh_token() -> (String, Vec<u8>) {
     (token, hash)
 }
 
-async fn begin_auth(client: &mut Object) -> Result<Transaction<'_>, ApiError> {
+pub(crate) async fn begin_auth(client: &mut Object) -> Result<Transaction<'_>, ApiError> {
     let tx = client.transaction().await.map_err(db_error)?;
     tx.batch_execute("SET LOCAL ROLE nelcota_auth")
         .await
@@ -163,7 +172,7 @@ struct SessionUser {
 }
 
 /// Cria sessão + primeiro refresh token, marca o login e devolve a resposta.
-async fn start_session(
+pub(crate) async fn start_session(
     state: &AuthState,
     tx: &Transaction<'_>,
     user_id: Uuid,
@@ -203,7 +212,7 @@ async fn issue_tokens(
     session_id: Uuid,
     user: &SessionUser,
 ) -> Result<Value, ApiError> {
-    let (refresh_token, hash) = new_refresh_token();
+    let (refresh_token, hash) = new_opaque_token();
     let ttl_days = i32::try_from(state.settings.refresh_ttl_days).unwrap_or(i32::MAX);
     tx.execute(
         "INSERT INTO auth.refresh_tokens (session_id, token_hash, expires_at)
@@ -240,7 +249,7 @@ async fn issue_tokens(
     }))
 }
 
-fn user_agent(headers: &HeaderMap) -> Option<&str> {
+pub(crate) fn user_agent(headers: &HeaderMap) -> Option<&str> {
     headers
         .get(header::USER_AGENT)
         .and_then(|v| v.to_str().ok())
@@ -312,7 +321,7 @@ async fn signup(
     Ok((StatusCode::CREATED, Json(session)))
 }
 
-fn ip_key(ip: Option<IpAddr>) -> String {
+pub(crate) fn ip_key(ip: Option<IpAddr>) -> String {
     ip.map(|i| i.to_string()).unwrap_or_default()
 }
 
@@ -554,6 +563,7 @@ mod tests {
             refresh_ttl_days: 1,
             signup_enabled: true,
             trust_proxy: false,
+            recovery_url: None,
         };
         let mut headers = HeaderMap::new();
         headers.insert("x-forwarded-for", "1.1.1.1, 2.2.2.2".parse().unwrap());

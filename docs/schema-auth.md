@@ -14,7 +14,7 @@ interna `nelcota_auth`, que nenhum JWT pode assumir. `anon`, `authenticated` e
 | `id` | `uuid` PK | `gen_random_uuid()`; é o `sub` do JWT e o `auth.uid()` |
 | `email` | `text` único | sempre minúsculo, ≤ 254 caracteres |
 | `encrypted_password` | `text` | **PHC string argon2id** (ver abaixo); `NULL` = sem senha |
-| `email_confirmed_at` | `timestamptz` | ponto de extensão (confirmação de email fora do MVP) |
+| `email_confirmed_at` | `timestamptz` | preenchido quando a pessoa usa um link de recuperação (prova que recebe os emails); confirmação no cadastro ainda fora do MVP |
 | `raw_user_meta_data` | `jsonb` | campo `data` do cadastro; devolvido como `user_metadata` |
 | `created_at`, `updated_at` | `timestamptz` | |
 | `last_sign_in_at` | `timestamptz` | atualizado em cada login |
@@ -64,6 +64,19 @@ Dois refreshes simultâneos com o mesmo token (duas abas) também disparam a
 detecção. O cliente deve serializar o refresh. Uma janela de tolerância pode
 entrar depois, se necessário.
 
+## `auth.one_time_tokens`
+
+Links enviados por email (hoje, só recuperação de senha).
+
+| Coluna | Tipo | Notas |
+|---|---|---|
+| `id` | `bigint` PK | |
+| `user_id` | `uuid` → `auth.users` | `ON DELETE CASCADE` |
+| `kind` | `text` | `recovery` |
+| `token_hash` | `bytea` único | **SHA-256** do token; o token em si nunca é guardado |
+| `created_at`, `expires_at` | `timestamptz` | validade: 1 hora |
+| `used_at` | `timestamptz` | preenchido no uso; o link não vale de novo |
+
 ## Endpoints
 
 | Método e rota | Corpo | Resposta |
@@ -74,6 +87,8 @@ entrar depois, se necessário.
 | `POST /auth/v1/logout` | Bearer | 204 (revoga a sessão) |
 | `GET /auth/v1/user` | Bearer | dados do usuário |
 | `GET /auth/v1/.well-known/jwks.json` | - | JWKS público |
+| `POST /auth/v1/recover` | `{email}` | 200 `{}` (exista ou não a conta) |
+| `POST /auth/v1/verify` | `{type: "recovery", token, password}` | 200 + sessão |
 
 Sessão:
 
@@ -93,5 +108,42 @@ user_already_exists`, `400 invalid_grant` (credenciais ou refresh inválidos, co
 a mesma mensagem para email inexistente e senha errada), `429 rate_limited` com
 `Retry-After`, `403 signup_disabled`.
 
+Recuperação: `403 recovery_disabled` (projeto sem SMTP), `400 invalid_grant`
+(link inválido, expirado ou já usado), `400 unsupported_type`.
+
 Senha: de 8 a 256 caracteres. Rate limit: `NELCOTA_AUTH_RATE_LIMIT_PER_MINUTE`
 por IP (padrão 30) e o mesmo limite por email no login.
+
+## Recuperação de senha
+
+Desligada até o projeto configurar um SMTP (o Nelcota não tem servidor de
+email próprio; use o do seu provedor: Postmark, SES, Resend...). No `.env` do
+projeto, os três juntos:
+
+```sh
+NELCOTA_SMTP_URL=smtps://usuario:senha@smtp.exemplo.com:465   # ou smtp://...:587?tls=required
+NELCOTA_SMTP_FROM=Loja <nao-responda@loja.com>
+NELCOTA_PASSWORD_RECOVERY_URL=https://app.loja.com/nova-senha
+```
+
+Configuração pela metade impede o servidor de subir (melhor do que descobrir
+no primeiro "esqueci minha senha").
+
+1. O app chama `POST /auth/v1/recover {email}`. A resposta é sempre `200 {}`,
+   para não revelar quem tem conta. Se a conta existe, chega um email com o
+   link `https://app.loja.com/nova-senha#type=recovery&token=...`.
+2. Essa página do app lê o token do fragmento (`location.hash`), pede a senha
+   nova e chama `POST /auth/v1/verify {type: "recovery", token, password}`.
+3. A resposta é uma sessão (mesmo formato do login): a pessoa já entra.
+
+Garantias:
+
+- O token vai no fragmento da URL, que o navegador não envia a nenhum
+  servidor: não aparece em logs nem no `Referer`.
+- Vale 1 hora e uma vez só. Pedir de novo invalida o link anterior.
+- No máximo um email por minuto para a mesma conta, além do rate limit por IP:
+  o endpoint não serve para lotar a caixa de entrada de alguém.
+- O email sai em segundo plano: o tempo de resposta não revela se a conta
+  existe, e uma falha do SMTP vai para o log em vez de virar erro.
+- Trocar a senha encerra todas as sessões da conta (os refresh tokens deixam de
+  valer na hora; JWTs de acesso já emitidos valem até expirar).
