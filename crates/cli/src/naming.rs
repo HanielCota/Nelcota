@@ -1,15 +1,16 @@
-//! Nomes de projeto e domínios: validação e resolução de
-//! `nelcota init [DOMÍNIO] [--project NOME]`.
+//! Project names and domains: validation and resolution of
+//! `nelcota init [DOMAIN] [--project NAME]`.
 //!
-//! - Domínio próprio: `nelcota init api.loja.com` → projeto "loja".
-//! - Subdomínio do domínio base do host: `nelcota init --project loja`
-//!   com `--base-domain exemplo.com` → `loja.exemplo.com`.
-//! - Local: `nelcota init --local --project loja` → `loja.localhost`.
+//! - Own domain: `nelcota init api.shop.com` → project "shop".
+//! - Subdomain of the host's base domain: `nelcota init --project shop`
+//!   with `--base-domain example.com` → `shop.example.com`.
+//! - Local: `nelcota init --local --project shop` → `shop.localhost`.
 
 use anyhow::bail;
 
-/// Primeiros rótulos que não servem como nome de projeto (`api.loja.com` → "loja").
-const GENERIC_LABELS: [&str; 6] = ["api", "app", "www", "admin", "painel", "db"];
+/// Leading labels that do not make a project name (`api.shop.com` → "shop").
+/// "painel" is Portuguese for "panel", common in Brazilian domains.
+const GENERIC_LABELS: [&str; 7] = ["api", "app", "www", "admin", "panel", "painel", "db"];
 
 pub fn validate_project_name(name: &str) -> anyhow::Result<()> {
     let ok = (1..=32).contains(&name.len())
@@ -19,7 +20,7 @@ pub fn validate_project_name(name: &str) -> anyhow::Result<()> {
         && !name.starts_with('-')
         && !name.ends_with('-');
     if !ok {
-        bail!("nome de projeto inválido: '{name}' (use a-z, 0-9 e hífen, até 32 caracteres)");
+        bail!("invalid project name: '{name}' (use a-z, 0-9 and hyphens, up to 32 characters)");
     }
     Ok(())
 }
@@ -36,13 +37,13 @@ pub fn is_valid_domain(domain: &str) -> bool {
         })
 }
 
-/// Nome sugerido para o projeto a partir do domínio.
+/// Project name suggested from the domain.
 pub fn project_name_from_domain(domain: &str) -> String {
     let labels: Vec<&str> = domain.split('.').collect();
     let label = match labels.as_slice() {
         [first, second, _, ..] if GENERIC_LABELS.contains(first) => second,
         [first, ..] => first,
-        [] => "projeto",
+        [] => "project",
     };
     let name: String = label
         .to_lowercase()
@@ -53,7 +54,7 @@ pub fn project_name_from_domain(domain: &str) -> String {
     name.trim_matches('-').to_owned()
 }
 
-/// Nome e domínio finais de um projeto novo.
+/// Final name and domain of a new project.
 pub fn resolve(
     domain: Option<&str>,
     project: Option<&str>,
@@ -72,16 +73,16 @@ pub fn resolve(
         }
         (None, None, _, true) => ("local".to_owned(), "local.localhost".to_owned()),
         (None, Some(_), None, false) => bail!(
-            "informe o domínio (`nelcota init api.loja.com`) ou defina um domínio base \
-             (`nelcota init --project loja --base-domain exemplo.com`)"
+            "give the domain (`nelcota init api.shop.com`) or set a base domain \
+             (`nelcota init --project shop --base-domain example.com`)"
         ),
         (None, None, _, false) => {
-            bail!("informe o domínio (`nelcota init api.loja.com`) ou o projeto com --project")
+            bail!("give the domain (`nelcota init api.shop.com`) or the project with --project")
         }
     };
     validate_project_name(&name)?;
     if !is_valid_domain(&domain) {
-        bail!("domínio inválido: {domain}");
+        bail!("invalid domain: {domain}");
     }
     Ok((name, domain))
 }
@@ -91,26 +92,27 @@ mod tests {
     use super::*;
 
     #[test]
-    fn nome_vem_do_dominio() {
-        assert_eq!(project_name_from_domain("api.loja.com"), "loja");
-        assert_eq!(project_name_from_domain("loja.com.br"), "loja");
-        assert_eq!(project_name_from_domain("meu_app.exemplo.com"), "meu-app");
+    fn name_comes_from_the_domain() {
+        assert_eq!(project_name_from_domain("api.shop.com"), "shop");
+        assert_eq!(project_name_from_domain("shop.com.br"), "shop");
+        assert_eq!(project_name_from_domain("panel.shop.com"), "shop");
+        assert_eq!(project_name_from_domain("my_app.example.com"), "my-app");
         assert_eq!(project_name_from_domain("api.com"), "api");
     }
 
     #[test]
-    fn dominio_proprio_subdominio_e_local() {
+    fn own_domain_subdomain_and_local() {
         assert_eq!(
-            resolve(Some("API.Loja.com."), None, None, false).unwrap(),
-            ("loja".into(), "api.loja.com".into())
+            resolve(Some("API.Shop.com."), None, None, false).unwrap(),
+            ("shop".into(), "api.shop.com".into())
         );
         assert_eq!(
-            resolve(Some("api.loja.com"), Some("vendas"), None, false).unwrap(),
-            ("vendas".into(), "api.loja.com".into())
+            resolve(Some("api.shop.com"), Some("sales"), None, false).unwrap(),
+            ("sales".into(), "api.shop.com".into())
         );
         assert_eq!(
-            resolve(None, Some("blog"), Some("exemplo.com"), false).unwrap(),
-            ("blog".into(), "blog.exemplo.com".into())
+            resolve(None, Some("blog"), Some("example.com"), false).unwrap(),
+            ("blog".into(), "blog.example.com".into())
         );
         assert_eq!(
             resolve(None, Some("blog"), None, true).unwrap(),
@@ -123,9 +125,9 @@ mod tests {
     }
 
     #[test]
-    fn valida_nome_de_projeto() {
-        assert!(validate_project_name("loja-2").is_ok());
-        for bad in ["", "-loja", "loja-", "Loja", "a.b", "../x", &"x".repeat(33)] {
+    fn validates_project_name() {
+        assert!(validate_project_name("shop-2").is_ok());
+        for bad in ["", "-shop", "shop-", "Shop", "a.b", "../x", &"x".repeat(33)] {
             assert!(validate_project_name(bad).is_err(), "{bad}");
         }
     }

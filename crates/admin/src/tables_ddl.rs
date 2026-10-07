@@ -1,5 +1,5 @@
-//! Handlers de estrutura de tabelas: tipos disponíveis, criar, alterar e
-//! apagar. Validação e SQL ficam em `ddl::table`; execução em `apply`.
+//! Table structure handlers: available types, create, alter and drop.
+//! Validation and SQL live in `ddl::table`; execution in `apply`.
 
 use axum::{
     Json,
@@ -35,7 +35,7 @@ async fn enums(client: &Client, schema: &str) -> Result<Vec<String>, ApiError> {
         .collect())
 }
 
-/// `GET /admin/api/types`: tipos que o formulário oferece.
+/// `GET /admin/api/types`: types the form offers.
 pub async fn types(State(state): State<AdminState>) -> ApiResult {
     let schema = state.catalog.get().schema.clone();
     let client = state.db.get().await?;
@@ -66,7 +66,7 @@ pub async fn create(State(state): State<AdminState>, Json(body): Json<CreateRequ
         &state,
         statements,
         body.preview,
-        &format!("tabela '{}' criada", body.table.name),
+        &format!("table '{}' created", body.table.name),
     )
     .await
 }
@@ -90,7 +90,10 @@ pub async fn alter(
         let client = state.db.get().await?;
         let current = structure::load(&client, &schema, &table.name)
             .await?
-            .ok_or_else(|| ApiError::not_found(format!("tabela '{name}' não existe")))?;
+            .ok_or_else(|| {
+                ApiError::not_found("table_not_found", format!("table '{name}' does not exist"))
+                    .params(json!({ "table": name }))
+            })?;
         (current, enums(&client, &schema).await?)
     };
     let statements = table::alter(
@@ -105,7 +108,7 @@ pub async fn alter(
         &state,
         statements,
         body.preview,
-        &format!("tabela '{name}' alterada"),
+        &format!("table '{name}' altered"),
     )
     .await
 }
@@ -131,7 +134,7 @@ pub async fn drop(
         &state,
         statements,
         params.preview,
-        &format!("tabela '{name}' apagada"),
+        &format!("table '{name}' dropped"),
     )
     .await
 }

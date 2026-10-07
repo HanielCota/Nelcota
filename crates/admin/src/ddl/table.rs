@@ -1,14 +1,16 @@
-//! DDL de tabelas: criar, alterar (lista de ações numa transação) e apagar.
+//! Table DDL: create, alter (a list of actions in one transaction) and drop.
 
 use nelcota_api::query::ident;
 use serde::Deserialize;
+use serde_json::{Value, json};
 
 use super::{
-    DataType, GrantDef, Result, expression, grant, invalid, literal, qualified, validate_name,
+    DataType, GrantDef, Result, error, expression, grant, invalid, literal, qualified,
+    validate_name,
 };
 use crate::structure::{ColumnInfo, Structure};
 
-/// Contexto para validar tipos: schema exposto e enums dele.
+/// Context for validating types: the exposed schema and its enums.
 pub struct Context<'a> {
     pub schema: &'a str,
     pub enums: &'a [String],
@@ -55,11 +57,11 @@ pub struct ColumnDef {
     pub data_type: String,
     #[serde(default = "yes")]
     pub nullable: bool,
-    /// Expressão SQL (`now()`, `0`, `'rascunho'`).
+    /// SQL expression (`now()`, `0`, `'draft'`).
     pub default: Option<String>,
     #[serde(default)]
     pub primary_key: bool,
-    /// `GENERATED ALWAYS AS IDENTITY` (só tipos inteiros).
+    /// `GENERATED ALWAYS AS IDENTITY` (integer types only).
     #[serde(default)]
     pub identity: bool,
     #[serde(default)]
@@ -69,8 +71,8 @@ pub struct ColumnDef {
 }
 
 fn references_sql(schema: &str, def: &ReferenceDef) -> Result<String> {
-    validate_name("tabela referenciada", &def.table)?;
-    validate_name("coluna referenciada", &def.column)?;
+    validate_name("referenced table", &def.table)?;
+    validate_name("referenced column", &def.column)?;
     Ok(format!(
         "REFERENCES {} ({}) ON DELETE {}",
         qualified(schema, &def.table),
@@ -79,24 +81,29 @@ fn references_sql(schema: &str, def: &ReferenceDef) -> Result<String> {
     ))
 }
 
-/// Definição da coluna dentro de `CREATE TABLE`/`ADD COLUMN`.
-/// `inline_pk`: a PK é desta coluna só (senão vai como constraint da tabela).
+/// The column definition inside `CREATE TABLE`/`ADD COLUMN`.
+/// `inline_pk`: the PK is this column alone (otherwise it is a table constraint).
 fn column_sql(ctx: &Context, col: &ColumnDef, inline_pk: bool) -> Result<String> {
-    validate_name("coluna", &col.name)?;
+    validate_name("column", &col.name)?;
     let data_type = DataType::parse(&col.data_type, ctx.enums)?;
     let mut sql = format!("{} {}", ident(&col.name), data_type.to_sql(ctx.schema));
     if col.identity {
         if !data_type.is_integer() {
-            return invalid(format!(
-                "coluna '{}': identity só em smallint, integer ou bigint",
-                col.name
-            ));
+            return invalid(
+                "identity_requires_integer",
+                format!(
+                    "column '{}': identity only on smallint, integer or bigint",
+                    col.name
+                ),
+                json!({ "column": col.name }),
+            );
         }
         if col.default.is_some() {
-            return invalid(format!(
-                "coluna '{}': identity não aceita DEFAULT",
-                col.name
-            ));
+            return invalid(
+                "identity_with_default",
+                format!("column '{}': identity does not take a DEFAULT", col.name),
+                json!({ "column": col.name }),
+            );
         }
         sql.push_str(" GENERATED ALWAYS AS IDENTITY");
     }
@@ -106,10 +113,7 @@ fn column_sql(ctx: &Context, col: &ColumnDef, inline_pk: bool) -> Result<String>
         sql.push_str(" NOT NULL");
     }
     if let Some(default) = &col.default {
-        sql.push_str(&format!(
-            " DEFAULT {}",
-            expression(&format!("default de '{}'", col.name), default)?
-        ));
+        sql.push_str(&format!(" DEFAULT {}", expression("DEFAULT", default)?));
     }
     if col.unique && !inline_pk {
         sql.push_str(" UNIQUE");
@@ -136,7 +140,7 @@ pub struct CreateTable {
     pub name: String,
     pub comment: Option<String>,
     pub columns: Vec<ColumnDef>,
-    /// RLS ligado já na criação (padrão): sem policies, só service_role acessa.
+    /// RLS on from creation (the default): without policies, only service_role gets in.
     #[serde(default = "yes")]
     pub rls: bool,
     #[serde(default)]
@@ -144,13 +148,21 @@ pub struct CreateTable {
 }
 
 pub fn create(ctx: &Context, spec: &CreateTable) -> Result<Vec<String>> {
-    validate_name("tabela", &spec.name)?;
+    validate_name("table", &spec.name)?;
     if spec.columns.is_empty() {
-        return invalid("a tabela precisa de pelo menos uma coluna");
+        return invalid(
+            "table_needs_columns",
+            "the table needs at least one column",
+            Value::Null,
+        );
     }
     for (i, col) in spec.columns.iter().enumerate() {
         if spec.columns[..i].iter().any(|c| c.name == col.name) {
-            return invalid(format!("coluna '{}' repetida", col.name));
+            return invalid(
+                "duplicate_column",
+                format!("column '{}' repeated", col.name),
+                json!({ "column": col.name }),
+            );
         }
     }
     let table = qualified(ctx.schema, &spec.name);
@@ -184,7 +196,7 @@ pub fn create(ctx: &Context, spec: &CreateTable) -> Result<Vec<String>> {
     Ok(statements)
 }
 
-/// Uma alteração. A lista inteira roda numa transação, na ordem enviada.
+/// One change. The whole list runs in one transaction, in the order sent.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "action", rename_all = "snake_case")]
 pub enum AlterAction {
@@ -207,7 +219,7 @@ pub enum AlterAction {
         from: String,
         to: String,
     },
-    /// `using`: expressão de conversão; padrão `"coluna"::novo_tipo`.
+    /// `using`: conversion expression; default `"column"::new_type`.
     SetType {
         column: String,
         data_type: String,
@@ -233,14 +245,14 @@ pub enum AlterAction {
         column: String,
         comment: Option<String>,
     },
-    /// Substitui os privilégios da role na tabela.
+    /// Replaces the role's privileges on the table.
     SetGrants {
         grant: GrantDef,
     },
 }
 
-/// Coluna recém-adicionada na cópia de trabalho (nomes de constraints ainda
-/// não existem: o Postgres só os cria ao executar).
+/// Column just added to the working copy (constraint names do not exist yet:
+/// Postgres only creates them when it runs).
 fn added_column(col: &ColumnDef) -> ColumnInfo {
     ColumnInfo {
         name: col.name.clone(),
@@ -260,18 +272,22 @@ fn column_exists<'a>(
     current: &'a Structure,
     name: &str,
 ) -> Result<&'a crate::structure::ColumnInfo> {
-    current
-        .column(name)
-        .ok_or_else(|| super::DdlError(format!("coluna '{name}' não existe")))
+    current.column(name).ok_or_else(|| {
+        error(
+            "column_not_found",
+            format!("column '{name}' does not exist"),
+            json!({ "column": name }),
+        )
+    })
 }
 
-/// `current`: estrutura atual (valida colunas e acha nomes de constraints).
+/// `initial`: the current structure (validates columns and finds constraint names).
 pub fn alter(ctx: &Context, initial: &Structure, actions: &[AlterAction]) -> Result<Vec<String>> {
     if actions.is_empty() {
-        return invalid("nenhuma alteração");
+        return invalid("no_changes", "no changes", Value::Null);
     }
-    // Cópia de trabalho atualizada a cada ação: depois de renomear uma
-    // coluna (ou a tabela), as ações seguintes usam o nome novo.
+    // Working copy updated after each action: once a column (or the table) is
+    // renamed, the following actions use the new name.
     let mut current = initial.clone();
     let mut table = qualified(ctx.schema, &current.name);
     let mut statements = Vec::new();
@@ -280,7 +296,7 @@ pub fn alter(ctx: &Context, initial: &Structure, actions: &[AlterAction]) -> Res
         let alter = |clause: String| format!("ALTER TABLE {target} {clause}");
         match action {
             AlterAction::RenameTable { name } => {
-                validate_name("tabela", name)?;
+                validate_name("table", name)?;
                 statements.push(alter(format!("RENAME TO {}", ident(name))));
                 table = qualified(ctx.schema, name);
             }
@@ -301,10 +317,18 @@ pub fn alter(ctx: &Context, initial: &Structure, actions: &[AlterAction]) -> Res
             )),
             AlterAction::AddColumn { column } => {
                 if column.primary_key {
-                    return invalid("a chave primária é definida na criação da tabela");
+                    return invalid(
+                        "primary_key_on_create_only",
+                        "the primary key is set when the table is created",
+                        Value::Null,
+                    );
                 }
                 if current.column(&column.name).is_some() {
-                    return invalid(format!("coluna '{}' já existe", column.name));
+                    return invalid(
+                        "column_already_exists",
+                        format!("column '{}' already exists", column.name),
+                        json!({ "column": column.name }),
+                    );
                 }
                 statements.push(alter(format!(
                     "ADD COLUMN {}",
@@ -322,7 +346,7 @@ pub fn alter(ctx: &Context, initial: &Structure, actions: &[AlterAction]) -> Res
             }
             AlterAction::RenameColumn { from, to } => {
                 column_exists(&current, from)?;
-                validate_name("coluna", to)?;
+                validate_name("column", to)?;
                 statements.push(alter(format!(
                     "RENAME COLUMN {} TO {}",
                     ident(from),
@@ -360,9 +384,13 @@ pub fn alter(ctx: &Context, initial: &Structure, actions: &[AlterAction]) -> Res
             AlterAction::SetDefault { column, default } => {
                 let info = column_exists(&current, column)?;
                 if info.identity.is_some() || info.generated {
-                    return invalid(format!(
-                        "coluna '{column}' é identity/gerada: não aceita DEFAULT"
-                    ));
+                    return invalid(
+                        "column_rejects_default",
+                        format!(
+                            "column '{column}' is identity/generated: it does not take a DEFAULT"
+                        ),
+                        json!({ "column": column }),
+                    );
                 }
                 let change = match default {
                     Some(expr) => format!("SET DEFAULT {}", expression("DEFAULT", expr)?),
@@ -451,7 +479,7 @@ mod tests {
 
     fn spec(columns: Vec<ColumnDef>) -> CreateTable {
         CreateTable {
-            name: "notas".into(),
+            name: "notes".into(),
             comment: None,
             columns,
             rls: true,
@@ -460,7 +488,7 @@ mod tests {
     }
 
     #[test]
-    fn cria_tabela_com_pk_identity_default_fk_rls_comentarios_e_grants() {
+    fn creates_a_table_with_pk_identity_default_fk_rls_comments_and_grants() {
         let mut table = spec(vec![
             ColumnDef {
                 primary_key: true,
@@ -469,12 +497,12 @@ mod tests {
             },
             ColumnDef {
                 nullable: false,
-                ..col("texto", "text")
+                ..col("body", "text")
             },
             ColumnDef {
                 default: Some("now()".into()),
                 nullable: false,
-                ..col("criada_em", "timestamptz")
+                ..col("created_at", "timestamptz")
             },
             ColumnDef {
                 unique: true,
@@ -482,15 +510,15 @@ mod tests {
             },
             ColumnDef {
                 references: Some(ReferenceDef {
-                    table: "clientes".into(),
+                    table: "customers".into(),
                     column: "id".into(),
                     on_delete: OnDelete::Cascade,
                 }),
-                comment: Some("dona da nota".into()),
-                ..col("cliente_id", "bigint")
+                comment: Some("owner of the note".into()),
+                ..col("customer_id", "bigint")
             },
         ]);
-        table.comment = Some("Notas d'equipe".into());
+        table.comment = Some("The team's notes".into());
         table.grants = vec![
             GrantDef {
                 role: ApiRole::Authenticated,
@@ -504,22 +532,22 @@ mod tests {
         assert_eq!(
             create(&ctx(), &table).unwrap(),
             [
-                "CREATE TABLE \"public\".\"notas\" (\n  \
+                "CREATE TABLE \"public\".\"notes\" (\n  \
                  \"id\" bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,\n  \
-                 \"texto\" text NOT NULL,\n  \
-                 \"criada_em\" timestamptz NOT NULL DEFAULT (now()),\n  \
+                 \"body\" text NOT NULL,\n  \
+                 \"created_at\" timestamptz NOT NULL DEFAULT (now()),\n  \
                  \"slug\" varchar(80) UNIQUE,\n  \
-                 \"cliente_id\" bigint REFERENCES \"public\".\"clientes\" (\"id\") ON DELETE CASCADE\n)",
-                "ALTER TABLE \"public\".\"notas\" ENABLE ROW LEVEL SECURITY",
-                "COMMENT ON TABLE \"public\".\"notas\" IS 'Notas d''equipe'",
-                "COMMENT ON COLUMN \"public\".\"notas\".\"cliente_id\" IS 'dona da nota'",
-                "GRANT SELECT, INSERT ON TABLE \"public\".\"notas\" TO \"authenticated\"",
+                 \"customer_id\" bigint REFERENCES \"public\".\"customers\" (\"id\") ON DELETE CASCADE\n)",
+                "ALTER TABLE \"public\".\"notes\" ENABLE ROW LEVEL SECURITY",
+                "COMMENT ON TABLE \"public\".\"notes\" IS 'The team''s notes'",
+                "COMMENT ON COLUMN \"public\".\"notes\".\"customer_id\" IS 'owner of the note'",
+                "GRANT SELECT, INSERT ON TABLE \"public\".\"notes\" TO \"authenticated\"",
             ]
         );
     }
 
     #[test]
-    fn chave_primaria_composta_vira_constraint_da_tabela() {
+    fn composite_primary_key_becomes_a_table_constraint() {
         let table = spec(vec![
             ColumnDef {
                 primary_key: true,
@@ -536,14 +564,14 @@ mod tests {
     }
 
     #[test]
-    fn sem_rls_quando_pedido() {
+    fn no_rls_when_asked() {
         let mut table = spec(vec![col("x", "text")]);
         table.rls = false;
         assert_eq!(create(&ctx(), &table).unwrap().len(), 1);
     }
 
     #[test]
-    fn criacao_recusa_especificacoes_invalidas() {
+    fn creation_refuses_invalid_specifications() {
         let cases = [
             spec(vec![]),
             spec(vec![col("x", "text"), col("x", "integer")]),
@@ -565,6 +593,9 @@ mod tests {
         for case in cases {
             assert!(create(&ctx(), &case).is_err(), "{case:?}");
         }
+        let err = create(&ctx(), &spec(vec![col("x", "text"), col("x", "integer")])).unwrap_err();
+        assert_eq!(err.code, "duplicate_column");
+        assert_eq!(err.params, json!({ "column": "x" }));
     }
 
     fn structure() -> Structure {
@@ -581,11 +612,11 @@ mod tests {
             comment: None,
         };
         Structure {
-            name: "notas".into(),
+            name: "notes".into(),
             comment: None,
             rls_enabled: true,
             primary_key: vec!["id".into()],
-            primary_key_constraint: Some("notas_pkey".into()),
+            primary_key_constraint: Some("notes_pkey".into()),
             columns: vec![
                 ColumnInfo {
                     identity: Some("always"),
@@ -593,49 +624,49 @@ mod tests {
                     ..info("id")
                 },
                 ColumnInfo {
-                    unique: Some("notas_slug_key".into()),
+                    unique: Some("notes_slug_key".into()),
                     ..info("slug")
                 },
                 ColumnInfo {
                     references: Some(ForeignKeyRef {
-                        table: "clientes".into(),
+                        table: "customers".into(),
                         column: "id".into(),
                         on_delete: "no action",
-                        constraint: "notas_cliente_id_fkey".into(),
+                        constraint: "notes_customer_id_fkey".into(),
                     }),
-                    ..info("cliente_id")
+                    ..info("customer_id")
                 },
-                info("texto"),
+                info("body"),
             ],
             grants: vec![],
         }
     }
 
     #[test]
-    fn alteracoes_de_coluna() {
+    fn column_changes() {
         let actions = vec![
             AlterAction::AddColumn {
                 column: ColumnDef {
                     default: Some("0".into()),
-                    ..col("votos", "integer")
+                    ..col("votes", "integer")
                 },
             },
             AlterAction::SetType {
-                column: "texto".into(),
+                column: "body".into(),
                 data_type: "varchar(200)".into(),
                 using: None,
             },
             AlterAction::SetNullable {
-                column: "texto".into(),
+                column: "body".into(),
                 nullable: false,
             },
             AlterAction::SetDefault {
-                column: "texto".into(),
+                column: "body".into(),
                 default: Some("''".into()),
             },
             AlterAction::RenameColumn {
-                from: "texto".into(),
-                to: "conteudo".into(),
+                from: "body".into(),
+                to: "content".into(),
             },
             AlterAction::DropColumn {
                 name: "slug".into(),
@@ -644,32 +675,32 @@ mod tests {
         assert_eq!(
             alter(&ctx(), &structure(), &actions).unwrap(),
             [
-                "ALTER TABLE \"public\".\"notas\" ADD COLUMN \"votos\" integer DEFAULT (0)",
-                "ALTER TABLE \"public\".\"notas\" ALTER COLUMN \"texto\" TYPE varchar(200) USING \"texto\"::varchar(200)",
-                "ALTER TABLE \"public\".\"notas\" ALTER COLUMN \"texto\" SET NOT NULL",
-                "ALTER TABLE \"public\".\"notas\" ALTER COLUMN \"texto\" SET DEFAULT ('')",
-                "ALTER TABLE \"public\".\"notas\" RENAME COLUMN \"texto\" TO \"conteudo\"",
-                "ALTER TABLE \"public\".\"notas\" DROP COLUMN \"slug\"",
+                "ALTER TABLE \"public\".\"notes\" ADD COLUMN \"votes\" integer DEFAULT (0)",
+                "ALTER TABLE \"public\".\"notes\" ALTER COLUMN \"body\" TYPE varchar(200) USING \"body\"::varchar(200)",
+                "ALTER TABLE \"public\".\"notes\" ALTER COLUMN \"body\" SET NOT NULL",
+                "ALTER TABLE \"public\".\"notes\" ALTER COLUMN \"body\" SET DEFAULT ('')",
+                "ALTER TABLE \"public\".\"notes\" RENAME COLUMN \"body\" TO \"content\"",
+                "ALTER TABLE \"public\".\"notes\" DROP COLUMN \"slug\"",
             ]
         );
     }
 
     #[test]
-    fn acoes_seguintes_enxergam_colunas_renomeadas_adicionadas_e_removidas() {
+    fn later_actions_see_renamed_added_and_dropped_columns() {
         let actions = vec![
             AlterAction::RenameColumn {
-                from: "texto".into(),
-                to: "conteudo".into(),
+                from: "body".into(),
+                to: "content".into(),
             },
             AlterAction::SetNullable {
-                column: "conteudo".into(),
+                column: "content".into(),
                 nullable: false,
             },
             AlterAction::AddColumn {
-                column: col("votos", "integer"),
+                column: col("votes", "integer"),
             },
             AlterAction::SetDefault {
-                column: "votos".into(),
+                column: "votes".into(),
                 default: Some("0".into()),
             },
             AlterAction::DropColumn {
@@ -680,17 +711,17 @@ mod tests {
 
         let stale = vec![
             AlterAction::RenameColumn {
-                from: "texto".into(),
-                to: "conteudo".into(),
+                from: "body".into(),
+                to: "content".into(),
             },
             AlterAction::SetNullable {
-                column: "texto".into(),
+                column: "body".into(),
                 nullable: false,
             },
         ];
         assert!(
             alter(&ctx(), &structure(), &stale).is_err(),
-            "nome antigo não vale mais"
+            "the old name no longer applies"
         );
         let dropped = vec![
             AlterAction::DropColumn {
@@ -705,25 +736,25 @@ mod tests {
     }
 
     #[test]
-    fn constraints_usam_os_nomes_atuais() {
+    fn constraints_use_the_current_names() {
         let actions = vec![
             AlterAction::SetUnique {
                 column: "slug".into(),
                 unique: false,
             },
             AlterAction::SetUnique {
-                column: "texto".into(),
+                column: "body".into(),
                 unique: true,
             },
-            // Já é unique: nada a fazer.
+            // Already unique: nothing to do.
             AlterAction::SetUnique {
-                column: "texto".into(),
+                column: "body".into(),
                 unique: true,
             },
             AlterAction::SetReference {
-                column: "cliente_id".into(),
+                column: "customer_id".into(),
                 reference: Some(ReferenceDef {
-                    table: "clientes".into(),
+                    table: "customers".into(),
                     column: "id".into(),
                     on_delete: OnDelete::SetNull,
                 }),
@@ -732,27 +763,27 @@ mod tests {
         let sql = alter(&ctx(), &structure(), &actions).unwrap();
         assert_eq!(
             sql[0],
-            "ALTER TABLE \"public\".\"notas\" DROP CONSTRAINT \"notas_slug_key\""
+            "ALTER TABLE \"public\".\"notes\" DROP CONSTRAINT \"notes_slug_key\""
         );
         assert_eq!(
             sql[1],
-            "ALTER TABLE \"public\".\"notas\" ADD UNIQUE (\"texto\")"
+            "ALTER TABLE \"public\".\"notes\" ADD UNIQUE (\"body\")"
         );
         assert_eq!(
             sql[3],
-            "ALTER TABLE \"public\".\"notas\" DROP CONSTRAINT \"notas_cliente_id_fkey\""
+            "ALTER TABLE \"public\".\"notes\" DROP CONSTRAINT \"notes_customer_id_fkey\""
         );
         assert_eq!(
             sql[4],
-            "ALTER TABLE \"public\".\"notas\" ADD FOREIGN KEY (\"cliente_id\") REFERENCES \"public\".\"clientes\" (\"id\") ON DELETE SET NULL"
+            "ALTER TABLE \"public\".\"notes\" ADD FOREIGN KEY (\"customer_id\") REFERENCES \"public\".\"customers\" (\"id\") ON DELETE SET NULL"
         );
     }
 
     #[test]
-    fn renomear_tabela_vale_para_os_comandos_seguintes() {
+    fn renaming_the_table_applies_to_the_following_statements() {
         let actions = vec![
             AlterAction::RenameTable {
-                name: "anotacoes".into(),
+                name: "annotations".into(),
             },
             AlterAction::SetRls { enabled: false },
             AlterAction::SetGrants {
@@ -765,28 +796,28 @@ mod tests {
         assert_eq!(
             alter(&ctx(), &structure(), &actions).unwrap(),
             [
-                "ALTER TABLE \"public\".\"notas\" RENAME TO \"anotacoes\"",
-                "ALTER TABLE \"public\".\"anotacoes\" DISABLE ROW LEVEL SECURITY",
-                "REVOKE ALL ON TABLE \"public\".\"anotacoes\" FROM \"anon\"",
-                "GRANT SELECT ON TABLE \"public\".\"anotacoes\" TO \"anon\"",
+                "ALTER TABLE \"public\".\"notes\" RENAME TO \"annotations\"",
+                "ALTER TABLE \"public\".\"annotations\" DISABLE ROW LEVEL SECURITY",
+                "REVOKE ALL ON TABLE \"public\".\"annotations\" FROM \"anon\"",
+                "GRANT SELECT ON TABLE \"public\".\"annotations\" TO \"anon\"",
             ]
         );
     }
 
     #[test]
-    fn alteracao_recusa_o_que_nao_faz_sentido() {
+    fn alter_refuses_what_makes_no_sense() {
         let cases = vec![
             vec![],
             vec![AlterAction::DropColumn {
-                name: "nao_existe".into(),
+                name: "missing".into(),
             }],
             vec![AlterAction::AddColumn {
-                column: col("texto", "text"),
+                column: col("body", "text"),
             }],
             vec![AlterAction::AddColumn {
                 column: ColumnDef {
                     primary_key: true,
-                    ..col("novo", "text")
+                    ..col("new", "text")
                 },
             }],
             vec![AlterAction::SetDefault {
@@ -794,7 +825,7 @@ mod tests {
                 default: Some("1".into()),
             }],
             vec![AlterAction::SetType {
-                column: "texto".into(),
+                column: "body".into(),
                 data_type: "money".into(),
                 using: None,
             }],
@@ -808,14 +839,14 @@ mod tests {
     }
 
     #[test]
-    fn apagar_com_e_sem_cascade() {
+    fn drop_with_and_without_cascade() {
         assert_eq!(
-            drop("public", "notas", false),
-            ["DROP TABLE \"public\".\"notas\""]
+            drop("public", "notes", false),
+            ["DROP TABLE \"public\".\"notes\""]
         );
         assert_eq!(
-            drop("public", "notas", true),
-            ["DROP TABLE \"public\".\"notas\" CASCADE"]
+            drop("public", "notes", true),
+            ["DROP TABLE \"public\".\"notes\" CASCADE"]
         );
     }
 }

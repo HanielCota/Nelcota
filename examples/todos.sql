@@ -1,7 +1,7 @@
--- Exemplo: tabela com RLS em que cada usuário só enxerga as próprias linhas.
+-- Example: a table with RLS where each user only sees their own rows.
 --
--- Não faz parte das migrações do Nelcota (não queremos criar tabelas no banco
--- de ninguém). Os testes de integração aplicam este arquivo; em dev, rode:
+-- Not part of Nelcota's migrations (we do not want to create tables in anyone's
+-- database). The integration tests apply this file; in dev, run:
 --   psql "$NELCOTA_DATABASE_URL" -f examples/todos.sql
 
 CREATE TABLE IF NOT EXISTS public.todos (
@@ -14,26 +14,26 @@ CREATE TABLE IF NOT EXISTS public.todos (
 
 ALTER TABLE public.todos ENABLE ROW LEVEL SECURITY;
 
--- anon não recebe GRANT: sem login, nem chega a ver a tabela.
+-- anon gets no GRANT: without a login it does not even see the table.
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.todos TO authenticated, service_role;
 
-DROP POLICY IF EXISTS todos_dono_select ON public.todos;
-CREATE POLICY todos_dono_select ON public.todos
+DROP POLICY IF EXISTS todos_owner_select ON public.todos;
+CREATE POLICY todos_owner_select ON public.todos
     FOR SELECT TO authenticated
     USING (user_id = auth.uid());
 
-DROP POLICY IF EXISTS todos_dono_insert ON public.todos;
-CREATE POLICY todos_dono_insert ON public.todos
+DROP POLICY IF EXISTS todos_owner_insert ON public.todos;
+CREATE POLICY todos_owner_insert ON public.todos
     FOR INSERT TO authenticated
     WITH CHECK (user_id = auth.uid());
 
-DROP POLICY IF EXISTS todos_dono_update ON public.todos;
-CREATE POLICY todos_dono_update ON public.todos
+DROP POLICY IF EXISTS todos_owner_update ON public.todos;
+CREATE POLICY todos_owner_update ON public.todos
     FOR UPDATE TO authenticated
     USING (user_id = auth.uid())
     WITH CHECK (user_id = auth.uid());
 
-DROP POLICY IF EXISTS todos_dono_delete ON public.todos;
-CREATE POLICY todos_dono_delete ON public.todos
+DROP POLICY IF EXISTS todos_owner_delete ON public.todos;
+CREATE POLICY todos_owner_delete ON public.todos
     FOR DELETE TO authenticated
     USING (user_id = auth.uid());

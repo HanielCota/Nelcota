@@ -1,83 +1,121 @@
-//! Geração de DDL a partir de especificações tipadas vindas do painel.
+//! DDL generation from typed specifications sent by the panel.
 //!
-//! Só monta texto: não toca no banco (quem executa é o `apply`). Assim cada
-//! regra é testável isoladamente e a prévia ("ver SQL") mostra exatamente o
-//! que vai rodar.
+//! It only builds text: it never touches the database (`apply` runs it). So
+//! every rule is testable on its own and the preview ("view SQL") shows
+//! exactly what will run.
 //!
-//! Identificadores sempre vão entre aspas e tipos são conferidos contra uma
-//! lista. Expressões (`DEFAULT`, `USING`, `WITH CHECK`) são SQL por natureza
-//! e passam como estão: o admin já é o dono do banco (tem o editor SQL), e o
-//! `apply` executa cada comando pelo protocolo estendido, que recusa mais de
-//! um comando por vez. Regras que o Postgres já valida (tabela referenciada
-//! existe, cast possível) ficam com ele: a mensagem dele volta como 400.
+//! Identifiers are always quoted and types are checked against a list.
+//! Expressions (`DEFAULT`, `USING`, `WITH CHECK`) are SQL by nature and pass
+//! as they are: the admin already owns the database (they have the SQL
+//! editor), and `apply` runs each statement through the extended protocol,
+//! which refuses more than one statement at a time. Rules Postgres already
+//! enforces (the referenced table exists, the cast is possible) are left to
+//! it: its message comes back as a 400.
 
 pub mod policy;
 pub mod table;
 
 use nelcota_api::query::ident;
 use serde::Deserialize;
+use serde_json::{Value, json};
 
-/// Erro de validação da especificação. Vira 400 (sem `Display` de propósito:
-/// assim não cai na conversão genérica de erros para 500 do `ApiError`).
-#[derive(Debug, PartialEq, Eq)]
-pub struct DdlError(pub String);
+/// Specification validation error. Becomes a 400 with a code and params the
+/// panel translates (no `Display` on purpose: it must not fall into
+/// `ApiError`'s generic conversion to 500).
+#[derive(Debug, PartialEq)]
+pub struct DdlError {
+    pub code: &'static str,
+    pub message: String,
+    pub params: Value,
+}
 
 pub type Result<T> = std::result::Result<T, DdlError>;
 
 impl From<DdlError> for crate::ApiError {
     fn from(err: DdlError) -> Self {
-        crate::ApiError::bad_request(err.0)
+        let error = crate::ApiError::bad_request(err.code, err.message);
+        if err.params.is_null() {
+            error
+        } else {
+            error.params(err.params)
+        }
     }
 }
 
-fn invalid<T>(message: impl Into<String>) -> Result<T> {
-    Err(DdlError(message.into()))
+fn error(code: &'static str, message: impl Into<String>, params: Value) -> DdlError {
+    DdlError {
+        code,
+        message: message.into(),
+        params,
+    }
 }
 
-/// Limite de identificadores do Postgres (NAMEDATALEN - 1), em bytes.
+fn invalid<T>(code: &'static str, message: impl Into<String>, params: Value) -> Result<T> {
+    Err(error(code, message, params))
+}
+
+/// Postgres identifier limit (NAMEDATALEN - 1), in bytes.
 const MAX_IDENT_BYTES: usize = 63;
 
-/// Nome de tabela, coluna ou policy: o Postgres aceita quase tudo entre
-/// aspas, mas cortaria em silêncio o que passar de 63 bytes.
+/// Table, column or policy name: Postgres accepts almost anything quoted,
+/// but would silently cut whatever goes past 63 bytes.
 pub fn validate_name(kind: &str, name: &str) -> Result<()> {
     if name.trim().is_empty() {
-        return invalid(format!("{kind}: nome vazio"));
+        return invalid(
+            "name_empty",
+            format!("{kind}: empty name"),
+            json!({ "kind": kind }),
+        );
     }
     if name != name.trim() {
-        return invalid(format!("{kind} '{name}': sem espaços no começo ou no fim"));
+        return invalid(
+            "name_surrounding_spaces",
+            format!("{kind} '{name}': no leading or trailing spaces"),
+            json!({ "kind": kind, "name": name }),
+        );
     }
     if name.len() > MAX_IDENT_BYTES {
-        return invalid(format!(
-            "{kind} '{name}': máximo de {MAX_IDENT_BYTES} bytes"
-        ));
+        return invalid(
+            "name_too_long",
+            format!("{kind} '{name}': at most {MAX_IDENT_BYTES} bytes"),
+            json!({ "kind": kind, "name": name, "max": MAX_IDENT_BYTES }),
+        );
     }
     if name.contains('\0') {
-        return invalid(format!("{kind}: caractere inválido"));
+        return invalid(
+            "name_invalid_character",
+            format!("{kind}: invalid character"),
+            json!({ "kind": kind }),
+        );
     }
     Ok(())
 }
 
-/// `"schema"."nome"`
+/// `"schema"."name"`
 pub fn qualified(schema: &str, name: &str) -> String {
     format!("{}.{}", ident(schema), ident(name))
 }
 
-/// Literal de texto (`standard_conforming_strings` é padrão desde o 9.1).
+/// Text literal (`standard_conforming_strings` is the default since 9.1).
 pub fn literal(text: &str) -> String {
     format!("'{}'", text.replace('\'', "''"))
 }
 
-/// Expressão SQL obrigatória (não vazia), entre parênteses.
+/// Required (non-empty) SQL expression, in parentheses.
 fn expression(kind: &str, sql: &str) -> Result<String> {
     let sql = sql.trim();
     if sql.is_empty() {
-        return invalid(format!("{kind}: expressão vazia"));
+        return invalid(
+            "expression_empty",
+            format!("{kind}: empty expression"),
+            json!({ "kind": kind }),
+        );
     }
     Ok(format!("({sql})"))
 }
 
-/// Tipos que o painel oferece (além dos enums do schema). Nomes canônicos do
-/// Postgres, na ordem em que aparecem no formulário.
+/// Types the panel offers (besides the schema's enums). Canonical Postgres
+/// names, in the order they appear in the form.
 pub const BASE_TYPES: [&str; 18] = [
     "text",
     "varchar",
@@ -100,11 +138,11 @@ pub const BASE_TYPES: [&str; 18] = [
 ];
 
 const INTEGER_TYPES: [&str; 3] = ["smallint", "integer", "bigint"];
-/// Tipos que aceitam modificador: `varchar(80)`, `numeric(10,2)`, `timestamptz(3)`.
+/// Types that take a modifier: `varchar(80)`, `numeric(10,2)`, `timestamptz(3)`.
 const WITH_MODIFIER: [&str; 5] = ["varchar", "numeric", "time", "timestamp", "timestamptz"];
 
-/// Tipo de coluna validado: um dos [`BASE_TYPES`] ou um enum do schema, com
-/// modificador opcional e `[]` opcional.
+/// Validated column type: one of [`BASE_TYPES`] or a schema enum, with an
+/// optional modifier and an optional `[]`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DataType {
     base: String,
@@ -122,9 +160,13 @@ impl DataType {
         };
         let (base, modifier) = match rest.split_once('(') {
             Some((base, args)) => {
-                let args = args
-                    .strip_suffix(')')
-                    .ok_or_else(|| DdlError(format!("tipo '{text}': parêntese sem fechar")))?;
+                let args = args.strip_suffix(')').ok_or_else(|| {
+                    error(
+                        "type_unclosed_parenthesis",
+                        format!("type '{text}': unclosed parenthesis"),
+                        json!({ "type": text }),
+                    )
+                })?;
                 (base.trim(), Some(args.replace(' ', "")))
             }
             None => (rest, None),
@@ -136,7 +178,11 @@ impl DataType {
         } else if let Some(known) = BASE_TYPES.iter().find(|t| **t == lower) {
             (*known).to_owned()
         } else {
-            return invalid(format!("tipo desconhecido: '{base}'"));
+            return invalid(
+                "unknown_type",
+                format!("unknown type: '{base}'"),
+                json!({ "type": base }),
+            );
         };
         if let Some(args) = &modifier {
             let ok = WITH_MODIFIER.contains(&base.as_str())
@@ -146,7 +192,11 @@ impl DataType {
                     .split(',')
                     .all(|a| !a.is_empty() && a.bytes().all(|b| b.is_ascii_digit()));
             if !ok {
-                return invalid(format!("tipo '{text}': modificador inválido"));
+                return invalid(
+                    "invalid_type_modifier",
+                    format!("type '{text}': invalid modifier"),
+                    json!({ "type": text }),
+                );
             }
         }
         Ok(DataType {
@@ -161,12 +211,12 @@ impl DataType {
         !self.array && INTEGER_TYPES.contains(&self.base.as_str())
     }
 
-    /// SQL do tipo; enums vão qualificados com o schema.
+    /// The type's SQL; enums are qualified with the schema.
     pub fn to_sql(&self, schema: &str) -> String {
         let mut sql = if self.is_enum {
             qualified(schema, &self.base)
         } else if self.base == "timestamptz" && self.modifier.is_some() {
-            // timestamptz(3) não existe na gramática: é timestamp(3) with time zone.
+            // timestamptz(3) is not in the grammar: it is timestamp(3) with time zone.
             "timestamp".to_owned()
         } else {
             self.base.clone()
@@ -184,7 +234,7 @@ impl DataType {
     }
 }
 
-/// Roles da API que o painel deixa configurar em GRANTs e policies.
+/// API roles the panel lets you configure in GRANTs and policies.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ApiRole {
@@ -229,7 +279,7 @@ pub struct GrantDef {
     pub privileges: Vec<Privilege>,
 }
 
-/// `GRANT ... TO role`, ou nada se a lista estiver vazia.
+/// `GRANT ... TO role`, or nothing when the list is empty.
 fn grant(table: &str, def: &GrantDef) -> Option<String> {
     let mut privileges = def.privileges.clone();
     privileges.sort();
@@ -250,22 +300,33 @@ mod tests {
     use super::*;
 
     fn enums() -> Vec<String> {
-        vec!["prioridade".into()]
+        vec!["priority".into()]
     }
 
     #[test]
-    fn nomes_validos_e_invalidos() {
-        assert!(validate_name("tabela", "pedidos_2026").is_ok());
-        assert!(validate_name("tabela", "descrição com espaço").is_ok());
-        assert!(validate_name("tabela", "").is_err());
-        assert!(validate_name("tabela", " pedidos").is_err());
-        assert!(validate_name("tabela", &"x".repeat(64)).is_err());
-        // 63 bytes, não 63 caracteres: "ç" ocupa 2.
-        assert!(validate_name("tabela", &"ç".repeat(32)).is_err());
+    fn valid_and_invalid_names() {
+        assert!(validate_name("table", "orders_2026").is_ok());
+        assert!(validate_name("table", "description with spaces").is_ok());
+        assert!(validate_name("table", "").is_err());
+        assert!(validate_name("table", " orders").is_err());
+        assert!(validate_name("table", &"x".repeat(64)).is_err());
+        // 63 bytes, not 63 characters: "ç" takes 2.
+        assert!(validate_name("table", &"ç".repeat(32)).is_err());
     }
 
     #[test]
-    fn tipos_da_lista_com_modificador_e_array() {
+    fn errors_carry_a_code_and_params_for_the_panel() {
+        let err = validate_name("table", &"x".repeat(64)).unwrap_err();
+        assert_eq!(err.code, "name_too_long");
+        assert_eq!(err.params["max"], 63);
+        let err = DataType::parse("money", &enums()).unwrap_err();
+        assert_eq!(err.code, "unknown_type");
+        assert_eq!(err.params, json!({ "type": "money" }));
+        assert_eq!(err.message, "unknown type: 'money'");
+    }
+
+    #[test]
+    fn listed_types_with_modifier_and_array() {
         let sql = |t: &str| DataType::parse(t, &enums()).unwrap().to_sql("public");
         assert_eq!(sql("text"), "text");
         assert_eq!(sql("BIGINT"), "bigint");
@@ -274,14 +335,14 @@ mod tests {
         assert_eq!(sql("text[]"), "text[]");
         assert_eq!(sql("double precision"), "double precision");
         assert_eq!(sql("timestamptz(3)"), "timestamp(3) with time zone");
-        assert_eq!(sql("prioridade"), "\"public\".\"prioridade\"");
-        assert_eq!(sql("prioridade[]"), "\"public\".\"prioridade\"[]");
+        assert_eq!(sql("priority"), "\"public\".\"priority\"");
+        assert_eq!(sql("priority[]"), "\"public\".\"priority\"[]");
     }
 
     #[test]
-    fn tipos_recusados() {
+    fn refused_types() {
         for bad in [
-            "texto",
+            "string",
             "int; drop table x",
             "text(10)",
             "numeric(a)",
@@ -291,19 +352,19 @@ mod tests {
         ] {
             assert!(
                 DataType::parse(bad, &enums()).is_err(),
-                "{bad} deveria ser recusado"
+                "{bad} should be refused"
             );
         }
     }
 
     #[test]
-    fn literal_e_identificadores_escapados() {
-        assert_eq!(literal("d'água"), "'d''água'");
+    fn literal_and_escaped_identifiers() {
+        assert_eq!(literal("O'Reilly"), "'O''Reilly'");
         assert_eq!(qualified("public", "a\"b"), "\"public\".\"a\"\"b\"");
     }
 
     #[test]
-    fn grant_ordena_e_remove_repetidos() {
+    fn grant_sorts_and_removes_duplicates() {
         let def = GrantDef {
             role: ApiRole::Authenticated,
             privileges: vec![Privilege::Update, Privilege::Select, Privilege::Select],

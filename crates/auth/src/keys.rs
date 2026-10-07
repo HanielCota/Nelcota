@@ -1,8 +1,8 @@
-//! Chaves de assinatura dos JWTs, verificação local e JWKS público.
+//! JWT signing keys, local verification and the public JWKS.
 //!
-//! - EdDSA (Ed25519) é o padrão: a chave pública vai para o JWKS, e qualquer
-//!   serviço consegue validar nossos tokens sem conhecer segredo nenhum.
-//! - HS256 é o modo simples/legado (segredo compartilhado, nunca publicado).
+//! - EdDSA (Ed25519) is the default: the public key goes into the JWKS, and any
+//!   service can validate our tokens without knowing any secret.
+//! - HS256 is the simple/legacy mode (shared secret, never published).
 
 use base64::{
     Engine,
@@ -18,17 +18,17 @@ use sha2::{Digest, Sha256};
 
 use crate::{JwtVerifier, VerifyError};
 
-/// Cabeçalho ASN.1 de uma chave privada Ed25519 em PKCS#8 v1 (RFC 8410),
-/// seguido dos 32 bytes da semente.
+/// ASN.1 header of an Ed25519 private key in PKCS#8 v1 (RFC 8410), followed
+/// by the 32 seed bytes.
 const ED25519_PKCS8_PREFIX: [u8; 16] = [
     0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x04, 0x22, 0x04, 0x20,
 ];
 
 #[derive(Debug, thiserror::Error)]
 pub enum KeyError {
-    #[error("chave privada Ed25519 inválida: {0}")]
+    #[error("invalid Ed25519 private key: {0}")]
     InvalidPrivateKey(String),
-    #[error("nenhuma chave de assinatura configurada")]
+    #[error("no signing key configured")]
     NoKey,
 }
 
@@ -48,7 +48,7 @@ struct HsVerifier {
     validation: Validation,
 }
 
-/// Conjunto de chaves do servidor: assina tokens, verifica e publica o JWKS.
+/// The server's key set: signs tokens, verifies them and publishes the JWKS.
 pub struct Keys {
     signer: Signer,
     ed: Option<EdVerifier>,
@@ -59,15 +59,15 @@ pub struct Keys {
 fn validation(alg: Algorithm) -> Validation {
     let mut validation = Validation::new(alg);
     validation.leeway = 30;
-    // `aud` é informativa no contrato (docs/jwt-e-roles.md): não é exigida.
+    // `aud` is informative in the contract (docs/jwt-and-roles.md): not required.
     validation.validate_aud = false;
     validation
 }
 
 impl Keys {
-    /// `private_key`: PKCS#8 Ed25519 em PEM ou em base64 (uma linha).
-    /// `hs256_secret`: segredo HS256. Com as duas, assina com EdDSA e aceita
-    /// ambos na verificação (útil para migrar de HS256).
+    /// `private_key`: PKCS#8 Ed25519 as PEM or base64 (one line).
+    /// `hs256_secret`: HS256 secret. With both, signs with EdDSA and accepts
+    /// either when verifying (useful to migrate away from HS256).
     pub fn new(private_key: Option<&str>, hs256_secret: Option<&[u8]>) -> Result<Self, KeyError> {
         let ed = private_key.map(parse_ed25519).transpose()?;
         let hs = hs256_secret.map(|secret| HsVerifier {
@@ -114,17 +114,17 @@ impl Keys {
             signer,
             ed: ed_verifier,
             hs,
-            jwks: serde_json::to_string(&jwks).expect("JwkSet serializa"),
+            jwks: serde_json::to_string(&jwks).expect("JwkSet serializes"),
         })
     }
 
-    /// Assina um payload de claims com a chave ativa.
+    /// Signs a claims payload with the active key.
     pub fn sign(&self, claims: &Value) -> Result<String, jsonwebtoken::errors::Error> {
         jsonwebtoken::encode(&self.signer.header, claims, &self.signer.key)
     }
 
-    /// JWT com `role: service_role`, válido por `days` dias. **Ignora o RLS**:
-    /// só para backends confiáveis. Único emissor (CLI e painel usam este).
+    /// JWT with `role: service_role`, valid for `days` days. **Bypasses RLS**:
+    /// only for trusted backends. The single issuer (CLI and panel use it).
     pub fn service_role_token(
         &self,
         issuer: &str,
@@ -139,12 +139,12 @@ impl Keys {
         }))
     }
 
-    /// Algoritmo usado na assinatura (`EdDSA` ou `HS256`).
+    /// Signing algorithm (`EdDSA` or `HS256`).
     pub fn algorithm(&self) -> Algorithm {
         self.signer.header.alg
     }
 
-    /// JWKS público (`{"keys": [...]}`); vazio no modo só-HS256.
+    /// Public JWKS (`{"keys": [...]}`); empty in HS256-only mode.
     pub fn jwks_json(&self) -> &str {
         &self.jwks
     }
@@ -169,7 +169,7 @@ impl JwtVerifier for Keys {
     }
 }
 
-/// Lê a chave privada e devolve (chave, `x` da chave pública, kid).
+/// Reads the private key and returns (key, public key `x`, kid).
 fn parse_ed25519(input: &str) -> Result<(EncodingKey, String, String), KeyError> {
     let input = input.trim();
     let key = if input.contains("-----BEGIN") {
@@ -184,20 +184,20 @@ fn parse_ed25519(input: &str) -> Result<(EncodingKey, String, String), KeyError>
     let jwk = Jwk::from_encoding_key(&key, Algorithm::EdDSA)
         .map_err(|e| KeyError::InvalidPrivateKey(e.to_string()))?;
     let AlgorithmParameters::OctetKeyPair(params) = jwk.algorithm else {
-        return Err(KeyError::InvalidPrivateKey("não é Ed25519".into()));
+        return Err(KeyError::InvalidPrivateKey("not Ed25519".into()));
     };
-    // kid = thumbprint JWK (RFC 7638): estável para a mesma chave.
+    // kid = JWK thumbprint (RFC 7638): stable for the same key.
     let canonical = format!(r#"{{"crv":"Ed25519","kty":"OKP","x":"{}"}}"#, params.x);
     let kid = URL_SAFE_NO_PAD.encode(Sha256::digest(canonical.as_bytes()));
     Ok((key, params.x, kid))
 }
 
-/// Gera uma chave privada Ed25519 nova, em base64 de PKCS#8 (uma linha,
-/// cabe num `.env`). Equivale a `openssl genpkey -algorithm ed25519`.
+/// Generates a new Ed25519 private key as base64 PKCS#8 (one line, fits in a
+/// `.env`). Equivalent to `openssl genpkey -algorithm ed25519`.
 pub fn generate_ed25519_private_key() -> String {
     let mut der = ED25519_PKCS8_PREFIX.to_vec();
     let mut seed = [0u8; 32];
-    getrandom::fill(&mut seed).expect("fonte de aleatoriedade do sistema indisponível");
+    getrandom::fill(&mut seed).expect("system randomness source unavailable");
     der.extend_from_slice(&seed);
     STANDARD.encode(der)
 }
@@ -216,7 +216,7 @@ mod tests {
     }
 
     #[test]
-    fn token_service_role_verificavel_com_validade_pedida() {
+    fn service_role_token_verifies_with_requested_lifetime() {
         let keys = Keys::new(Some(&generate_ed25519_private_key()), None).unwrap();
         let token = keys.service_role_token("nelcota", 30).unwrap();
         let claims = keys.verify(&token).unwrap();
@@ -234,7 +234,7 @@ mod tests {
     }
 
     #[test]
-    fn eddsa_assina_verifica_e_publica_jwks() {
+    fn eddsa_signs_verifies_and_publishes_jwks() {
         let keys = Keys::new(Some(&generate_ed25519_private_key()), None).unwrap();
         assert_eq!(keys.algorithm(), Algorithm::EdDSA);
         let token = keys.sign(&payload()).unwrap();
@@ -247,17 +247,17 @@ mod tests {
         assert_eq!(jwk["alg"], "EdDSA");
         assert!(
             jwk.get("d").is_none(),
-            "JWKS nunca pode conter a parte privada"
+            "the JWKS must never contain the private part"
         );
 
-        // Um terceiro valida o token só com o JWKS.
+        // A third party validates the token with the JWKS alone.
         let set: JwkSet = serde_json::from_value(jwks).unwrap();
         let key = DecodingKey::from_jwk(&set.keys[0]).unwrap();
         assert!(jsonwebtoken::decode::<Value>(&token, &key, &validation(Algorithm::EdDSA)).is_ok());
     }
 
     #[test]
-    fn aceita_pem_pkcs8() {
+    fn accepts_pkcs8_pem() {
         let b64 = generate_ed25519_private_key();
         let pem = format!("-----BEGIN PRIVATE KEY-----\n{b64}\n-----END PRIVATE KEY-----\n");
         let a = Keys::new(Some(&b64), None).unwrap();
@@ -266,15 +266,15 @@ mod tests {
     }
 
     #[test]
-    fn token_de_outra_chave_e_rejeitado() {
+    fn token_from_another_key_is_rejected() {
         let a = Keys::new(Some(&generate_ed25519_private_key()), None).unwrap();
         let b = Keys::new(Some(&generate_ed25519_private_key()), None).unwrap();
         assert!(b.verify(&a.sign(&payload()).unwrap()).is_err());
     }
 
     #[test]
-    fn hs256_so_aceito_quando_configurado() {
-        let secret = b"segredo-de-teste-com-mais-de-32-caracteres";
+    fn hs256_only_accepted_when_configured() {
+        let secret = b"test-secret-with-more-than-32-characters";
         let hs = Keys::new(None, Some(secret)).unwrap();
         let token = hs.sign(&payload()).unwrap();
         assert!(hs.verify(&token).is_ok());
@@ -287,8 +287,8 @@ mod tests {
     }
 
     #[test]
-    fn chave_invalida_da_erro() {
-        assert!(Keys::new(Some("nao-e-base64!"), None).is_err());
+    fn invalid_key_errors() {
+        assert!(Keys::new(Some("not-base64!"), None).is_err());
         assert!(Keys::new(Some("AAAA"), None).is_err());
         assert!(Keys::new(None, None).is_err());
     }

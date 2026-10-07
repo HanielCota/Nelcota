@@ -1,6 +1,6 @@
 [package]
 name = "nelcota-cli"
-description = "Comandos do binário nelcota: init, up, down, migrate, upgrade, backup, types..."
+description = "Commands of the nelcota binary: init, up, down, migrate, upgrade, backup, types..."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

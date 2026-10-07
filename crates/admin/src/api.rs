@@ -1,5 +1,5 @@
-//! Handlers JSON do painel: visão geral, tabelas (dados e escrita), usuários,
-//! policies e o schema para o autocomplete do editor SQL.
+//! Panel JSON handlers: overview, tables (data and writes), users, policies
+//! and the schema for the SQL editor's autocomplete.
 
 use std::collections::HashMap;
 
@@ -24,8 +24,8 @@ pub(crate) type Row = HashMap<String, Box<RawValue>>;
 
 const MAX_PAGE_SIZE: i64 = 500;
 
-/// Texto de um valor JSON vindo do Postgres, sem passar por `f64` (numeric
-/// mantém todas as casas). `None` = NULL.
+/// Text of a JSON value coming from Postgres, without going through `f64`
+/// (numeric keeps every digit). `None` = NULL.
 pub(crate) fn raw_text(value: Option<&RawValue>) -> Option<String> {
     let raw = value?.get();
     if raw == "null" {
@@ -38,12 +38,13 @@ pub(crate) fn raw_text(value: Option<&RawValue>) -> Option<String> {
 }
 
 pub(crate) fn table_or_404(state: &AdminState, name: &str) -> Result<Table, ApiError> {
-    state
-        .catalog
-        .get()
-        .table(name)
-        .cloned()
-        .ok_or_else(|| ApiError::not_found(format!("tabela '{name}' não existe no schema exposto")))
+    state.catalog.get().table(name).cloned().ok_or_else(|| {
+        ApiError::not_found(
+            "table_not_found",
+            format!("table '{name}' does not exist in the exposed schema"),
+        )
+        .params(json!({ "table": name }))
+    })
 }
 
 async fn policy_counts(client: &Client, schema: &str) -> Result<HashMap<String, usize>, ApiError> {
@@ -59,16 +60,16 @@ async fn policy_counts(client: &Client, schema: &str) -> Result<HashMap<String, 
         .collect())
 }
 
-/// Estado do RLS: `ok` (com policies), `warn` (sem policies), `danger`
-/// (exposta sem RLS), `none` (sem RLS e sem GRANT) ou `view`.
+/// RLS state: `ok` (with policies), `warn` (no policies), `danger` (exposed
+/// without RLS), `none` (no RLS and no GRANT) or `view`.
 fn rls_json(table: &Table, policies: usize) -> Value {
     let (state, label) = if table.kind != TableKind::Table {
         ("view", "view".to_owned())
     } else {
         match (table.rls_enabled, policies) {
-            (false, _) if table.exposed_without_rls() => ("danger", "sem RLS".to_owned()),
-            (false, _) => ("none", "sem RLS (sem GRANT)".to_owned()),
-            (true, 0) => ("warn", "RLS sem policies".to_owned()),
+            (false, _) if table.exposed_without_rls() => ("danger", "no RLS".to_owned()),
+            (false, _) => ("none", "no RLS (no GRANT)".to_owned()),
+            (true, 0) => ("warn", "RLS without policies".to_owned()),
             (true, n) => ("ok", format!("RLS · {n} policies")),
         }
     };
@@ -113,8 +114,8 @@ fn exposed(catalog: &Catalog) -> Vec<&str> {
         .collect()
 }
 
-/// Contagem exata para tabelas pequenas (ou nunca analisadas); estimativa do
-/// planejador nas grandes, para não custar um seq scan.
+/// Exact count for small (or never analysed) tables; the planner's estimate
+/// for large ones, so it never costs a seq scan.
 async fn row_count(
     client: &Client,
     schema: &str,
@@ -149,7 +150,7 @@ async fn estimates(client: &Client, schema: &str) -> Result<HashMap<String, i64>
 
 pub async fn overview(State(state): State<AdminState>) -> ApiResult {
     let catalog = state.catalog.get();
-    // Uma conexão só, com as consultas independentes em pipeline nela.
+    // A single connection, with the independent queries pipelined on it.
     let client = state.db.get().await?;
     let (policies, estimates, users) = try_join3(
         policy_counts(&client, &catalog.schema),
@@ -215,7 +216,7 @@ pub async fn tables(State(state): State<AdminState>) -> ApiResult {
     Ok(Json(json!({ "schema": catalog.schema, "tables": list })))
 }
 
-/// Tabelas e colunas para o autocomplete do CodeMirror (`schema.tabela`).
+/// Tables and columns for CodeMirror's autocomplete (`schema.table`).
 pub async fn schema(State(state): State<AdminState>) -> ApiResult {
     let catalog = state.catalog.get();
     let mut tables = Map::new();
@@ -238,7 +239,7 @@ pub async fn schema(State(state): State<AdminState>) -> ApiResult {
     Ok(Json(json!({ "schema": catalog.schema, "tables": tables })))
 }
 
-/// Operadores de filtro aceitos pelo painel (subconjunto dos da API REST).
+/// Filter operators the panel accepts (a subset of the REST API's).
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum FilterOp {
@@ -269,7 +270,7 @@ impl FilterOp {
     }
 }
 
-/// Um filtro da grade: `coluna operador valor`, opcionalmente negado.
+/// A grid filter: `column operator value`, optionally negated.
 #[derive(Debug, Deserialize)]
 pub(crate) struct FilterSpec {
     column: String,
@@ -280,8 +281,8 @@ pub(crate) struct FilterSpec {
 }
 
 impl FilterSpec {
-    /// Par no formato da API REST (`coluna=not.op.valor`), validado depois
-    /// pelo mesmo parser dela contra o catálogo.
+    /// Pair in the REST API format (`column=not.op.value`), then validated by
+    /// the same parser against the catalog.
     fn to_pair(&self) -> (String, String) {
         let not = if self.not { "not." } else { "" };
         (
@@ -291,18 +292,18 @@ impl FilterSpec {
     }
 }
 
-/// Ordem e filtros comuns à listagem e à exportação.
+/// Sort and filters shared by listing and export.
 #[derive(Debug, Default, Deserialize)]
 pub(crate) struct RowsQuery {
     pub sort: Option<String>,
     #[serde(default)]
     pub desc: bool,
-    /// Array JSON de [`FilterSpec`] (na query string, por ser um GET).
+    /// JSON array of [`FilterSpec`] (in the query string, since it is a GET).
     pub filters: Option<String>,
 }
 
-/// Monta a requisição validada (colunas e operadores conferidos contra o
-/// catálogo). `page` = `Some((página, tamanho))` para paginar.
+/// Builds the validated request (columns and operators checked against the
+/// catalog). `page` = `Some((page, size))` to paginate.
 pub(crate) fn build_request(
     table: &Table,
     params: &RowsQuery,
@@ -310,16 +311,18 @@ pub(crate) fn build_request(
 ) -> Result<query::Request, ApiError> {
     let filters: Vec<FilterSpec> = match params.filters.as_deref() {
         None | Some("") => Vec::new(),
-        Some(json) => serde_json::from_str(json)
-            .map_err(|e| ApiError::bad_request(format!("filtros inválidos: {e}")))?,
+        Some(json) => serde_json::from_str(json).map_err(|e| {
+            ApiError::bad_request("invalid_filters", format!("invalid filters: {e}"))
+                .params(json!({ "detail": e.to_string() }))
+        })?,
     };
     let mut pairs: Vec<(String, String)> = filters.iter().map(FilterSpec::to_pair).collect();
     if let Some((page, size)) = page {
-        // Uma linha a mais para saber se existe a próxima página.
+        // One extra row tells whether there is a next page.
         pairs.push(("limit".into(), (size + 1).to_string()));
         pairs.push(("offset".into(), (page * size).to_string()));
     }
-    // Ordenação: a coluna pedida (validada pelo parser) ou a PK.
+    // Sort: the requested column (validated by the parser) or the PK.
     let order = match &params.sort {
         Some(col) => Some(format!(
             "{col}.{}",
@@ -331,20 +334,28 @@ pub(crate) fn build_request(
     if let Some(order) = order {
         pairs.push(("order".into(), order));
     }
-    query::parse_request(&pairs, table).map_err(|e| ApiError::bad_request(e.to_string()))
+    query::parse_request(&pairs, table).map_err(invalid_query)
 }
 
-/// Erro de uma consulta montada a partir do que o admin digitou (filtro com
-/// valor do tipo errado, violação de constraint…): 400 com o texto do Postgres.
+/// The REST API parser refused the request (unknown column, bad operator…).
+pub(crate) fn invalid_query(err: impl std::fmt::Display) -> ApiError {
+    let detail = err.to_string();
+    ApiError::bad_request("invalid_query", format!("invalid query: {detail}"))
+        .params(json!({ "detail": detail }))
+}
+
+/// Error of a query built from what the admin typed (filter value of the
+/// wrong type, constraint violation…): 400 with Postgres' text, no code.
 pub(crate) fn user_query_error(err: tokio_postgres::Error) -> ApiError {
-    ApiError::bad_request(
+    ApiError::raw(
+        axum::http::StatusCode::BAD_REQUEST,
         err.as_db_error()
             .map_or_else(|| err.to_string(), |db| db.message().to_owned()),
     )
 }
 
-/// Contagem com teto de tempo: filtro sem índice numa tabela grande não pode
-/// travar a grade. `None` quando passa do limite.
+/// Count with a time cap: an unindexed filter on a big table must not freeze
+/// the grid. `None` when it runs past the limit.
 async fn bounded_count(client: &mut Client, sql: &query::Sql) -> Option<i64> {
     let tx = client.transaction().await.ok()?;
     tx.batch_execute("SET LOCAL statement_timeout = '3s'")
@@ -359,8 +370,8 @@ async fn bounded_count(client: &mut Client, sql: &query::Sql) -> Option<i64> {
     Some(count)
 }
 
-/// Chave estrangeira simples (uma coluna) para outra tabela exposta: a grade
-/// usa para navegar até a linha referenciada.
+/// Single-column foreign key to another exposed table: the grid uses it to
+/// jump to the referenced row.
 fn references(catalog: &Catalog, table: &Table, column: &str) -> Value {
     table
         .foreign_keys
@@ -377,8 +388,8 @@ fn references(catalog: &Catalog, table: &Table, column: &str) -> Value {
         )
 }
 
-// Campos repetidos de `RowsQuery` em vez de `#[serde(flatten)]`: com flatten o
-// serde_urlencoded entrega tudo como texto e `page`/`desc` deixam de converter.
+// `RowsQuery` fields repeated instead of `#[serde(flatten)]`: with flatten,
+// serde_urlencoded hands everything over as text and `page`/`desc` stop converting.
 #[derive(Deserialize)]
 pub struct TableQuery {
     #[serde(default)]
@@ -408,7 +419,7 @@ pub async fn table(
     let filtered = !request.filters.is_empty();
     let sql = query::select(&catalog.schema, &table, &request, None);
 
-    // Linhas, estimativas e policies em pipeline na mesma conexão.
+    // Rows, estimates and policies pipelined on the same connection.
     let mut client = state.db.get().await?;
     let (row, (estimates, policies)) = try_join(
         async {
@@ -491,22 +502,27 @@ pub async fn table(
     })))
 }
 
-/// Converte os valores vindos do formulário (texto ou null) para JSON:
-/// json/jsonb são interpretados como JSON; o resto vai como texto e o
-/// Postgres converte para o tipo da coluna.
+/// Converts form values (text or null) to JSON: json/jsonb are parsed as
+/// JSON; everything else goes as text and Postgres casts it to the column type.
 fn to_values(table: &Table, values: Map<String, Value>) -> Result<Map<String, Value>, ApiError> {
     let mut out = Map::new();
     for (key, value) in values {
         let Some(col) = table.column(&key).filter(|c| !c.generated) else {
-            return Err(ApiError::bad_request(format!(
-                "coluna desconhecida ou gerada: {key}"
-            )));
+            return Err(ApiError::bad_request(
+                "unknown_or_generated_column",
+                format!("unknown or generated column: {key}"),
+            )
+            .params(json!({ "column": key })));
         };
         let json = match value {
             Value::Null => Value::Null,
             Value::String(s) if matches!(col.type_name.as_str(), "json" | "jsonb") => {
                 serde_json::from_str(&s).map_err(|e| {
-                    ApiError::bad_request(format!("{}: JSON inválido ({e})", col.name))
+                    ApiError::bad_request(
+                        "invalid_json_value",
+                        format!("{}: invalid JSON ({e})", col.name),
+                    )
+                    .params(json!({ "column": col.name, "detail": e.to_string() }))
                 })?
             }
             Value::String(s) => Value::String(s),
@@ -517,11 +533,12 @@ fn to_values(table: &Table, values: Map<String, Value>) -> Result<Map<String, Va
     Ok(out)
 }
 
-/// Pares `coluna=eq.valor` da chave primária.
+/// `column=eq.value` pairs of the primary key.
 fn pk_filters(table: &Table, pk: &Map<String, Value>) -> Result<Vec<query::Filter>, ApiError> {
     if table.primary_key.is_empty() {
         return Err(ApiError::bad_request(
-            "tabela sem chave primária: edição pelo painel indisponível (use o editor SQL)",
+            "no_primary_key",
+            "table without a primary key: editing from the panel is unavailable (use the SQL editor)",
         ));
     }
     let pairs: Vec<(String, String)> = table
@@ -531,9 +548,11 @@ fn pk_filters(table: &Table, pk: &Map<String, Value>) -> Result<Vec<query::Filte
             let value = match pk.get(col) {
                 Some(Value::String(s)) => s.clone(),
                 Some(Value::Null) | None => {
-                    return Err(ApiError::bad_request(format!(
-                        "valor da chave '{col}' ausente"
-                    )));
+                    return Err(ApiError::bad_request(
+                        "missing_key_value",
+                        format!("missing value for key '{col}'"),
+                    )
+                    .params(json!({ "column": col })));
                 }
                 Some(other) => other.to_string(),
             };
@@ -541,11 +560,11 @@ fn pk_filters(table: &Table, pk: &Map<String, Value>) -> Result<Vec<query::Filte
         })
         .collect::<Result<_, _>>()?;
     Ok(query::parse_request(&pairs, table)
-        .map_err(|e| ApiError::bad_request(e.to_string()))?
+        .map_err(invalid_query)?
         .filters)
 }
 
-/// Executa uma escrita e devolve a mensagem de erro do Postgres como 400.
+/// Runs a write and returns Postgres' error message as a 400.
 async fn execute(state: &AdminState, sql: &query::Sql) -> Result<u64, ApiError> {
     let client = state.db.get().await?;
     client
@@ -567,10 +586,9 @@ pub async fn insert_row(
     let table = table_or_404(&state, &name)?;
     let schema = state.catalog.get().schema.clone();
     let values = to_values(&table, body.values)?;
-    let sql = query::insert(&schema, &table, Value::Object(values), None)
-        .map_err(|e| ApiError::bad_request(e.to_string()))?;
+    let sql = query::insert(&schema, &table, Value::Object(values), None).map_err(invalid_query)?;
     execute(&state, &sql).await?;
-    Ok(Json(json!({ "message": "linha inserida" })))
+    Ok(Json(json!({ "message": "row inserted" })))
 }
 
 #[derive(Deserialize)]
@@ -589,10 +607,10 @@ pub async fn update_row(
     let filters = pk_filters(&table, &body.pk)?;
     let values = to_values(&table, body.values)?;
     let sql = query::update(&schema, &table, Value::Object(values), &filters, None)
-        .map_err(|e| ApiError::bad_request(e.to_string()))?;
+        .map_err(invalid_query)?;
     let n = execute(&state, &sql).await?;
     Ok(Json(
-        json!({ "message": format!("{n} linha(s) atualizada(s)"), "count": n }),
+        json!({ "message": format!("{n} row(s) updated"), "count": n }),
     ))
 }
 
@@ -601,7 +619,7 @@ pub struct DeleteRequest {
     pks: Vec<Map<String, Value>>,
 }
 
-/// Apaga várias linhas (seleção na grade) numa transação só.
+/// Deletes several rows (the grid selection) in a single transaction.
 pub async fn delete_rows(
     State(state): State<AdminState>,
     Path(name): Path<String>,
@@ -610,7 +628,10 @@ pub async fn delete_rows(
     let table = table_or_404(&state, &name)?;
     let schema = state.catalog.get().schema.clone();
     if body.pks.is_empty() {
-        return Err(ApiError::bad_request("nenhuma linha selecionada"));
+        return Err(ApiError::bad_request(
+            "no_rows_selected",
+            "no rows selected",
+        ));
     }
     let statements: Vec<query::Sql> = body
         .pks
@@ -631,16 +652,11 @@ pub async fn delete_rows(
         total += tx
             .execute(sql.text.as_str(), &sql.param_refs())
             .await
-            .map_err(|e| {
-                ApiError::bad_request(
-                    e.as_db_error()
-                        .map_or_else(|| e.to_string(), |db| db.message().to_owned()),
-                )
-            })?;
+            .map_err(user_query_error)?;
     }
     tx.commit().await?;
     Ok(Json(
-        json!({ "message": format!("{total} linha(s) apagada(s)"), "count": total }),
+        json!({ "message": format!("{total} row(s) deleted"), "count": total }),
     ))
 }
 
@@ -699,7 +715,7 @@ pub async fn users(State(state): State<AdminState>, Query(params): Query<UsersQu
     })))
 }
 
-/// Validação de formato de uuid (8-4-4-4-12 hex).
+/// uuid format check (8-4-4-4-12 hex).
 pub(crate) fn is_uuid(value: &str) -> bool {
     let parts: Vec<&str> = value.split('-').collect();
     parts.len() == 5
@@ -709,9 +725,14 @@ pub(crate) fn is_uuid(value: &str) -> bool {
             .all(|(p, len)| p.len() == len && p.chars().all(|c| c.is_ascii_hexdigit()))
 }
 
+/// The user id in the path is not a uuid.
+pub(crate) fn invalid_id() -> ApiError {
+    ApiError::bad_request("invalid_id", "invalid id")
+}
+
 pub async fn revoke_sessions(State(state): State<AdminState>, Path(id): Path<String>) -> ApiResult {
     if !is_uuid(&id) {
-        return Err(ApiError::bad_request("id inválido"));
+        return Err(invalid_id());
     }
     let client = state.db.get().await?;
     let n = client
@@ -721,22 +742,26 @@ pub async fn revoke_sessions(State(state): State<AdminState>, Path(id): Path<Str
         )
         .await?;
     Ok(Json(
-        json!({ "message": format!("{n} sessão(ões) encerrada(s)"), "count": n }),
+        json!({ "message": format!("{n} session(s) ended"), "count": n }),
     ))
 }
 
 pub async fn delete_user(State(state): State<AdminState>, Path(id): Path<String>) -> ApiResult {
     if !is_uuid(&id) {
-        return Err(ApiError::bad_request("id inválido"));
+        return Err(invalid_id());
     }
     let client = state.db.get().await?;
     let n = client
         .execute("DELETE FROM auth.users WHERE id = $1::text::uuid", &[&id])
         .await?;
     if n == 0 {
-        return Err(ApiError::not_found("usuário não encontrado"));
+        return Err(user_not_found());
     }
-    Ok(Json(json!({ "message": "usuário apagado" })))
+    Ok(Json(json!({ "message": "user deleted" })))
+}
+
+pub(crate) fn user_not_found() -> ApiError {
+    ApiError::not_found("user_not_found", "user not found")
 }
 
 pub async fn policies(State(state): State<AdminState>) -> ApiResult {
@@ -795,7 +820,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn valores_preservam_o_texto_do_postgres() {
+    fn values_keep_postgres_text() {
         let raw = |s: &str| serde_json::from_str::<Box<RawValue>>(s).unwrap();
         assert_eq!(raw_text(Some(&raw("\"<b>\""))).as_deref(), Some("<b>"));
         assert_eq!(
@@ -810,9 +835,9 @@ mod tests {
     }
 
     #[test]
-    fn valida_uuid() {
+    fn validates_uuid() {
         assert!(is_uuid("054f8cd2-decb-4c78-91a1-f351bd8f5b92"));
-        assert!(!is_uuid("nao-e-uuid"));
+        assert!(!is_uuid("not-a-uuid"));
         assert!(!is_uuid("054f8cd2-decb-4c78-91a1-f351bd8f5b9z"));
     }
 }

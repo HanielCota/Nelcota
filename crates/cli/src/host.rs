@@ -1,12 +1,12 @@
-//! Host: a pasta raiz que reúne o Caddy compartilhado e os projetos.
+//! Host: the root folder that holds the shared Caddy and the projects.
 //!
 //! ```text
-//! <raiz>/
-//! ├── nelcota-host.json   registro (fonte da verdade): modo de login, domínio base, projetos
-//! ├── host.env            segredos do host (0600): admin, segredo de SSO, S3
-//! ├── shared/             lista pública de projetos, montada nos apps (somente leitura)
-//! ├── caddy/              Caddy compartilhado
-//! └── projects/<nome>/    um projeto isolado (compose, .env, migrations/, backups/)
+//! <root>/
+//! ├── nelcota-host.json   registry (source of truth): login mode, base domain, projects
+//! ├── host.env            host secrets (0600): admin, SSO secret, S3
+//! ├── shared/             public project list, mounted into the apps (read-only)
+//! ├── caddy/              shared Caddy
+//! └── projects/<name>/    one isolated project (compose, .env, migrations/, backups/)
 //! ```
 
 use std::{
@@ -21,14 +21,14 @@ use crate::{envfile::EnvFile, naming, project::Project};
 
 pub const MANIFEST: &str = "nelcota-host.json";
 
-/// Como os admins entram nos painéis.
+/// How admins sign in to the panels.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, clap::ValueEnum)]
 #[serde(rename_all = "kebab-case")]
 pub enum PanelLogin {
-    /// Um login para todos os painéis do host (SSO entre projetos).
+    /// One login for every panel on the host (SSO between projects).
     #[default]
     Shared,
-    /// Cada projeto com o próprio login.
+    /// Each project with its own login.
     PerProject,
 }
 
@@ -57,13 +57,13 @@ impl ProjectEntry {
 pub struct Manifest {
     pub version: u32,
     pub panel_login: PanelLogin,
-    /// Domínio base para subdomínios (`--project loja` → `loja.<base>`).
+    /// Base domain for subdomains (`--project shop` → `shop.<base>`).
     #[serde(default)]
     pub base_domain: Option<String>,
-    /// Instalação local: HTTPS com certificado interno do Caddy.
+    /// Local install: HTTPS with Caddy's internal certificate.
     #[serde(default)]
     pub local: bool,
-    /// Imagem do app (a tag fica no `.env` de cada projeto).
+    /// App image (the tag lives in each project's `.env`).
     pub image: String,
     #[serde(default)]
     pub projects: Vec<ProjectEntry>,
@@ -91,7 +91,7 @@ impl Host {
     pub fn require(&self) -> anyhow::Result<Manifest> {
         if !self.exists() {
             bail!(
-                "nenhum host em {} ({MANIFEST} não encontrado). Rode `nelcota init` ou use -C <raiz>.",
+                "no host at {} ({MANIFEST} not found). Run `nelcota init` or use -C <root>.",
                 self.root.display()
             );
         }
@@ -101,11 +101,11 @@ impl Host {
     pub fn manifest(&self) -> anyhow::Result<Manifest> {
         let path = self.root.join(MANIFEST);
         let bytes =
-            fs::read(&path).with_context(|| format!("não foi possível ler {}", path.display()))?;
-        serde_json::from_slice(&bytes).with_context(|| format!("{} inválido", path.display()))
+            fs::read(&path).with_context(|| format!("could not read {}", path.display()))?;
+        serde_json::from_slice(&bytes).with_context(|| format!("{} is invalid", path.display()))
     }
 
-    /// Grava o registro de forma atômica (arquivo temporário + rename).
+    /// Writes the registry atomically (temporary file + rename).
     pub fn save(&self, manifest: &Manifest) -> anyhow::Result<()> {
         fs::create_dir_all(&self.root)?;
         let tmp = self.root.join(format!("{MANIFEST}.tmp"));
@@ -142,7 +142,7 @@ impl Host {
         manifest.projects.iter().map(|e| self.project(e)).collect()
     }
 
-    /// Projeto pelo `-p`; sem `-p`, o único projeto do host.
+    /// The project from `-p`; without `-p`, the host's only project.
     pub fn select(&self, manifest: &Manifest, name: Option<&str>) -> anyhow::Result<Project> {
         let entry = select_entry(manifest, name)?;
         Ok(self.project(entry))
@@ -157,15 +157,15 @@ pub fn select_entry<'a>(
         (Some(name), projects) => {
             naming::validate_project_name(name)?;
             projects.iter().find(|p| p.name == name).ok_or_else(|| {
-                anyhow::anyhow!("projeto '{name}' não existe (veja `nelcota projects`)")
+                anyhow::anyhow!("project '{name}' does not exist (see `nelcota projects`)")
             })
         }
         (None, [only]) => Ok(only),
-        (None, []) => bail!("nenhum projeto ainda: crie um com `nelcota init`"),
+        (None, []) => bail!("no projects yet: create one with `nelcota init`"),
         (None, projects) => {
             let names: Vec<&str> = projects.iter().map(|p| p.name.as_str()).collect();
             bail!(
-                "há {} projetos ({}): escolha um com -p <nome>",
+                "there are {} projects ({}): pick one with -p <name>",
                 names.len(),
                 names.join(", ")
             )
@@ -195,27 +195,27 @@ mod tests {
     }
 
     #[test]
-    fn selecao_de_projeto() {
-        let one = manifest(&["loja"]);
-        assert_eq!(select_entry(&one, None).unwrap().name, "loja");
-        let two = manifest(&["loja", "blog"]);
+    fn project_selection() {
+        let one = manifest(&["shop"]);
+        assert_eq!(select_entry(&one, None).unwrap().name, "shop");
+        let two = manifest(&["shop", "blog"]);
         assert!(
             select_entry(&two, None)
                 .unwrap_err()
                 .to_string()
-                .contains("-p <nome>")
+                .contains("-p <name>")
         );
         assert_eq!(select_entry(&two, Some("blog")).unwrap().name, "blog");
-        assert!(select_entry(&two, Some("nada")).is_err());
+        assert!(select_entry(&two, Some("nothing")).is_err());
         assert!(select_entry(&two, Some("../etc")).is_err());
         assert!(select_entry(&manifest(&[]), None).is_err());
     }
 
     #[test]
-    fn registro_ida_e_volta() {
+    fn registry_round_trip() {
         let root = std::env::temp_dir().join(format!("nelcota-host-{}", std::process::id()));
         let host = Host::new(&root);
-        let m = manifest(&["loja"]);
+        let m = manifest(&["shop"]);
         host.save(&m).unwrap();
         let back = host.manifest().unwrap();
         assert_eq!(back.projects, m.projects);

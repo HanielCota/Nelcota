@@ -1,10 +1,12 @@
-//! DDL de policies de RLS.
+//! RLS policy DDL.
 //!
-//! Editar = `DROP` + `CREATE` na mesma transação: `ALTER POLICY` não muda o
-//! comando (`FOR SELECT` → `FOR UPDATE`) nem o tipo (permissiva/restritiva).
+//! Editing = `DROP` + `CREATE` in the same transaction: `ALTER POLICY` changes
+//! neither the command (`FOR SELECT` → `FOR UPDATE`) nor the kind
+//! (permissive/restrictive).
 
 use nelcota_api::query::ident;
 use serde::Deserialize;
+use serde_json::{Value, json};
 
 use super::{Result, expression, invalid, qualified, validate_name};
 
@@ -29,7 +31,7 @@ impl Command {
         }
     }
 
-    /// INSERT só tem linha nova (WITH CHECK); SELECT/DELETE só a existente (USING).
+    /// INSERT only has the new row (WITH CHECK); SELECT/DELETE only the existing one (USING).
     fn accepts_using(self) -> bool {
         self != Command::Insert
     }
@@ -39,7 +41,7 @@ impl Command {
     }
 }
 
-/// `public` = todas as roles.
+/// `public` = every role.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PolicyRole {
@@ -52,7 +54,7 @@ pub enum PolicyRole {
 impl PolicyRole {
     fn as_sql(self) -> String {
         match self {
-            // PUBLIC é palavra-chave, não role: vai sem aspas.
+            // PUBLIC is a keyword, not a role: it goes unquoted.
             PolicyRole::Public => "PUBLIC".to_owned(),
             PolicyRole::Anon => ident("anon"),
             PolicyRole::Authenticated => ident("authenticated"),
@@ -69,14 +71,14 @@ const fn yes() -> bool {
 pub struct PolicyDef {
     pub name: String,
     pub command: Command,
-    /// Vazio = `PUBLIC`.
+    /// Empty = `PUBLIC`.
     #[serde(default)]
     pub roles: Vec<PolicyRole>,
     #[serde(default = "yes")]
     pub permissive: bool,
-    /// Quais linhas existentes a role enxerga/altera.
+    /// Which existing rows the role sees/changes.
     pub using: Option<String>,
-    /// Quais linhas novas/alteradas são aceitas.
+    /// Which new/changed rows are accepted.
     pub check: Option<String>,
 }
 
@@ -90,21 +92,35 @@ pub fn create(schema: &str, table: &str, def: &PolicyDef) -> Result<Vec<String>>
     let check = non_empty(&def.check);
     if using.is_some() && !def.command.accepts_using() {
         return invalid(
-            "policy de INSERT não usa USING: a linha ainda não existe (use WITH CHECK)",
+            "policy_insert_no_using",
+            "an INSERT policy does not use USING: the row does not exist yet (use WITH CHECK)",
+            Value::Null,
         );
     }
     if check.is_some() && !def.command.accepts_check() {
-        return invalid(format!(
-            "policy de {} não usa WITH CHECK: nenhuma linha é gravada (use USING)",
-            def.command.as_sql()
-        ));
+        let command = def.command.as_sql();
+        return invalid(
+            "policy_check_not_allowed",
+            format!("a {command} policy does not use WITH CHECK: no row is written (use USING)"),
+            json!({ "command": command }),
+        );
     }
     match def.command {
         Command::Insert if check.is_none() => {
-            return invalid("policy de INSERT precisa de WITH CHECK");
+            return invalid(
+                "policy_insert_needs_check",
+                "an INSERT policy needs WITH CHECK",
+                Value::Null,
+            );
         }
         Command::Insert => {}
-        _ if using.is_none() => return invalid("a policy precisa da expressão USING"),
+        _ if using.is_none() => {
+            return invalid(
+                "policy_needs_using",
+                "the policy needs a USING expression",
+                Value::Null,
+            );
+        }
         _ => {}
     }
 
@@ -148,7 +164,7 @@ pub fn drop(schema: &str, table: &str, name: &str) -> Vec<String> {
     )]
 }
 
-/// Troca a policy `original` pela definição nova (pode mudar o nome).
+/// Replaces the policy `original` with the new definition (the name may change).
 pub fn replace(schema: &str, table: &str, original: &str, def: &PolicyDef) -> Result<Vec<String>> {
     let mut statements = drop(schema, table, original);
     statements.extend(create(schema, table, def)?);
@@ -161,7 +177,7 @@ mod tests {
 
     fn def(command: Command, using: Option<&str>, check: Option<&str>) -> PolicyDef {
         PolicyDef {
-            name: "dono".into(),
+            name: "owner".into(),
             command,
             roles: vec![PolicyRole::Authenticated],
             permissive: true,
@@ -171,23 +187,23 @@ mod tests {
     }
 
     #[test]
-    fn cria_policy_com_using_e_check() {
+    fn creates_a_policy_with_using_and_check() {
         let policy = def(
             Command::All,
-            Some("dono = auth.uid()"),
-            Some("dono = auth.uid()"),
+            Some("owner = auth.uid()"),
+            Some("owner = auth.uid()"),
         );
         assert_eq!(
-            create("public", "notas", &policy).unwrap(),
+            create("public", "notes", &policy).unwrap(),
             [
-                "CREATE POLICY \"dono\" ON \"public\".\"notas\" AS PERMISSIVE FOR ALL TO \"authenticated\" \
-              USING (dono = auth.uid()) WITH CHECK (dono = auth.uid())"
+                "CREATE POLICY \"owner\" ON \"public\".\"notes\" AS PERMISSIVE FOR ALL TO \"authenticated\" \
+              USING (owner = auth.uid()) WITH CHECK (owner = auth.uid())"
             ]
         );
     }
 
     #[test]
-    fn roles_restritiva_e_public() {
+    fn roles_restrictive_and_public() {
         let mut policy = def(Command::Select, Some("true"), None);
         policy.permissive = false;
         policy.roles = vec![
@@ -206,7 +222,7 @@ mod tests {
     }
 
     #[test]
-    fn expressoes_conforme_o_comando() {
+    fn expressions_follow_the_command() {
         assert!(create("public", "t", &def(Command::Insert, None, Some("true"))).is_ok());
         assert!(
             create(
@@ -217,27 +233,27 @@ mod tests {
             .is_err()
         );
         assert!(create("public", "t", &def(Command::Insert, None, None)).is_err());
-        assert!(
-            create(
-                "public",
-                "t",
-                &def(Command::Select, Some("true"), Some("true"))
-            )
-            .is_err()
-        );
+        let err = create(
+            "public",
+            "t",
+            &def(Command::Select, Some("true"), Some("true")),
+        )
+        .unwrap_err();
+        assert_eq!(err.code, "policy_check_not_allowed");
+        assert_eq!(err.params, json!({ "command": "SELECT" }));
         assert!(create("public", "t", &def(Command::Delete, None, None)).is_err());
         assert!(create("public", "t", &def(Command::Update, Some("true"), None)).is_ok());
         assert!(create("public", "t", &def(Command::Select, Some("   "), None)).is_err());
     }
 
     #[test]
-    fn editar_e_apagar_e_recriar() {
+    fn edit_is_drop_and_recreate() {
         let policy = PolicyDef {
-            name: "novo nome".into(),
+            name: "new name".into(),
             ..def(Command::Select, Some("true"), None)
         };
-        let sql = replace("public", "t", "antigo", &policy).unwrap();
-        assert_eq!(sql[0], "DROP POLICY \"antigo\" ON \"public\".\"t\"");
-        assert!(sql[1].starts_with("CREATE POLICY \"novo nome\" ON \"public\".\"t\""));
+        let sql = replace("public", "t", "old", &policy).unwrap();
+        assert_eq!(sql[0], "DROP POLICY \"old\" ON \"public\".\"t\"");
+        assert!(sql[1].starts_with("CREATE POLICY \"new name\" ON \"public\".\"t\""));
     }
 }

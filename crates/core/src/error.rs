@@ -1,4 +1,4 @@
-//! Erro HTTP da API, no formato `{"code": "...", "message": "..."}`.
+//! API HTTP error, shaped as `{"code": "...", "message": "..."}`.
 
 use axum::{
     Json,
@@ -28,24 +28,24 @@ impl ApiError {
         }
     }
 
-    /// 429 com `Retry-After`.
+    /// 429 with `Retry-After`.
     pub fn rate_limited(retry_after_secs: u64) -> Self {
         ApiError {
             retry_after_secs: Some(retry_after_secs.max(1)),
             ..Self::new(
                 StatusCode::TOO_MANY_REQUESTS,
                 "rate_limited",
-                "muitas tentativas; aguarde e tente de novo",
+                "too many attempts; wait and try again",
             )
         }
     }
 
-    /// Token ausente quando exigido, inválido, expirado ou com role desconhecida.
+    /// Token missing when required, invalid, expired or with an unknown role.
     pub fn invalid_token() -> Self {
         Self::new(
             StatusCode::UNAUTHORIZED,
             "invalid_token",
-            "JWT inválido ou expirado",
+            "invalid or expired JWT",
         )
     }
 
@@ -53,7 +53,7 @@ impl ApiError {
         Self::new(
             StatusCode::INTERNAL_SERVER_ERROR,
             "internal",
-            "erro interno",
+            "internal error",
         )
     }
 
@@ -61,7 +61,7 @@ impl ApiError {
         Self::new(
             StatusCode::SERVICE_UNAVAILABLE,
             "unavailable",
-            "banco de dados indisponível",
+            "database unavailable",
         )
     }
 
@@ -69,11 +69,11 @@ impl ApiError {
         self.status
     }
 
-    /// Traduz um erro do Postgres. Falta de permissão vira 401 para `anon`
-    /// (precisa logar) e 403 para as demais roles, como no PostgREST.
+    /// Maps a Postgres error. Missing privileges become 401 for `anon` (must
+    /// sign in) and 403 for the other roles, as in PostgREST.
     pub fn from_db(err: tokio_postgres::Error, role: Role) -> Self {
         let Some(db) = err.as_db_error() else {
-            tracing::error!(error = %err, "falha de comunicação com o Postgres");
+            tracing::error!(error = %err, "failed to communicate with Postgres");
             return Self::unavailable();
         };
         let code = db.code().code();
@@ -85,17 +85,17 @@ impl ApiError {
             | SqlState::FOREIGN_KEY_VIOLATION
             | SqlState::EXCLUSION_VIOLATION => StatusCode::CONFLICT,
             SqlState::QUERY_CANCELED => StatusCode::GATEWAY_TIMEOUT,
-            // Tipo/operador incompatível, coluna gerada, RAISE EXCEPTION em
-            // função do usuário: erro do cliente, não do servidor.
+            // Incompatible type/operator, generated column, RAISE EXCEPTION in a
+            // user function: a client error, not a server one.
             SqlState::UNDEFINED_FUNCTION
             | SqlState::UNDEFINED_COLUMN
             | SqlState::DATATYPE_MISMATCH
             | SqlState::GENERATED_ALWAYS
             | SqlState::RAISE_EXCEPTION => StatusCode::BAD_REQUEST,
-            // Classe 22 (dados inválidos) e 23 (integridade): 400.
+            // Class 22 (invalid data) and 23 (integrity): 400.
             _ if code.starts_with("22") || code.starts_with("23") => StatusCode::BAD_REQUEST,
             _ => {
-                tracing::error!(code = db.code().code(), error = %db, "erro inesperado do Postgres");
+                tracing::error!(code = db.code().code(), error = %db, "unexpected Postgres error");
                 return Self::internal();
             }
         };
@@ -107,7 +107,7 @@ impl ApiError {
     }
 
     pub fn from_pool(err: deadpool_postgres::PoolError) -> Self {
-        tracing::error!(error = %err, "não foi possível obter conexão do pool");
+        tracing::error!(error = %err, "could not get a connection from the pool");
         Self::unavailable()
     }
 }

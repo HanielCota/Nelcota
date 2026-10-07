@@ -1,8 +1,7 @@
-//! Estrutura completa de uma tabela, lida do `pg_catalog`: o catálogo da API
-//! guarda só o necessário para servir requests (não tem, por exemplo, a
-//! expressão do DEFAULT nem os nomes das constraints). Usada pela aba
-//! Estrutura do painel e pelos handlers de DDL, que validam alterações
-//! contra o estado atual.
+//! A table's full structure, read from `pg_catalog`: the API catalog keeps
+//! only what it needs to serve requests (it has, for instance, neither the
+//! DEFAULT expression nor constraint names). Used by the panel's Structure tab
+//! and by the DDL handlers, which validate changes against the current state.
 
 use axum::{
     Json,
@@ -12,16 +11,18 @@ use futures_util::future::try_join3;
 use serde::Serialize;
 use tokio_postgres::Client;
 
+use serde_json::json;
+
 use crate::{AdminState, ApiError, api::table_or_404};
 
-/// Roles que o painel mostra e permite configurar nos GRANTs.
+/// Roles the panel shows and lets you configure in GRANTs.
 pub const API_ROLES: [&str; 3] = ["anon", "authenticated", "service_role"];
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ForeignKeyRef {
     pub table: String,
     pub column: String,
-    /// `no action`, `restrict`, `cascade`, `set null` ou `set default`.
+    /// `no action`, `restrict`, `cascade`, `set null` or `set default`.
     pub on_delete: &'static str,
     pub constraint: String,
 }
@@ -29,16 +30,16 @@ pub struct ForeignKeyRef {
 #[derive(Debug, Clone, Serialize)]
 pub struct ColumnInfo {
     pub name: String,
-    /// Tipo como o Postgres escreve (`character varying(80)`, `integer[]`).
+    /// Type as Postgres writes it (`character varying(80)`, `integer[]`).
     pub data_type: String,
     pub nullable: bool,
-    /// Expressão do DEFAULT (ou da coluna gerada), como em `pg_get_expr`.
+    /// DEFAULT (or generated column) expression, as in `pg_get_expr`.
     pub default: Option<String>,
-    /// `always`, `by default` ou `None` (não é identity).
+    /// `always`, `by default` or `None` (not an identity column).
     pub identity: Option<&'static str>,
     pub generated: bool,
     pub primary_key: bool,
-    /// Nome da constraint UNIQUE de uma coluna só, se houver.
+    /// Name of the single-column UNIQUE constraint, if any.
     pub unique: Option<String>,
     pub references: Option<ForeignKeyRef>,
     pub comment: Option<String>,
@@ -47,7 +48,7 @@ pub struct ColumnInfo {
 #[derive(Debug, Clone, Serialize)]
 pub struct Grant {
     pub role: &'static str,
-    /// Subconjunto de `select`, `insert`, `update`, `delete`.
+    /// Subset of `select`, `insert`, `update`, `delete`.
     pub privileges: Vec<&'static str>,
 }
 
@@ -97,7 +98,7 @@ const COLUMNS_SQL: &str = "
     WHERE a.attrelid = $1 AND a.attnum > 0 AND NOT a.attisdropped
     ORDER BY a.attnum";
 
-// Colunas de cada constraint na ordem da definição (conkey/confkey).
+// Columns of each constraint in definition order (conkey/confkey).
 const CONSTRAINTS_SQL: &str = "
     SELECT con.conname::text, con.contype::text,
            ARRAY(SELECT a.attname::text FROM unnest(con.conkey) WITH ORDINALITY k(n, o)
@@ -117,7 +118,7 @@ const GRANTS_SQL: &str = "
     CROSS JOIN unnest(ARRAY['select', 'insert', 'update', 'delete']) AS p(privilege)
     WHERE has_table_privilege(r.role, $1::oid, p.privilege)";
 
-/// Lê a estrutura de `schema.table`. `None` se a tabela não existir.
+/// Reads the structure of `schema.table`. `None` if the table does not exist.
 pub async fn load(
     client: &Client,
     schema: &str,
@@ -136,7 +137,7 @@ pub async fn load(
     };
     let oid: u32 = head.get(0);
     let roles: Vec<&str> = API_ROLES.to_vec();
-    // Três consultas independentes, em pipeline na mesma conexão.
+    // Three independent queries, pipelined on the same connection.
     let (columns, constraints, grants) = try_join3(
         client.query(COLUMNS_SQL, &[&oid]),
         client.query(CONSTRAINTS_SQL, &[&oid]),
@@ -157,7 +158,7 @@ pub async fn load(
                 primary_key = cols;
                 primary_key_constraint = Some(name);
             }
-            // Só constraints de uma coluna viram atributo da coluna.
+            // Only single-column constraints become column attributes.
             "u" if cols.len() == 1 => uniques.push((cols[0].clone(), name)),
             "f" if cols.len() == 1 => {
                 let foreign_schema: String = row.get(3);
@@ -241,5 +242,8 @@ pub async fn structure(
     load(&client, &schema, &table.name)
         .await?
         .map(Json)
-        .ok_or_else(|| ApiError::not_found(format!("tabela '{name}' não existe")))
+        .ok_or_else(|| {
+            ApiError::not_found("table_not_found", format!("table '{name}' does not exist"))
+                .params(json!({ "table": name }))
+        })
 }

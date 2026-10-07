@@ -1,6 +1,6 @@
-//! Testes da API REST automática contra Postgres real: CRUD, filtros, RLS em
-//! todos os verbos, injeção de SQL, RPC, OpenAPI, recarga do catálogo e um
-//! teste básico de desempenho.
+//! Tests of the automatic REST API against a real Postgres: CRUD, filters, RLS
+//! on every verb, SQL injection, RPC, OpenAPI, catalog reload and a basic
+//! performance check.
 
 mod common;
 
@@ -14,7 +14,7 @@ const REPR: (&str, &str) = ("prefer", "return=representation");
 
 fn ids(body: &Value) -> Vec<i64> {
     body.as_array()
-        .unwrap_or_else(|| panic!("esperava array: {body}"))
+        .unwrap_or_else(|| panic!("expected an array: {body}"))
         .iter()
         .map(|r| r["id"].as_i64().unwrap())
         .collect()
@@ -22,36 +22,36 @@ fn ids(body: &Value) -> Vec<i64> {
 
 fn names(body: &Value) -> Vec<&str> {
     body.as_array()
-        .unwrap_or_else(|| panic!("esperava array: {body}"))
+        .unwrap_or_else(|| panic!("expected an array: {body}"))
         .iter()
-        .map(|r| r["nome"].as_str().unwrap())
+        .map(|r| r["name"].as_str().unwrap())
         .collect()
 }
 
 #[tokio::test]
-async fn crud_completo_com_representation() {
+async fn full_crud_with_representation() {
     let app = TestApp::spawn().await;
     let a = user_token(app.user_a);
 
-    // POST com representação: user_id vem do DEFAULT auth.uid().
+    // POST with representation: user_id comes from the DEFAULT auth.uid().
     let created = app
         .request_with(
             Method::POST,
             "/rest/v1/todos",
             Some(&a),
-            Some(json!({ "title": "nova", "tags": ["casa", "urgente"], "extra": { "x": 1 } })),
+            Some(json!({ "title": "new", "tags": ["home", "urgent"], "extra": { "x": 1 } })),
             &[REPR],
         )
         .await;
     assert_eq!(created.status, StatusCode::CREATED, "{}", created.body);
     let row = &created.body[0];
     assert_eq!(row["user_id"], app.user_a.to_string());
-    assert_eq!(row["prioridade"], "media");
-    assert_eq!(row["tags"], json!(["casa", "urgente"]));
+    assert_eq!(row["priority"], "medium");
+    assert_eq!(row["tags"], json!(["home", "urgent"]));
     assert_eq!(row["extra"], json!({ "x": 1 }));
     let id = row["id"].as_i64().unwrap();
 
-    // POST mínimo: 201 sem corpo.
+    // Minimal POST: 201 without a body.
     let minimal = app
         .post(
             "/rest/v1/todos",
@@ -69,14 +69,14 @@ async fn crud_completo_com_representation() {
         )
         .await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(body, json!([{ "id": id, "title": "nova", "done": false }]));
+    assert_eq!(body, json!([{ "id": id, "title": "new", "done": false }]));
 
     let patched = app
         .request_with(
             Method::PATCH,
             &format!("/rest/v1/todos?id=eq.{id}&select=id,done"),
             Some(&a),
-            Some(json!({ "done": true, "prioridade": "alta" })),
+            Some(json!({ "done": true, "priority": "high" })),
             &[REPR],
         )
         .await;
@@ -88,7 +88,7 @@ async fn crud_completo_com_representation() {
             Method::PATCH,
             &format!("/rest/v1/todos?id=eq.{id}"),
             Some(&a),
-            Some(json!({ "title": "renomeada" })),
+            Some(json!({ "title": "renamed" })),
         )
         .await;
     assert_eq!(minimal.status, StatusCode::NO_CONTENT);
@@ -103,7 +103,7 @@ async fn crud_completo_com_representation() {
         )
         .await;
     assert_eq!(deleted.status, StatusCode::OK);
-    assert_eq!(deleted.body[0]["title"], "renomeada");
+    assert_eq!(deleted.body[0]["title"], "renamed");
 
     let (_, body) = app
         .get(&format!("/rest/v1/todos?id=eq.{id}"), Some(&a))
@@ -112,7 +112,7 @@ async fn crud_completo_com_representation() {
 }
 
 #[tokio::test]
-async fn rls_vale_em_todos_os_verbos() {
+async fn rls_holds_on_every_verb() {
     let app = TestApp::spawn().await;
     let a = user_token(app.user_a);
     let b_id: i64 = app
@@ -125,20 +125,20 @@ async fn rls_vale_em_todos_os_verbos() {
         .unwrap()
         .get(0);
 
-    // GET: A não vê a linha de B nem filtrando pelo id dela.
+    // GET: A does not see B's row, not even filtering by its id.
     let (_, body) = app
         .get(&format!("/rest/v1/todos?id=eq.{b_id}"), Some(&a))
         .await;
     assert_eq!(body, json!([]));
 
-    // PATCH/DELETE na linha de B: zero linhas afetadas.
+    // PATCH/DELETE on B's row: zero rows affected.
     for method in [Method::PATCH, Method::DELETE] {
         let reply = app
             .request_with(
                 method.clone(),
                 &format!("/rest/v1/todos?id=eq.{b_id}"),
                 Some(&a),
-                (method == Method::PATCH).then(|| json!({ "title": "invadido" })),
+                (method == Method::PATCH).then(|| json!({ "title": "hijacked" })),
                 &[REPR],
             )
             .await;
@@ -146,37 +146,37 @@ async fn rls_vale_em_todos_os_verbos() {
         assert_eq!(reply.body, json!([]), "{method}");
     }
 
-    // POST em nome de B: violação da policy (WITH CHECK).
+    // POST on behalf of B: policy violation (WITH CHECK).
     let reply = app
         .post(
             "/rest/v1/todos",
             Some(&a),
-            json!({ "title": "forjada", "user_id": app.user_b }),
+            json!({ "title": "forged", "user_id": app.user_b }),
         )
         .await;
     assert_eq!(reply.status, StatusCode::FORBIDDEN, "{}", reply.body);
 
-    // PATCH tentando transferir a própria linha para B: também barrado.
+    // PATCH trying to hand one's own row to B: also blocked.
     let reply = app
         .request(
             Method::PATCH,
-            "/rest/v1/todos?title=eq.tarefa%20de%20A",
+            "/rest/v1/todos?title=eq.task%20of%20A",
             Some(&a),
             Some(json!({ "user_id": app.user_b })),
         )
         .await;
     assert_eq!(reply.status, StatusCode::FORBIDDEN);
 
-    // A linha de B continua intacta.
+    // B's row stays intact.
     let title: String = app
         .admin_client
         .query_one("SELECT title FROM public.todos WHERE id = $1", &[&b_id])
         .await
         .unwrap()
         .get(0);
-    assert_eq!(title, "tarefa de B");
+    assert_eq!(title, "task of B");
 
-    // anon: sem GRANT, 401 em todos os verbos.
+    // anon: no GRANT, 401 on every verb.
     for (method, body) in [
         (Method::GET, None),
         (Method::POST, Some(json!({ "title": "x" }))),
@@ -192,68 +192,68 @@ async fn rls_vale_em_todos_os_verbos() {
         assert_eq!(reply.status, StatusCode::UNAUTHORIZED, "{method}");
     }
 
-    // authenticated sem GRANT de escrita em produtos: 403. service_role: ok.
+    // authenticated without a write GRANT on products: 403. service_role: ok.
     let reply = app
         .post(
-            "/rest/v1/produtos",
+            "/rest/v1/products",
             Some(&a),
-            json!({ "nome": "X", "preco": 1 }),
+            json!({ "name": "X", "price": 1 }),
         )
         .await;
     assert_eq!(reply.status, StatusCode::FORBIDDEN);
     let reply = app
         .post(
-            "/rest/v1/produtos",
+            "/rest/v1/products",
             Some(&service_token()),
-            json!({ "nome": "X", "preco": 1 }),
+            json!({ "name": "X", "price": 1 }),
         )
         .await;
     assert_eq!(reply.status, StatusCode::CREATED);
 
-    // Tabela sem GRANT para usuários.
-    let (status, _) = app.get("/rest/v1/segredos", Some(&a)).await;
+    // Table without a GRANT for users.
+    let (status, _) = app.get("/rest/v1/secrets", Some(&a)).await;
     assert_eq!(status, StatusCode::FORBIDDEN);
-    let (status, _) = app.get("/rest/v1/segredos", Some(&service_token())).await;
+    let (status, _) = app.get("/rest/v1/secrets", Some(&service_token())).await;
     assert_eq!(status, StatusCode::OK);
 }
 
 #[tokio::test]
-async fn filtros_ordem_paginacao_e_contagem() {
+async fn filters_order_paging_and_count() {
     let app = TestApp::spawn().await;
     let get = |q: &str| {
-        let path = format!("/rest/v1/produtos?{q}");
+        let path = format!("/rest/v1/products?{q}");
         let app = &app;
         async move { app.get(&path, None).await }
     };
 
-    let (_, b) = get("preco=gt.10&order=preco.desc").await;
-    assert_eq!(names(&b), ["Mochila", "Caderno"]);
-    let (_, b) = get("estoque=eq.0").await;
-    assert_eq!(names(&b), ["Mochila"]);
-    let (_, b) = get("estoque=neq.0&order=nome").await;
-    assert_eq!(names(&b), ["Caderno", "Caneta", "Régua, 30cm"]);
-    let (_, b) = get("preco=lte.4&preco=gte.3").await;
-    assert_eq!(names(&b), ["Régua, 30cm"]);
-    let (_, b) = get("nome=in.(Caneta,\"Régua, 30cm\")&order=id").await;
-    assert_eq!(names(&b), ["Caneta", "Régua, 30cm"]);
-    let (_, b) = get("nome=in.()").await;
+    let (_, b) = get("price=gt.10&order=price.desc").await;
+    assert_eq!(names(&b), ["Backpack", "Notebook"]);
+    let (_, b) = get("stock=eq.0").await;
+    assert_eq!(names(&b), ["Backpack"]);
+    let (_, b) = get("stock=neq.0&order=name").await;
+    assert_eq!(names(&b), ["Notebook", "Pen", "Ruler, 30cm"]);
+    let (_, b) = get("price=lte.4&price=gte.3").await;
+    assert_eq!(names(&b), ["Ruler, 30cm"]);
+    let (_, b) = get("name=in.(Pen,\"Ruler, 30cm\")&order=id").await;
+    assert_eq!(names(&b), ["Pen", "Ruler, 30cm"]);
+    let (_, b) = get("name=in.()").await;
     assert_eq!(b, json!([]));
-    let (_, b) = get("nome=like.Ca*&order=nome").await;
-    assert_eq!(names(&b), ["Caderno", "Caneta"]);
-    let (_, b) = get("nome=ilike.*CHILA").await;
-    assert_eq!(names(&b), ["Mochila"]);
-    let (_, b) = get("nome=not.like.Ca*&order=nome.desc").await;
-    assert_eq!(names(&b), ["Régua, 30cm", "Mochila"]);
-    let (_, b) = get("slug=eq.mochila&select=nome,slug").await;
-    assert_eq!(b, json!([{ "nome": "Mochila", "slug": "mochila" }]));
-    let (_, b) = get("criado_em=not.is.null&select=id&order=id&limit=2&offset=1").await;
+    let (_, b) = get("name=like.*e*&order=name").await;
+    assert_eq!(names(&b), ["Notebook", "Pen", "Ruler, 30cm"]);
+    let (_, b) = get("name=ilike.*PACK").await;
+    assert_eq!(names(&b), ["Backpack"]);
+    let (_, b) = get("name=not.like.P*&order=name.desc").await;
+    assert_eq!(names(&b), ["Ruler, 30cm", "Notebook", "Backpack"]);
+    let (_, b) = get("slug=eq.backpack&select=name,slug").await;
+    assert_eq!(b, json!([{ "name": "Backpack", "slug": "backpack" }]));
+    let (_, b) = get("created_at=not.is.null&select=id&order=id&limit=2&offset=1").await;
     assert_eq!(ids(&b), [2, 3]);
 
-    // Content-Range e count=exact.
+    // Content-Range and count=exact.
     let reply = app
         .request_with(
             Method::GET,
-            "/rest/v1/produtos?order=id&limit=2&offset=1",
+            "/rest/v1/products?order=id&limit=2&offset=1",
             None,
             None,
             &[("prefer", "count=exact")],
@@ -261,72 +261,72 @@ async fn filtros_ordem_paginacao_e_contagem() {
         .await;
     assert_eq!(reply.headers[header::CONTENT_RANGE], "1-2/4");
     let reply = app
-        .request(Method::GET, "/rest/v1/produtos?estoque=gt.1000", None, None)
+        .request(Method::GET, "/rest/v1/products?stock=gt.1000", None, None)
         .await;
     assert_eq!(reply.headers[header::CONTENT_RANGE], "*/*");
 
-    // Filtros em enum, array e booleano (como usuário).
+    // Filters on enum, array and boolean (as a user).
     let a = user_token(app.user_a);
-    // Lote com chaves diferentes: colunas ausentes recebem o DEFAULT.
+    // Batch with different keys: missing columns get the DEFAULT.
     let reply = app
         .post(
             "/rest/v1/todos",
             Some(&a),
             json!([
-                { "title": "alta", "prioridade": "alta", "tags": ["x"] },
-                { "title": "baixa", "prioridade": "baixa", "done": true },
+                { "title": "high", "priority": "high", "tags": ["x"] },
+                { "title": "low", "priority": "low", "done": true },
             ]),
         )
         .await;
     assert_eq!(reply.status, StatusCode::CREATED, "{}", reply.body);
     let (_, b) = app
-        .get("/rest/v1/todos?prioridade=eq.alta&select=title", Some(&a))
+        .get("/rest/v1/todos?priority=eq.high&select=title", Some(&a))
         .await;
-    assert_eq!(b, json!([{ "title": "alta" }]));
+    assert_eq!(b, json!([{ "title": "high" }]));
     let (_, b) = app
         .get("/rest/v1/todos?done=is.true&select=title", Some(&a))
         .await;
-    assert_eq!(b, json!([{ "title": "baixa" }]));
+    assert_eq!(b, json!([{ "title": "low" }]));
     let (_, b) = app
         .get(
-            "/rest/v1/todos?prioridade=in.(alta,baixa)&select=title&order=title",
+            "/rest/v1/todos?priority=in.(high,low)&select=title&order=title",
             Some(&a),
         )
         .await;
-    assert_eq!(b, json!([{ "title": "alta" }, { "title": "baixa" }]));
+    assert_eq!(b, json!([{ "title": "high" }, { "title": "low" }]));
 }
 
 #[tokio::test]
-async fn max_rows_limita_leituras() {
+async fn max_rows_caps_reads() {
     let app = TestApp::spawn_with(Options {
         max_rows: Some(2),
         ..Options::default()
     })
     .await;
-    let (_, b) = app.get("/rest/v1/produtos?order=id", None).await;
+    let (_, b) = app.get("/rest/v1/products?order=id", None).await;
     assert_eq!(ids(&b), [1, 2]);
-    let (_, b) = app.get("/rest/v1/produtos?order=id&limit=100", None).await;
+    let (_, b) = app.get("/rest/v1/products?order=id&limit=100", None).await;
     assert_eq!(ids(&b).len(), 2);
 }
 
 #[tokio::test]
-async fn erros_de_dados_viram_400() {
+async fn data_errors_become_400() {
     let app = TestApp::spawn().await;
     let s = service_token();
     for (case, body) in [
-        ("check", json!({ "nome": "X", "preco": -1 })),
-        ("not null", json!({ "preco": 1 })),
-        ("tipo", json!({ "nome": "X", "preco": "caro" })),
+        ("check", json!({ "name": "X", "price": -1 })),
+        ("not null", json!({ "price": 1 })),
+        ("type", json!({ "name": "X", "price": "expensive" })),
         (
-            "coluna gerada",
-            json!({ "nome": "X", "preco": 1, "slug": "y" }),
+            "generated column",
+            json!({ "name": "X", "price": 1, "slug": "y" }),
         ),
         (
-            "coluna inexistente",
-            json!({ "nome": "X", "preco": 1, "cor": "azul" }),
+            "unknown column",
+            json!({ "name": "X", "price": 1, "color": "blue" }),
         ),
     ] {
-        let reply = app.post("/rest/v1/produtos", Some(&s), body).await;
+        let reply = app.post("/rest/v1/products", Some(&s), body).await;
         assert_eq!(
             reply.status,
             StatusCode::BAD_REQUEST,
@@ -334,57 +334,55 @@ async fn erros_de_dados_viram_400() {
             reply.body
         );
     }
-    let (status, _) = app.get("/rest/v1/produtos?preco=eq.abc", None).await;
+    let (status, _) = app.get("/rest/v1/products?price=eq.abc", None).await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
-    let (status, _) = app
-        .get("/rest/v1/produtos?id=gt.1&estoque=lt.x", None)
-        .await;
+    let (status, _) = app.get("/rest/v1/products?id=gt.1&stock=lt.x", None).await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 
-    // Duplicata de PK: 409.
+    // Duplicate PK: 409.
     let reply = app
         .post(
-            "/rest/v1/produtos",
+            "/rest/v1/products",
             Some(&s),
-            json!({ "id": 1, "nome": "X", "preco": 1 }),
+            json!({ "id": 1, "name": "X", "price": 1 }),
         )
         .await;
     assert_eq!(reply.status, StatusCode::CONFLICT);
 
-    // Corpo que não é JSON.
+    // A body that is not JSON.
     let reply = app
-        .request_with(Method::POST, "/rest/v1/produtos", Some(&s), None, &[])
+        .request_with(Method::POST, "/rest/v1/products", Some(&s), None, &[])
         .await;
     assert_eq!(reply.status, StatusCode::BAD_REQUEST);
 
-    // PATCH/DELETE sem filtro são recusados.
+    // PATCH/DELETE without a filter are refused.
     let reply = app
-        .request(Method::DELETE, "/rest/v1/produtos", Some(&s), None)
+        .request(Method::DELETE, "/rest/v1/products", Some(&s), None)
         .await;
     assert_eq!(reply.status, StatusCode::BAD_REQUEST);
     let reply = app
         .request(
             Method::PATCH,
-            "/rest/v1/produtos",
+            "/rest/v1/products",
             Some(&s),
-            Some(json!({ "estoque": 0 })),
+            Some(json!({ "stock": 0 })),
         )
         .await;
     assert_eq!(reply.status, StatusCode::BAD_REQUEST);
 
-    let (status, _) = app.get("/rest/v1/nao_existe", None).await;
+    let (status, _) = app.get("/rest/v1/does_not_exist", None).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
 
 #[tokio::test]
-async fn injecao_de_sql_em_identificadores_e_valores() {
+async fn sql_injection_in_identifiers_and_values() {
     let app = TestApp::spawn().await;
     let s = service_token();
 
-    // Identificadores maliciosos: rejeitados antes de chegar ao banco.
+    // Malicious identifiers: rejected before reaching the database.
     for path in [
-        "/rest/v1/produtos;DROP%20TABLE%20produtos",
-        "/rest/v1/produtos%22;DROP%20TABLE%20produtos;--",
+        "/rest/v1/products;DROP%20TABLE%20products",
+        "/rest/v1/products%22;DROP%20TABLE%20products;--",
         "/rest/v1/pg_catalog.pg_authid",
         "/rest/v1/..%2Fauth.users",
     ] {
@@ -392,27 +390,27 @@ async fn injecao_de_sql_em_identificadores_e_valores() {
         assert_eq!(status, StatusCode::NOT_FOUND, "{path}");
     }
     for query in [
-        "select=nome,(SELECT%20senha%20FROM%20auth.users)",
-        "select=nome%22,%22preco",
-        "select=*;DROP%20TABLE%20produtos",
-        "order=nome;DROP%20TABLE%20produtos",
+        "select=name,(SELECT%20password%20FROM%20auth.users)",
+        "select=name%22,%22price",
+        "select=*;DROP%20TABLE%20products",
+        "order=name;DROP%20TABLE%20products",
         "order=(SELECT%201)",
-        "nome%22%3D%27x%27%20OR%201%3D1--=eq.1",
+        "name%22%3D%27x%27%20OR%201%3D1--=eq.1",
         "id=eq.1&1=1",
-        "limit=1;DROP%20TABLE%20produtos",
+        "limit=1;DROP%20TABLE%20products",
         "id=in.(1)%29%20OR%20(1=1",
     ] {
         let (status, body) = app
-            .get(&format!("/rest/v1/produtos?{query}"), Some(&s))
+            .get(&format!("/rest/v1/products?{query}"), Some(&s))
             .await;
         assert_eq!(status, StatusCode::BAD_REQUEST, "{query}: {body}");
     }
 
-    // Valores maliciosos: tratados como dado.
-    let payload = "x'); DROP TABLE produtos; --";
+    // Malicious values: treated as data.
+    let payload = "x'); DROP TABLE products; --";
     let (status, body) = app
         .get(
-            &format!("/rest/v1/produtos?nome=eq.{}", urlencode(payload)),
+            &format!("/rest/v1/products?name=eq.{}", urlencode(payload)),
             Some(&s),
         )
         .await;
@@ -420,7 +418,7 @@ async fn injecao_de_sql_em_identificadores_e_valores() {
     let (status, _) = app
         .get(
             &format!(
-                "/rest/v1/produtos?nome=in.({},\"a\\\"b\")",
+                "/rest/v1/products?name=in.({},\"a\\\"b\")",
                 urlencode(payload)
             ),
             Some(&s),
@@ -431,27 +429,27 @@ async fn injecao_de_sql_em_identificadores_e_valores() {
     let created = app
         .request_with(
             Method::POST,
-            "/rest/v1/produtos",
+            "/rest/v1/products",
             Some(&s),
-            Some(json!({ "nome": payload, "preco": 1 })),
+            Some(json!({ "name": payload, "price": 1 })),
             &[REPR],
         )
         .await;
     assert_eq!(created.status, StatusCode::CREATED);
-    assert_eq!(created.body[0]["nome"], payload);
+    assert_eq!(created.body[0]["name"], payload);
 
-    // Chaves maliciosas no corpo e nomes de função.
+    // Malicious keys in the body and function names.
     let reply = app
         .post(
-            "/rest/v1/produtos",
+            "/rest/v1/products",
             Some(&s),
-            json!({ "nome\" text); DROP TABLE produtos; --": "x" }),
+            json!({ "name\" text); DROP TABLE products; --": "x" }),
         )
         .await;
     assert_eq!(reply.status, StatusCode::BAD_REQUEST);
     let reply = app
         .post(
-            "/rest/v1/rpc/soma;DROP%20TABLE%20produtos",
+            "/rest/v1/rpc/add;DROP%20TABLE%20products",
             Some(&s),
             json!({}),
         )
@@ -459,17 +457,17 @@ async fn injecao_de_sql_em_identificadores_e_valores() {
     assert_eq!(reply.status, StatusCode::NOT_FOUND);
     let reply = app
         .post(
-            "/rest/v1/rpc/soma",
+            "/rest/v1/rpc/add",
             Some(&s),
-            json!({ "a) ; DROP TABLE produtos; --": 1 }),
+            json!({ "a) ; DROP TABLE products; --": 1 }),
         )
         .await;
     assert_eq!(reply.status, StatusCode::BAD_REQUEST);
 
-    // Tudo continua lá.
+    // Everything is still there.
     let count: i64 = app
         .admin_client
-        .query_one("SELECT count(*) FROM public.produtos", &[])
+        .query_one("SELECT count(*) FROM public.products", &[])
         .await
         .unwrap()
         .get(0);
@@ -487,161 +485,165 @@ fn urlencode(value: &str) -> String {
 }
 
 #[tokio::test]
-async fn rpc_chama_funcoes_sob_a_role_do_jwt() {
+async fn rpc_calls_functions_under_the_jwt_role() {
     let app = TestApp::spawn().await;
     let a = user_token(app.user_a);
 
-    let reply = app.post("/rest/v1/rpc/soma", None, json!({ "a": 1 })).await;
+    let reply = app.post("/rest/v1/rpc/add", None, json!({ "a": 1 })).await;
     assert_eq!((reply.status, reply.body), (StatusCode::OK, json!(11)));
     let reply = app
-        .post("/rest/v1/rpc/soma", None, json!({ "a": 1, "b": 2 }))
+        .post("/rest/v1/rpc/add", None, json!({ "a": 1, "b": 2 }))
         .await;
     assert_eq!(reply.body, json!(3));
     let reply = app
-        .post("/rest/v1/rpc/soma", None, json!({ "a": 1, "c": 2 }))
+        .post("/rest/v1/rpc/add", None, json!({ "a": 1, "c": 2 }))
         .await;
     assert_eq!(reply.status, StatusCode::BAD_REQUEST);
-    let reply = app.post("/rest/v1/rpc/soma", None, json!({})).await;
+    let reply = app.post("/rest/v1/rpc/add", None, json!({})).await;
     assert_eq!(reply.status, StatusCode::BAD_REQUEST);
 
-    // Funções SETOF obedecem ao RLS da tabela.
+    // SETOF functions obey the table's RLS.
     let reply = app
-        .post("/rest/v1/rpc/minhas_tarefas_abertas", Some(&a), json!({}))
+        .post("/rest/v1/rpc/my_open_todos", Some(&a), json!({}))
         .await;
     assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
     assert_eq!(reply.body.as_array().unwrap().len(), 1);
-    assert_eq!(reply.body[0]["title"], "tarefa de A");
+    assert_eq!(reply.body[0]["title"], "task of A");
 
-    // auth.uid()/auth.role() dentro da função refletem o JWT.
-    let reply = app
-        .post("/rest/v1/rpc/quem_sou_eu", Some(&a), json!({}))
-        .await;
+    // auth.uid()/auth.role() inside the function reflect the JWT.
+    let reply = app.post("/rest/v1/rpc/who_am_i", Some(&a), json!({})).await;
     assert_eq!(
         reply.body,
         json!({ "uid": app.user_a, "role": "authenticated" })
     );
     let reply = app
-        .request(Method::POST, "/rest/v1/rpc/quem_sou_eu", None, None)
+        .request(Method::POST, "/rest/v1/rpc/who_am_i", None, None)
         .await;
     assert_eq!(reply.body, json!({ "uid": null, "role": "anon" }));
 
-    let reply = app.post("/rest/v1/rpc/nada", None, json!({})).await;
+    let reply = app.post("/rest/v1/rpc/nothing", None, json!({})).await;
     assert_eq!(reply.status, StatusCode::NO_CONTENT);
-    let reply = app.post("/rest/v1/rpc/falha", None, json!({})).await;
+    let reply = app.post("/rest/v1/rpc/fail", None, json!({})).await;
     assert_eq!(reply.status, StatusCode::BAD_REQUEST);
     assert!(
         reply.body["message"]
             .as_str()
             .unwrap()
-            .contains("regra de negócio")
+            .contains("business rule")
     );
-    let reply = app.post("/rest/v1/rpc/nao_existe", None, json!({})).await;
+    let reply = app
+        .post("/rest/v1/rpc/does_not_exist", None, json!({}))
+        .await;
     assert_eq!(reply.status, StatusCode::NOT_FOUND);
 
-    // EXECUTE revogado de PUBLIC: anon 401, authenticated 403, service ok.
-    let reply = app.post("/rest/v1/rpc/so_servico", None, json!({})).await;
+    // EXECUTE revoked from PUBLIC: anon 401, authenticated 403, service ok.
+    let reply = app.post("/rest/v1/rpc/service_only", None, json!({})).await;
     assert_eq!(reply.status, StatusCode::UNAUTHORIZED);
     let reply = app
-        .post("/rest/v1/rpc/so_servico", Some(&a), json!({}))
+        .post("/rest/v1/rpc/service_only", Some(&a), json!({}))
         .await;
     assert_eq!(reply.status, StatusCode::FORBIDDEN);
     let reply = app
-        .post("/rest/v1/rpc/so_servico", Some(&service_token()), json!({}))
+        .post(
+            "/rest/v1/rpc/service_only",
+            Some(&service_token()),
+            json!({}),
+        )
         .await;
     assert_eq!(reply.body, json!("ok"));
 }
 
 #[tokio::test]
-async fn openapi_segue_os_privilegios_da_role() {
+async fn openapi_follows_the_role_privileges() {
     let app = TestApp::spawn().await;
 
     let (status, anon) = app.get("/rest/v1/", None).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(anon["openapi"], "3.0.3");
     let paths = anon["paths"].as_object().unwrap();
-    assert!(paths.contains_key("/produtos"));
-    assert!(paths["/produtos"].get("get").is_some());
-    assert!(paths["/produtos"].get("post").is_none());
+    assert!(paths.contains_key("/products"));
+    assert!(paths["/products"].get("get").is_some());
+    assert!(paths["/products"].get("post").is_none());
     assert!(!paths.contains_key("/todos"));
-    assert!(!paths.contains_key("/segredos"));
-    assert!(paths.contains_key("/rpc/soma"));
-    assert!(!paths.contains_key("/rpc/so_servico"));
-    let produto = &anon["components"]["schemas"]["produtos"];
-    assert_eq!(produto["properties"]["preco"]["type"], "number");
-    assert_eq!(produto["properties"]["id"]["type"], "integer");
-    assert_eq!(produto["description"], "Catálogo de produtos");
+    assert!(!paths.contains_key("/secrets"));
+    assert!(paths.contains_key("/rpc/add"));
+    assert!(!paths.contains_key("/rpc/service_only"));
+    let product = &anon["components"]["schemas"]["products"];
+    assert_eq!(product["properties"]["price"]["type"], "number");
+    assert_eq!(product["properties"]["id"]["type"], "integer");
+    assert_eq!(product["description"], "Product catalog");
 
     let (_, user) = app.get("/rest/v1/", Some(&user_token(app.user_a))).await;
     let todos = &user["paths"]["/todos"];
     for verb in ["get", "post", "patch", "delete"] {
         assert!(todos.get(verb).is_some(), "{verb}");
     }
-    let prioridade = &user["components"]["schemas"]["todos"]["properties"]["prioridade"];
-    assert_eq!(prioridade["enum"], json!(["baixa", "media", "alta"]));
+    let priority = &user["components"]["schemas"]["todos"]["properties"]["priority"];
+    assert_eq!(priority["enum"], json!(["low", "medium", "high"]));
 
     let (_, service) = app.get("/rest/v1/", Some(&service_token())).await;
-    assert!(service["paths"].get("/segredos").is_some());
-    assert!(service["paths"].get("/rpc/so_servico").is_some());
+    assert!(service["paths"].get("/secrets").is_some());
+    assert!(service["paths"].get("/rpc/service_only").is_some());
 }
 
 #[tokio::test]
-async fn catalogo_recarrega_sozinho_apos_ddl() {
+async fn catalog_reloads_on_its_own_after_ddl() {
     let app = TestApp::spawn().await;
-    let (status, _) = app.get("/rest/v1/novidades", None).await;
+    let (status, _) = app.get("/rest/v1/news", None).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 
     app.admin_client
         .batch_execute(
-            "CREATE TABLE public.novidades (id int PRIMARY KEY, texto text);
-             INSERT INTO public.novidades VALUES (1, 'olá');
-             GRANT SELECT ON public.novidades TO anon;",
+            "CREATE TABLE public.news (id int PRIMARY KEY, body text);
+             INSERT INTO public.news VALUES (1, 'hello');
+             GRANT SELECT ON public.news TO anon;",
         )
         .await
         .unwrap();
 
-    // O event trigger notifica; o listener recarrega em ~100 ms.
+    // The event trigger notifies; the listener reloads within ~100 ms.
     let deadline = Instant::now() + Duration::from_secs(10);
     loop {
-        let (status, body) = app.get("/rest/v1/novidades", None).await;
+        let (status, body) = app.get("/rest/v1/news", None).await;
         if status == StatusCode::OK {
-            assert_eq!(body, json!([{ "id": 1, "texto": "olá" }]));
+            assert_eq!(body, json!([{ "id": 1, "body": "hello" }]));
             break;
         }
-        assert!(Instant::now() < deadline, "catálogo não recarregou");
+        assert!(Instant::now() < deadline, "catalog did not reload");
         tokio::time::sleep(Duration::from_millis(50)).await;
     }
 
-    // Colunas novas também aparecem.
+    // New columns show up too.
     app.admin_client
-        .batch_execute("ALTER TABLE public.novidades ADD COLUMN lida boolean DEFAULT false")
+        .batch_execute("ALTER TABLE public.news ADD COLUMN read boolean DEFAULT false")
         .await
         .unwrap();
     let deadline = Instant::now() + Duration::from_secs(10);
     while app
         .catalog
         .get()
-        .table("novidades")
+        .table("news")
         .unwrap()
-        .column("lida")
+        .column("read")
         .is_none()
     {
-        assert!(Instant::now() < deadline, "coluna nova não apareceu");
+        assert!(Instant::now() < deadline, "the new column did not show up");
         tokio::time::sleep(Duration::from_millis(50)).await;
     }
-    let (status, _) = app.get("/rest/v1/novidades?lida=is.false", None).await;
+    let (status, _) = app.get("/rest/v1/news?read=is.false", None).await;
     assert_eq!(status, StatusCode::OK);
 }
 
-/// Não é benchmark (esse fica em `bench/`): só garante que a leitura simples
-/// não degrada absurdamente, mesmo em build de debug.
+/// Not a benchmark (that lives in `bench/`): it only ensures a simple read does
+/// not degrade absurdly, even in a debug build.
 #[tokio::test]
-async fn desempenho_basico_de_leitura() {
+async fn basic_read_performance() {
     let app = TestApp::spawn().await;
     app.admin_client
         .batch_execute(
-            "INSERT INTO public.produtos (nome, preco, estoque)
-             SELECT 'produto ' || i, (i % 500) + 0.99, i % 7 FROM generate_series(1, 20000) i;
-             ANALYZE public.produtos;",
+            "INSERT INTO public.products (name, price, stock)
+             SELECT 'product ' || i, (i % 500) + 0.99, i % 7 FROM generate_series(1, 20000) i;
+             ANALYZE public.products;",
         )
         .await
         .unwrap();
@@ -651,7 +653,7 @@ async fn desempenho_basico_de_leitura() {
     for i in 0..requests {
         let (status, body) = app
             .get(
-                &format!("/rest/v1/produtos?estoque=eq.{}&order=id&limit=20", i % 7),
+                &format!("/rest/v1/products?stock=eq.{}&order=id&limit=20", i % 7),
                 None,
             )
             .await;
@@ -659,6 +661,6 @@ async fn desempenho_basico_de_leitura() {
         assert_eq!(body.as_array().unwrap().len(), 20);
     }
     let average = started.elapsed() / requests;
-    println!("leitura simples: média de {average:?} por request ({requests} requests)");
-    assert!(average < Duration::from_millis(100), "média {average:?}");
+    println!("simple read: average of {average:?} per request ({requests} requests)");
+    assert!(average < Duration::from_millis(100), "average {average:?}");
 }

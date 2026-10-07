@@ -1,13 +1,14 @@
-//! Regras de email e senha das contas. Compartilhadas pelo cadastro público
-//! (`/auth/v1/signup`) e pelo painel, que cria usuários e redefine senhas:
-//! a mesma conta não pode ter regras diferentes conforme quem a criou.
+//! Email and password rules for accounts. Shared by public signup
+//! (`/auth/v1/signup`) and the panel, which creates users and resets
+//! passwords: an account cannot follow different rules depending on who
+//! created it.
 
-/// Credencial recusada; a mensagem vai para quem preencheu.
+/// Rejected credential; the message goes to whoever filled it in.
 #[derive(Debug, PartialEq, Eq)]
 pub struct InvalidCredential(pub &'static str);
 
-/// Email em minúsculas e sem espaços nas pontas, com validação mínima
-/// (o banco também exige minúsculas e no máximo 254 caracteres).
+/// Lowercase email with no surrounding spaces, minimally validated (the
+/// database also requires lowercase and at most 254 characters).
 pub fn normalize_email(email: &str) -> Result<String, InvalidCredential> {
     let email = email.trim().to_lowercase();
     let valid = email.len() <= 254
@@ -18,18 +19,18 @@ pub fn normalize_email(email: &str) -> Result<String, InvalidCredential> {
     if valid {
         Ok(email)
     } else {
-        Err(InvalidCredential("email inválido"))
+        Err(InvalidCredential("invalid email"))
     }
 }
 
 pub fn validate_password(password: &str) -> Result<(), InvalidCredential> {
     match password.chars().count() {
         0..8 => Err(InvalidCredential(
-            "a senha precisa de ao menos 8 caracteres",
+            "the password needs at least 8 characters",
         )),
         8..=256 => Ok(()),
         _ => Err(InvalidCredential(
-            "a senha pode ter no máximo 256 caracteres",
+            "the password can have at most 256 characters",
         )),
     }
 }
@@ -39,10 +40,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn normaliza_email() {
+    fn normalizes_email() {
         assert_eq!(
-            normalize_email("  Ana@Exemplo.COM ").unwrap(),
-            "ana@exemplo.com"
+            normalize_email("  Ana@Example.COM ").unwrap(),
+            "ana@example.com"
         );
         for bad in [
             "",
@@ -58,11 +59,11 @@ mod tests {
     }
 
     #[test]
-    fn tamanho_da_senha() {
+    fn password_length() {
         assert!(validate_password("1234567").is_err());
         assert!(validate_password("12345678").is_ok());
-        // Conta caracteres, não bytes.
-        assert!(validate_password("çççççççç").is_ok());
+        // Counts characters, not bytes.
+        assert!(validate_password("€€€€€€€€").is_ok());
         assert!(validate_password(&"x".repeat(257)).is_err());
     }
 }

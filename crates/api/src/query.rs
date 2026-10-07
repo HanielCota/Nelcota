@@ -1,13 +1,13 @@
-//! Tradução da URL (estilo PostgREST) para SQL parametrizado.
+//! Translation of the URL (PostgREST style) into parameterized SQL.
 //!
-//! Regras de segurança, verificadas nos testes de injeção:
-//! - identificadores (tabela, coluna, função) só entram no SQL se existirem no
-//!   catálogo, e sempre entre aspas duplas ([`ident`]);
-//! - tipos usados em casts vêm do catálogo (`format_type`), nunca da URL;
-//! - todo valor vindo do usuário é um parâmetro (`$n`), nunca texto do SQL.
+//! Security rules, checked by the injection tests:
+//! - identifiers (table, column, function) only reach SQL if they exist in the
+//!   catalog, and always double-quoted ([`ident`]);
+//! - types used in casts come from the catalog (`format_type`), never the URL;
+//! - every user-supplied value is a parameter (`$n`), never SQL text.
 //!
-//! Os valores chegam como texto e o Postgres converte para o tipo da coluna
-//! (`$1::text::integer`): a validação de tipo é dele, como num literal.
+//! Values arrive as text and Postgres converts them to the column type
+//! (`$1::text::integer`): type validation is its job, as with a literal.
 
 use std::error::Error;
 
@@ -27,12 +27,12 @@ fn invalid(message: impl Into<String>) -> QueryError {
     QueryError::Invalid(message.into())
 }
 
-/// Identificador entre aspas, com aspas internas duplicadas.
+/// Quoted identifier, with inner quotes doubled.
 pub fn ident(name: &str) -> String {
     format!("\"{}\"", name.replace('"', "\"\""))
 }
 
-// ------------------------------------------------------------------ parâmetros
+// ------------------------------------------------------------------ parameters
 
 #[derive(Debug)]
 pub enum Param {
@@ -55,14 +55,14 @@ impl ToSql for Param {
     }
 
     fn accepts(_: &Type) -> bool {
-        // A checagem real acontece no `to_sql_checked` do valor interno.
+        // The real check happens in the inner value's `to_sql_checked`.
         true
     }
 
     to_sql_checked!();
 }
 
-/// SQL em construção + seus parâmetros.
+/// SQL under construction + its parameters.
 #[derive(Debug, Default)]
 pub struct Sql {
     pub text: String,
@@ -83,7 +83,7 @@ impl Sql {
     }
 }
 
-// ------------------------------------------------------------------ requisição
+// ------------------------------------------------------------------ request
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Select {
@@ -144,7 +144,7 @@ pub struct OrderTerm {
     nulls_first: Option<bool>,
 }
 
-/// O que a query string pede: colunas, filtros, ordem e paginação.
+/// What the query string asks for: columns, filters, ordering and paging.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Request {
     pub select: Select,
@@ -155,9 +155,12 @@ pub struct Request {
 }
 
 fn column<'a>(table: &'a Table, name: &str) -> Result<&'a Column, QueryError> {
-    table
-        .column(name)
-        .ok_or_else(|| invalid(format!("coluna '{name}' não existe em '{}'", table.name)))
+    table.column(name).ok_or_else(|| {
+        invalid(format!(
+            "column '{name}' does not exist in '{}'",
+            table.name
+        ))
+    })
 }
 
 fn parse_select(value: &str, table: &Table) -> Result<Select, QueryError> {
@@ -168,10 +171,12 @@ fn parse_select(value: &str, table: &Table) -> Result<Select, QueryError> {
     let mut columns = Vec::new();
     for name in value.split(',').map(str::trim) {
         if name.is_empty() {
-            return Err(invalid("select vazio ou malformado"));
+            return Err(invalid("empty or malformed select"));
         }
         if name.contains('(') {
-            return Err(invalid("embed de relações em select ainda não é suportado"));
+            return Err(invalid(
+                "embedding relations in select is not supported yet",
+            ));
         }
         columns.push(column(table, name)?.name.clone());
     }
@@ -194,7 +199,7 @@ fn parse_order(value: &str, table: &Table) -> Result<Vec<OrderTerm>, QueryError>
                 "desc" => order.desc = true,
                 "nullsfirst" => order.nulls_first = Some(true),
                 "nullslast" => order.nulls_first = Some(false),
-                other => return Err(invalid(format!("ordem inválida: '{other}'"))),
+                other => return Err(invalid(format!("invalid order: '{other}'"))),
             }
         }
         terms.push(order);
@@ -207,16 +212,16 @@ fn parse_non_negative(name: &str, value: &str) -> Result<i64, QueryError> {
         .parse::<i64>()
         .ok()
         .filter(|v| *v >= 0)
-        .ok_or_else(|| invalid(format!("{name} precisa ser um inteiro >= 0")))
+        .ok_or_else(|| invalid(format!("{name} must be an integer >= 0")))
 }
 
-/// `(a,b,"c,d")` → `["a", "b", "c,d"]`. Aspas permitem vírgulas e parênteses;
-/// `\"` e `\\` escapam dentro das aspas.
+/// `(a,b,"c,d")` → `["a", "b", "c,d"]`. Quotes allow commas and parentheses;
+/// `\"` and `\\` escape inside quotes.
 fn parse_in_list(value: &str) -> Result<Vec<String>, QueryError> {
     let inner = value
         .strip_prefix('(')
         .and_then(|v| v.strip_suffix(')'))
-        .ok_or_else(|| invalid("in espera uma lista entre parênteses: in.(a,b)"))?;
+        .ok_or_else(|| invalid("in expects a parenthesized list: in.(a,b)"))?;
     if inner.trim().is_empty() {
         return Ok(Vec::new());
     }
@@ -247,7 +252,7 @@ fn parse_in_list(value: &str) -> Result<Vec<String>, QueryError> {
         }
     }
     if quoted {
-        return Err(invalid("aspas não fechadas na lista do in"));
+        return Err(invalid("unclosed quotes in the in list"));
     }
     items.push(finish_item(&current, was_quoted));
     Ok(items)
@@ -269,7 +274,7 @@ fn parse_filter(table: &Table, key: &str, value: &str) -> Result<Filter, QueryEr
     };
     let (op, operand) = rest
         .split_once('.')
-        .ok_or_else(|| invalid(format!("filtro inválido em '{key}': use operador.valor")))?;
+        .ok_or_else(|| invalid(format!("invalid filter on '{key}': use operator.value")))?;
     let op = match op {
         "eq" => Op::Cmp(CmpOp::Eq, operand.to_owned()),
         "neq" => Op::Cmp(CmpOp::Neq, operand.to_owned()),
@@ -287,9 +292,9 @@ fn parse_filter(table: &Table, key: &str, value: &str) -> Result<Filter, QueryEr
             "true" => IsValue::True,
             "false" => IsValue::False,
             "unknown" => IsValue::Unknown,
-            _ => return Err(invalid("is aceita null, true, false ou unknown")),
+            _ => return Err(invalid("is accepts null, true, false or unknown")),
         }),
-        other => return Err(invalid(format!("operador desconhecido: '{other}'"))),
+        other => return Err(invalid(format!("unknown operator: '{other}'"))),
     };
     Ok(Filter {
         column: col.name.clone(),
@@ -298,7 +303,7 @@ fn parse_filter(table: &Table, key: &str, value: &str) -> Result<Filter, QueryEr
     })
 }
 
-/// Interpreta a query string. Toda coluna citada é validada contra a tabela.
+/// Parses the query string. Every column mentioned is validated against the table.
 pub fn parse_request(pairs: &[(String, String)], table: &Table) -> Result<Request, QueryError> {
     let mut request = Request {
         select: Select::All,
@@ -336,7 +341,7 @@ fn select_list(select: &Select, alias: &str) -> String {
     }
 }
 
-/// Escapa um elemento de literal de array do Postgres (`{"a","b"}`).
+/// Escapes an element of a Postgres array literal (`{"a","b"}`).
 fn array_literal(items: &[String]) -> String {
     let escaped: Vec<String> = items
         .iter()
@@ -353,7 +358,7 @@ fn where_clause(sql: &mut Sql, table: &Table, filters: &[Filter]) -> String {
     for filter in filters {
         let col = table
             .column(&filter.column)
-            .expect("coluna validada no parse");
+            .expect("column validated while parsing");
         let target = format!("_t.{}", ident(&col.name));
         let condition = match &filter.op {
             Op::Cmp(op, value) => {
@@ -415,7 +420,7 @@ fn order_clause(order: &[OrderTerm]) -> String {
     format!(" ORDER BY {}", terms.join(", "))
 }
 
-/// `SELECT` que devolve `(json_text, linhas)`; o Postgres monta o JSON.
+/// `SELECT` returning `(json_text, rows)`; Postgres builds the JSON.
 pub fn select(schema: &str, table: &Table, request: &Request, max_rows: Option<i64>) -> Sql {
     let mut sql = Sql::default();
     let rows = rows_subquery(&mut sql, schema, table, request, max_rows);
@@ -423,8 +428,8 @@ pub fn select(schema: &str, table: &Table, request: &Request, max_rows: Option<i
     sql
 }
 
-/// Um registro por linha do resultado, como texto JSON: para ler em fluxo
-/// (exportação) sem montar a resposta inteira na memória.
+/// One record per result row, as JSON text: for streaming reads (export)
+/// without building the whole response in memory.
 pub fn select_rows(schema: &str, table: &Table, request: &Request) -> Sql {
     let mut sql = Sql::default();
     let rows = rows_subquery(&mut sql, schema, table, request, None);
@@ -432,7 +437,7 @@ pub fn select_rows(schema: &str, table: &Table, request: &Request) -> Sql {
     sql
 }
 
-/// Colunas, filtros, ordem e paginação da tabela (alias `_t`).
+/// Columns, filters, ordering and paging of the table (alias `_t`).
 fn rows_subquery(
     sql: &mut Sql,
     schema: &str,
@@ -461,7 +466,7 @@ fn rows_subquery(
     )
 }
 
-/// Total de linhas que os filtros alcançam (para `Prefer: count=exact`).
+/// Total rows the filters reach (for `Prefer: count=exact`).
 pub fn count(schema: &str, table: &Table, request: &Request) -> Sql {
     let mut sql = Sql::default();
     let filters = where_clause(&mut sql, table, &request.filters);
@@ -472,7 +477,7 @@ pub fn count(schema: &str, table: &Table, request: &Request) -> Sql {
     sql
 }
 
-/// Envolve uma escrita para devolver a representação (`Prefer: return=representation`).
+/// Wraps a write to return the representation (`Prefer: return=representation`).
 fn with_representation(write: String, select: &Select) -> String {
     format!(
         "WITH _w AS ({write} RETURNING _t.*) \
@@ -481,13 +486,13 @@ fn with_representation(write: String, select: &Select) -> String {
     )
 }
 
-/// Colunas de um corpo JSON (objeto ou array de objetos), validadas.
+/// Columns of a JSON body (object or array of objects), validated.
 fn body_columns(table: &Table, rows: &[Value]) -> Result<Vec<String>, QueryError> {
     let mut columns: Vec<String> = Vec::new();
     for row in rows {
         let Value::Object(map) = row else {
             return Err(invalid(
-                "o corpo deve ser um objeto JSON ou um array de objetos",
+                "the body must be a JSON object or an array of objects",
             ));
         };
         for key in map.keys() {
@@ -499,12 +504,12 @@ fn body_columns(table: &Table, rows: &[Value]) -> Result<Vec<String>, QueryError
     Ok(columns)
 }
 
-/// `INSERT` a partir de JSON: o Postgres converte cada campo para o tipo da
-/// coluna (`json_populate_recordset`).
+/// `INSERT` from JSON: Postgres converts each field to the column type
+/// (`json_populate_recordset`).
 ///
-/// Colunas ausentes num objeto recebem o DEFAULT, mesmo em lotes com chaves
-/// diferentes: as linhas são agrupadas por conjunto de colunas, e cada grupo
-/// vira um INSERT (CTEs na mesma instrução, numa transação só).
+/// Columns missing from an object get the DEFAULT, even in batches with
+/// different keys: rows are grouped by column set, and each group becomes an
+/// INSERT (CTEs in the same statement, in a single transaction).
 pub fn insert(
     schema: &str,
     table: &Table,
@@ -516,14 +521,14 @@ pub fn insert(
         object @ Value::Object(_) => vec![object],
         _ => {
             return Err(invalid(
-                "o corpo deve ser um objeto JSON ou um array de objetos",
+                "the body must be a JSON object or an array of objects",
             ));
         }
     };
     if rows.is_empty() {
-        return Err(invalid("nada para inserir"));
+        return Err(invalid("nothing to insert"));
     }
-    // Agrupa por conjunto de colunas, na ordem das colunas da tabela.
+    // Group by column set, in the table's column order.
     let mut groups: Vec<(Vec<String>, Vec<Value>)> = Vec::new();
     for row in rows {
         let columns = body_columns(table, std::slice::from_ref(&row))?;
@@ -544,7 +549,7 @@ pub fn insert(
     let mut statements = Vec::new();
     for (columns, rows) in groups {
         if columns.is_empty() {
-            // Objetos vazios: uma linha só com DEFAULTs para cada um.
+            // Empty objects: one all-DEFAULT row for each.
             for _ in rows {
                 statements.push(format!("INSERT INTO {target} AS _t DEFAULT VALUES"));
             }
@@ -592,7 +597,7 @@ pub fn insert(
     Ok(sql)
 }
 
-/// `UPDATE` com os campos do objeto JSON, só nas linhas dos filtros (e do RLS).
+/// `UPDATE` with the JSON object's fields, only on the rows the filters (and RLS) allow.
 pub fn update(
     schema: &str,
     table: &Table,
@@ -601,11 +606,11 @@ pub fn update(
     representation: Option<&Select>,
 ) -> Result<Sql, QueryError> {
     let Value::Object(map) = body else {
-        return Err(invalid("o corpo do PATCH deve ser um objeto JSON"));
+        return Err(invalid("the PATCH body must be a JSON object"));
     };
     let columns = body_columns(table, &[Value::Object(map.clone())])?;
     if columns.is_empty() {
-        return Err(invalid("o corpo do PATCH não tem colunas"));
+        return Err(invalid("the PATCH body has no columns"));
     }
     let target = qualified(schema, table);
     let mut sql = Sql::default();
@@ -642,7 +647,7 @@ pub fn delete(
     sql
 }
 
-/// Escolhe a sobrecarga cujos argumentos batem com as chaves do corpo.
+/// Picks the overload whose arguments match the body's keys.
 pub fn resolve_function<'a>(
     candidates: &'a [Function],
     args: &Map<String, Value>,
@@ -656,11 +661,11 @@ pub fn resolve_function<'a>(
                     .all(|a| a.has_default || args.contains_key(&a.name))
         })
         .min_by_key(|f| f.args.len())
-        .ok_or_else(|| invalid("os argumentos não batem com nenhuma assinatura da função"))
+        .ok_or_else(|| invalid("the arguments match no signature of the function"))
 }
 
-/// Chamada de função com argumentos nomeados, convertidos pelo Postgres a
-/// partir do JSON (`json_to_record`).
+/// Function call with named arguments, converted by Postgres from the JSON
+/// (`json_to_record`).
 pub fn rpc(schema: &str, function: &Function, args: Map<String, Value>) -> Sql {
     let mut sql = Sql::default();
     let used: Vec<_> = function
@@ -743,7 +748,7 @@ mod tests {
     }
 
     #[test]
-    fn select_com_filtros_ordem_e_paginacao() {
+    fn select_with_filters_order_and_paging() {
         let t = table();
         let req = parse_request(
             &pairs(&[
@@ -770,7 +775,7 @@ mod tests {
     }
 
     #[test]
-    fn select_rows_devolve_um_registro_json_por_linha() {
+    fn select_rows_returns_one_json_record_per_row() {
         let t = table();
         let req = parse_request(&pairs(&[("done", "eq.true"), ("order", "id")]), &t).unwrap();
         let sql = select_rows("public", &t, &req);
@@ -783,7 +788,7 @@ mod tests {
     }
 
     #[test]
-    fn max_rows_limita_o_limit() {
+    fn max_rows_caps_the_limit() {
         let t = table();
         let req = parse_request(&pairs(&[("limit", "5000")]), &t).unwrap();
         let sql = select("public", &t, &req, Some(100));
@@ -791,7 +796,7 @@ mod tests {
     }
 
     #[test]
-    fn identificadores_desconhecidos_sao_rejeitados() {
+    fn unknown_identifiers_are_rejected() {
         let t = table();
         for q in [
             ("select", "id,\"title\""),
@@ -804,7 +809,7 @@ mod tests {
             ("title", "foo.1"),
             ("limit", "-1"),
             ("limit", "1;drop"),
-            ("title", "is.nada"),
+            ("title", "is.nothing"),
             ("title", "in.(a,\"b)"),
         ] {
             assert!(parse_request(&pairs(&[q]), &t).is_err(), "{q:?}");
@@ -812,7 +817,7 @@ mod tests {
     }
 
     #[test]
-    fn valores_viram_parametros() {
+    fn values_become_parameters() {
         let t = table();
         let malicious = "'; DROP TABLE todos; --";
         let req = parse_request(&pairs(&[("title", &format!("eq.{malicious}"))]), &t).unwrap();
@@ -822,7 +827,7 @@ mod tests {
     }
 
     #[test]
-    fn lista_do_in_com_aspas_e_escapes() {
+    fn in_list_with_quotes_and_escapes() {
         assert_eq!(
             parse_in_list(r#"(1, 2,"a,b","x\"y",)"#).unwrap(),
             vec!["1", "2", "a,b", "x\"y", ""]
@@ -835,12 +840,12 @@ mod tests {
     }
 
     #[test]
-    fn ident_duplica_aspas() {
+    fn ident_doubles_quotes() {
         assert_eq!(ident("a\"b"), "\"a\"\"b\"");
     }
 
     #[test]
-    fn insert_rejeita_colunas_desconhecidas() {
+    fn insert_rejects_unknown_columns() {
         let t = table();
         let body = serde_json::json!({"title": "x", "\"; drop table todos; --": 1});
         assert!(insert("public", &t, body, None).is_err());
@@ -855,7 +860,7 @@ mod tests {
             sql.text
                 .starts_with("INSERT INTO \"public\".\"todos\" AS _t (\"title\")")
         );
-        // Chaves diferentes: um INSERT por grupo, para valer o DEFAULT.
+        // Different keys: one INSERT per group, so the DEFAULT applies.
         let sql = insert(
             "public",
             &t,

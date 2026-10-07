@@ -1,6 +1,6 @@
-//! Testes do painel administrativo: login separado, API JSON protegida, CSRF,
-//! alerta de tabela sem RLS, editor SQL, edição de tabelas, usuários,
-//! policies e a SPA embutida.
+//! Admin panel tests: separate login, protected JSON API, CSRF, the
+//! no-RLS table warning, SQL editor, table editing, users, policies and the
+//! embedded SPA.
 
 mod common;
 
@@ -52,12 +52,12 @@ async fn sql(app: &TestApp, cookie: &str, query: &str) -> Value {
 }
 
 #[tokio::test]
-async fn login_separado_e_api_protegida() {
+async fn separate_login_and_protected_api() {
     let app = TestApp::spawn().await;
 
     for path in [
         "/admin/api/overview",
-        "/admin/api/tables/produtos",
+        "/admin/api/tables/products",
         "/admin/api/users",
     ] {
         let reply = app.raw(Method::GET, path, &[], String::new()).await;
@@ -74,8 +74,8 @@ async fn login_separado_e_api_protegida() {
     assert_eq!(reply.status, StatusCode::UNAUTHORIZED);
 
     for (email, password) in [
-        (ADMIN_EMAIL, "senha-errada"),
-        ("outro@exemplo.com", ADMIN_PASSWORD),
+        (ADMIN_EMAIL, "wrong-password"),
+        ("someone@example.com", ADMIN_PASSWORD),
     ] {
         let reply = app
             .raw(
@@ -86,10 +86,12 @@ async fn login_separado_e_api_protegida() {
             )
             .await;
         assert_eq!(reply.status, StatusCode::UNAUTHORIZED);
-        assert_eq!(reply.body["error"], "Email ou senha inválidos.");
+        assert_eq!(reply.body["error"], "Invalid email or password.");
+        // The panel translates by code (crates/admin/ui/src/lib/i18n/messages/errors.ts).
+        assert_eq!(reply.body["code"], "invalid_credentials");
     }
 
-    // Um JWT (nem de service_role) não abre o painel.
+    // A JWT (not even service_role) does not open the panel.
     let reply = app
         .raw(
             Method::GET,
@@ -104,7 +106,7 @@ async fn login_separado_e_api_protegida() {
     let reply = get(&app, "/admin/api/session", &cookie).await;
     assert_eq!(reply.body["email"], ADMIN_EMAIL);
 
-    // Login como o navegador faz (mesma origem) passa; `Origin: null` não.
+    // Login the way a browser does it (same origin) passes; `Origin: null` does not.
     let browser = |origin: &'static str| {
         [
             JSON,
@@ -132,21 +134,23 @@ async fn login_separado_e_api_protegida() {
         )
         .await;
     assert_eq!(reply.status, StatusCode::FORBIDDEN);
+    assert_eq!(reply.body["code"], "origin_not_allowed");
 
-    // Logout invalida a sessão.
+    // Logout invalidates the session.
     let reply = send(&app, Method::POST, "/admin/api/logout", &cookie, json!({})).await;
     assert_eq!(reply.status, StatusCode::OK);
     let reply = get(&app, "/admin/api/session", &cookie).await;
     assert_eq!(reply.status, StatusCode::UNAUTHORIZED);
+    assert_eq!(reply.body["code"], "session_expired");
 }
 
 #[tokio::test]
-async fn alerta_de_tabela_sem_rls() {
+async fn warning_for_a_table_without_rls() {
     let app = TestApp::spawn().await;
     let cookie = login(&app).await;
 
     let overview = get(&app, "/admin/api/overview", &cookie).await.body;
-    assert_eq!(overview["exposed_without_rls"], json!(["produtos"]));
+    assert_eq!(overview["exposed_without_rls"], json!(["products"]));
     let table = |name: &str| {
         overview["tables"]
             .as_array()
@@ -156,14 +160,14 @@ async fn alerta_de_tabela_sem_rls() {
             .cloned()
             .unwrap()
     };
-    assert_eq!(table("produtos")["rls"]["state"], "danger");
+    assert_eq!(table("products")["rls"]["state"], "danger");
     assert_eq!(table("todos")["rls"]["state"], "ok");
     assert_eq!(table("todos")["rls"]["label"], "RLS · 4 policies");
-    // segredos não tem GRANT para anon/authenticated: não é "exposta".
-    assert_eq!(table("segredos")["rls"]["state"], "none");
-    assert_eq!(table("produtos")["grants"]["anon"], json!(["SELECT"]));
-    assert_eq!(table("produtos")["rows"], 4);
-    assert_eq!(table("produtos")["rows_exact"], true);
+    // secrets has no GRANT for anon/authenticated: it is not "exposed".
+    assert_eq!(table("secrets")["rls"]["state"], "none");
+    assert_eq!(table("products")["grants"]["anon"], json!(["SELECT"]));
+    assert_eq!(table("products")["rows"], 4);
+    assert_eq!(table("products")["rows_exact"], true);
     assert!(overview["counts"]["functions"].as_u64().unwrap() >= 5);
 
     let policies = get(&app, "/admin/api/policies", &cookie).await.body;
@@ -177,7 +181,7 @@ async fn alerta_de_tabela_sem_rls() {
         .as_array()
         .unwrap()
         .iter()
-        .find(|p| p["name"] == "todos_dono_select")
+        .find(|p| p["name"] == "todos_owner_select")
         .unwrap();
     assert_eq!(select["using"], "(user_id = auth.uid())");
     assert_eq!(select["command"], "SELECT");
@@ -186,69 +190,72 @@ async fn alerta_de_tabela_sem_rls() {
         policies["anon_functions"]
             .as_array()
             .unwrap()
-            .contains(&json!("soma"))
+            .contains(&json!("add"))
     );
     assert!(
         !policies["anon_functions"]
             .as_array()
             .unwrap()
-            .contains(&json!("so_servico"))
+            .contains(&json!("service_only"))
     );
 
-    // Corrigido o problema, o alerta some (o catálogo recarrega sozinho).
+    // Once the problem is fixed, the warning goes away (the catalog reloads by itself).
     app.admin_client
-        .batch_execute("ALTER TABLE public.produtos ENABLE ROW LEVEL SECURITY")
+        .batch_execute("ALTER TABLE public.products ENABLE ROW LEVEL SECURITY")
         .await
         .unwrap();
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
     loop {
         let overview = get(&app, "/admin/api/overview", &cookie).await.body;
         if overview["exposed_without_rls"] == json!([]) {
-            let produtos = overview["tables"]
+            let products = overview["tables"]
                 .as_array()
                 .unwrap()
                 .iter()
-                .find(|t| t["name"] == "produtos")
+                .find(|t| t["name"] == "products")
                 .unwrap()
                 .clone();
-            assert_eq!(produtos["rls"]["state"], "warn");
+            assert_eq!(products["rls"]["state"], "warn");
             break;
         }
-        assert!(std::time::Instant::now() < deadline, "alerta não sumiu");
+        assert!(
+            std::time::Instant::now() < deadline,
+            "warning did not go away"
+        );
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
     }
 }
 
 #[tokio::test]
-async fn editor_sql_isolado_e_com_erros_legiveis() {
+async fn sql_editor_is_isolated_and_has_readable_errors() {
     let app = TestApp::spawn().await;
     let cookie = login(&app).await;
 
     let out = sql(
         &app,
         &cookie,
-        "select 1 as um, null as nada; select 'b' as dois",
+        "select 1 as one, null as nothing; select 'b' as two",
     )
     .await;
     let results = out["results"].as_array().unwrap();
     assert_eq!(results.len(), 2);
-    assert_eq!(results[0]["columns"], json!(["um", "nada"]));
+    assert_eq!(results[0]["columns"], json!(["one", "nothing"]));
     assert_eq!(results[0]["rows"], json!([["1", null]]));
     assert_eq!(results[1]["rows"], json!([["b"]]));
 
-    let out = sql(&app, &cookie, "select * from tabela_que_nao_existe").await;
+    let out = sql(&app, &cookie, "select * from table_that_does_not_exist").await;
     assert_eq!(out["error"]["code"], "42P01");
     assert!(out["error"]["position"].is_number());
 
-    // Transação aberta e SET ROLE não vazam para a próxima execução.
+    // An open transaction and SET ROLE do not leak into the next run.
     sql(&app, &cookie, "BEGIN; SET ROLE anon;").await;
     let out = sql(&app, &cookie, "select current_user::text").await;
     assert_eq!(out["results"][0]["rows"], json!([["postgres"]]));
 
-    // CSRF: origem diferente é recusada.
+    // CSRF: a different origin is refused.
     for extra in [
         [
-            ("origin", "https://site-malicioso.com"),
+            ("origin", "https://malicious.example"),
             ("host", "localhost"),
         ],
         [("sec-fetch-site", "cross-site"), ("host", "localhost")],
@@ -268,13 +275,13 @@ async fn editor_sql_isolado_e_com_erros_legiveis() {
     let out = sql(&app, &cookie, "select count(*) from public.todos").await;
     assert_eq!(out["results"][0]["rows"], json!([["2"]]));
 
-    // Schema para o autocomplete do editor.
+    // Schema for the editor's autocomplete.
     let schema = get(&app, "/admin/api/schema", &cookie).await.body;
     assert!(
-        schema["tables"]["produtos"]
+        schema["tables"]["products"]
             .as_array()
             .unwrap()
-            .contains(&json!("preco"))
+            .contains(&json!("price"))
     );
     assert!(
         schema["tables"]["auth.users"]
@@ -285,117 +292,129 @@ async fn editor_sql_isolado_e_com_erros_legiveis() {
 }
 
 #[tokio::test]
-async fn editar_tabelas_pelo_painel_com_valores_exatos() {
+async fn edit_tables_from_the_panel_with_exact_values() {
     let app = TestApp::spawn().await;
     let cookie = login(&app).await;
 
-    let data = get(&app, "/admin/api/tables/produtos", &cookie).await.body;
+    let data = get(&app, "/admin/api/tables/products", &cookie).await.body;
     assert_eq!(data["table"]["primary_key"], json!(["id"]));
     assert_eq!(data["table"]["editable"], true);
-    let preco = data["table"]["columns"]
+    let price = data["table"]["columns"]
         .as_array()
         .unwrap()
         .iter()
-        .find(|c| c["name"] == "preco")
+        .find(|c| c["name"] == "price")
         .unwrap()
         .clone();
-    assert_eq!(preco["full_type"], "numeric(10,2)");
+    assert_eq!(price["full_type"], "numeric(10,2)");
     assert!(
         data["rows"]
             .as_array()
             .unwrap()
             .iter()
-            .any(|r| r["nome"] == "Caderno")
+            .any(|r| r["name"] == "Notebook")
     );
-    // numeric chega como texto exato (sem passar por f64).
+    // numeric arrives as exact text (never through f64).
     assert!(
         data["rows"]
             .as_array()
             .unwrap()
             .iter()
-            .any(|r| r["preco"] == "15.00")
+            .any(|r| r["price"] == "15.00")
     );
     assert_eq!(data["total"], 4);
 
-    // Ordenação por coluna (validada contra o catálogo).
+    // Sort by column (validated against the catalog).
     let sorted = get(
         &app,
-        "/admin/api/tables/produtos?sort=preco&desc=true",
+        "/admin/api/tables/products?sort=price&desc=true",
         &cookie,
     )
     .await
     .body;
-    assert_eq!(sorted["rows"][0]["nome"], "Mochila");
-    let bad = get(&app, "/admin/api/tables/produtos?sort=preco;drop", &cookie).await;
+    assert_eq!(sorted["rows"][0]["name"], "Backpack");
+    let bad = get(&app, "/admin/api/tables/products?sort=price;drop", &cookie).await;
     assert_eq!(bad.status, StatusCode::BAD_REQUEST);
 
-    // Inserção: texto com cara de HTML é guardado como texto (o escape é do
-    // Svelte, que nunca usa {@html}); campo omitido usa o DEFAULT.
+    // Insert: HTML-looking text is stored as text (escaping is Svelte's job,
+    // which never uses {@html}); an omitted field uses the DEFAULT.
     let xss = "<script>alert(1)</script>";
     let reply = send(
         &app,
         Method::POST,
-        "/admin/api/tables/produtos/rows",
+        "/admin/api/tables/products/rows",
         &cookie,
-        json!({ "values": { "nome": xss, "preco": "9.90" } }),
+        json!({ "values": { "name": xss, "price": "9.90" } }),
     )
     .await;
     assert_eq!(reply.status, StatusCode::OK, "{}", reply.text);
     let row = app
         .admin_client
         .query_one(
-            "SELECT id, estoque, preco::text FROM public.produtos WHERE nome = $1",
+            "SELECT id, stock, price::text FROM public.products WHERE name = $1",
             &[&xss],
         )
         .await
         .unwrap();
     let id: i32 = row.get(0);
-    assert_eq!(row.get::<_, i32>(1), 0, "campo omitido usa o DEFAULT");
+    assert_eq!(row.get::<_, i32>(1), 0, "an omitted field uses the DEFAULT");
     assert_eq!(row.get::<_, String>(2), "9.90");
 
     let reply = send(
         &app,
         Method::PATCH,
-        "/admin/api/tables/produtos/rows",
+        "/admin/api/tables/products/rows",
         &cookie,
-        json!({ "pk": { "id": id.to_string() }, "values": { "nome": "Estojo", "estoque": "5" } }),
+        json!({ "pk": { "id": id.to_string() }, "values": { "name": "Pencil case", "stock": "5" } }),
     )
     .await;
     assert_eq!(reply.body["count"], 1, "{}", reply.text);
 
-    // Erro do banco volta como 400 com a mensagem.
+    // A database error comes back as a 400 with its message (and no code:
+    // the panel shows Postgres' text as-is).
     let reply = send(
         &app,
         Method::PATCH,
-        "/admin/api/tables/produtos/rows",
+        "/admin/api/tables/products/rows",
         &cookie,
-        json!({ "pk": { "id": id.to_string() }, "values": { "preco": "-1" } }),
+        json!({ "pk": { "id": id.to_string() }, "values": { "price": "-1" } }),
     )
     .await;
     assert_eq!(reply.status, StatusCode::BAD_REQUEST);
     assert!(reply.body["error"].as_str().unwrap().contains("check"));
+    assert!(reply.body.get("code").is_none(), "{}", reply.text);
 
-    // Coluna desconhecida ou gerada é recusada.
+    // An unknown or generated column is refused.
     for values in [
-        json!({ "\"; drop table produtos; --": "1" }),
+        json!({ "\"; drop table products; --": "1" }),
         json!({ "slug": "x" }),
     ] {
         let reply = send(
             &app,
             Method::POST,
-            "/admin/api/tables/produtos/rows",
+            "/admin/api/tables/products/rows",
             &cookie,
             json!({ "values": values }),
         )
         .await;
         assert_eq!(reply.status, StatusCode::BAD_REQUEST);
     }
+    let reply = send(
+        &app,
+        Method::POST,
+        "/admin/api/tables/products/rows",
+        &cookie,
+        json!({ "values": { "slug": "x" } }),
+    )
+    .await;
+    assert_eq!(reply.body["code"], "unknown_or_generated_column");
+    assert_eq!(reply.body["params"], json!({ "column": "slug" }));
 
-    // Apagar várias linhas numa transação.
+    // Delete several rows in one transaction.
     let reply = send(
         &app,
         Method::DELETE,
-        "/admin/api/tables/produtos/rows",
+        "/admin/api/tables/products/rows",
         &cookie,
         json!({ "pks": [{ "id": id.to_string() }, { "id": "3" }] }),
     )
@@ -403,34 +422,39 @@ async fn editar_tabelas_pelo_painel_com_valores_exatos() {
     assert_eq!(reply.body["count"], 2, "{}", reply.text);
     let count: i64 = app
         .admin_client
-        .query_one("SELECT count(*) FROM public.produtos", &[])
+        .query_one("SELECT count(*) FROM public.products", &[])
         .await
         .unwrap()
         .get(0);
     assert_eq!(count, 3);
 
-    let reply = get(&app, "/admin/api/tables/nao_existe", &cookie).await;
+    let reply = get(&app, "/admin/api/tables/missing", &cookie).await;
     assert_eq!(reply.status, StatusCode::NOT_FOUND);
+    assert_eq!(reply.body["code"], "table_not_found");
+    assert_eq!(reply.body["params"], json!({ "table": "missing" }));
 }
 
 #[tokio::test]
-async fn usuarios_e_sessoes() {
+async fn users_and_sessions() {
     let app = TestApp::spawn().await;
     let session = app
         .post(
             "/auth/v1/signup",
             None,
-            json!({ "email": "painel@exemplo.com", "password": "senha-forte-123" }),
+            json!({ "email": "panel@example.com", "password": "strong-password-123" }),
         )
         .await
         .body;
     let user_id = session["user"]["id"].as_str().unwrap().to_owned();
     let cookie = login(&app).await;
 
-    let users = get(&app, "/admin/api/users?q=painel", &cookie).await;
-    assert_eq!(users.body["users"][0]["email"], "painel@exemplo.com");
+    let users = get(&app, "/admin/api/users?q=panel", &cookie).await;
+    assert_eq!(users.body["users"][0]["email"], "panel@example.com");
     assert_eq!(users.body["users"][0]["sessions"], 1);
-    assert!(!users.text.contains("argon2id"), "hash nunca sai do banco");
+    assert!(
+        !users.text.contains("argon2id"),
+        "the hash never leaves the database"
+    );
 
     let reply = send(
         &app,
@@ -460,12 +484,12 @@ async fn usuarios_e_sessoes() {
     .await;
     assert_eq!(reply.status, StatusCode::OK);
     let users = get(&app, "/admin/api/users", &cookie).await;
-    assert!(!users.text.contains("painel@exemplo.com"));
+    assert!(!users.text.contains("panel@example.com"));
 
     let reply = send(
         &app,
         Method::DELETE,
-        "/admin/api/users/nao-e-uuid",
+        "/admin/api/users/not-a-uuid",
         &cookie,
         json!(null),
     )
@@ -474,7 +498,7 @@ async fn usuarios_e_sessoes() {
 }
 
 #[tokio::test]
-async fn spa_embutida_com_cabecalhos_de_seguranca() {
+async fn embedded_spa_with_security_headers() {
     let app = TestApp::spawn().await;
 
     let index = app.raw(Method::GET, "/admin/", &[], String::new()).await;
@@ -486,30 +510,30 @@ async fn spa_embutida_com_cabecalhos_de_seguranca() {
     assert!(csp.contains("script-src 'self';"), "{csp}");
     assert!(
         !csp.contains("script-src 'self' 'unsafe"),
-        "scripts nunca inline"
+        "scripts never inline"
     );
     assert_eq!(index.headers[header::X_FRAME_OPTIONS], "DENY");
-    // Regressão: com `no-referrer` o navegador manda `Origin: null` nos POSTs.
+    // Regression: with `no-referrer` the browser sends `Origin: null` on POSTs.
     assert_eq!(index.headers[header::REFERRER_POLICY], "same-origin");
     assert!(
         !index.text.contains("<script>"),
-        "sem script inline no index.html"
+        "no inline script in index.html"
     );
 
-    // Rotas do cliente devolvem o mesmo index.html.
+    // Client routes return the same index.html.
     let deep = app
-        .raw(Method::GET, "/admin/tables/qualquer", &[], String::new())
+        .raw(Method::GET, "/admin/tables/anything", &[], String::new())
         .await;
     assert_eq!(deep.status, StatusCode::OK);
     assert_eq!(deep.text, index.text);
 
-    // O bundle referenciado existe, com cache imutável.
+    // The referenced bundle exists, with an immutable cache.
     let script = index
         .text
         .split("src=\"")
         .nth(1)
         .and_then(|s| s.split('"').next())
-        .expect("index.html referencia o bundle");
+        .expect("index.html references the bundle");
     assert!(script.starts_with("/admin/assets/index-"), "{script}");
     let js = app.raw(Method::GET, script, &[], String::new()).await;
     assert_eq!(js.status, StatusCode::OK);
@@ -536,13 +560,14 @@ async fn spa_embutida_com_cabecalhos_de_seguranca() {
         .await;
     assert_ne!(reply.status, StatusCode::OK);
     let reply = app
-        .raw(Method::GET, "/admin/api/nao-existe", &[], String::new())
+        .raw(Method::GET, "/admin/api/missing", &[], String::new())
         .await;
     assert_eq!(reply.status, StatusCode::NOT_FOUND);
+    assert_eq!(reply.body["code"], "route_not_found");
 }
 
-/// Token de handoff assinado com o segredo compartilhado (como outro painel do
-/// host faria).
+/// Handoff token signed with the shared secret (as another panel on the host
+/// would do).
 fn handoff_token(audience: &str, email: &str, exp_offset: i64, secret: &str) -> String {
     let now = jsonwebtoken::get_current_timestamp() as i64;
     jsonwebtoken::encode(
@@ -571,17 +596,17 @@ async fn redeem(app: &TestApp, token: &str) -> Reply {
 }
 
 #[tokio::test]
-async fn login_unico_entre_projetos_do_host() {
+async fn single_sign_on_between_host_projects() {
     let app = TestApp::spawn().await;
 
-    // A tela de login sabe em qual projeto está.
+    // The login screen knows which project it is on.
     let whoami = app
         .raw(Method::GET, "/admin/api/whoami", &[], String::new())
         .await;
-    assert_eq!(whoami.body, json!({ "project": "loja", "sso": true }));
+    assert_eq!(whoami.body, json!({ "project": "shop", "sso": true }));
 
-    // Token emitido por outro painel do host para "loja": vira sessão.
-    let token = handoff_token("loja", ADMIN_EMAIL, 60, SSO_SECRET);
+    // Token issued by another panel on the host for "shop": becomes a session.
+    let token = handoff_token("shop", ADMIN_EMAIL, 60, SSO_SECRET);
     let reply = redeem(&app, &token).await;
     assert_eq!(reply.status, StatusCode::OK, "{}", reply.text);
     let cookie = reply.headers[header::SET_COOKIE]
@@ -593,28 +618,28 @@ async fn login_unico_entre_projetos_do_host() {
         .to_owned();
     assert_eq!(
         get(&app, "/admin/api/session", &cookie).await.body["project"],
-        "loja"
+        "shop"
     );
 
-    // Uso único.
+    // Single use.
     assert_eq!(redeem(&app, &token).await.status, StatusCode::UNAUTHORIZED);
 
-    // Destino errado, admin errado, vencido ou segredo errado: recusados.
+    // Wrong target, wrong admin, expired or wrong secret: refused.
     for bad in [
         handoff_token("blog", ADMIN_EMAIL, 60, SSO_SECRET),
-        handoff_token("loja", "intruso@exemplo.com", 60, SSO_SECRET),
-        handoff_token("loja", ADMIN_EMAIL, -120, SSO_SECRET),
+        handoff_token("shop", "intruder@example.com", 60, SSO_SECRET),
+        handoff_token("shop", ADMIN_EMAIL, -120, SSO_SECRET),
         handoff_token(
-            "loja",
+            "shop",
             ADMIN_EMAIL,
             60,
-            "outro-segredo-qualquer-de-32-bytes!!",
+            "some-other-secret-with-32-bytes!!!!",
         ),
     ] {
         assert_eq!(redeem(&app, &bad).await.status, StatusCode::UNAUTHORIZED);
     }
 
-    // Handoff para outro projeto exige sessão e projeto existente.
+    // A handoff to another project needs a session and an existing project.
     let reply = app
         .raw(
             Method::POST,
@@ -629,7 +654,7 @@ async fn login_unico_entre_projetos_do_host() {
         Method::POST,
         "/admin/api/sso/handoff",
         &cookie,
-        json!({ "project": "nada" }),
+        json!({ "project": "nothing" }),
     )
     .await;
     assert_eq!(reply.status, StatusCode::NOT_FOUND);
@@ -644,8 +669,8 @@ async fn login_unico_entre_projetos_do_host() {
     .await;
     let url = reply.body["url"].as_str().unwrap().to_owned();
     let (base, token) = url.split_once("/admin/#sso=").unwrap();
-    assert_eq!(base, "https://blog.exemplo.com");
-    // O token é para "blog": não serve para entrar na própria "loja".
+    assert_eq!(base, "https://blog.example.com");
+    // The token is for "blog": it cannot be used to enter "shop" itself.
     assert_eq!(redeem(&app, token).await.status, StatusCode::UNAUTHORIZED);
     let mut validation = jsonwebtoken::Validation::default();
     validation.set_audience(&["blog"]);
@@ -658,16 +683,16 @@ async fn login_unico_entre_projetos_do_host() {
     .claims;
     assert_eq!(claims["sub"], ADMIN_EMAIL);
     let ttl = claims["exp"].as_u64().unwrap() - claims["iat"].as_u64().unwrap();
-    assert!(ttl <= 60, "token curto");
+    assert!(ttl <= 60, "short-lived token");
 }
 
 #[tokio::test]
-async fn lista_e_estado_dos_projetos_do_host() {
+async fn host_project_list_and_status() {
     let app = TestApp::spawn().await;
     let cookie = login(&app).await;
 
     let list = get(&app, "/admin/api/projects", &cookie).await.body;
-    assert_eq!(list["current"], "loja");
+    assert_eq!(list["current"], "shop");
     assert_eq!(list["sso"], true);
     let names: Vec<&str> = list["projects"]
         .as_array()
@@ -675,14 +700,14 @@ async fn lista_e_estado_dos_projetos_do_host() {
         .iter()
         .map(|p| p["name"].as_str().unwrap())
         .collect();
-    assert_eq!(names, ["loja", "blog"]);
+    assert_eq!(names, ["shop", "blog"]);
     assert_eq!(list["projects"][0]["current"], true);
     assert!(
         !list.to_string().contains("secret"),
-        "a lista nunca carrega segredos"
+        "the list never carries secrets"
     );
 
-    // Fora de um host Docker, os apps não respondem: o estado vem como fora do ar.
+    // Outside a Docker host the apps do not answer: the status comes back as down.
     let status = get(&app, "/admin/api/projects/status", &cookie).await.body;
     assert_eq!(status["projects"].as_array().unwrap().len(), 2);
     assert_eq!(status["projects"][1]["healthy"], false);
@@ -693,7 +718,7 @@ async fn lista_e_estado_dos_projetos_do_host() {
     assert_eq!(reply.status, StatusCode::UNAUTHORIZED);
 }
 
-/// Percent-encoding para pôr JSON na query string.
+/// Percent-encoding to put JSON in the query string.
 fn enc(value: &str) -> String {
     value
         .bytes()
@@ -711,89 +736,90 @@ fn names(data: &Value) -> Vec<String> {
         .as_array()
         .unwrap()
         .iter()
-        .map(|r| r["nome"].as_str().unwrap().to_owned())
+        .map(|r| r["name"].as_str().unwrap().to_owned())
         .collect()
 }
 
 #[tokio::test]
-async fn filtros_na_grade_validados_pelo_catalogo() {
+async fn grid_filters_validated_by_the_catalog() {
     let app = TestApp::spawn().await;
     let cookie = login(&app).await;
     let table = |filters: Value| {
         format!(
-            "/admin/api/tables/produtos?sort=id&filters={}",
+            "/admin/api/tables/products?sort=id&filters={}",
             enc(&filters.to_string())
         )
     };
 
-    let caros = get(
+    let expensive = get(
         &app,
-        &table(json!([{ "column": "preco", "op": "gte", "value": "10" }])),
+        &table(json!([{ "column": "price", "op": "gte", "value": "10" }])),
         &cookie,
     )
     .await;
-    assert_eq!(caros.status, StatusCode::OK, "{}", caros.text);
-    assert_eq!(names(&caros.body), ["Caderno", "Mochila"]);
-    // O total acompanha o filtro (e é exato).
-    assert_eq!(caros.body["total"], 2);
-    assert_eq!(caros.body["total_exact"], true);
+    assert_eq!(expensive.status, StatusCode::OK, "{}", expensive.text);
+    assert_eq!(names(&expensive.body), ["Notebook", "Backpack"]);
+    // The total follows the filter (and is exact).
+    assert_eq!(expensive.body["total"], 2);
+    assert_eq!(expensive.body["total_exact"], true);
 
-    let contem = get(
+    let contains = get(
         &app,
-        &table(json!([{ "column": "nome", "op": "ilike", "value": "*CA*" }])),
+        &table(json!([{ "column": "name", "op": "ilike", "value": "*N*" }])),
         &cookie,
     )
     .await
     .body;
-    assert_eq!(names(&contem), ["Caneta", "Caderno"]);
+    assert_eq!(names(&contains), ["Pen", "Notebook"]);
 
-    let negado = get(
+    let negated = get(
         &app,
         &table(json!([
-            { "column": "estoque", "op": "eq", "value": "0", "not": true },
-            { "column": "preco", "op": "lt", "value": "10" },
+            { "column": "stock", "op": "eq", "value": "0", "not": true },
+            { "column": "price", "op": "lt", "value": "10" },
         ])),
         &cookie,
     )
     .await
     .body;
-    assert_eq!(names(&negado), ["Caneta", "Régua, 30cm"]);
+    assert_eq!(names(&negated), ["Pen", "Ruler, 30cm"]);
 
-    // Valor do tipo errado: 400 com a mensagem do Postgres, não 500.
-    let tipo = get(
+    // A value of the wrong type: 400 with Postgres' message, not a 500.
+    let wrong_type = get(
         &app,
-        &table(json!([{ "column": "preco", "op": "eq", "value": "abc" }])),
+        &table(json!([{ "column": "price", "op": "eq", "value": "abc" }])),
         &cookie,
     )
     .await;
-    assert_eq!(tipo.status, StatusCode::BAD_REQUEST, "{}", tipo.text);
-    assert!(tipo.text.contains("numeric"), "{}", tipo.text);
+    assert_eq!(
+        wrong_type.status,
+        StatusCode::BAD_REQUEST,
+        "{}",
+        wrong_type.text
+    );
+    assert!(wrong_type.text.contains("numeric"), "{}", wrong_type.text);
 
-    // Coluna fora do catálogo e operador fora da lista: recusados antes do banco.
+    // A column outside the catalog and an operator outside the list: refused before the database.
     for filters in [
-        json!([{ "column": "nao_existe", "op": "eq", "value": "1" }]),
+        json!([{ "column": "missing", "op": "eq", "value": "1" }]),
         json!([{ "column": "id", "op": "in", "value": "(1,2)" }]),
     ] {
         let reply = get(&app, &table(filters), &cookie).await;
         assert_eq!(reply.status, StatusCode::BAD_REQUEST, "{}", reply.text);
     }
-    let lixo = get(
-        &app,
-        "/admin/api/tables/produtos?filters=nao-e-json",
-        &cookie,
-    )
-    .await;
-    assert_eq!(lixo.status, StatusCode::BAD_REQUEST);
+    let garbage = get(&app, "/admin/api/tables/products?filters=not-json", &cookie).await;
+    assert_eq!(garbage.status, StatusCode::BAD_REQUEST);
+    assert_eq!(garbage.body["code"], "invalid_filters");
 }
 
 #[tokio::test]
-async fn exportar_tabela_em_csv_e_json() {
+async fn export_a_table_as_csv_and_json() {
     let app = TestApp::spawn().await;
     let cookie = login(&app).await;
 
     let csv = get(
         &app,
-        "/admin/api/tables/produtos/export?format=csv&sort=id",
+        "/admin/api/tables/products/export?format=csv&sort=id",
         &cookie,
     )
     .await;
@@ -801,79 +827,79 @@ async fn exportar_tabela_em_csv_e_json() {
     assert_eq!(csv.headers[header::CONTENT_TYPE], "text/csv; charset=utf-8");
     assert_eq!(
         csv.headers[header::CONTENT_DISPOSITION],
-        "attachment; filename=\"produtos.csv\""
+        "attachment; filename=\"products.csv\""
     );
     let lines: Vec<&str> = csv.text.split("\r\n").collect();
-    assert_eq!(lines[0], "\u{feff}id,nome,preco,estoque,criado_em,slug");
-    assert!(lines[1].starts_with("1,Caneta,2.50,100,"), "{}", lines[1]);
-    // Vírgula dentro do valor: campo entre aspas.
+    assert_eq!(lines[0], "\u{feff}id,name,price,stock,created_at,slug");
+    assert!(lines[1].starts_with("1,Pen,2.50,100,"), "{}", lines[1]);
+    // A comma inside the value: quoted field.
     assert!(
-        lines[4].starts_with("4,\"Régua, 30cm\",4.00,"),
+        lines[4].starts_with("4,\"Ruler, 30cm\",4.00,"),
         "{}",
         lines[4]
     );
-    assert_eq!(lines.len(), 6, "cabeçalho + 4 linhas + final vazio");
+    assert_eq!(lines.len(), 6, "header + 4 rows + empty end");
 
-    // A exportação segue os filtros da grade.
-    let filters = enc(&json!([{ "column": "estoque", "op": "eq", "value": "0" }]).to_string());
-    let filtrado = get(
+    // Export follows the grid's filters.
+    let filters = enc(&json!([{ "column": "stock", "op": "eq", "value": "0" }]).to_string());
+    let filtered = get(
         &app,
-        &format!("/admin/api/tables/produtos/export?format=json&filters={filters}"),
+        &format!("/admin/api/tables/products/export?format=json&filters={filters}"),
         &cookie,
     )
     .await;
-    assert_eq!(filtrado.headers[header::CONTENT_TYPE], "application/json");
-    let rows: Value = serde_json::from_str(&filtrado.text).unwrap();
+    assert_eq!(filtered.headers[header::CONTENT_TYPE], "application/json");
+    let rows: Value = serde_json::from_str(&filtered.text).unwrap();
     assert_eq!(rows.as_array().unwrap().len(), 1);
-    assert_eq!(rows[0]["nome"], "Mochila");
-    // numeric sai com o texto do Postgres.
-    assert!(filtrado.text.contains("120.00"), "{}", filtrado.text);
+    assert_eq!(rows[0]["name"], "Backpack");
+    // numeric goes out with Postgres' text.
+    assert!(filtered.text.contains("120.00"), "{}", filtered.text);
 
-    let erro = get(
+    let error = get(
         &app,
         &format!(
-            "/admin/api/tables/produtos/export?format=csv&filters={}",
+            "/admin/api/tables/products/export?format=csv&filters={}",
             enc(&json!([{ "column": "id", "op": "eq", "value": "x" }]).to_string())
         ),
         &cookie,
     )
     .await;
-    assert_eq!(erro.status, StatusCode::BAD_REQUEST, "{}", erro.text);
-    let formato = get(
+    assert_eq!(error.status, StatusCode::BAD_REQUEST, "{}", error.text);
+    let format = get(
         &app,
-        "/admin/api/tables/produtos/export?format=xls",
+        "/admin/api/tables/products/export?format=xls",
         &cookie,
     )
     .await;
-    assert_eq!(formato.status, StatusCode::BAD_REQUEST);
+    assert_eq!(format.status, StatusCode::BAD_REQUEST);
 }
 
 #[tokio::test]
-async fn colunas_indicam_a_chave_estrangeira() {
+async fn columns_point_to_their_foreign_key() {
     let app = TestApp::spawn().await;
     let cookie = login(&app).await;
     app.admin_client
         .batch_execute(
-            "CREATE TABLE public.avaliacoes (
+            "CREATE TABLE public.reviews (
                  id int PRIMARY KEY,
-                 produto_id int REFERENCES public.produtos (id),
-                 nota int
+                 product_id int REFERENCES public.products (id),
+                 rating int
              );
-             GRANT SELECT ON public.avaliacoes TO service_role;",
+             GRANT SELECT ON public.reviews TO service_role;",
         )
         .await
         .unwrap();
 
-    // O catálogo recarrega sozinho depois do DDL.
+    // The catalog reloads by itself after the DDL.
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
     let data = loop {
-        let reply = get(&app, "/admin/api/tables/avaliacoes", &cookie).await;
+        let reply = get(&app, "/admin/api/tables/reviews", &cookie).await;
         if reply.status == StatusCode::OK {
             break reply.body;
         }
         assert!(
             std::time::Instant::now() < deadline,
-            "tabela nova não apareceu"
+            "the new table did not show up"
         );
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
     };
@@ -887,23 +913,23 @@ async fn colunas_indicam_a_chave_estrangeira() {
             .clone()
     };
     assert_eq!(
-        column("produto_id")["references"],
-        json!({ "table": "produtos", "column": "id" })
+        column("product_id")["references"],
+        json!({ "table": "products", "column": "id" })
     );
-    assert_eq!(column("nota")["references"], Value::Null);
+    assert_eq!(column("rating")["references"], Value::Null);
 }
 
 #[tokio::test]
-async fn estrutura_da_tabela_lida_do_catalogo_do_postgres() {
+async fn table_structure_read_from_the_postgres_catalog() {
     let app = TestApp::spawn().await;
     let cookie = login(&app).await;
 
-    let reply = get(&app, "/admin/api/tables/produtos/structure", &cookie).await;
+    let reply = get(&app, "/admin/api/tables/products/structure", &cookie).await;
     assert_eq!(reply.status, StatusCode::OK, "{}", reply.text);
     let data = reply.body;
     assert_eq!(data["primary_key"], json!(["id"]));
     assert_eq!(data["rls_enabled"], false);
-    assert_eq!(data["comment"], "Catálogo de produtos");
+    assert_eq!(data["comment"], "Product catalog");
     let column = |name: &str| {
         data["columns"]
             .as_array()
@@ -915,10 +941,10 @@ async fn estrutura_da_tabela_lida_do_catalogo_do_postgres() {
     };
     assert_eq!(column("id")["identity"], "by default");
     assert_eq!(column("id")["primary_key"], true);
-    assert_eq!(column("nome")["data_type"], "character varying(80)");
-    assert_eq!(column("nome")["nullable"], false);
-    assert_eq!(column("estoque")["default"], "0");
-    assert_eq!(column("criado_em")["default"], "now()");
+    assert_eq!(column("name")["data_type"], "character varying(80)");
+    assert_eq!(column("name")["nullable"], false);
+    assert_eq!(column("stock")["default"], "0");
+    assert_eq!(column("created_at")["default"], "now()");
     assert_eq!(column("slug")["generated"], true);
     assert_eq!(
         data["grants"],
@@ -931,34 +957,34 @@ async fn estrutura_da_tabela_lida_do_catalogo_do_postgres() {
 
     app.admin_client
         .batch_execute(
-            "CREATE TABLE public.itens (
+            "CREATE TABLE public.items (
                  id int PRIMARY KEY,
-                 produto_id int REFERENCES public.produtos (id) ON DELETE CASCADE,
-                 codigo text CONSTRAINT itens_codigo_key UNIQUE
+                 product_id int REFERENCES public.products (id) ON DELETE CASCADE,
+                 code text CONSTRAINT items_code_key UNIQUE
              );",
         )
         .await
         .unwrap();
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
-    let itens = loop {
-        let reply = get(&app, "/admin/api/tables/itens/structure", &cookie).await;
+    let items = loop {
+        let reply = get(&app, "/admin/api/tables/items/structure", &cookie).await;
         if reply.status == StatusCode::OK {
             break reply.body;
         }
         assert!(
             std::time::Instant::now() < deadline,
-            "tabela nova não apareceu"
+            "the new table did not show up"
         );
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
     };
-    let columns = itens["columns"].as_array().unwrap();
+    let columns = items["columns"].as_array().unwrap();
     assert_eq!(
         columns[1]["references"],
-        json!({ "table": "produtos", "column": "id", "on_delete": "cascade", "constraint": "itens_produto_id_fkey" })
+        json!({ "table": "products", "column": "id", "on_delete": "cascade", "constraint": "items_product_id_fkey" })
     );
-    assert_eq!(columns[2]["unique"], "itens_codigo_key");
+    assert_eq!(columns[2]["unique"], "items_code_key");
 
-    let missing = get(&app, "/admin/api/tables/nao_existe/structure", &cookie).await;
+    let missing = get(&app, "/admin/api/tables/missing/structure", &cookie).await;
     assert_eq!(missing.status, StatusCode::NOT_FOUND);
 }
 
@@ -972,29 +998,29 @@ fn columns_of(structure: &Value) -> Vec<String> {
 }
 
 #[tokio::test]
-async fn criar_alterar_e_apagar_tabelas_pelo_painel() {
+async fn create_alter_and_drop_tables_from_the_panel() {
     let app = TestApp::spawn().await;
     let cookie = login(&app).await;
-    let notas = json!({
-        "name": "notas",
-        "comment": "Notas da equipe",
+    let notes = json!({
+        "name": "notes",
+        "comment": "The team's notes",
         "columns": [
             { "name": "id", "data_type": "bigint", "primary_key": true, "identity": true },
-            { "name": "texto", "data_type": "text", "nullable": false },
-            { "name": "produto_id", "data_type": "integer",
-              "references": { "table": "produtos", "column": "id", "on_delete": "cascade" } },
-            { "name": "criada_em", "data_type": "timestamptz", "nullable": false, "default": "now()" },
+            { "name": "body", "data_type": "text", "nullable": false },
+            { "name": "product_id", "data_type": "integer",
+              "references": { "table": "products", "column": "id", "on_delete": "cascade" } },
+            { "name": "created_at", "data_type": "timestamptz", "nullable": false, "default": "now()" },
         ],
         "grants": [{ "role": "anon", "privileges": ["select"] }],
     });
 
-    // Prévia: devolve o SQL e não cria nada.
+    // Preview: returns the SQL and creates nothing.
     let preview = send(
         &app,
         Method::POST,
         "/admin/api/tables",
         &cookie,
-        json!({ "table": notas, "preview": true }),
+        json!({ "table": notes, "preview": true }),
     )
     .await;
     assert_eq!(preview.status, StatusCode::OK, "{}", preview.text);
@@ -1002,10 +1028,10 @@ async fn criar_alterar_e_apagar_tabelas_pelo_painel() {
         preview.body["sql"][0]
             .as_str()
             .unwrap()
-            .starts_with("CREATE TABLE \"public\".\"notas\"")
+            .starts_with("CREATE TABLE \"public\".\"notes\"")
     );
     assert_eq!(
-        get(&app, "/admin/api/tables/notas", &cookie).await.status,
+        get(&app, "/admin/api/tables/notes", &cookie).await.status,
         StatusCode::NOT_FOUND
     );
 
@@ -1014,12 +1040,12 @@ async fn criar_alterar_e_apagar_tabelas_pelo_painel() {
         Method::POST,
         "/admin/api/tables",
         &cookie,
-        json!({ "table": notas }),
+        json!({ "table": notes }),
     )
     .await;
     assert_eq!(created.status, StatusCode::OK, "{}", created.text);
-    // O catálogo já recarregou: a tabela está no painel e na API REST, sem espera.
-    let structure = get(&app, "/admin/api/tables/notas/structure", &cookie)
+    // The catalog already reloaded: the table is in the panel and the REST API, no waiting.
+    let structure = get(&app, "/admin/api/tables/notes/structure", &cookie)
         .await
         .body;
     assert_eq!(structure["rls_enabled"], true);
@@ -1028,66 +1054,66 @@ async fn criar_alterar_e_apagar_tabelas_pelo_painel() {
         json!({ "role": "anon", "privileges": ["select"] })
     );
     let rest = app
-        .raw(Method::GET, "/rest/v1/notas", &[], String::new())
+        .raw(Method::GET, "/rest/v1/notes", &[], String::new())
         .await;
     assert_eq!(rest.status, StatusCode::OK, "{}", rest.text);
     assert_eq!(
         rest.body,
         json!([]),
-        "RLS ligado e sem policies: anon não vê nada"
+        "RLS on and no policies: anon sees nothing"
     );
 
-    // Várias alterações numa transação.
-    let altered = send(&app, Method::PATCH, "/admin/api/tables/notas", &cookie, json!({ "actions": [
-        { "action": "add_column", "column": { "name": "votos", "data_type": "integer", "default": "0", "nullable": false } },
-        { "action": "rename_column", "from": "texto", "to": "conteudo" },
-        { "action": "set_type", "column": "conteudo", "data_type": "varchar(500)" },
-        { "action": "set_unique", "column": "conteudo", "unique": true },
+    // Several changes in one transaction.
+    let altered = send(&app, Method::PATCH, "/admin/api/tables/notes", &cookie, json!({ "actions": [
+        { "action": "add_column", "column": { "name": "votes", "data_type": "integer", "default": "0", "nullable": false } },
+        { "action": "rename_column", "from": "body", "to": "content" },
+        { "action": "set_type", "column": "content", "data_type": "varchar(500)" },
+        { "action": "set_unique", "column": "content", "unique": true },
         { "action": "set_grants", "grant": { "role": "authenticated", "privileges": ["select", "insert"] } },
     ] })).await;
     assert_eq!(altered.status, StatusCode::OK, "{}", altered.text);
-    let structure = get(&app, "/admin/api/tables/notas/structure", &cookie)
+    let structure = get(&app, "/admin/api/tables/notes/structure", &cookie)
         .await
         .body;
     assert_eq!(
         columns_of(&structure),
-        ["id", "conteudo", "produto_id", "criada_em", "votos"]
+        ["id", "content", "product_id", "created_at", "votes"]
     );
-    let conteudo = &structure["columns"][1];
-    assert_eq!(conteudo["data_type"], "character varying(500)");
-    assert!(conteudo["unique"].is_string());
+    let content = &structure["columns"][1];
+    assert_eq!(content["data_type"], "character varying(500)");
+    assert!(content["unique"].is_string());
     assert_eq!(
         structure["grants"][1]["privileges"],
         json!(["select", "insert"])
     );
 
-    // Atomicidade: a segunda ação falha (cast impossível) e a primeira não fica.
+    // Atomicity: the second action fails (impossible cast) and the first one is not kept.
     let failed = send(
         &app,
         Method::PATCH,
-        "/admin/api/tables/notas",
+        "/admin/api/tables/notes",
         &cookie,
         json!({ "actions": [
-        { "action": "add_column", "column": { "name": "rascunho", "data_type": "boolean" } },
-        { "action": "set_type", "column": "criada_em", "data_type": "integer" },
+        { "action": "add_column", "column": { "name": "draft", "data_type": "boolean" } },
+        { "action": "set_type", "column": "created_at", "data_type": "integer" },
     ] }),
     )
     .await;
     assert_eq!(failed.status, StatusCode::BAD_REQUEST, "{}", failed.text);
-    let structure = get(&app, "/admin/api/tables/notas/structure", &cookie)
+    let structure = get(&app, "/admin/api/tables/notes/structure", &cookie)
         .await
         .body;
-    assert!(!columns_of(&structure).contains(&"rascunho".to_owned()));
+    assert!(!columns_of(&structure).contains(&"draft".to_owned()));
 
-    // Expressão com um segundo comando: o protocolo estendido recusa.
+    // An expression with a second statement: the extended protocol refuses it.
     let injection = send(
         &app,
         Method::PATCH,
-        "/admin/api/tables/notas",
+        "/admin/api/tables/notes",
         &cookie,
         json!({ "actions": [
         { "action": "add_column", "column": { "name": "x", "data_type": "text",
-          "default": "'a'); DROP TABLE public.produtos; --" } },
+          "default": "'a'); DROP TABLE public.products; --" } },
     ] }),
     )
     .await;
@@ -1098,13 +1124,13 @@ async fn criar_alterar_e_apagar_tabelas_pelo_painel() {
         injection.text
     );
     assert_eq!(
-        get(&app, "/admin/api/tables/produtos", &cookie)
+        get(&app, "/admin/api/tables/products", &cookie)
             .await
             .status,
         StatusCode::OK
     );
 
-    // Validação antes do banco.
+    // Validation before the database.
     let bad_type = send(
         &app,
         Method::POST,
@@ -1115,17 +1141,15 @@ async fn criar_alterar_e_apagar_tabelas_pelo_painel() {
     )
     .await;
     assert_eq!(bad_type.status, StatusCode::BAD_REQUEST);
-    assert!(
-        bad_type.text.contains("tipo desconhecido"),
-        "{}",
-        bad_type.text
-    );
+    assert!(bad_type.text.contains("unknown type"), "{}", bad_type.text);
+    assert_eq!(bad_type.body["code"], "unknown_type");
+    assert_eq!(bad_type.body["params"], json!({ "type": "money" }));
 
-    // produtos é referenciada por notas: sem CASCADE o Postgres recusa.
+    // products is referenced by notes: without CASCADE Postgres refuses.
     let blocked = app
         .raw(
             Method::DELETE,
-            "/admin/api/tables/produtos",
+            "/admin/api/tables/products",
             &[("cookie", cookie.as_str())],
             String::new(),
         )
@@ -1134,18 +1158,18 @@ async fn criar_alterar_e_apagar_tabelas_pelo_painel() {
     let dropped = app
         .raw(
             Method::DELETE,
-            "/admin/api/tables/notas",
+            "/admin/api/tables/notes",
             &[("cookie", cookie.as_str())],
             String::new(),
         )
         .await;
     assert_eq!(dropped.status, StatusCode::OK, "{}", dropped.text);
     assert_eq!(
-        get(&app, "/admin/api/tables/notas", &cookie).await.status,
+        get(&app, "/admin/api/tables/notes", &cookie).await.status,
         StatusCode::NOT_FOUND
     );
     assert_eq!(
-        app.raw(Method::GET, "/rest/v1/notas", &[], String::new())
+        app.raw(Method::GET, "/rest/v1/notes", &[], String::new())
             .await
             .status,
         StatusCode::NOT_FOUND
@@ -1158,39 +1182,48 @@ async fn criar_alterar_e_apagar_tabelas_pelo_painel() {
             .unwrap()
             .contains(&json!("timestamptz"))
     );
-    assert_eq!(types["enums"], json!(["prioridade"]));
+    assert_eq!(types["enums"], json!(["priority"]));
 }
 
 async fn anon_rows(app: &TestApp) -> usize {
     let reply = app
-        .raw(Method::GET, "/rest/v1/produtos", &[], String::new())
+        .raw(Method::GET, "/rest/v1/products", &[], String::new())
         .await;
     assert_eq!(reply.status, StatusCode::OK, "{}", reply.text);
     reply.body.as_array().unwrap().len()
 }
 
 #[tokio::test]
-async fn policies_criadas_editadas_e_apagadas_pelo_painel() {
+async fn policies_created_edited_and_dropped_from_the_panel() {
     let app = TestApp::spawn().await;
     let cookie = login(&app).await;
-    assert_eq!(anon_rows(&app).await, 4, "sem RLS, anon vê tudo");
+    assert_eq!(
+        anon_rows(&app).await,
+        4,
+        "without RLS, anon sees everything"
+    );
 
     let rls = send(
         &app,
         Method::PATCH,
-        "/admin/api/tables/produtos",
+        "/admin/api/tables/products",
         &cookie,
         json!({ "actions": [{ "action": "set_rls", "enabled": true }] }),
     )
     .await;
     assert_eq!(rls.status, StatusCode::OK, "{}", rls.text);
-    assert_eq!(anon_rows(&app).await, 0, "RLS sem policies: ninguém vê");
+    assert_eq!(
+        anon_rows(&app).await,
+        0,
+        "RLS without policies: nobody sees anything"
+    );
 
-    let policy = json!({ "name": "leitura pública", "command": "select", "roles": ["anon"], "using": "true" });
+    let policy =
+        json!({ "name": "public read", "command": "select", "roles": ["anon"], "using": "true" });
     let created = send(
         &app,
         Method::POST,
-        "/admin/api/tables/produtos/policies",
+        "/admin/api/tables/products/policies",
         &cookie,
         json!({ "policy": policy }),
     )
@@ -1198,35 +1231,36 @@ async fn policies_criadas_editadas_e_apagadas_pelo_painel() {
     assert_eq!(created.status, StatusCode::OK, "{}", created.text);
     assert_eq!(anon_rows(&app).await, 4);
 
-    // Editar: troca a expressão e o nome numa transação (DROP + CREATE).
-    let edited = send(&app, Method::PUT, "/admin/api/tables/produtos/policies/leitura%20p%C3%BAblica", &cookie,
-        json!({ "policy": { "name": "em estoque", "command": "select", "roles": ["anon"], "using": "estoque > 0" } })).await;
+    // Edit: changes the expression and the name in one transaction (DROP + CREATE).
+    let edited = send(&app, Method::PUT, "/admin/api/tables/products/policies/public%20read", &cookie,
+        json!({ "policy": { "name": "in stock", "command": "select", "roles": ["anon"], "using": "stock > 0" } })).await;
     assert_eq!(edited.status, StatusCode::OK, "{}", edited.text);
-    assert_eq!(anon_rows(&app).await, 3, "Mochila tem estoque 0");
+    assert_eq!(anon_rows(&app).await, 3, "Backpack has stock 0");
     let listed = get(&app, "/admin/api/policies", &cookie).await.body;
-    let produtos = listed["tables"]
+    let products = listed["tables"]
         .as_array()
         .unwrap()
         .iter()
-        .find(|t| t["name"] == "produtos")
+        .find(|t| t["name"] == "products")
         .unwrap()
         .clone();
-    assert_eq!(produtos["policies"][0]["name"], "em estoque");
-    assert_eq!(produtos["policies"][0]["using"], "(estoque > 0)");
+    assert_eq!(products["policies"][0]["name"], "in stock");
+    assert_eq!(products["policies"][0]["using"], "(stock > 0)");
 
-    // Regras de cada comando validadas antes do banco.
+    // Each command's rules are validated before the database.
     let invalid = send(
         &app,
         Method::POST,
-        "/admin/api/tables/produtos/policies",
+        "/admin/api/tables/products/policies",
         &cookie,
         json!({ "policy": { "name": "x", "command": "insert", "using": "true" } }),
     )
     .await;
     assert_eq!(invalid.status, StatusCode::BAD_REQUEST);
-    // Segundo comando escondido na expressão: recusado, e nada muda.
-    let injection = send(&app, Method::POST, "/admin/api/tables/produtos/policies", &cookie,
-        json!({ "policy": { "name": "y", "command": "select", "using": "true) ; DROP TABLE public.produtos; --" } })).await;
+    assert_eq!(invalid.body["code"], "policy_insert_no_using");
+    // A second statement hidden in the expression: refused, and nothing changes.
+    let injection = send(&app, Method::POST, "/admin/api/tables/products/policies", &cookie,
+        json!({ "policy": { "name": "y", "command": "select", "using": "true) ; DROP TABLE public.products; --" } })).await;
     assert_eq!(
         injection.status,
         StatusCode::BAD_REQUEST,
@@ -1238,7 +1272,7 @@ async fn policies_criadas_editadas_e_apagadas_pelo_painel() {
     let dropped = app
         .raw(
             Method::DELETE,
-            "/admin/api/tables/produtos/policies/em%20estoque",
+            "/admin/api/tables/products/policies/in%20stock",
             &[("cookie", cookie.as_str())],
             String::new(),
         )
@@ -1248,7 +1282,7 @@ async fn policies_criadas_editadas_e_apagadas_pelo_painel() {
     let missing = app
         .raw(
             Method::DELETE,
-            "/admin/api/tables/produtos/policies/nao-existe",
+            "/admin/api/tables/products/policies/missing",
             &[("cookie", cookie.as_str())],
             String::new(),
         )
@@ -1257,17 +1291,17 @@ async fn policies_criadas_editadas_e_apagadas_pelo_painel() {
 }
 
 #[tokio::test]
-async fn token_service_role_emitido_pelo_painel() {
+async fn service_role_token_issued_by_the_panel() {
     let app = TestApp::spawn().await;
     let cookie = login(&app).await;
 
     let anon = app
-        .raw(Method::GET, "/rest/v1/segredos", &[], String::new())
+        .raw(Method::GET, "/rest/v1/secrets", &[], String::new())
         .await;
     assert_ne!(
         anon.status,
         StatusCode::OK,
-        "segredos só tem GRANT para service_role"
+        "secrets only has a GRANT for service_role"
     );
 
     let reply = send(
@@ -1285,7 +1319,7 @@ async fn token_service_role_emitido_pelo_painel() {
     let service = app
         .raw(
             Method::GET,
-            "/rest/v1/segredos",
+            "/rest/v1/secrets",
             &[("authorization", bearer.as_str())],
             String::new(),
         )
@@ -1302,8 +1336,10 @@ async fn token_service_role_emitido_pelo_painel() {
         )
         .await;
         assert_eq!(bad.status, StatusCode::BAD_REQUEST);
+        assert_eq!(bad.body["code"], "invalid_token_validity");
+        assert_eq!(bad.body["params"], json!({ "max": 3650 }));
     }
-    // Sem sessão do painel, nada de token.
+    // Without a panel session, no token.
     let outsider = app
         .raw(
             Method::POST,
@@ -1326,7 +1362,7 @@ async fn password_login(app: &TestApp, email: &str, password: &str) -> Reply {
 }
 
 #[tokio::test]
-async fn criar_usuario_e_redefinir_senha_pelo_painel() {
+async fn create_user_and_reset_password_from_the_panel() {
     let app = TestApp::spawn().await;
     let cookie = login(&app).await;
 
@@ -1335,56 +1371,60 @@ async fn criar_usuario_e_redefinir_senha_pelo_painel() {
         Method::POST,
         "/admin/api/users",
         &cookie,
-        json!({ "email": "  Nova@Exemplo.com ", "password": "senha-inicial-123" }),
+        json!({ "email": "  New@Example.com ", "password": "initial-password-123" }),
     )
     .await;
     assert_eq!(created.status, StatusCode::CREATED, "{}", created.text);
-    // Mesmas regras do cadastro público: email normalizado.
-    assert_eq!(created.body["email"], "nova@exemplo.com");
+    // Same rules as public signup: normalized email.
+    assert_eq!(created.body["email"], "new@example.com");
     let id = created.body["id"].as_str().unwrap().to_owned();
 
-    // O usuário criado entra pela API pública, com o mesmo hash do cadastro.
-    let session = password_login(&app, "nova@exemplo.com", "senha-inicial-123").await;
+    // The created user signs in through the public API, with the same hash as signup.
+    let session = password_login(&app, "new@example.com", "initial-password-123").await;
     assert_eq!(session.status, StatusCode::OK, "{}", session.text);
     let refresh = session.body["refresh_token"].as_str().unwrap().to_owned();
 
-    for (body, status) in [
+    for (body, status, code) in [
         (
-            json!({ "email": "nova@exemplo.com", "password": "outra-senha-123" }),
+            json!({ "email": "new@example.com", "password": "other-password-123" }),
             StatusCode::CONFLICT,
+            "user_already_exists",
         ),
         (
-            json!({ "email": "sem-arroba", "password": "senha-valida-123" }),
+            json!({ "email": "no-at-sign", "password": "valid-password-123" }),
             StatusCode::BAD_REQUEST,
+            "invalid_email",
         ),
         (
-            json!({ "email": "curta@exemplo.com", "password": "1234567" }),
+            json!({ "email": "short@example.com", "password": "1234567" }),
             StatusCode::BAD_REQUEST,
+            "password_too_short",
         ),
     ] {
         let reply = send(&app, Method::POST, "/admin/api/users", &cookie, body).await;
         assert_eq!(reply.status, status, "{}", reply.text);
+        assert_eq!(reply.body["code"], code, "{}", reply.text);
     }
 
-    // Redefinir: a senha antiga para de valer e a sessão aberta é encerrada.
+    // Reset: the old password stops working and the open session is ended.
     let reset = send(
         &app,
         Method::PUT,
         &format!("/admin/api/users/{id}/password"),
         &cookie,
-        json!({ "password": "senha-nova-456" }),
+        json!({ "password": "new-password-456" }),
     )
     .await;
     assert_eq!(reset.status, StatusCode::OK, "{}", reset.text);
     assert_eq!(reset.body["sessions_revoked"], 1);
     assert_eq!(
-        password_login(&app, "nova@exemplo.com", "senha-inicial-123")
+        password_login(&app, "new@example.com", "initial-password-123")
             .await
             .status,
         StatusCode::BAD_REQUEST
     );
     assert_eq!(
-        password_login(&app, "nova@exemplo.com", "senha-nova-456")
+        password_login(&app, "new@example.com", "new-password-456")
             .await
             .status,
         StatusCode::OK
@@ -1400,7 +1440,7 @@ async fn criar_usuario_e_redefinir_senha_pelo_painel() {
     assert_ne!(
         reused.status,
         StatusCode::OK,
-        "sessão anterior à troca de senha não pode renovar"
+        "a session from before the password change cannot refresh"
     );
 
     let weak = send(
@@ -1408,7 +1448,7 @@ async fn criar_usuario_e_redefinir_senha_pelo_painel() {
         Method::PUT,
         &format!("/admin/api/users/{id}/password"),
         &cookie,
-        json!({ "password": "curta" }),
+        json!({ "password": "short" }),
     )
     .await;
     assert_eq!(weak.status, StatusCode::BAD_REQUEST);
@@ -1417,24 +1457,25 @@ async fn criar_usuario_e_redefinir_senha_pelo_painel() {
         Method::PUT,
         "/admin/api/users/00000000-0000-0000-0000-000000000000/password",
         &cookie,
-        json!({ "password": "senha-valida-123" }),
+        json!({ "password": "valid-password-123" }),
     )
     .await;
     assert_eq!(missing.status, StatusCode::NOT_FOUND);
+    assert_eq!(missing.body["code"], "user_not_found");
     let bad_id = send(
         &app,
         Method::PUT,
-        "/admin/api/users/nao-e-uuid/password",
+        "/admin/api/users/not-a-uuid/password",
         &cookie,
-        json!({ "password": "senha-valida-123" }),
+        json!({ "password": "valid-password-123" }),
     )
     .await;
     assert_eq!(bad_id.status, StatusCode::BAD_REQUEST);
 }
 
 #[tokio::test]
-async fn foto_de_perfil_do_admin() {
-    // PNG mínimo (assinatura + início do IHDR) e um SVG, em base64.
+async fn admin_profile_photo() {
+    // Minimal PNG (signature + start of IHDR) and an SVG, in base64.
     const PNG: &str = "iVBORw0KGgoAAAANSUhEUg==";
     const SVG: &str = "PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4=";
     let app = TestApp::spawn().await;
@@ -1452,9 +1493,9 @@ async fn foto_de_perfil_do_admin() {
     let reply = get(&app, "/admin/api/profile/avatar", &cookie).await;
     assert_eq!(reply.status, StatusCode::NOT_FOUND);
 
-    // Só PNG, JPEG ou WebP reconhecidos pelos bytes; tamanho limitado.
-    let too_big = "A".repeat(349_528); // 262.146 bytes decodificados
-    for image in [SVG, "não é base64", "", too_big.as_str()] {
+    // Only PNG, JPEG or WebP recognised by their bytes; size is limited.
+    let too_big = "A".repeat(349_528); // 262,146 decoded bytes
+    for image in [SVG, "not base64!", "", too_big.as_str()] {
         let reply = send(
             &app,
             Method::PUT,
@@ -1466,7 +1507,7 @@ async fn foto_de_perfil_do_admin() {
         assert_eq!(reply.status, StatusCode::BAD_REQUEST, "{}", reply.text);
     }
 
-    // CSRF: outra origem não troca a foto.
+    // CSRF: another origin does not change the photo.
     let reply = app
         .raw(
             Method::PUT,
@@ -1474,7 +1515,7 @@ async fn foto_de_perfil_do_admin() {
             &[
                 ("cookie", &cookie),
                 JSON,
-                ("origin", "https://site-malicioso.com"),
+                ("origin", "https://malicious.example"),
             ],
             json!({ "image": PNG }).to_string(),
         )
@@ -1490,7 +1531,7 @@ async fn foto_de_perfil_do_admin() {
     )
     .await;
     assert_eq!(reply.status, StatusCode::OK, "{}", reply.text);
-    let version = reply.body["avatar"].as_i64().expect("versão da foto");
+    let version = reply.body["avatar"].as_i64().expect("photo version");
     let profile = get(&app, "/admin/api/profile", &cookie).await;
     assert_eq!(profile.body["avatar"], version);
 
@@ -1500,7 +1541,7 @@ async fn foto_de_perfil_do_admin() {
     assert_eq!(reply.headers[header::X_CONTENT_TYPE_OPTIONS], "nosniff");
     assert!(reply.text.ends_with("IHDR"));
 
-    // A tabela fica fora do alcance das roles da API.
+    // The table is out of reach of the API roles.
     let out = sql(
         &app,
         &cookie,
@@ -1528,11 +1569,11 @@ async fn foto_de_perfil_do_admin() {
 fn simple_table(name: &str) -> Value {
     json!({ "name": name, "columns": [
         { "name": "id", "data_type": "bigint", "primary_key": true, "identity": true },
-        { "name": "texto", "data_type": "text" },
+        { "name": "body", "data_type": "text" },
     ] })
 }
 
-/// Roda migrações como o `nelcota migrate` (refinery, `abort_divergent`).
+/// Runs migrations as `nelcota migrate` does (refinery, `abort_divergent`).
 async fn refinery_migrate(app: &TestApp, files: &[(&str, &str)]) -> Result<usize, String> {
     let (mut client, connection) = app.admin.connect(tokio_postgres::NoTls).await.unwrap();
     tokio::spawn(connection);
@@ -1550,7 +1591,7 @@ async fn refinery_migrate(app: &TestApp, files: &[(&str, &str)]) -> Result<usize
 }
 
 #[tokio::test]
-async fn alteracoes_do_painel_viram_migracao_reconhecida_pelo_migrate() {
+async fn panel_changes_become_a_migration_recognised_by_migrate() {
     let app = TestApp::spawn().await;
     let cookie = login(&app).await;
     let create = |table: Value| send(&app, Method::POST, "/admin/api/tables", &cookie, table);
@@ -1564,8 +1605,8 @@ async fn alteracoes_do_painel_viram_migracao_reconhecida_pelo_migrate() {
         )
     };
 
-    // Prévia e DDL recusado pelo banco não contam como alteração.
-    create(json!({ "table": simple_table("pedidos"), "preview": true })).await;
+    // A preview and DDL refused by the database do not count as changes.
+    create(json!({ "table": simple_table("orders"), "preview": true })).await;
     let bad = create(
         json!({ "table": { "name": "x", "columns": [{ "name": "a", "data_type": "money" }] } }),
     )
@@ -1576,14 +1617,14 @@ async fn alteracoes_do_painel_viram_migracao_reconhecida_pelo_migrate() {
     assert_eq!(list["next_version"], 1);
     assert!(list["folder"].is_null());
 
-    for name in ["pedidos", "itens"] {
+    for name in ["orders", "items"] {
         let reply = create(json!({ "table": simple_table(name) })).await;
         assert_eq!(reply.status, StatusCode::OK, "{}", reply.text);
     }
     let list = get(&app, "/admin/api/migrations", &cookie).await.body;
     let pending = list["pending"].as_array().unwrap();
     assert_eq!(pending.len(), 2);
-    // ISO 8601 com o offset completo ("+00:00"), que o navegador entende.
+    // ISO 8601 with the full offset ("+00:00"), which the browser understands.
     let at = pending[0]["applied_at"].as_str().unwrap();
     let offset = &at[at.len() - 6..];
     assert!(
@@ -1596,32 +1637,34 @@ async fn alteracoes_do_painel_viram_migracao_reconhecida_pelo_migrate() {
         pending[0]["statements"][0]
             .as_str()
             .unwrap()
-            .starts_with("CREATE TABLE \"public\".\"pedidos\"")
+            .starts_with("CREATE TABLE \"public\".\"orders\"")
     );
 
     assert_eq!(
-        export("Criar Pedidos").await.status,
+        export("Create Orders").await.status,
         StatusCode::BAD_REQUEST
     );
-    let reply = export("criar_pedidos").await;
+    let reply = export("create_orders").await;
     assert_eq!(reply.status, StatusCode::OK, "{}", reply.text);
     assert_eq!(reply.body["version"], 1);
-    assert_eq!(reply.body["filename"], "V1__criar_pedidos.sql");
+    assert_eq!(reply.body["filename"], "V1__create_orders.sql");
     let sql = reply.body["sql"].as_str().unwrap().to_owned();
-    assert!(sql.contains("CREATE TABLE \"public\".\"pedidos\""));
-    assert!(sql.contains("CREATE TABLE \"public\".\"itens\""));
+    assert!(sql.contains("CREATE TABLE \"public\".\"orders\""));
+    assert!(sql.contains("CREATE TABLE \"public\".\"items\""));
 
     let list = get(&app, "/admin/api/migrations", &cookie).await.body;
     assert_eq!(list["pending"], json!([]));
     let first = &list["migrations"][0];
     assert_eq!(
         (&first["version"], &first["name"], &first["from_panel"]),
-        (&json!(1), &json!("criar_pedidos"), &json!(true))
+        (&json!(1), &json!("create_orders"), &json!(true))
     );
     assert!(first["applied_on"].is_string());
-    assert_eq!(export("de_novo").await.status, StatusCode::CONFLICT);
+    let again = export("again").await;
+    assert_eq!(again.status, StatusCode::CONFLICT);
+    assert_eq!(again.body["code"], "no_pending_changes");
 
-    // O arquivo pode ser baixado de novo, idêntico.
+    // The file can be downloaded again, unchanged.
     let file = get(&app, "/admin/api/migrations/1/file", &cookie).await;
     assert_eq!(file.status, StatusCode::OK);
     assert_eq!(file.text, sql);
@@ -1629,40 +1672,40 @@ async fn alteracoes_do_painel_viram_migracao_reconhecida_pelo_migrate() {
         file.headers[header::CONTENT_DISPOSITION]
             .to_str()
             .unwrap()
-            .contains("V1__criar_pedidos.sql")
+            .contains("V1__create_orders.sql")
     );
 
-    // O migrate reconhece o arquivo como já aplicado (nada roda duas vezes)...
+    // migrate recognises the file as already applied (nothing runs twice)...
     assert_eq!(
-        refinery_migrate(&app, &[("V1__criar_pedidos", &sql)]).await,
+        refinery_migrate(&app, &[("V1__create_orders", &sql)]).await,
         Ok(0)
     );
-    // ...e recusa o arquivo editado.
-    let edited = format!("{sql}-- editado\n");
+    // ...and refuses the edited file.
+    let edited = format!("{sql}-- edited\n");
     assert!(
-        refinery_migrate(&app, &[("V1__criar_pedidos", &edited)])
+        refinery_migrate(&app, &[("V1__create_orders", &edited)])
             .await
             .is_err()
     );
 
-    // Depois de uma migração escrita à mão (V2), a próxima gerada é a V3.
-    let v2 = "CREATE INDEX pedidos_texto_idx ON public.pedidos (texto);";
+    // After a hand-written migration (V2), the next generated one is V3.
+    let v2 = "CREATE INDEX orders_body_idx ON public.orders (body);";
     assert_eq!(
-        refinery_migrate(&app, &[("V1__criar_pedidos", &sql), ("V2__indice", v2)]).await,
+        refinery_migrate(&app, &[("V1__create_orders", &sql), ("V2__index", v2)]).await,
         Ok(1)
     );
-    create(json!({ "table": simple_table("clientes") })).await;
-    let reply = export("clientes").await;
+    create(json!({ "table": simple_table("customers") })).await;
+    let reply = export("customers").await;
     assert_eq!(reply.body["version"], 3, "{}", reply.text);
 }
 
 #[tokio::test]
-async fn migracao_gerada_nao_colide_com_arquivo_ainda_nao_aplicado() {
+async fn generated_migration_never_collides_with_an_unapplied_file() {
     let dir = std::env::temp_dir().join(format!("nelcota-migrations-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(dir.join("V1__base.sql"), "select 1;").unwrap();
-    std::fs::write(dir.join("V4__ainda_nao_aplicada.sql"), "select 1;").unwrap();
-    std::fs::write(dir.join("LEIA-ME.md"), "não é migração").unwrap();
+    std::fs::write(dir.join("V4__not_applied_yet.sql"), "select 1;").unwrap();
+    std::fs::write(dir.join("README.md"), "not a migration").unwrap();
     let app = TestApp::spawn_with(Options {
         migrations_dir: Some(dir.clone()),
         ..Options::default()
@@ -1675,7 +1718,7 @@ async fn migracao_gerada_nao_colide_com_arquivo_ainda_nao_aplicado() {
         Method::POST,
         "/admin/api/tables",
         &cookie,
-        json!({ "table": simple_table("pedidos") }),
+        json!({ "table": simple_table("orders") }),
     )
     .await;
     let list = get(&app, "/admin/api/migrations", &cookie).await.body;
@@ -1695,9 +1738,9 @@ async fn migracao_gerada_nao_colide_com_arquivo_ainda_nao_aplicado() {
         Method::POST,
         "/admin/api/migrations",
         &cookie,
-        json!({ "name": "pedidos" }),
+        json!({ "name": "orders" }),
     )
     .await;
-    assert_eq!(reply.body["filename"], "V5__pedidos.sql", "{}", reply.text);
+    assert_eq!(reply.body["filename"], "V5__orders.sql", "{}", reply.text);
     std::fs::remove_dir_all(&dir).ok();
 }

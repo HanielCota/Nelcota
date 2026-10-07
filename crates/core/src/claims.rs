@@ -1,14 +1,14 @@
-//! Claims de um request já autenticado e as roles que a API aceita.
+//! Claims of an already authenticated request and the roles the API accepts.
 //!
-//! O contrato está em `docs/jwt-e-roles.md`. Este módulo não sabe nada de
-//! assinatura: quem valida o token é o crate `nelcota-auth`.
+//! The contract is in `docs/jwt-and-roles.md`. This module knows nothing about
+//! signatures: the `nelcota-auth` crate validates the token.
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
 
-/// Roles do Postgres que um request pode assumir. Qualquer outro valor na
-/// claim `role` (ex.: `postgres`, `authenticator`) é rejeitado.
+/// Postgres roles a request may assume. Any other value in the `role` claim
+/// (e.g. `postgres`, `authenticator`) is rejected.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Role {
@@ -18,7 +18,7 @@ pub enum Role {
 }
 
 impl Role {
-    /// Nome da role no Postgres. Vem de uma lista fechada, nunca do usuário.
+    /// Role name in Postgres. Comes from a closed list, never from the user.
     pub fn as_str(self) -> &'static str {
         match self {
             Role::Anon => "anon",
@@ -30,14 +30,14 @@ impl Role {
 
 #[derive(Debug, thiserror::Error)]
 pub enum InvalidClaims {
-    #[error("claims inválidas: {0}")]
+    #[error("invalid claims: {0}")]
     Malformed(#[from] serde_json::Error),
-    #[error("role authenticated exige a claim sub")]
+    #[error("role authenticated requires the sub claim")]
     MissingSub,
 }
 
-/// Claims de um request: a role a assumir, o usuário (se houver) e o JSON
-/// completo, repassado ao Postgres em `request.jwt.claims`.
+/// Claims of a request: the role to assume, the user (if any) and the full
+/// JSON, passed on to Postgres in `request.jwt.claims`.
 #[derive(Clone, Debug)]
 pub struct Claims {
     role: Role,
@@ -54,7 +54,7 @@ struct Known {
 }
 
 impl Claims {
-    /// Claims de um request sem token.
+    /// Claims of a request without a token.
     pub fn anon() -> Self {
         Claims {
             role: Role::Anon,
@@ -64,7 +64,7 @@ impl Claims {
         }
     }
 
-    /// Interpreta o payload de um JWT já verificado.
+    /// Interprets the payload of an already verified JWT.
     pub fn from_payload(payload: Value) -> Result<Self, InvalidClaims> {
         let known = Known::deserialize(&payload)?;
         if known.role == Role::Authenticated && known.sub.is_none() {
@@ -86,12 +86,12 @@ impl Claims {
         self.sub
     }
 
-    /// Uma claim qualquer do payload (ex.: `session_id`, `email`).
+    /// Any claim of the payload (e.g. `session_id`, `email`).
     pub fn claim(&self, name: &str) -> Option<&Value> {
         self.payload.get(name)
     }
 
-    /// JSON das claims, como o Postgres vai enxergar em `auth.jwt()`.
+    /// JSON of the claims, as Postgres will see it in `auth.jwt()`.
     pub fn as_json(&self) -> &str {
         &self.json
     }
@@ -103,14 +103,14 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn aceita_roles_conhecidas() {
+    fn accepts_known_roles() {
         let c = Claims::from_payload(json!({"role": "service_role"})).unwrap();
         assert_eq!(c.role(), Role::ServiceRole);
         assert_eq!(c.sub(), None);
     }
 
     #[test]
-    fn rejeita_role_fora_da_lista() {
+    fn rejects_roles_outside_the_list() {
         for role in ["postgres", "authenticator", "Anon", ""] {
             assert!(
                 Claims::from_payload(json!({"role": role})).is_err(),
@@ -121,7 +121,7 @@ mod tests {
     }
 
     #[test]
-    fn authenticated_exige_sub_uuid() {
+    fn authenticated_requires_uuid_sub() {
         assert!(matches!(
             Claims::from_payload(json!({"role": "authenticated"})),
             Err(InvalidClaims::MissingSub)

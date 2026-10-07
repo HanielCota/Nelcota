@@ -1,9 +1,9 @@
-//! Envio de email (hoje só o link de recuperação de senha).
+//! Sending email (today only the password recovery link).
 //!
-//! Fica atrás da trait [`Mailer`]: em produção, SMTP ([`SmtpMailer`]); nos
-//! testes, um carteiro que só guarda as mensagens. O Nelcota não tem servidor
-//! de email próprio: usa o SMTP que o projeto configurar (Postmark, SES,
-//! Resend, Gmail, o do provedor de hospedagem...).
+//! It sits behind the [`Mailer`] trait: SMTP in production ([`SmtpMailer`]);
+//! in tests, a mailer that only keeps the messages. Nelcota runs no mail server
+//! of its own: it uses whatever SMTP the project configures (Postmark, SES,
+//! Resend, Gmail, the hosting provider's...).
 
 use std::time::Duration;
 
@@ -13,8 +13,8 @@ use lettre::{
     message::{Mailbox, header::ContentType},
 };
 
-/// Mensagem em texto puro: links funcionam em qualquer cliente e não há HTML
-/// para escapar.
+/// Plain-text message: links work in any client and there is no HTML to
+/// escape.
 #[derive(Clone, Debug)]
 pub struct Email {
     pub to: String,
@@ -30,9 +30,9 @@ pub trait Mailer: Send + Sync + 'static {
     fn send(&self, email: Email) -> BoxFuture<'_, Result<(), MailError>>;
 }
 
-/// SMTP configurado por URL, no formato do lettre:
-/// `smtps://usuario:senha@smtp.exemplo.com:465` (TLS direto) ou
-/// `smtp://usuario:senha@smtp.exemplo.com:587?tls=required` (STARTTLS).
+/// SMTP configured by URL, in lettre's format:
+/// `smtps://user:password@smtp.example.com:465` (implicit TLS) or
+/// `smtp://user:password@smtp.example.com:587?tls=required` (STARTTLS).
 pub struct SmtpMailer {
     transport: AsyncSmtpTransport<Tokio1Executor>,
     from: Mailbox,
@@ -42,10 +42,10 @@ impl SmtpMailer {
     pub fn new(url: &str, from: &str) -> Result<Self, MailError> {
         let from = from
             .parse::<Mailbox>()
-            .map_err(|e| MailError(format!("NELCOTA_SMTP_FROM inválido: {e}")))?;
-        // A mensagem de erro do lettre não inclui a URL (que tem a senha).
+            .map_err(|e| MailError(format!("invalid NELCOTA_SMTP_FROM: {e}")))?;
+        // lettre's error message does not include the URL (which holds the password).
         let transport = AsyncSmtpTransport::<Tokio1Executor>::from_url(url)
-            .map_err(|e| MailError(format!("NELCOTA_SMTP_URL inválida: {e}")))?
+            .map_err(|e| MailError(format!("invalid NELCOTA_SMTP_URL: {e}")))?
             .timeout(Some(Duration::from_secs(15)))
             .build();
         Ok(SmtpMailer { transport, from })
@@ -58,7 +58,7 @@ impl Mailer for SmtpMailer {
             let to = email
                 .to
                 .parse::<Mailbox>()
-                .map_err(|e| MailError(format!("destinatário inválido: {e}")))?;
+                .map_err(|e| MailError(format!("invalid recipient: {e}")))?;
             let message = Message::builder()
                 .from(self.from.clone())
                 .to(to)
@@ -80,29 +80,29 @@ mod tests {
     use super::SmtpMailer;
 
     #[test]
-    fn configuracao_valida_e_invalida() {
+    fn valid_and_invalid_settings() {
         assert!(
             SmtpMailer::new(
-                "smtps://u:p@smtp.exemplo.com:465",
-                "Loja <nao-responda@loja.com>"
+                "smtps://u:p@smtp.example.com:465",
+                "Shop <no-reply@shop.com>"
             )
             .is_ok()
         );
         assert!(
             SmtpMailer::new(
-                "smtp://u:p@smtp.exemplo.com:587?tls=required",
-                "nao-responda@loja.com"
+                "smtp://u:p@smtp.example.com:587?tls=required",
+                "no-reply@shop.com"
             )
             .is_ok()
         );
-        let err = SmtpMailer::new("http://smtp.exemplo.com", "a@b.com")
+        let err = SmtpMailer::new("http://smtp.example.com", "a@b.com")
             .err()
             .unwrap();
         assert!(err.0.contains("NELCOTA_SMTP_URL"));
-        let err = SmtpMailer::new("smtps://u:segredo@smtp.exemplo.com", "não é email")
+        let err = SmtpMailer::new("smtps://u:secret@smtp.example.com", "not an email")
             .err()
             .unwrap();
         assert!(err.0.contains("NELCOTA_SMTP_FROM"));
-        assert!(!err.0.contains("segredo"));
+        assert!(!err.0.contains("secret"));
     }
 }

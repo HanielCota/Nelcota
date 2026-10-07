@@ -1,7 +1,7 @@
-//! Harness dos testes de integração: sobe um Postgres 17 real (testcontainers),
-//! aplica as migrações e monta o mesmo `Router` de produção.
+//! Integration test harness: starts a real Postgres 17 (testcontainers),
+//! applies the migrations and builds the same `Router` as production.
 //!
-//! Requer Docker em execução.
+//! Requires Docker to be running.
 #![allow(dead_code)]
 
 use std::{sync::Arc, time::Duration};
@@ -28,12 +28,12 @@ use testcontainers_modules::{
 use tower::ServiceExt;
 use uuid::Uuid;
 
-pub const JWT_SECRET: &str = "segredo-de-teste-com-mais-de-32-caracteres";
-pub const AUTHENTICATOR_PASSWORD: &str = "senha-do-authenticator-de-teste";
-pub const ADMIN_EMAIL: &str = "admin@exemplo.com";
-pub const SSO_SECRET: &str = "segredo-compartilhado-do-host-com-32+";
+pub const JWT_SECRET: &str = "test-secret-with-more-than-32-characters";
+pub const AUTHENTICATOR_PASSWORD: &str = "test-authenticator-password";
+pub const ADMIN_EMAIL: &str = "admin@example.com";
+pub const SSO_SECRET: &str = "host-shared-secret-with-32-chars+";
 
-/// Lista de projetos do host usada nos testes (este app é a "loja").
+/// The host's project list used in the tests (this app is "shop").
 fn registry_file() -> std::path::PathBuf {
     let dir = std::env::temp_dir().join(format!("nelcota-test-{}", Uuid::new_v4()));
     std::fs::create_dir_all(&dir).unwrap();
@@ -43,8 +43,8 @@ fn registry_file() -> std::path::PathBuf {
         json!({
             "panel_login": "shared",
             "projects": [
-                { "name": "loja", "url": "https://loja.exemplo.com" },
-                { "name": "blog", "url": "https://blog.exemplo.com" },
+                { "name": "shop", "url": "https://shop.example.com" },
+                { "name": "blog", "url": "https://blog.example.com" },
             ],
         })
         .to_string(),
@@ -52,12 +52,12 @@ fn registry_file() -> std::path::PathBuf {
     .unwrap();
     path
 }
-pub const ADMIN_PASSWORD: &str = "senha-do-admin-de-teste";
+pub const ADMIN_PASSWORD: &str = "test-admin-password";
 
-/// Página do app que recebe o link de recuperação nos testes.
-pub const RECOVERY_URL: &str = "https://app.exemplo.com/nova-senha";
+/// App page that receives the recovery link in the tests.
+pub const RECOVERY_URL: &str = "https://app.example.com/new-password";
 
-/// Carteiro dos testes: guarda as mensagens em vez de mandar.
+/// Test mailer: keeps the messages instead of sending them.
 #[derive(Default)]
 pub struct Outbox {
     sent: std::sync::Mutex<Vec<Email>>,
@@ -68,7 +68,7 @@ impl Outbox {
         self.sent.lock().unwrap().clone()
     }
 
-    /// Espera até haver `n` mensagens (o envio roda em segundo plano).
+    /// Waits until there are `n` messages (sending runs in the background).
     pub async fn wait_for(&self, n: usize) -> Vec<Email> {
         for _ in 0..250 {
             let sent = self.sent();
@@ -77,7 +77,7 @@ impl Outbox {
             }
             tokio::time::sleep(Duration::from_millis(20)).await;
         }
-        panic!("esperava {n} email(s), chegaram {}", self.sent().len());
+        panic!("expected {n} email(s), got {}", self.sent().len());
     }
 }
 
@@ -94,9 +94,9 @@ impl Mailer for Outbox {
 
 pub struct Options {
     pub pool_size: usize,
-    /// Recuperação de senha ligada (com o [`Outbox`] no lugar do SMTP).
+    /// Password recovery on (with the [`Outbox`] instead of SMTP).
     pub mail: bool,
-    /// Pasta `migrations/` que o painel enxerga.
+    /// `migrations/` folder the panel sees.
     pub migrations_dir: Option<std::path::PathBuf>,
     pub rate_limit_per_minute: u32,
     pub access_ttl_secs: u64,
@@ -153,7 +153,7 @@ impl TestApp {
             ])
             .start()
             .await
-            .expect("Docker precisa estar rodando para os testes de integração");
+            .expect("Docker must be running for the integration tests");
         let host = container.get_host().await.unwrap();
         let port = container.get_host_port_ipv4(5432).await.unwrap();
         let admin: tokio_postgres::Config =
@@ -165,8 +165,8 @@ impl TestApp {
             .await
             .unwrap();
 
-        // Fixture: tabela de exemplo + uma linha para cada usuário, inseridas
-        // como superusuário (que ignora RLS).
+        // Fixture: the example table + one row per user, inserted as the
+        // superuser (which bypasses RLS).
         let (user_a, user_b) = (Uuid::new_v4(), Uuid::new_v4());
         let (admin_client, connection) = admin.connect(tokio_postgres::NoTls).await.unwrap();
         tokio::spawn(connection);
@@ -180,14 +180,14 @@ impl TestApp {
             .unwrap();
         admin_client
             .execute(
-                "INSERT INTO public.todos (user_id, title) VALUES ($1, 'tarefa de A'), ($2, 'tarefa de B')",
+                "INSERT INTO public.todos (user_id, title) VALUES ($1, 'task of A'), ($2, 'task of B')",
                 &[&user_a, &user_b],
             )
             .await
             .unwrap();
 
-        // Assina com EdDSA (como em produção) e também aceita HS256, para os
-        // testes cunharem tokens arbitrários com `token()`.
+        // Signs with EdDSA (as in production) and also accepts HS256, so the
+        // tests can mint arbitrary tokens with `token()`.
         let keys = Arc::new(
             Keys::new(
                 Some(&generate_ed25519_private_key()),
@@ -222,7 +222,7 @@ impl TestApp {
             limiter: Arc::new(RateLimiter::new(1000)),
             secure_cookies: false,
             host: Arc::new(nelcota_admin::HostLink {
-                project: "loja".into(),
+                project: "shop".into(),
                 registry: Some(registry_file()),
                 sso: Some(nelcota_admin::Sso::new(SSO_SECRET.as_bytes())),
             }),
@@ -312,7 +312,7 @@ impl TestApp {
         }
     }
 
-    /// Request com corpo arbitrário (formulários do painel).
+    /// Request with an arbitrary body (panel forms).
     pub async fn raw(
         &self,
         method: Method,
@@ -351,8 +351,8 @@ impl TestApp {
     }
 }
 
-/// Percent-encode dos bytes que não podem aparecer crus numa URI (espaço,
-/// aspas, acentos...), para os testes escreverem queries legíveis.
+/// Percent-encodes the bytes that cannot appear raw in a URI (space, quotes,
+/// accents...), so the tests can write readable queries.
 pub fn encode_uri(path: &str) -> String {
     path.bytes()
         .map(|b| match b {
@@ -364,7 +364,7 @@ pub fn encode_uri(path: &str) -> String {
         .collect()
 }
 
-/// JWT HS256 com as claims dadas (`exp` padrão: daqui a 1 h).
+/// HS256 JWT with the given claims (default `exp`: 1 hour from now).
 pub fn token(claims: Value) -> String {
     token_with_secret(claims, JWT_SECRET)
 }

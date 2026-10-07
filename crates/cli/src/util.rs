@@ -1,4 +1,4 @@
-//! Utilidades pequenas: segredos aleatórios, datas, prompts, healthcheck.
+//! Small utilities: random secrets, dates, prompts, healthcheck.
 
 use std::{
     io::{BufRead, IsTerminal, Read, Write},
@@ -8,14 +8,14 @@ use std::{
 
 const ALPHANUMERIC: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
-/// Segredo alfanumérico (seguro para URLs e `.env`), sem viés de módulo.
+/// Alphanumeric secret (safe for URLs and `.env`), without modulo bias.
 pub fn secret(len: usize) -> String {
     let mut out = String::with_capacity(len);
     let mut buf = [0u8; 64];
     while out.len() < len {
-        getrandom::fill(&mut buf).expect("fonte de aleatoriedade do sistema indisponível");
+        getrandom::fill(&mut buf).expect("system randomness source unavailable");
         for b in buf {
-            // 248 = 62 * 4: descarta o resto para a distribuição ficar uniforme.
+            // 248 = 62 * 4: discard the remainder so the distribution stays uniform.
             if b < 248 && out.len() < len {
                 out.push(ALPHANUMERIC[usize::from(b) % ALPHANUMERIC.len()] as char);
             }
@@ -24,7 +24,7 @@ pub fn secret(len: usize) -> String {
     out
 }
 
-/// Data/hora UTC atual em `AAAAMMDDTHHMMSSZ`.
+/// Current UTC date/time as `YYYYMMDDTHHMMSSZ`.
 pub fn timestamp() -> String {
     let secs = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -35,7 +35,7 @@ pub fn timestamp() -> String {
 fn format_timestamp(secs: u64) -> String {
     let days = i64::try_from(secs / 86_400).unwrap_or(0);
     let rest = secs % 86_400;
-    // Algoritmo civil_from_days (Howard Hinnant).
+    // civil_from_days algorithm (Howard Hinnant).
     let z = days + 719_468;
     let era = z.div_euclid(146_097);
     let doe = z.rem_euclid(146_097);
@@ -57,7 +57,7 @@ pub fn interactive() -> bool {
     std::io::stdin().is_terminal()
 }
 
-/// Pergunta com valor padrão (Enter aceita o padrão).
+/// Question with a default value (Enter accepts the default).
 pub fn ask(question: &str, default: &str) -> String {
     if default.is_empty() {
         print!("{question}: ");
@@ -77,14 +77,14 @@ pub fn ask(question: &str, default: &str) -> String {
 
 pub fn confirm(question: &str) -> bool {
     matches!(
-        ask(&format!("{question} (s/N)"), "")
+        ask(&format!("{question} (y/N)"), "")
             .to_lowercase()
             .as_str(),
-        "s" | "sim" | "y" | "yes"
+        "y" | "yes"
     )
 }
 
-/// GET /health via TCP puro (a imagem é `scratch`, sem curl).
+/// GET /health over plain TCP (the image is `scratch`, no curl).
 pub fn healthcheck(addr: &str) -> bool {
     let Some(socket) = addr.to_socket_addrs().ok().and_then(|mut a| a.next()) else {
         return false;
@@ -125,7 +125,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn segredo_alfanumerico_do_tamanho_pedido() {
+    fn alphanumeric_secret_of_the_requested_length() {
         let s = secret(40);
         assert_eq!(s.len(), 40);
         assert!(s.bytes().all(|b| b.is_ascii_alphanumeric()));
@@ -133,7 +133,7 @@ mod tests {
     }
 
     #[test]
-    fn formata_timestamp_utc() {
+    fn formats_utc_timestamp() {
         assert_eq!(format_timestamp(0), "19700101T000000Z");
         assert_eq!(format_timestamp(1_791_308_348), "20261006T173908Z");
         assert_eq!(format_timestamp(951_782_400), "20000229T000000Z");

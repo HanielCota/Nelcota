@@ -1,9 +1,10 @@
-//! Projetos do host: lista pública (para o seletor do painel) e estado de cada
-//! app.
+//! Host projects: the public list (for the panel's switcher) and each app's
+//! status.
 //!
-//! A lista vem de `shared/projects.json`, gerado pelo CLI e montado somente
-//! leitura nos apps. Ela tem só nome e URL, nunca segredos, e é relida a cada
-//! request: projetos novos aparecem sem reiniciar ninguém.
+//! The list comes from `shared/projects.json`, written by the CLI and mounted
+//! read-only into the apps. It holds only names and URLs, never secrets, and
+//! is re-read on every request: new projects show up without restarting
+//! anything.
 
 use std::{path::PathBuf, time::Duration};
 
@@ -18,13 +19,13 @@ use tokio::{
 
 use crate::{AdminState, ApiError, sso::Sso};
 
-/// Como este app se encaixa no host.
+/// How this app fits into the host.
 pub struct HostLink {
-    /// Nome deste projeto.
+    /// This project's name.
     pub project: String,
-    /// `shared/projects.json` (ausente fora de um host, ex.: `nelcota dev`).
+    /// `shared/projects.json` (absent outside a host, e.g. `nelcota dev`).
     pub registry: Option<PathBuf>,
-    /// Login único (handoff) habilitado.
+    /// Single sign-on (handoff) enabled.
     pub sso: Option<Sso>,
 }
 
@@ -50,7 +51,7 @@ fn read_registry(host: &HostLink) -> Registry {
         .unwrap_or_default()
 }
 
-/// Projeto pelo nome, na lista do host.
+/// Project by name, from the host's list.
 pub fn find(host: &HostLink, name: &str) -> Option<RegistryProject> {
     read_registry(host)
         .projects
@@ -58,8 +59,8 @@ pub fn find(host: &HostLink, name: &str) -> Option<RegistryProject> {
         .find(|p| p.name == name)
 }
 
-/// Nomes de projeto válidos (o mesmo formato que o CLI aceita); usados para
-/// montar o endereço interno `app-<nome>`.
+/// Valid project names (the same format the CLI accepts); used to build the
+/// internal address `app-<name>`.
 fn valid_name(name: &str) -> bool {
     !name.is_empty()
         && name.len() <= 32
@@ -86,7 +87,7 @@ pub async fn list(State(state): State<AdminState>) -> Json<Value> {
     }))
 }
 
-/// Faz `GET /health` no app de um projeto pela rede interna do host.
+/// Calls `GET /health` on a project's app over the host's internal network.
 async fn probe(name: &str) -> Value {
     let started = std::time::Instant::now();
     let result = timeout(Duration::from_secs(2), async {
@@ -117,7 +118,7 @@ async fn probe(name: &str) -> Value {
     })
 }
 
-/// `GET /admin/api/projects/status`: estado de cada projeto (em paralelo).
+/// `GET /admin/api/projects/status`: each project's status (in parallel).
 pub async fn status(State(state): State<AdminState>) -> Result<Json<Value>, ApiError> {
     let registry = read_registry(&state.host);
     let probes = registry.projects.iter().map(|p| {
@@ -152,10 +153,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn so_nomes_seguros_viram_endereco_interno() {
-        assert!(valid_name("loja"));
+    fn only_safe_names_become_internal_addresses() {
+        assert!(valid_name("shop"));
         assert!(valid_name("blog-2"));
-        assert!(!valid_name("Loja"));
+        assert!(!valid_name("Shop"));
         assert!(!valid_name("a.b"));
         assert!(!valid_name("x:80"));
         assert!(!valid_name(""));

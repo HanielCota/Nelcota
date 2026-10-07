@@ -1,6 +1,6 @@
 [package]
 name = "nelcota-auth"
-description = "Verificação de JWT (atrás de uma trait) e extrator de claims para o axum."
+description = "JWT verification (behind a trait) and the claims extractor for axum."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

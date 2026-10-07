@@ -1,10 +1,10 @@
-//! Recuperação de senha por email.
+//! Password recovery by email.
 //!
-//! 1. `POST /auth/v1/recover {email}`: se a conta existe, manda um link para
-//!    a página do app (`NELCOTA_PASSWORD_RECOVERY_URL#type=recovery&token=...`).
-//!    A resposta é a mesma exista ou não a conta.
-//! 2. `POST /auth/v1/verify {type: "recovery", token, password}`: troca a
-//!    senha, encerra as outras sessões e devolve uma sessão nova.
+//! 1. `POST /auth/v1/recover {email}`: if the account exists, sends a link to
+//!    the app page (`NELCOTA_PASSWORD_RECOVERY_URL#type=recovery&token=...`).
+//!    The response is the same whether or not the account exists.
+//! 2. `POST /auth/v1/verify {type: "recovery", token, password}`: changes the
+//!    password, ends the other sessions and returns a new session.
 
 use axum::{
     Json,
@@ -26,36 +26,36 @@ use crate::{
     },
 };
 
-/// Validade do link.
+/// Lifetime of the link.
 const TTL_MINUTES: i32 = 60;
-/// Intervalo mínimo entre dois emails para a mesma conta: o endpoint é
-/// público e não pode servir para lotar a caixa de entrada de alguém.
+/// Minimum interval between two emails to the same account: the endpoint is
+/// public and must not be usable to flood someone's inbox.
 const COOLDOWN_SECONDS: i32 = 60;
 
 fn disabled() -> ApiError {
     ApiError::new(
         StatusCode::FORBIDDEN,
         "recovery_disabled",
-        "recuperação de senha desabilitada: o projeto não tem SMTP configurado",
+        "password recovery is disabled: the project has no SMTP configured",
     )
 }
 
 fn expired_link() -> ApiError {
-    invalid_grant("link de recuperação inválido ou expirado")
+    invalid_grant("invalid or expired recovery link")
 }
 
-/// Texto do email. O token vai no fragmento: o navegador não o envia ao
-/// servidor do app, então ele não aparece em logs nem no `Referer`.
+/// Email text. The token goes in the fragment: the browser does not send it to
+/// the app's server, so it never shows in logs or the `Referer`.
 pub(crate) fn recovery_email(to: &str, recovery_url: &str, token: &str) -> Email {
     let link = format!("{recovery_url}#type=recovery&token={token}");
     Email {
         to: to.to_owned(),
-        subject: "Redefinir sua senha".into(),
+        subject: "Reset your password".into(),
         text: format!(
-            "Recebemos um pedido para redefinir a senha da conta {to}.\n\n\
-             Para escolher uma senha nova, abra o link abaixo. Ele vale por 1 hora \
-             e só pode ser usado uma vez:\n\n{link}\n\n\
-             Se não foi você, ignore este email: sua senha continua a mesma.\n"
+            "We received a request to reset the password of the account {to}.\n\n\
+             To choose a new password, open the link below. It is valid for 1 hour \
+             and can be used only once:\n\n{link}\n\n\
+             If this was not you, ignore this email: your password stays the same.\n"
         ),
     }
 }
@@ -102,7 +102,7 @@ pub(crate) async fn recover(
             .map_err(db_error)?
             .get(0);
         if !recent {
-            // Um link por vez: pedir de novo invalida os anteriores.
+            // One link at a time: asking again voids the previous ones.
             tx.execute(
                 "DELETE FROM auth.one_time_tokens WHERE user_id = $1 AND kind = 'recovery'",
                 &[&user_id],
@@ -123,11 +123,12 @@ pub(crate) async fn recover(
     tx.commit().await.map_err(db_error)?;
 
     if let Some(message) = outgoing {
-        // Em segundo plano: o tempo de resposta não revela se a conta existe,
-        // e uma falha do SMTP não vira erro para quem pediu (fica no log).
+        // In the background: the response time does not reveal whether the
+        // account exists, and an SMTP failure is not an error for the requester
+        // (it goes to the log).
         tokio::spawn(async move {
             if let Err(err) = mailer.send(message).await {
-                tracing::error!(error = %err, "falha ao enviar o email de recuperação de senha");
+                tracing::error!(error = %err, "failed to send the password recovery email");
             }
         });
     }
@@ -142,7 +143,7 @@ pub(crate) struct VerifyBody {
     password: String,
 }
 
-/// `POST /auth/v1/verify` `{type: "recovery", token, password}` → 200 + sessão.
+/// `POST /auth/v1/verify` `{type: "recovery", token, password}` → 200 + session.
 pub(crate) async fn verify(
     State(state): State<AuthState>,
     PeerAddr(peer): PeerAddr,
@@ -155,7 +156,7 @@ pub(crate) async fn verify(
         return Err(ApiError::new(
             StatusCode::BAD_REQUEST,
             "unsupported_type",
-            "type deve ser recovery",
+            "type must be recovery",
         ));
     }
     if body.token.is_empty() || body.token.len() > 128 {
@@ -164,7 +165,7 @@ pub(crate) async fn verify(
     validate_password(&body.password).map_err(invalid)?;
     let hash = Sha256::digest(body.token.as_bytes()).to_vec();
 
-    // Confere o link antes do argon2 (caro): link inválido não gasta CPU.
+    // Check the link before argon2 (expensive): an invalid link costs no CPU.
     let mut client = state.pool.get().await.map_err(ApiError::from_pool)?;
     {
         let tx = begin_auth(&mut client).await?;
@@ -193,7 +194,8 @@ pub(crate) async fn verify(
 
     let mut client = state.pool.get().await.map_err(ApiError::from_pool)?;
     let tx = begin_auth(&mut client).await?;
-    // Consumo atômico: dois envios do mesmo link não trocam a senha duas vezes.
+    // Atomic consumption: two submissions of the same link do not change the
+    // password twice.
     let user_id: Uuid = tx
         .query_opt(
             "UPDATE auth.one_time_tokens SET used_at = now()
@@ -206,7 +208,7 @@ pub(crate) async fn verify(
         .map_err(db_error)?
         .ok_or_else(expired_link)?
         .get(0);
-    // Abrir o link prova que a pessoa recebe os emails da conta.
+    // Opening the link proves the person receives the account's emails.
     tx.execute(
         "UPDATE auth.users
             SET encrypted_password = $2, updated_at = now(),
@@ -216,8 +218,8 @@ pub(crate) async fn verify(
     )
     .await
     .map_err(db_error)?;
-    // Quem entrou com a senha antiga perde o acesso (os refresh tokens morrem
-    // na hora; JWTs de acesso já emitidos valem até expirar).
+    // Whoever signed in with the old password loses access (refresh tokens die
+    // immediately; access JWTs already issued stay valid until they expire).
     tx.execute(
         "UPDATE auth.sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL",
         &[&user_id],
@@ -226,7 +228,7 @@ pub(crate) async fn verify(
     .map_err(db_error)?;
     let session = start_session(&state, &tx, user_id, ip, user_agent(&headers)).await?;
     tx.commit().await.map_err(db_error)?;
-    tracing::info!(user_id = %user_id, "senha redefinida pelo link de recuperação");
+    tracing::info!(user_id = %user_id, "password reset through the recovery link");
     Ok(Json(session))
 }
 
@@ -235,13 +237,13 @@ mod tests {
     use super::recovery_email;
 
     #[test]
-    fn link_leva_o_token_no_fragmento() {
-        let email = recovery_email("ana@x.com", "https://app.x.com/nova-senha", "abc_-123");
+    fn link_carries_the_token_in_the_fragment() {
+        let email = recovery_email("ana@x.com", "https://app.x.com/new-password", "abc_-123");
         assert_eq!(email.to, "ana@x.com");
         assert!(
             email
                 .text
-                .contains("https://app.x.com/nova-senha#type=recovery&token=abc_-123")
+                .contains("https://app.x.com/new-password#type=recovery&token=abc_-123")
         );
         assert!(email.text.contains("ana@x.com"));
     }

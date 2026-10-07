@@ -1,6 +1,6 @@
-//! Editor SQL do painel. Cada execução usa uma conexão administrativa NOVA,
-//! descartada no fim: um `BEGIN` sem `COMMIT` ou um `SET ROLE` deixado pelo
-//! admin nunca contamina o pool. O texto do SQL não vai para o log.
+//! Panel SQL editor. Each run uses a NEW admin connection, dropped at the
+//! end: a `BEGIN` without `COMMIT` or a `SET ROLE` left by the admin never
+//! contaminates the pool. The SQL text does not go to the log.
 
 use axum::{
     Json,
@@ -21,7 +21,7 @@ pub struct SqlRequest {
 }
 
 pub async fn run(State(state): State<AdminState>, Json(request): Json<SqlRequest>) -> Response {
-    tracing::info!(bytes = request.sql.len(), "editor SQL do painel executado");
+    tracing::info!(bytes = request.sql.len(), "panel SQL editor run");
     let mut config = state.db_config.clone();
     config
         .application_name("nelcota-admin-sql")

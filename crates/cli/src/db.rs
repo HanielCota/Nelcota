@@ -1,7 +1,8 @@
-//! Comandos que falam com o banco: migrate, types e token.
+//! Commands that talk to the database: migrate, types and token.
 //!
-//! Rodam direto quando há configuração no ambiente (container, dev); num
-//! host do `nelcota init`, são repassados ao container `app` do projeto.
+//! They run directly when the environment has a configuration (container,
+//! dev); on a `nelcota init` host they are forwarded to the project's `app`
+//! container.
 
 use std::{fs, path::Path};
 
@@ -17,7 +18,7 @@ use crate::{
     util::{ok, step},
 };
 
-/// Tabela de controle das migrações do usuário (documentada em docs/deploy.md).
+/// Control table of the user's migrations (documented in docs/deploy.md).
 pub const USER_MIGRATIONS_TABLE: &str = "nelcota.user_migrations";
 
 enum Target {
@@ -37,8 +38,8 @@ fn target(host: &Host, selection: Option<&str>) -> anyhow::Result<Target> {
         return Ok(Target::Direct(Box::new(config)));
     }
     bail!(
-        "sem banco configurado: defina NELCOTA_DATABASE_URL, rode num projeto do `nelcota init` \
-         ou inicie o ambiente com `nelcota dev`"
+        "no database configured: set NELCOTA_DATABASE_URL, run inside a `nelcota init` project \
+         or start the environment with `nelcota dev`"
     )
 }
 
@@ -53,16 +54,16 @@ async fn connect(config: &Config) -> anyhow::Result<tokio_postgres::Client> {
         .database_config()?
         .connect(NoTls)
         .await
-        .context("falha ao conectar no Postgres")?;
+        .context("could not connect to Postgres")?;
     tokio::spawn(connection);
     Ok(client)
 }
 
-/// Lê `V<n>__<nome>.sql` do diretório. CRLF vira LF para o checksum não
-/// depender do sistema operacional de quem fez checkout.
+/// Reads `V<n>__<name>.sql` from the directory. CRLF becomes LF so the
+/// checksum does not depend on the operating system of whoever checked out.
 fn load_migrations(dir: &Path) -> anyhow::Result<Vec<Migration>> {
     if !dir.is_dir() {
-        bail!("diretório de migrações não encontrado: {}", dir.display());
+        bail!("migrations directory not found: {}", dir.display());
     }
     let mut paths: Vec<_> = fs::read_dir(dir)?
         .filter_map(|e| e.ok().map(|e| e.path()))
@@ -74,11 +75,11 @@ fn load_migrations(dir: &Path) -> anyhow::Result<Vec<Migration>> {
         let stem = path
             .file_stem()
             .and_then(|s| s.to_str())
-            .context("nome de arquivo inválido")?;
+            .context("invalid file name")?;
         let sql = fs::read_to_string(&path)?.replace("\r\n", "\n");
         migrations.push(
             Migration::unapplied(stem, &sql)
-                .with_context(|| format!("nome inválido: {stem} (use V<n>__<nome>.sql)"))?,
+                .with_context(|| format!("invalid name: {stem} (use V<n>__<name>.sql)"))?,
         );
     }
     Ok(migrations)
@@ -87,16 +88,16 @@ fn load_migrations(dir: &Path) -> anyhow::Result<Vec<Migration>> {
 pub fn migrate(host: &Host, selection: Option<&str>, dir: &Path) -> anyhow::Result<()> {
     match target(host, selection)? {
         Target::Container(project) => {
-            // O compose monta ./migrations em /migrations (somente leitura).
+            // The compose mounts ./migrations at /migrations (read-only).
             if dir != Path::new("migrations") {
-                bail!("num projeto do `nelcota init`, as migrações ficam em ./migrations");
+                bail!("in a `nelcota init` project, migrations live in ./migrations");
             }
             project.in_app(&["migrate", "--path", "/migrations"])
         }
         Target::Direct(config) => {
             let migrations = load_migrations(dir)?;
             if migrations.is_empty() {
-                println!("Nenhuma migração em {}.", dir.display());
+                println!("No migrations in {}.", dir.display());
                 return Ok(());
             }
             runtime()?.block_on(async {
@@ -106,15 +107,15 @@ pub fn migrate(host: &Host, selection: Option<&str>, dir: &Path) -> anyhow::Resu
                     .await?;
                 let mut runner = Runner::new(&migrations).set_abort_divergent(true);
                 runner.set_migration_table_name(USER_MIGRATIONS_TABLE);
-                step(&format!("Aplicando migrações de {}", dir.display()));
+                step(&format!("Applying migrations from {}", dir.display()));
                 let report = runner.run_async(&mut client).await?;
                 if report.applied_migrations().is_empty() {
-                    ok("nada novo: o banco já está atualizado");
+                    ok("nothing new: the database is up to date");
                 }
                 for migration in report.applied_migrations() {
                     ok(&migration.to_string());
                 }
-                // Recarga do catálogo mesmo sem event trigger.
+                // Reload the catalog even without the event trigger.
                 client
                     .batch_execute("NOTIFY nelcota, 'reload schema'")
                     .await?;
@@ -136,7 +137,7 @@ pub fn types(host: &Host, selection: Option<&str>, out: Option<&Path>) -> anyhow
     match out {
         Some(path) => {
             fs::write(path, code)?;
-            ok(&format!("tipos gravados em {}", path.display()));
+            ok(&format!("types written to {}", path.display()));
         }
         None => print!("{code}"),
     }
@@ -157,7 +158,7 @@ pub fn service_role_token(host: &Host, selection: Option<&str>, days: u64) -> an
             )?;
             let token = keys.service_role_token(&config.jwt_issuer, days)?;
             eprintln!(
-                "ATENÇÃO: este token ignora o RLS. Use só no seu backend, nunca no frontend."
+                "WARNING: this token bypasses RLS. Use it only in your backend, never in a frontend."
             );
             println!("{token}");
         }

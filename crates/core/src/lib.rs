@@ -1,5 +1,5 @@
-//! Peças comuns do Nelcota: configuração, erros HTTP, claims/roles e acesso ao
-//! Postgres (pool, migrações e o escopo de transação por request).
+//! Shared Nelcota pieces: configuration, HTTP errors, claims/roles and Postgres
+//! access (pool, migrations and the per-request transaction scope).
 
 pub mod claims;
 pub mod config;

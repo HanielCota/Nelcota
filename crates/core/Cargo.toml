@@ -1,6 +1,6 @@
 [package]
 name = "nelcota-core"
-description = "Config, erros, pool de conexões e o escopo de transação por request (role + claims)."
+description = "Config, errors, connection pool and the per-request transaction scope (role + claims)."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

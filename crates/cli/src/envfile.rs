@@ -1,4 +1,4 @@
-//! Arquivos `CHAVE=valor` (`.env` dos projetos e `host.env`), sempre 0600.
+//! `KEY=value` files (the projects' `.env` and `host.env`), always 0600.
 
 use std::{
     fs,
@@ -22,11 +22,11 @@ impl EnvFile {
 
     pub fn read(&self) -> anyhow::Result<Vec<(String, String)>> {
         let text = fs::read_to_string(&self.path)
-            .with_context(|| format!("não foi possível ler {}", self.path.display()))?;
+            .with_context(|| format!("could not read {}", self.path.display()))?;
         Ok(parse(&text))
     }
 
-    /// Valor de uma chave (vazio conta como ausente).
+    /// Value of a key (empty counts as missing).
     pub fn get(&self, key: &str) -> anyhow::Result<Option<String>> {
         Ok(self
             .read()?
@@ -36,8 +36,8 @@ impl EnvFile {
             .filter(|v| !v.is_empty()))
     }
 
-    /// Troca (ou acrescenta) uma chave, preservando o resto do arquivo.
-    /// Valores com `$` vão entre aspas simples (o Compose não interpola).
+    /// Replaces (or appends) a key, preserving the rest of the file.
+    /// Values with `$` go in single quotes (Compose does not interpolate them).
     pub fn set(&self, key: &str, value: &str) -> anyhow::Result<()> {
         let line = if value.contains('$') {
             format!("{key}='{value}'")
@@ -78,7 +78,7 @@ fn key_of(line: &str) -> Option<&str> {
     line.split_once('=').map(|(k, _)| k.trim())
 }
 
-/// `CHAVE=valor`, ignorando comentários; aspas simples/duplas são removidas.
+/// `KEY=value`, ignoring comments; single/double quotes are removed.
 pub fn parse(text: &str) -> Vec<(String, String)> {
     text.lines()
         .map(str::trim)
@@ -96,10 +96,9 @@ pub fn parse(text: &str) -> Vec<(String, String)> {
         .collect()
 }
 
-/// Grava um arquivo legível só pelo dono (0600 em Unix).
+/// Writes a file readable only by its owner (0600 on Unix).
 pub fn write_private(path: &Path, content: &str) -> anyhow::Result<()> {
-    fs::write(path, content)
-        .with_context(|| format!("não foi possível gravar {}", path.display()))?;
+    fs::write(path, content).with_context(|| format!("could not write {}", path.display()))?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -113,31 +112,31 @@ mod tests {
     use super::*;
 
     #[test]
-    fn le_env_com_aspas_e_comentarios() {
-        let env = parse("# comentário\nA=1\nB='$argon2id$v=19$x'\nC=\"com espaço\"\n\nD=\n");
+    fn reads_env_with_quotes_and_comments() {
+        let env = parse("# comment\nA=1\nB='$argon2id$v=19$x'\nC=\"with space\"\n\nD=\n");
         assert_eq!(
             env,
             vec![
                 ("A".into(), "1".into()),
                 ("B".into(), "$argon2id$v=19$x".into()),
-                ("C".into(), "com espaço".into()),
+                ("C".into(), "with space".into()),
                 ("D".into(), String::new()),
             ]
         );
     }
 
     #[test]
-    fn set_e_remove_preservam_o_resto() {
+    fn set_and_remove_preserve_the_rest() {
         let dir = std::env::temp_dir().join(format!("nelcota-env-{}", std::process::id()));
         fs::create_dir_all(&dir).unwrap();
-        let file = EnvFile::new(dir.join("teste.env"));
-        fs::write(file.path(), "# topo\nA=1\nB=2\n").unwrap();
+        let file = EnvFile::new(dir.join("test.env"));
+        fs::write(file.path(), "# top\nA=1\nB=2\n").unwrap();
         file.set("B", "$hash$").unwrap();
         file.set("C", "3").unwrap();
         file.remove("A").unwrap();
         assert_eq!(
             fs::read_to_string(file.path()).unwrap(),
-            "# topo\nB='$hash$'\nC=3\n"
+            "# top\nB='$hash$'\nC=3\n"
         );
         assert_eq!(file.get("B").unwrap().as_deref(), Some("$hash$"));
         fs::remove_dir_all(dir).unwrap();

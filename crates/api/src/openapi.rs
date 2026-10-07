@@ -1,12 +1,12 @@
-//! Documento OpenAPI 3.0 gerado do catálogo, filtrado pelos privilégios da
-//! role do request (cada role só vê o que pode usar).
+//! OpenAPI 3.0 document generated from the catalog, filtered by the request
+//! role's privileges (each role only sees what it can use).
 
 use nelcota_core::Role;
 use serde_json::{Map, Value, json};
 
 use crate::catalog::{Catalog, Column, Table, TableKind};
 
-/// JSON Schema de um tipo do Postgres, pelo nome formatado.
+/// JSON Schema of a Postgres type, by its formatted name.
 pub fn json_schema(type_name: &str, enum_values: &[String]) -> Value {
     if !enum_values.is_empty() {
         return json!({ "type": "string", "enum": enum_values });
@@ -31,7 +31,7 @@ pub fn json_schema(type_name: &str, enum_values: &[String]) -> Value {
 fn column_schema(column: &Column) -> Value {
     let mut schema = json_schema(&column.type_name, &column.enum_values);
     if let Value::Object(map) = &mut schema {
-        let mut description = format!("Tipo Postgres: {}", column.full_type);
+        let mut description = format!("Postgres type: {}", column.full_type);
         if let Some(comment) = &column.comment {
             description = format!("{comment}\n\n{description}");
         }
@@ -99,14 +99,14 @@ pub fn document(catalog: &Catalog, role: Role) -> Value {
                 json!({
                     "name": c.name, "in": "query", "required": false,
                     "schema": { "type": "string" },
-                    "description": "Filtro: eq, neq, gt, gte, lt, lte, like, ilike, in, is (ex.: eq.valor, in.(a,b), not.is.null)",
+                    "description": "Filter: eq, neq, gt, gte, lt, lte, like, ilike, in, is (e.g. eq.value, in.(a,b), not.is.null)",
                 })
             })
             .collect();
         let mut item = Map::new();
         if privileges.select {
             let mut parameters = vec![
-                json!({ "name": "select", "in": "query", "schema": { "type": "string" }, "description": "Colunas: col1,col2 ou *" }),
+                json!({ "name": "select", "in": "query", "schema": { "type": "string" }, "description": "Columns: col1,col2 or *" }),
                 json!({ "name": "order", "in": "query", "schema": { "type": "string" }, "description": "col.asc|desc[.nullsfirst|nullslast],..." }),
                 json!({ "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 0 } }),
                 json!({ "name": "offset", "in": "query", "schema": { "type": "integer", "minimum": 0 } }),
@@ -117,7 +117,7 @@ pub fn document(catalog: &Catalog, role: Role) -> Value {
                 "get".into(),
                 json!({
                     "tags": [table.name], "parameters": parameters,
-                    "responses": { "200": json_response("Linhas visíveis (RLS)", array_of(&table.name)) },
+                    "responses": { "200": json_response("Visible rows (RLS)", array_of(&table.name)) },
                 }),
             );
         }
@@ -130,7 +130,7 @@ pub fn document(catalog: &Catalog, role: Role) -> Value {
                     "requestBody": { "required": true, "content": { "application/json": { "schema": {
                         "oneOf": [reference(&table.name), array_of(&table.name)] } } } },
                     "responses": {
-                        "201": json_response("Criado (corpo só com return=representation)", array_of(&table.name)),
+                        "201": json_response("Created (body only with return=representation)", array_of(&table.name)),
                     },
                 }),
             );
@@ -144,8 +144,8 @@ pub fn document(catalog: &Catalog, role: Role) -> Value {
                     "tags": [table.name], "parameters": parameters,
                     "requestBody": { "required": true, "content": { "application/json": { "schema": reference(&table.name) } } },
                     "responses": {
-                        "200": json_response("Atualizado (return=representation)", array_of(&table.name)),
-                        "204": { "description": "Atualizado" },
+                        "200": json_response("Updated (return=representation)", array_of(&table.name)),
+                        "204": { "description": "Updated" },
                     },
                 }),
             );
@@ -158,8 +158,8 @@ pub fn document(catalog: &Catalog, role: Role) -> Value {
                 json!({
                     "tags": [table.name], "parameters": parameters,
                     "responses": {
-                        "200": json_response("Removido (return=representation)", array_of(&table.name)),
-                        "204": { "description": "Removido" },
+                        "200": json_response("Deleted (return=representation)", array_of(&table.name)),
+                        "204": { "description": "Deleted" },
                     },
                 }),
             );
@@ -192,7 +192,7 @@ pub fn document(catalog: &Catalog, role: Role) -> Value {
                     "description": function.comment,
                     "requestBody": { "content": { "application/json": { "schema": {
                         "type": "object", "properties": properties, "required": required } } } },
-                    "responses": { "200": json_response("Resultado", returns) },
+                    "responses": { "200": json_response("Result", returns) },
                 } }),
             );
         }
@@ -203,7 +203,7 @@ pub fn document(catalog: &Catalog, role: Role) -> Value {
         "info": {
             "title": "Nelcota REST API",
             "version": env!("CARGO_PKG_VERSION"),
-            "description": "API gerada do schema do Postgres. Autorização: RLS. Envie Authorization: Bearer <jwt>.",
+            "description": "API generated from the Postgres schema. Authorization: RLS. Send Authorization: Bearer <jwt>.",
         },
         "servers": [{ "url": "/rest/v1" }],
         "paths": paths,
