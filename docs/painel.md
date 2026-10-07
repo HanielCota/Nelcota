@@ -58,13 +58,15 @@ O estado do RLS aparece como selo colorido: verde (RLS com policies), âmbar
 | Editar a estrutura | aba **Estrutura** da tabela (`/admin/tables/<nome>/structure`): adicionar, editar e apagar colunas; renomear a tabela; descrição; ligar/desligar o RLS; GRANTs por role; apagar a tabela (digitando o nome) |
 | Policies | "Nova policy" em cada tabela, com modelos (leitura pública, logados leem, dono lê/cria/altera/apaga); editar e apagar; "Ativar RLS" nas tabelas sem |
 | Token service_role | página **API**: gera um token com validade escolhida; aparece uma vez e não é guardado |
+| Criar usuário / redefinir senha | página **Usuários**: "Novo usuário" e "Redefinir senha…" no menu de cada um, com gerador de senha. Mesmas regras do cadastro público. Não há convite nem confirmação de email: o nelcota não envia emails e o login não exige confirmação |
+| Datas na grade | `timestamptz` aparece no fuso de quem vê (`06/10/2026, 19:26:15`); `timestamp` e `date` como gravados. O valor exato fica no tooltip, na edição e na exportação |
 
 | Página | O que tem |
 |---|---|
 | **Visão geral** | contadores (tabelas, usuários, policies, funções), alerta de tabelas sem RLS e lista de tabelas com GRANTs |
 | **Editor de tabelas** | todas as tabelas do schema exposto, linhas estimadas, GRANTs de `anon`/`authenticated` e status do RLS. Listar, inserir, editar e apagar linhas (tabelas com chave primária); criar tabelas e editar a estrutura |
 | **SQL** | editor que roda como o dono do banco (ignora RLS); Ctrl+Enter executa; erros com código e posição |
-| **Usuários** | busca por email, último login, sessões ativas; encerrar sessões ou apagar usuário |
+| **Usuários** | busca por email, último login, sessões ativas; criar usuário, redefinir senha (encerra as sessões), encerrar sessões ou apagar usuário |
 | **Policies** | policies de cada tabela (`USING`/`WITH CHECK`): criar, editar e apagar; tabelas sem RLS; funções executáveis por `anon` |
 | **API** | endereço do projeto, como cada role chama a API, exemplos em curl e JavaScript gerados das colunas de cada tabela, token service_role |
 
