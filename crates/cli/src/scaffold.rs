@@ -118,7 +118,12 @@ pub fn create(host: &Host, new: &NewProject) -> anyhow::Result<()> {
          NELCOTA_JWT_PRIVATE_KEY={jwt}\n\
          NELCOTA_JWT_ISSUER=https://{domain}\n\
          NELCOTA_DB_POOL_SIZE={pool}\n\
-         NELCOTA_LOG_FORMAT=json\n",
+         NELCOTA_LOG_FORMAT=json\n\n\
+         # Recuperação de senha por email (opcional): o SMTP do seu provedor e a\n\
+         # página do app que recebe o link. Depois: nelcota -p {name} up\n\
+         # NELCOTA_SMTP_URL=smtps://usuario:senha@smtp.exemplo.com:465\n\
+         # NELCOTA_SMTP_FROM=Nome <nao-responda@{domain}>\n\
+         # NELCOTA_PASSWORD_RECOVERY_URL=https://app.exemplo.com/nova-senha\n",
         name = new.entry.name,
         now = util::timestamp(),
         domain = new.entry.domain,
