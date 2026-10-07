@@ -60,7 +60,7 @@
 
     <form class="grid gap-5 rounded-lg border bg-card px-6 pt-10 pb-6 sm:px-8 sm:pb-8" onsubmit={submit}>
       <div class="text-center">
-        <h1 class="text-xl font-semibold tracking-tight">Entrar no nelcota</h1>
+        <h1 class="text-xl font-semibold tracking-tight">Entrar no Nelcota</h1>
         <p class="mt-1 text-sm text-muted-foreground">
           {#if project}Painel do projeto <span class="font-medium text-foreground">{project}</span>{:else}Painel administrativo{/if}
         </p>
