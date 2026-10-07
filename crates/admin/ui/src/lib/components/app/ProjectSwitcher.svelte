@@ -39,18 +39,18 @@
       {#snippet child({ props })}
         <button
           {...props}
-          class="flex h-7 min-w-0 items-center gap-2 rounded-md px-2 text-sm font-medium transition-colors hover:bg-accent aria-expanded:bg-accent"
+          class="flex h-9 min-w-0 cursor-pointer items-center gap-2 rounded-lg px-2.5 text-sm font-semibold transition-colors hover:bg-accent aria-expanded:bg-accent"
         >
           <span class="truncate">{data!.current}</span>
           <span
-            class="hidden rounded-full border border-brand/30 bg-brand/5 px-1.5 dark:bg-brand/10 py-px text-3xs font-medium tracking-wide text-brand uppercase sm:inline"
+            class="hidden rounded-full border border-brand/30 bg-brand/5 px-2 dark:bg-brand/10 py-0.5 text-3xs font-semibold tracking-wide text-brand uppercase sm:inline"
             >projeto</span
           >
-          <ChevronsUpDown class="size-3.5 shrink-0 text-muted-foreground" />
+          <ChevronsUpDown class="size-4 shrink-0 text-muted-foreground" />
         </button>
       {/snippet}
     </DropdownMenu.Trigger>
-    <DropdownMenu.Content align="start" class="w-64">
+    <DropdownMenu.Content align="start" class="w-72">
       <DropdownMenu.Label class="text-xs font-normal text-muted-foreground">
         Projetos{data.sso ? '' : ' (cada um pede o próprio login)'}
       </DropdownMenu.Label>

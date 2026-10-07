@@ -9,7 +9,7 @@
   import BookOpen from '@lucide/svelte/icons/book-open'
   import { api } from '$lib/api'
   import { logout } from '$lib/auth'
-  import { navGroups } from '$lib/nav'
+  import { navItems } from '$lib/nav'
   import { palette } from '$lib/palette.svelte'
   import { navigate } from '$lib/router.svelte'
   import { commandScore } from '$lib/search'
@@ -54,7 +54,7 @@
     }
   }
 
-  const pages = navGroups.flat()
+  const pages = navItems
 </script>
 
 <svelte:window onkeydown={onKeydown} />

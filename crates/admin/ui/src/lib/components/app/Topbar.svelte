@@ -52,72 +52,86 @@
   </svg>
 {/snippet}
 
-<header class="flex h-12 shrink-0 items-center gap-1.5 border-b border-sidebar-border bg-sidebar pr-3">
-  <div class="flex w-14 shrink-0 justify-center">
-    <a href={href('/')} class="hidden md:block" aria-label="Início"><Logo mark /></a>
-    <Button variant="ghost" size="icon-sm" class="md:hidden" onclick={() => (mobileOpen = true)} aria-label="Menu">
-      <Menu />
+<header class="flex h-14 shrink-0 items-center gap-2 border-b border-sidebar-border bg-sidebar pr-3 sm:pr-4">
+  <div class="flex w-16 shrink-0 justify-center">
+    <a href={href('/')} class="hidden rounded-lg transition-transform hover:scale-105 md:block" aria-label="Início"
+      ><Logo mark size="lg" /></a
+    >
+    <Button variant="ghost" size="icon" class="md:hidden" onclick={() => (mobileOpen = true)} aria-label="Menu">
+      <Menu class="size-5" />
     </Button>
   </div>
 
   <div class="hidden min-w-0 items-center gap-1.5 sm:flex"><ProjectSwitcher {slash} /></div>
 
-  <nav class="flex min-w-0 items-center gap-1.5 text-sm" aria-label="Trilha">
+  <nav class="flex min-w-0 items-center gap-1.5 text-sm font-medium" aria-label="Trilha">
     {#each crumbs as crumb, i (i)}
       {@const last = i === crumbs.length - 1}
       <!-- No celular só a página atual cabe sem cortar. -->
       <span class={['min-w-0 items-center gap-1.5', last ? 'flex' : 'hidden sm:flex']}>
         {#if i > 0}<span class="hidden sm:inline">{@render slash()}</span>{/if}
         {#if crumb.path}
-          <a href={href(crumb.path)} class="truncate text-muted-foreground transition-colors hover:text-foreground"
+          <a
+            href={href(crumb.path)}
+            class="truncate rounded-md px-1 text-muted-foreground transition-colors hover:text-foreground"
             >{crumb.label}</a
           >
         {:else}
-          <span class="truncate text-foreground" aria-current="page">{crumb.label}</span>
+          <span class="truncate px-1 font-semibold text-foreground" aria-current="page">{crumb.label}</span>
         {/if}
       </span>
     {/each}
   </nav>
 
-  <div class="ml-auto flex items-center gap-1.5">
+  <div class="ml-auto flex items-center gap-2">
     <button
       type="button"
       onclick={() => (palette.open = true)}
-      class="flex h-7 items-center gap-2 rounded-md border border-border-strong bg-card px-2 text-xs text-muted-foreground transition-colors hover:border-ring hover:text-foreground sm:w-56"
+      class="flex size-9 cursor-pointer items-center justify-center gap-2.5 rounded-lg border border-border-strong bg-card text-sm text-muted-foreground shadow-card transition-colors hover:border-ring hover:text-foreground sm:w-64 sm:justify-start sm:px-3 lg:w-80"
       aria-label="Buscar"
     >
-      <Search class="size-3.5" />
-      <span class="hidden flex-1 text-left sm:inline">Buscar…</span>
-      <kbd class="hidden rounded border bg-muted px-1 font-sans text-3xs sm:inline">{isMac ? '⌘' : 'Ctrl'} K</kbd>
+      <Search class="size-4 shrink-0" />
+      <span class="hidden flex-1 text-left sm:inline">Buscar páginas, tabelas…</span>
+      <kbd
+        class="hidden rounded-md border border-border-strong bg-muted px-1.5 py-0.5 font-sans text-2xs font-medium sm:inline"
+        >{isMac ? '⌘' : 'Ctrl'} K</kbd
+      >
     </button>
-    <Button variant="outline" size="sm" href={href('/connect')} class="hidden sm:inline-flex">
-      <Plug />API
+    <Button variant="outline" href={href('/connect')} class="hidden lg:inline-flex">
+      <Plug />Conectar
     </Button>
-    <Button variant="ghost" size="icon-sm" onclick={toggleMode} aria-label="Alternar tema" title="Alternar tema">
-      {#if mode.current === 'dark'}<Sun />{:else}<Moon />{/if}
+    <Button variant="ghost" size="icon" onclick={toggleMode} aria-label="Alternar tema" title="Alternar tema">
+      {#if mode.current === 'dark'}<Sun class="size-[18px]" />{:else}<Moon class="size-[18px]" />{/if}
     </Button>
     <DropdownMenu.Root>
       <DropdownMenu.Trigger>
         {#snippet child({ props })}
           <button
             {...props}
-            class="ml-1 grid size-7 place-items-center rounded-full border border-border-strong bg-muted text-xs font-medium text-foreground transition-colors hover:border-brand/60"
+            class="ml-0.5 grid size-9 cursor-pointer place-items-center rounded-full bg-brand-soft text-sm font-bold text-brand ring-1 ring-brand/25 transition-shadow hover:ring-2 hover:ring-brand/50 aria-expanded:ring-2 aria-expanded:ring-brand/50"
             aria-label="Conta"
           >
             {initial}
           </button>
         {/snippet}
       </DropdownMenu.Trigger>
-      <DropdownMenu.Content align="end" class="w-60">
-        <div class="px-2 py-1.5">
-          <p class="text-xs font-light text-muted-foreground">Conectado como</p>
-          <p class="truncate text-sm font-medium">{session.email}</p>
+      <DropdownMenu.Content align="end" class="w-64">
+        <div class="flex items-center gap-3 px-2 py-2">
+          <span
+            class="grid size-9 shrink-0 place-items-center rounded-full bg-brand-soft text-sm font-bold text-brand ring-1 ring-brand/25"
+            >{initial}</span
+          >
+          <div class="min-w-0">
+            <p class="text-xs text-muted-foreground">Conectado como</p>
+            <p class="truncate text-sm font-semibold">{session.email}</p>
+          </div>
         </div>
         <DropdownMenu.Separator />
         <DropdownMenu.Item onclick={toggleMode}>
           {#if mode.current === 'dark'}<Sun />{:else}<Moon />{/if}Alternar tema
         </DropdownMenu.Item>
-        <DropdownMenu.Item onclick={logout}><LogOut />Sair</DropdownMenu.Item>
+        <DropdownMenu.Separator />
+        <DropdownMenu.Item variant="destructive" onclick={logout}><LogOut />Sair</DropdownMenu.Item>
       </DropdownMenu.Content>
     </DropdownMenu.Root>
   </div>
@@ -125,24 +139,33 @@
 
 <!-- Navegação em telas pequenas, onde o trilho lateral some. -->
 <Sheet.Root bind:open={mobileOpen}>
-  <Sheet.Content side="left" class="w-64 gap-0 bg-sidebar p-0">
-    <div class="flex h-12 items-center border-b border-sidebar-border px-4"><Logo /></div>
-    <nav class="p-2" aria-label="Navegação principal">
+  <Sheet.Content side="left" class="w-72 gap-0 bg-sidebar p-0">
+    <div class="flex h-14 items-center border-b border-sidebar-border px-5"><Logo /></div>
+    <nav class="grid gap-4 p-3" aria-label="Navegação principal">
       {#each navGroups as group, g (g)}
-        {#if g > 0}<div class="mx-2 my-2 border-t border-sidebar-border"></div>{/if}
-        {#each group as item (item.path)}
-          {@const active = isActive(item.path)}
-          <a
-            href={href(item.path)}
-            onclick={() => (mobileOpen = false)}
-            class={[
-              'flex h-9 items-center gap-3 rounded-md px-3 text-sm',
-              active ? 'bg-sidebar-accent text-foreground' : 'text-sidebar-foreground hover:bg-sidebar-accent/60',
-            ]}
-          >
-            <item.icon class={['size-[18px]', active && 'text-brand']} strokeWidth={1.6} />{item.title}
-          </a>
-        {/each}
+        <div>
+          {#if group.label}
+            <p class="mb-1 px-3 text-3xs font-semibold tracking-[0.08em] text-muted-foreground uppercase">
+              {group.label}
+            </p>
+          {/if}
+          {#each group.items as item (item.path)}
+            {@const active = isActive(item.path)}
+            <a
+              href={href(item.path)}
+              onclick={() => (mobileOpen = false)}
+              aria-current={active ? 'page' : undefined}
+              class={[
+                'flex h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium',
+                active
+                  ? 'bg-sidebar-accent text-foreground shadow-card'
+                  : 'text-sidebar-foreground hover:bg-sidebar-accent/60',
+              ]}
+            >
+              <item.icon class={['size-[18px]', active && 'text-brand']} strokeWidth={1.75} />{item.title}
+            </a>
+          {/each}
+        </div>
       {/each}
     </nav>
   </Sheet.Content>
