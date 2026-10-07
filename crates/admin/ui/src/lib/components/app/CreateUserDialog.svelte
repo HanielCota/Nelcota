@@ -3,6 +3,7 @@
   import { Button } from '$lib/components/ui/button'
   import { Input } from '$lib/components/ui/input'
   import { Label } from '$lib/components/ui/label'
+  import UserPlus from '@lucide/svelte/icons/user-plus'
   import { toast } from 'svelte-sonner'
   import PasswordField from './PasswordField.svelte'
   import { api } from '$lib/api'
@@ -42,18 +43,21 @@
 <Dialog.Root bind:open>
   <Dialog.Content class="sm:max-w-lg">
     <form class="grid gap-5" onsubmit={submit}>
-      <Dialog.Header>
+      <Dialog.Header class="gap-2">
+        <span class="grid size-11 place-items-center mb-1 rounded-xl border border-brand/20 bg-brand-soft text-brand" aria-hidden="true">
+          <UserPlus class="size-5" />
+        </span>
         <Dialog.Title>Novo usuário</Dialog.Title>
         <Dialog.Description>
           A conta já pode entrar pela API (<code>/auth/v1/token</code>) com o email e a senha abaixo.
         </Dialog.Description>
       </Dialog.Header>
       <div class="grid gap-2">
-        <Label for="new-user-email" class="font-normal text-muted-foreground">Email</Label>
-        <Input id="new-user-email" type="email" bind:value={email} placeholder="ana@exemplo.com" autocomplete="off" required />
+        <Label for="new-user-email">Email</Label>
+        <Input id="new-user-email" type="email" bind:value={email} placeholder="ana@exemplo.com" autocomplete="off" class="h-10" required />
       </div>
       <div class="grid gap-2">
-        <Label for="new-user-password" class="font-normal text-muted-foreground">Senha</Label>
+        <Label for="new-user-password">Senha</Label>
         <PasswordField id="new-user-password" bind:value={password} />
       </div>
       <Dialog.Footer>
