@@ -27,9 +27,9 @@ fn invalid(message: impl Into<String>) -> QueryError {
     QueryError::Invalid(message.into())
 }
 
-/// Quoted identifier, with inner quotes doubled.
+/// Quoted identifier, with inner quotes doubled (libpq's rules).
 pub fn ident(name: &str) -> String {
-    format!("\"{}\"", name.replace('"', "\"\""))
+    postgres_protocol::escape::escape_identifier(name)
 }
 
 // ------------------------------------------------------------------ parameters
@@ -842,6 +842,14 @@ mod tests {
     #[test]
     fn ident_doubles_quotes() {
         assert_eq!(ident("a\"b"), "\"a\"\"b\"");
+        // Backslashes and non-ASCII pass through untouched (no E'' form for identifiers).
+        assert_eq!(ident("a\\b"), "\"a\\b\"");
+        assert_eq!(ident("café"), "\"café\"");
+        assert_eq!(ident(""), "\"\"");
+        assert_eq!(
+            ident("x\"; drop table t; --"),
+            "\"x\"\"; drop table t; --\""
+        );
     }
 
     #[test]

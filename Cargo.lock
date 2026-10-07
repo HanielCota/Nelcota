@@ -1851,6 +1851,7 @@ dependencies = [
  "futures-util",
  "nelcota-auth",
  "nelcota-core",
+ "postgres-protocol",
  "serde",
  "serde_json",
  "thiserror",
