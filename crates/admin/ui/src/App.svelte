@@ -51,7 +51,10 @@
 
 {#if session.email === undefined}
   <div class="grid h-screen place-items-center">
-    <span class="size-5 animate-spin rounded-full border-2 border-border-strong border-t-brand"></span>
+    <div class="flex flex-col items-center gap-4" role="status">
+      <span class="size-7 animate-spin rounded-full border-[2.5px] border-border-strong border-t-brand"></span>
+      <span class="text-sm font-medium text-muted-foreground">Carregando painel…</span>
+    </div>
   </div>
 {:else if session.email === null}
   <Login />
@@ -60,7 +63,7 @@
     <!-- Primeira parada do Tab: pula topbar e menu. -->
     <a
       href="#conteudo"
-      class="sr-only z-50 rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
+      class="sr-only z-50 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-raised focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
       >Pular para o conteúdo</a
     >
     <div class="flex h-screen flex-col overflow-hidden bg-background">
