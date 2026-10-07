@@ -18,7 +18,7 @@ rows each user sees.
 
 | Parameter | Example | Effect |
 |---|---|---|
-| `select` | `select=id,title` | columns (default `*`) |
+| `select` | `select=id,title` | columns (default `*`) and embedded relations, see below |
 | `{column}` | `price=gt.10` | filter (several are combined with AND) |
 | `or`, `and` | `or=(status.eq.paid,status.eq.shipped)` | group of filters, see below |
 | `order` | `order=created_at.desc.nullslast,id` | ordering |
@@ -37,6 +37,37 @@ rows each user sees.
 
 Values reach Postgres as parameters and Postgres itself converts them to the
 column type (`$1::text::<type>`). A value invalid for the type gives 400.
+
+### Embedding related rows
+
+`select` follows foreign keys in either direction, so one request returns an
+order with its customer and items:
+
+```
+GET /rest/v1/orders?select=id,total,customers(name),items(product,qty)
+
+[{ "id": 10, "total": 30.00,
+   "customers": { "name": "Ana" },
+   "items": [{ "product": "Pen", "qty": 2 }, { "product": "Ruler", "qty": 1 }] }]
+```
+
+- When this table has the foreign key (`orders.customer_id → customers`), the
+  embed is an **object**, or `null` when nothing matches. When the other table
+  points here (`items.order_id → orders`), it is an **array**, `[]` when empty.
+- `items(*)` takes every column. `purchases:orders(*)` renames the key.
+- Two foreign keys to the same table (`buyer_id`, `seller_id` → `users`) are
+  ambiguous: pick one with the column or the constraint name,
+  `buyer:users!buyer_id(email),seller:users!seller_id(email)`. The error lists
+  the options.
+- One level deep, and not a table into itself (self-reference); filters and
+  ordering apply to the main table. A key that repeats a selected column is a
+  400: rename it with an alias.
+- **RLS applies to the embedded table** too: each embed runs with the request's
+  role, so it shows exactly what a direct read of that table would. A related
+  row the user cannot see becomes `null` or is left out of the array.
+- Works in the representation of writes (`return=representation`).
+- Each embed is a correlated subquery: index the foreign key columns on the
+  "many" side (Postgres does not create those indexes on its own).
 
 ### Combining filters: `or` and `and`
 
@@ -158,5 +189,5 @@ NOTIFY nelcota, 'reload schema';
 
 ## Out of the MVP
 
-Relation embedding (`select=*,orders(*)`), `GET` on `/rpc`,
-`Accept: application/vnd.pgrst.object+json`.
+Embedding more than one level deep, filtering or ordering embedded rows,
+`GET` on `/rpc`, `Accept: application/vnd.pgrst.object+json`.

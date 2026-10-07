@@ -170,7 +170,8 @@ async fn read(
     let table = catalog
         .table(&name)
         .ok_or_else(|| not_found("table", &name))?;
-    let request = query::parse_request(&pairs(raw), table).map_err(bad_query)?;
+    let request =
+        query::parse_request_with_relations(&pairs(raw), table, &catalog).map_err(bad_query)?;
     reject_on_conflict(&request)?;
     let prefer = Prefer::from_headers(&headers);
     let sql = query::select(&catalog.schema, table, &request, settings.max_rows);
@@ -242,7 +243,8 @@ async fn create(
     let table = catalog
         .table(&name)
         .ok_or_else(|| not_found("table", &name))?;
-    let request = query::parse_request(&pairs(raw), table).map_err(bad_query)?;
+    let request =
+        query::parse_request_with_relations(&pairs(raw), table, &catalog).map_err(bad_query)?;
     if !request.filters.is_empty() {
         return Err(bad_query(QueryError::Invalid(
             "POST does not accept filters".into(),
@@ -326,7 +328,8 @@ async fn update(
     let table = catalog
         .table(&name)
         .ok_or_else(|| not_found("table", &name))?;
-    let request = query::parse_request(&pairs(raw), table).map_err(bad_query)?;
+    let request =
+        query::parse_request_with_relations(&pairs(raw), table, &catalog).map_err(bad_query)?;
     require_filters(&request)?;
     reject_on_conflict(&request)?;
     let prefer = Prefer::from_headers(&headers);
@@ -363,7 +366,8 @@ async fn remove(
     let table = catalog
         .table(&name)
         .ok_or_else(|| not_found("table", &name))?;
-    let request = query::parse_request(&pairs(raw), table).map_err(bad_query)?;
+    let request =
+        query::parse_request_with_relations(&pairs(raw), table, &catalog).map_err(bad_query)?;
     require_filters(&request)?;
     reject_on_conflict(&request)?;
     let prefer = Prefer::from_headers(&headers);

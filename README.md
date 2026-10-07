@@ -106,7 +106,7 @@ token kills the session.
 ## Out of the MVP
 
 Realtime, Storage (use any S3), Edge Functions, OAuth/MFA/magic link,
-multi-tenant, relation embedding. The architecture leaves room for them.
+multi-tenant. The architecture leaves room for them.
 
 ## License
 

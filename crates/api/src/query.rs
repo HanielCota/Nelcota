@@ -15,7 +15,7 @@ use bytes::BytesMut;
 use serde_json::{Map, Value};
 use tokio_postgres::types::{IsNull, ToSql, Type, to_sql_checked};
 
-use crate::catalog::{Column, Function, Table};
+use crate::catalog::{Catalog, Column, ForeignKey, Function, Table};
 
 #[derive(Debug, thiserror::Error)]
 pub enum QueryError {
@@ -85,11 +85,45 @@ impl Sql {
 
 // ------------------------------------------------------------------ request
 
+/// What `select=` asks for: `*` and/or columns, plus embedded relations.
 #[derive(Clone, Debug, PartialEq)]
-pub enum Select {
-    All,
-    Columns(Vec<String>),
+pub struct Select {
+    pub star: bool,
+    pub columns: Vec<String>,
+    pub embeds: Vec<Embed>,
 }
+
+impl Select {
+    /// No `select=`: every column, no relations.
+    pub fn all() -> Self {
+        Select {
+            star: true,
+            columns: Vec::new(),
+            embeds: Vec::new(),
+        }
+    }
+}
+
+/// `(related column, this table's column)` pairs of a foreign key, ANDed.
+pub type JoinPairs = Vec<(String, String)>;
+
+/// A related table embedded through a foreign key (`customers(name)`).
+#[derive(Clone, Debug, PartialEq)]
+pub struct Embed {
+    /// Key of the embedded value in the JSON (the table name or `alias:`).
+    pub alias: String,
+    /// The related table.
+    pub table: String,
+    /// `true` when the related table points here (one-to-many, an array);
+    /// `false` when this table points there (many-to-one, an object or null).
+    pub many: bool,
+    pub join: JoinPairs,
+    pub star: bool,
+    pub columns: Vec<String>,
+}
+
+/// Longest identifier Postgres keeps (longer aliases would be cut silently).
+const MAX_IDENTIFIER_BYTES: usize = 63;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum CmpOp {
@@ -249,24 +283,174 @@ fn column<'a>(table: &'a Table, name: &str) -> Result<&'a Column, QueryError> {
     })
 }
 
-fn parse_select(value: &str, table: &Table) -> Result<Select, QueryError> {
-    let value = value.trim();
-    if value == "*" {
-        return Ok(Select::All);
-    }
-    let mut columns = Vec::new();
-    for name in value.split(',').map(str::trim) {
-        if name.is_empty() {
+/// `*`, columns and embedded relations: `id,total,customers(name),items(*)`.
+/// Relations need the catalog; without it (the panel), they are refused.
+fn parse_select(
+    value: &str,
+    table: &Table,
+    catalog: Option<&Catalog>,
+) -> Result<Select, QueryError> {
+    let mut select = Select {
+        star: false,
+        columns: Vec::new(),
+        embeds: Vec::new(),
+    };
+    for item in split_top_level(value)?.into_iter().map(str::trim) {
+        if item.is_empty() {
             return Err(invalid("empty or malformed select"));
         }
-        if name.contains('(') {
-            return Err(invalid(
-                "embedding relations in select is not supported yet",
-            ));
+        if item == "*" {
+            select.star = true;
+        } else if item.contains('(') {
+            let Some(catalog) = catalog else {
+                return Err(invalid("embedding relations is not available here"));
+            };
+            select.embeds.push(parse_embed(item, table, catalog)?);
+        } else if item.contains(':') {
+            return Err(invalid(format!(
+                "column aliases are not supported: '{item}'"
+            )));
+        } else {
+            select.columns.push(column(table, item)?.name.clone());
         }
-        columns.push(column(table, name)?.name.clone());
     }
-    Ok(Select::Columns(columns))
+    // An embedded key must not collide with a column of the same row.
+    let mut keys: Vec<&str> = select.columns.iter().map(String::as_str).collect();
+    if select.star {
+        keys.extend(table.columns.iter().map(|c| c.name.as_str()));
+    }
+    for embed in &select.embeds {
+        if keys.contains(&embed.alias.as_str()) {
+            return Err(invalid(format!(
+                "'{}' is already a key of the row: rename the embed with alias:{}(...)",
+                embed.alias, embed.table
+            )));
+        }
+        keys.push(&embed.alias);
+    }
+    Ok(select)
+}
+
+/// `[alias:]table[!hint](columns)`, one level deep. The hint picks among
+/// several foreign keys: the key's column or the constraint name.
+fn parse_embed(item: &str, parent: &Table, catalog: &Catalog) -> Result<Embed, QueryError> {
+    let open = item.find('(').unwrap_or_default();
+    let inner = item[open + 1..]
+        .strip_suffix(')')
+        .ok_or_else(|| invalid(format!("malformed embed: '{item}'")))?;
+    if inner.contains('(') {
+        return Err(invalid("only one level of embedding is supported"));
+    }
+    let head = item[..open].trim();
+    let (alias, rest) = match head.split_once(':') {
+        Some((alias, rest)) => (Some(alias.trim()), rest.trim()),
+        None => (None, head),
+    };
+    let (name, hint) = match rest.split_once('!') {
+        Some((name, hint)) => (name.trim(), Some(hint.trim())),
+        None => (rest, None),
+    };
+    let target = catalog.table(name).ok_or_else(|| {
+        invalid(format!(
+            "table '{name}' does not exist in the exposed schema"
+        ))
+    })?;
+    let alias = alias.unwrap_or(name);
+    if alias.is_empty() || alias.len() > MAX_IDENTIFIER_BYTES {
+        return Err(invalid(format!("invalid embed alias: '{alias}'")));
+    }
+    let (many, join) = resolve_relation(&catalog.schema, parent, target, hint)?;
+
+    let mut embed = Embed {
+        alias: alias.to_owned(),
+        table: target.name.clone(),
+        many,
+        join,
+        star: false,
+        columns: Vec::new(),
+    };
+    for col in inner.split(',').map(str::trim) {
+        match col {
+            "" => return Err(invalid(format!("empty column list in '{item}'"))),
+            "*" => embed.star = true,
+            _ if col.contains(':') => {
+                return Err(invalid(format!(
+                    "column aliases are not supported: '{col}'"
+                )));
+            }
+            _ => embed.columns.push(column(target, col)?.name.clone()),
+        }
+    }
+    Ok(embed)
+}
+
+/// The foreign key linking `parent` and `target`, in either direction.
+/// Returns `(many, join pairs)`; no link or several links are errors.
+fn resolve_relation(
+    schema: &str,
+    parent: &Table,
+    target: &Table,
+    hint: Option<&str>,
+) -> Result<(bool, JoinPairs), QueryError> {
+    // The same key serves both directions here, so a hint cannot tell parent
+    // from children.
+    if parent.name == target.name {
+        return Err(invalid(format!(
+            "embedding '{}' in itself (a self-reference) is not supported yet",
+            parent.name
+        )));
+    }
+    let matches_hint = |fk: &ForeignKey| match hint {
+        None => true,
+        Some(h) => fk.name == h || fk.columns == [h],
+    };
+    let pairs = |left: &[String], right: &[String]| -> JoinPairs {
+        left.iter().cloned().zip(right.iter().cloned()).collect()
+    };
+    let mut candidates: Vec<(&ForeignKey, bool, JoinPairs)> = Vec::new();
+    // This table points there: many-to-one.
+    for fk in &parent.foreign_keys {
+        if fk.foreign_schema == schema && fk.foreign_table == target.name && matches_hint(fk) {
+            candidates.push((fk, false, pairs(&fk.foreign_columns, &fk.columns)));
+        }
+    }
+    // The related table points here: one-to-many.
+    for fk in &target.foreign_keys {
+        if fk.foreign_schema == schema && fk.foreign_table == parent.name && matches_hint(fk) {
+            candidates.push((fk, true, pairs(&fk.columns, &fk.foreign_columns)));
+        }
+    }
+    match candidates.len() {
+        0 => Err(invalid(match hint {
+            Some(h) => format!(
+                "no relationship between '{}' and '{}' matches '{h}'",
+                parent.name, target.name
+            ),
+            None => format!(
+                "no foreign key links '{}' and '{}'",
+                parent.name, target.name
+            ),
+        })),
+        1 => {
+            let (_, many, join) = candidates.remove(0);
+            Ok((many, join))
+        }
+        _ => {
+            let options: Vec<String> = candidates
+                .iter()
+                .map(|(fk, _, _)| match fk.columns.as_slice() {
+                    [column] => format!("{}!{column}", target.name),
+                    _ => format!("{}!{}", target.name, fk.name),
+                })
+                .collect();
+            Err(invalid(format!(
+                "more than one relationship between '{}' and '{}': pick one with {}",
+                parent.name,
+                target.name,
+                options.join(" or ")
+            )))
+        }
+    }
 }
 
 fn parse_order(value: &str, table: &Table) -> Result<Vec<OrderTerm>, QueryError> {
@@ -550,10 +734,29 @@ fn parse_on_conflict(value: &str, table: &Table) -> Result<Vec<String>, QueryErr
     Ok(columns)
 }
 
-/// Parses the query string. Every column mentioned is validated against the table.
+/// Parses the query string. Every column mentioned is validated against the
+/// table; embedded relations are refused (see [`parse_request_with_relations`]).
 pub fn parse_request(pairs: &[(String, String)], table: &Table) -> Result<Request, QueryError> {
+    parse(pairs, table, None)
+}
+
+/// Like [`parse_request`], also resolving embedded relations in `select=`
+/// through the catalog's foreign keys.
+pub fn parse_request_with_relations(
+    pairs: &[(String, String)],
+    table: &Table,
+    catalog: &Catalog,
+) -> Result<Request, QueryError> {
+    parse(pairs, table, Some(catalog))
+}
+
+fn parse(
+    pairs: &[(String, String)],
+    table: &Table,
+    catalog: Option<&Catalog>,
+) -> Result<Request, QueryError> {
     let mut request = Request {
-        select: Select::All,
+        select: Select::all(),
         filters: Vec::new(),
         order: Vec::new(),
         limit: None,
@@ -562,7 +765,7 @@ pub fn parse_request(pairs: &[(String, String)], table: &Table) -> Result<Reques
     };
     for (key, value) in pairs {
         match key.as_str() {
-            "select" => request.select = parse_select(value, table)?,
+            "select" => request.select = parse_select(value, table, catalog)?,
             "order" => request.order = parse_order(value, table)?,
             "limit" => request.limit = Some(parse_non_negative("limit", value)?),
             "offset" => request.offset = Some(parse_non_negative("offset", value)?),
@@ -586,15 +789,57 @@ fn qualified(schema: &str, table: &Table) -> String {
     format!("{}.{}", ident(schema), ident(&table.name))
 }
 
-fn select_list(select: &Select, alias: &str) -> String {
-    match select {
-        Select::All => format!("{alias}.*"),
-        Select::Columns(columns) => columns
-            .iter()
-            .map(|c| format!("{alias}.{}", ident(c)))
-            .collect::<Vec<_>>()
-            .join(", "),
+fn select_list(schema: &str, select: &Select, alias: &str) -> String {
+    let mut parts: Vec<String> = Vec::new();
+    if select.star {
+        parts.push(format!("{alias}.*"));
     }
+    parts.extend(
+        select
+            .columns
+            .iter()
+            .map(|c| format!("{alias}.{}", ident(c))),
+    );
+    parts.extend(
+        select
+            .embeds
+            .iter()
+            .enumerate()
+            .map(|(n, embed)| embed_sql(schema, embed, alias, n)),
+    );
+    parts.join(", ")
+}
+
+/// Correlated subquery for one embedded relation: an object (or null) for
+/// many-to-one, an array for one-to-many. It runs with the request's role,
+/// so the related table's RLS filters what comes back.
+fn embed_sql(schema: &str, embed: &Embed, parent: &str, n: usize) -> String {
+    let row = format!("_e{n}");
+    let json = format!("_j{n}");
+    let mut columns: Vec<String> = Vec::new();
+    if embed.star {
+        columns.push(format!("{row}.*"));
+    }
+    columns.extend(embed.columns.iter().map(|c| format!("{row}.{}", ident(c))));
+    let join = embed
+        .join
+        .iter()
+        .map(|(related, own)| format!("{row}.{} = {parent}.{}", ident(related), ident(own)))
+        .collect::<Vec<_>>()
+        .join(" AND ");
+    let rows = format!(
+        "SELECT {} FROM {}.{} AS {row} WHERE {join}",
+        columns.join(", "),
+        ident(schema),
+        ident(&embed.table),
+    );
+    let value = if embed.many {
+        format!("(SELECT coalesce(json_agg({json}), '[]') FROM ({rows}) AS {json})")
+    } else {
+        // The foreign key references a unique key: at most one row.
+        format!("(SELECT to_json({json}) FROM ({rows}) AS {json})")
+    };
+    format!("{value} AS {}", ident(&embed.alias))
 }
 
 /// Escapes an element of a Postgres array literal (`{"a","b"}`).
@@ -741,7 +986,7 @@ fn rows_subquery(
     }
     format!(
         "SELECT {} FROM {} AS _t{filters}{tail}",
-        select_list(&request.select, "_t"),
+        select_list(schema, &request.select, "_t"),
         qualified(schema, table),
     )
 }
@@ -758,11 +1003,11 @@ pub fn count(schema: &str, table: &Table, request: &Request) -> Sql {
 }
 
 /// Wraps a write to return the representation (`Prefer: return=representation`).
-fn with_representation(write: String, select: &Select) -> String {
+fn with_representation(schema: &str, write: String, select: &Select) -> String {
     format!(
         "WITH _w AS ({write} RETURNING _t.*) \
          SELECT coalesce(json_agg(_r), '[]')::text, count(*) FROM (SELECT {} FROM _w AS _t) _r",
-        select_list(select, "_t"),
+        select_list(schema, select, "_t"),
     )
 }
 
@@ -852,7 +1097,7 @@ pub fn insert(
     }
 
     sql.text = match (statements.len(), representation) {
-        (1, Some(select)) => with_representation(statements.remove(0), select),
+        (1, Some(select)) => with_representation(schema, statements.remove(0), select),
         (1, None) => statements.remove(0),
         (_, Some(select)) => {
             let ctes: Vec<String> = statements
@@ -866,7 +1111,7 @@ pub fn insert(
             format!(
                 "WITH {} SELECT coalesce(json_agg(_r), '[]')::text, count(*) FROM (SELECT {} FROM ({}) AS _t) _r",
                 ctes.join(", "),
-                select_list(select, "_t"),
+                select_list(schema, select, "_t"),
                 union.join(" UNION ALL "),
             )
         }
@@ -910,7 +1155,7 @@ pub fn update(
         "UPDATE {target} AS _t SET {assignments} FROM json_populate_record(NULL::{target}, {p}::json) AS _b{filters}"
     );
     sql.text = match representation {
-        Some(select) => with_representation(write, select),
+        Some(select) => with_representation(schema, write, select),
         None => write,
     };
     Ok(sql)
@@ -926,7 +1171,7 @@ pub fn delete(
     let filters = where_clause(&mut sql, table, filters);
     let write = format!("DELETE FROM {} AS _t{filters}", qualified(schema, table));
     sql.text = match representation {
-        Some(select) => with_representation(write, select),
+        Some(select) => with_representation(schema, write, select),
         None => write,
     };
     sql
@@ -1346,5 +1591,138 @@ mod tests {
         no_pk.primary_key.clear();
         assert!(Upsert::new(&no_pk, None, Resolution::Merge).is_err());
         assert!(Upsert::new(&no_pk, Some(&["title".to_owned()]), Resolution::Merge).is_ok());
+    }
+
+    // ------------------------------------------------------------- embedding
+
+    fn fk(name: &str, columns: &[&str], table: &str, foreign: &[&str]) -> ForeignKey {
+        ForeignKey {
+            name: name.into(),
+            columns: columns.iter().map(|c| (*c).into()).collect(),
+            foreign_schema: "public".into(),
+            foreign_table: table.into(),
+            foreign_columns: foreign.iter().map(|c| (*c).into()).collect(),
+        }
+    }
+
+    fn shop() -> Catalog {
+        let mut customers = table();
+        customers.name = "customers".into();
+        customers.columns = vec![col("id", "bigint"), col("name", "text")];
+        let mut orders = table();
+        orders.name = "orders".into();
+        orders.columns = vec![
+            col("id", "bigint"),
+            col("buyer_id", "bigint"),
+            col("seller_id", "bigint"),
+            col("customer_id", "bigint"),
+            col("total", "numeric"),
+        ];
+        orders.foreign_keys = vec![
+            fk(
+                "orders_customer_id_fkey",
+                &["customer_id"],
+                "customers",
+                &["id"],
+            ),
+            fk("orders_buyer_id_fkey", &["buyer_id"], "users", &["id"]),
+            fk("orders_seller_id_fkey", &["seller_id"], "users", &["id"]),
+        ];
+        let mut items = table();
+        items.name = "items".into();
+        items.columns = vec![
+            col("id", "bigint"),
+            col("order_id", "bigint"),
+            col("qty", "integer"),
+        ];
+        items.foreign_keys = vec![fk("items_order_id_fkey", &["order_id"], "orders", &["id"])];
+        let mut users = table();
+        users.name = "users".into();
+        users.columns = vec![col("id", "bigint"), col("email", "text")];
+        Catalog {
+            schema: "public".into(),
+            tables: [customers, orders, items, users]
+                .into_iter()
+                .map(|t| (t.name.clone(), t))
+                .collect(),
+            functions: Default::default(),
+        }
+    }
+
+    fn select_of(table: &str, select: &str) -> Result<(Select, String), QueryError> {
+        let catalog = shop();
+        let t = catalog.table(table).unwrap();
+        let req = parse_request_with_relations(&pairs(&[("select", select)]), t, &catalog)?;
+        let sql = super::select("public", t, &req, None);
+        Ok((req.select, sql.text))
+    }
+
+    #[test]
+    fn embeds_follow_foreign_keys_in_both_directions() {
+        let (select, text) = select_of("orders", "id,customers(name),items(*)").unwrap();
+        assert_eq!(select.columns, ["id"]);
+        let customer = &select.embeds[0];
+        assert_eq!(
+            (customer.many, &customer.join),
+            (false, &vec![("id".to_owned(), "customer_id".to_owned())])
+        );
+        let items = &select.embeds[1];
+        assert_eq!(
+            (items.many, &items.join),
+            (true, &vec![("order_id".to_owned(), "id".to_owned())])
+        );
+        assert!(text.contains(
+            "(SELECT to_json(_j0) FROM (SELECT _e0.\"name\" FROM \"public\".\"customers\" AS _e0 WHERE _e0.\"id\" = _t.\"customer_id\") AS _j0) AS \"customers\""
+        ), "{text}");
+        assert!(text.contains(
+            "(SELECT coalesce(json_agg(_j1), '[]') FROM (SELECT _e1.* FROM \"public\".\"items\" AS _e1 WHERE _e1.\"order_id\" = _t.\"id\") AS _j1) AS \"items\""
+        ), "{text}");
+    }
+
+    #[test]
+    fn several_keys_need_a_hint_and_aliases_name_the_result() {
+        let err = select_of("orders", "users(email)").unwrap_err().to_string();
+        assert!(err.contains("users!buyer_id or users!seller_id"), "{err}");
+        let (select, _) = select_of(
+            "orders",
+            "buyer:users!buyer_id(email),seller:users!orders_seller_id_fkey(email)",
+        )
+        .unwrap();
+        let picked: Vec<(&str, &str)> = select
+            .embeds
+            .iter()
+            .map(|e| (e.alias.as_str(), e.join[0].1.as_str()))
+            .collect();
+        assert_eq!(picked, [("buyer", "buyer_id"), ("seller", "seller_id")]);
+    }
+
+    #[test]
+    fn bad_embeds_are_rejected() {
+        let long = format!("{}:customers(name)", "a".repeat(64));
+        for (table, select) in [
+            ("orders", "nope(id)"),                    // unknown table
+            ("customers", "users(email)"),             // no foreign key
+            ("orders", "customers(nope)"),             // unknown column
+            ("orders", "customers(name,orders(id))"),  // nested
+            ("orders", "customers(name"),              // unbalanced
+            ("orders", "customers()"),                 // empty list
+            ("orders", "users!nope(email)"),           // hint matches nothing
+            ("orders", "total,total:customers(name)"), // alias collides with a column
+            ("orders", "*,id:customers(name)"),
+            ("orders", "customers(name),customers(id)"), // same key twice
+            ("orders", "x:customers(n:name)"),           // column alias
+            ("orders", long.as_str()),
+            ("orders", "orders(id)"), // self-reference
+            ("orders", "\"customers\"; drop table x(id)"),
+        ] {
+            assert!(select_of(table, select).is_err(), "{table}?select={select}");
+        }
+    }
+
+    #[test]
+    fn the_panel_parser_refuses_embeds() {
+        let catalog = shop();
+        let t = catalog.table("orders").unwrap();
+        assert!(parse_request(&pairs(&[("select", "customers(name)")]), t).is_err());
     }
 }

@@ -116,7 +116,7 @@ pub fn document(catalog: &Catalog, role: Role) -> Value {
         let mut item = Map::new();
         if privileges.select {
             let mut parameters = vec![
-                json!({ "name": "select", "in": "query", "schema": { "type": "string" }, "description": "Columns: col1,col2 or *" }),
+                json!({ "name": "select", "in": "query", "schema": { "type": "string" }, "description": "Columns: col1,col2 or *; embed related rows through foreign keys: customers(name), items(*), alias:table!fk_column(...)" }),
                 json!({ "name": "order", "in": "query", "schema": { "type": "string" }, "description": "col.asc|desc[.nullsfirst|nullslast],..." }),
                 json!({ "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 0 } }),
                 json!({ "name": "offset", "in": "query", "schema": { "type": "integer", "minimum": 0 } }),
