@@ -23,7 +23,10 @@ use sha2::{Digest, Sha256};
 use tokio_postgres::error::SqlState;
 use uuid::Uuid;
 
-use crate::{Auth, JwtVerifier, Keys, Passwords, RateLimiter, SharedVerifier};
+use crate::{
+    Auth, JwtVerifier, Keys, Passwords, RateLimiter, SharedVerifier,
+    credentials::{InvalidCredential, normalize_email, validate_password},
+};
 
 /// Configuração dos endpoints de auth.
 #[derive(Clone, Debug)]
@@ -123,26 +126,9 @@ fn limit(state: &AuthState, key: &str) -> Result<(), ApiError> {
         .map_err(|wait| ApiError::rate_limited(wait.as_secs()))
 }
 
-fn normalize_email(email: &str) -> Result<String, ApiError> {
-    let email = email.trim().to_lowercase();
-    let valid = email.len() <= 254
-        && !email.chars().any(char::is_whitespace)
-        && email.split_once('@').is_some_and(|(local, domain)| {
-            !local.is_empty() && domain.contains('.') && !domain.contains('@')
-        });
-    if valid {
-        Ok(email)
-    } else {
-        Err(validation("email inválido"))
-    }
-}
-
-fn validate_password(password: &str) -> Result<(), ApiError> {
-    match password.chars().count() {
-        0..8 => Err(validation("a senha precisa de ao menos 8 caracteres")),
-        8..=256 => Ok(()),
-        _ => Err(validation("a senha pode ter no máximo 256 caracteres")),
-    }
+/// Credencial recusada pelas regras de `credentials` vira erro de validação.
+fn invalid(err: InvalidCredential) -> ApiError {
+    validation(err.0)
 }
 
 /// Refresh token opaco: 32 bytes aleatórios. Só o SHA-256 vai para o banco.
@@ -287,8 +273,8 @@ async fn signup(
     let ip = client_ip(&state.settings, &headers, peer);
     limit(&state, &format!("signup:{}", ip_key(ip)))?;
 
-    let email = normalize_email(&body.email)?;
-    validate_password(&body.password)?;
+    let email = normalize_email(&body.email).map_err(invalid)?;
+    validate_password(&body.password).map_err(invalid)?;
     let metadata = match body.data {
         None => json!({}),
         Some(data @ Value::Object(_)) => data,
@@ -559,25 +545,6 @@ async fn jwks(State(state): State<AuthState>) -> impl IntoResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn normaliza_email() {
-        assert_eq!(
-            normalize_email("  Ana@Exemplo.COM ").unwrap(),
-            "ana@exemplo.com"
-        );
-        for bad in [
-            "",
-            "ana",
-            "@x.com",
-            "ana@",
-            "ana@x",
-            "a b@x.com",
-            "a@b@x.com",
-        ] {
-            assert!(normalize_email(bad).is_err(), "{bad}");
-        }
-    }
 
     #[test]
     fn x_forwarded_for_so_com_trust_proxy() {

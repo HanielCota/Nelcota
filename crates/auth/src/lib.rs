@@ -5,6 +5,7 @@
 //! tokens seja substituível (chaves locais hoje; um provedor OIDC externo
 //! depois). Este crate só AUTENTICA: autorização é exclusivamente do RLS.
 
+mod credentials;
 mod handlers;
 mod keys;
 mod password;
@@ -18,6 +19,7 @@ use axum::{
 };
 use nelcota_core::{ApiError, Claims};
 
+pub use credentials::{InvalidCredential, normalize_email, validate_password};
 pub use handlers::{AuthSettings, AuthState, router};
 pub use keys::{KeyError, Keys, generate_ed25519_private_key};
 pub use password::{Passwords, hash_password, verify_password};
