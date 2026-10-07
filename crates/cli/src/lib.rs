@@ -1,11 +1,11 @@
-//! Comandos do binário `nelcota`.
+//! Commands of the `nelcota` binary.
 //!
-//! O mesmo binário serve a API (`nelcota serve`, o padrão) e opera o host:
-//! uma pasta com um Caddy compartilhado e N projetos isolados (cada um com o
-//! próprio Postgres, app, chaves e backups). Comandos que precisam do banco
-//! rodam direto quando há `NELCOTA_DATABASE_URL` no ambiente (dentro do
-//! container ou num shell de dev) e, num host, são repassados ao container
-//! `app` do projeto com `docker compose exec`.
+//! The same binary serves the API (`nelcota serve`, the default) and operates
+//! the host: a folder with a shared Caddy and N isolated projects (each with its
+//! own Postgres, app, keys and backups). Commands that need the database run
+//! directly when `NELCOTA_DATABASE_URL` is in the environment (inside the
+//! container or in a dev shell) and, on a host, are forwarded to the project's
+//! `app` container with `docker compose exec`.
 
 mod caddy;
 mod checks;
@@ -36,10 +36,10 @@ pub use host::PanelLogin;
 #[command(
     name = "nelcota",
     version,
-    about = "BaaS sobre Postgres puro: API REST, auth e deploy num binário só."
+    about = "BaaS on plain Postgres: REST API, auth and deploy in a single binary."
 )]
 pub struct Cli {
-    /// Pasta do host (onde ficam nelcota-host.json, caddy/ e projects/).
+    /// Host folder (where nelcota-host.json, caddy/ and projects/ live).
     #[arg(
         short = 'C',
         long = "dir",
@@ -49,7 +49,7 @@ pub struct Cli {
     )]
     pub dir: PathBuf,
 
-    /// Projeto (obrigatório quando o host tem mais de um).
+    /// Project (required when the host has more than one).
     #[arg(short = 'p', long = "project", global = true)]
     pub project: Option<String>,
 
@@ -59,93 +59,93 @@ pub struct Cli {
 
 #[derive(Subcommand, Debug)]
 pub enum Command {
-    /// Sobe o servidor HTTP (padrão quando nenhum comando é dado).
+    /// Starts the HTTP server (the default when no command is given).
     Serve,
-    /// Cria um projeto (e o host, na primeira vez).
+    /// Creates a project (and the host, the first time).
     Init(Box<InitArgs>),
-    /// Lista os projetos do host e o estado de cada um.
+    /// Lists the host's projects and the state of each one.
     Projects,
-    /// Sobe os projetos e o Caddy (todos, ou só o do -p).
+    /// Starts the projects and Caddy (all of them, or only the one from -p).
     Up,
-    /// Para um projeto (ou todos com --all). Com --volumes, APAGA os dados.
+    /// Stops a project (or all with --all). With --volumes, DELETES the data.
     Down {
         #[arg(long)]
         volumes: bool,
         #[arg(long)]
         all: bool,
     },
-    /// Estado dos projetos (todos, ou só o do -p).
+    /// State of the projects (all of them, or only the one from -p).
     Status,
-    /// Logs de um projeto.
+    /// Logs of a project.
     Logs {
         #[arg(short, long)]
         follow: bool,
-        /// postgres ou app (padrão: os dois).
+        /// postgres or app (default: both).
         service: Option<String>,
     },
-    /// Remove um projeto: backup final em archive/, containers e dados apagados.
+    /// Removes a project: final backup in archive/, containers and data deleted.
     Remove {
-        /// Não pede confirmação.
+        /// Does not ask for confirmation.
         #[arg(long)]
         yes: bool,
-        /// Mantém a pasta do projeto (migrations, backups).
+        /// Keeps the project folder (migrations, backups).
         #[arg(long)]
         keep_files: bool,
     },
-    /// Login dos painéis: um para todos (shared) ou um por projeto.
+    /// Panel login: one for all (shared) or one per project.
     PanelLogin {
         #[arg(value_enum)]
         mode: PanelLogin,
     },
-    /// Ambiente local de desenvolvimento (Postgres em container + servidor).
+    /// Local development environment (Postgres in a container + server).
     Dev(DevArgs),
-    /// Aplica migrações SQL do diretório (arquivos V<n>__<nome>.sql).
+    /// Applies SQL migrations from the directory (files V<n>__<name>.sql).
     Migrate {
         #[arg(long, default_value = "migrations")]
         path: PathBuf,
     },
-    /// Atualiza a imagem do app com backup antes e rollback se falhar.
+    /// Updates the app image, with a backup first and a rollback if it fails.
     Upgrade {
-        /// Versão alvo (padrão: a versão deste binário).
+        /// Target version (default: this binary's version).
         #[arg(long)]
         version: Option<String>,
-        /// Todos os projetos, um por vez.
+        /// All projects, one at a time.
         #[arg(long)]
         all: bool,
     },
-    /// Gera um dump do banco em backups/ (e envia ao S3 com --upload).
+    /// Dumps the database to backups/ (and uploads it to S3 with --upload).
     Backup {
         #[arg(long)]
         upload: bool,
-        /// Mantém só os N dumps locais mais recentes.
+        /// Keeps only the N most recent local dumps.
         #[arg(long)]
         keep: Option<usize>,
-        /// Todos os projetos.
+        /// All projects.
         #[arg(long)]
         all: bool,
     },
-    /// Restaura um dump (substitui o banco atual do projeto).
+    /// Restores a dump (replaces the project's current database).
     Restore {
         file: PathBuf,
-        /// Não pede confirmação.
+        /// Does not ask for confirmation.
         #[arg(long)]
         yes: bool,
     },
-    /// Gera tipos TypeScript a partir do schema exposto.
+    /// Generates TypeScript types from the exposed schema.
     Types {
         #[arg(long, short)]
         out: Option<PathBuf>,
     },
-    /// Emite tokens de serviço.
+    /// Issues service tokens.
     Token {
         #[command(subcommand)]
         kind: TokenKind,
     },
-    /// Gera uma chave privada Ed25519 nova (para NELCOTA_JWT_PRIVATE_KEY).
+    /// Generates a new Ed25519 private key (for NELCOTA_JWT_PRIVATE_KEY).
     Keygen,
-    /// Senha nova para o painel (do host no login único; do projeto no login por projeto).
+    /// New panel password (the host's with single sign-on; the project's with per-project login).
     AdminPassword,
-    /// Healthcheck local (usado pelo Docker): sai com 0 se /health responde 200.
+    /// Local healthcheck (used by Docker): exits with 0 if /health answers 200.
     Healthcheck {
         #[arg(long, default_value = "127.0.0.1:8000")]
         addr: String,
@@ -154,7 +154,7 @@ pub enum Command {
 
 #[derive(Subcommand, Debug)]
 pub enum TokenKind {
-    /// JWT com role service_role (IGNORA O RLS: nunca use no frontend).
+    /// JWT with the service_role role (BYPASSES RLS: never use it in a frontend).
     ServiceRole {
         #[arg(long, default_value_t = 3650)]
         days: u64,
@@ -163,34 +163,34 @@ pub enum TokenKind {
 
 #[derive(Args, Debug)]
 pub struct InitArgs {
-    /// Domínio do projeto (ex.: api.loja.com). Sem ele, use --project com um
-    /// domínio base (subdomínio) ou --local.
+    /// Project domain (e.g. api.shop.com). Without it, use --project with a
+    /// base domain (subdomain) or --local.
     pub domain: Option<String>,
-    /// Nome do projeto (padrão: derivado do domínio, ex.: api.loja.com → loja).
+    /// Project name (default: derived from the domain, e.g. api.shop.com → shop).
     #[arg(long)]
     pub project: Option<String>,
-    /// Domínio base do host: `--project loja` vira `loja.<base>`.
+    /// Host base domain: `--project shop` becomes `shop.<base>`.
     #[arg(long)]
     pub base_domain: Option<String>,
-    /// Host local, sem domínio público: HTTPS em https://<projeto>.localhost.
+    /// Local host, without a public domain: HTTPS at https://<project>.localhost.
     #[arg(long)]
     pub local: bool,
-    /// Login dos painéis ao criar o host: um para todos (padrão) ou por projeto.
+    /// Panel login when creating the host: one for all (default) or per project.
     #[arg(long, value_enum, default_value_t = PanelLogin::Shared)]
     pub panel_login: PanelLogin,
-    /// Email do administrador (padrão: admin@<domínio>).
+    /// Administrator email (default: admin@<domain>).
     #[arg(long)]
     pub email: Option<String>,
-    /// Não faz perguntas (usa os padrões e as flags).
+    /// Asks no questions (uses the defaults and the flags).
     #[arg(long, short)]
     pub yes: bool,
-    /// Imagem do app.
+    /// App image.
     #[arg(long, env = "NELCOTA_IMAGE", default_value = "ghcr.io/nelcota/nelcota")]
     pub image: String,
-    /// Tag da imagem (padrão: a versão deste binário).
+    /// Image tag (default: this binary's version).
     #[arg(long)]
     pub version: Option<String>,
-    /// Perfil do Postgres: 1gb, 2gb, 4gb ou 8gb (padrão: pela RAM dividida entre os projetos).
+    /// Postgres profile: 1gb, 2gb, 4gb or 8gb (default: by the RAM split across the projects).
     #[arg(long)]
     pub profile: Option<String>,
     #[arg(long)]
@@ -203,10 +203,10 @@ pub struct InitArgs {
     pub s3_secret_key: Option<String>,
     #[arg(long, default_value = "us-east-1")]
     pub s3_region: String,
-    /// Configura o ufw (libera SSH, 80 e 443 e ativa).
+    /// Configures ufw (allows SSH, 80 and 443 and enables it).
     #[arg(long)]
     pub firewall: bool,
-    /// Pula as checagens de ambiente.
+    /// Skips the environment checks.
     #[arg(long)]
     pub skip_checks: bool,
 }
@@ -215,15 +215,15 @@ pub struct InitArgs {
 pub struct DevArgs {
     #[arg(long, default_value = "127.0.0.1:8000")]
     pub listen: std::net::SocketAddr,
-    /// Porta local do Postgres de desenvolvimento.
+    /// Local port of the development Postgres.
     #[arg(long, default_value_t = 54322)]
     pub db_port: u16,
 }
 
-/// O que o `main` deve fazer depois do comando.
+/// What `main` should do after the command.
 pub enum Outcome {
     Done,
-    /// Subir o servidor HTTP com esta configuração.
+    /// Start the HTTP server with this configuration.
     Serve(Box<Config>),
 }
 
@@ -278,7 +278,7 @@ pub fn run(cli: Cli) -> anyhow::Result<Outcome> {
         }
         Command::Remove { yes, keep_files } => {
             let Some(name) = selection else {
-                bail!("informe o projeto a remover: nelcota -p <nome> remove");
+                bail!("name the project to remove: nelcota -p <name> remove");
             };
             done(projects::remove(&host, name, yes, keep_files))
         }
@@ -309,14 +309,14 @@ pub fn run(cli: Cli) -> anyhow::Result<Outcome> {
             };
             let mut failed = Vec::new();
             for project in &targets {
-                // Um projeto com problema não impede o backup dos outros.
+                // A project with a problem does not stop the others from being backed up.
                 if let Err(err) = ops::backup(&host, project, upload, keep) {
                     util::warn(&format!("{err:#}"));
                     failed.push(project.name.clone());
                 }
             }
             if !failed.is_empty() {
-                bail!("backup falhou em: {}", failed.join(", "));
+                bail!("backup failed for: {}", failed.join(", "));
             }
             Ok(Outcome::Done)
         }

@@ -8,6 +8,7 @@
   import ChevronDown from '@lucide/svelte/icons/chevron-down'
   import { ON_DELETE, type ColumnDef, type OnDelete } from '$lib/ddl'
   import { pgTypes } from '$lib/pg-types.svelte'
+  import { t } from '$lib/i18n/index.svelte'
 
   let {
     column = $bindable(),
@@ -16,23 +17,23 @@
     onremove,
   }: {
     column: ColumnDef
-    /** Tabelas e colunas do schema, para a chave estrangeira. */
+    /** Tables and columns of the schema, for the foreign key. */
     tables: Record<string, string[]>
-    /** `create`: dentro de "Nova tabela"; `add`/`edit`: aba Estrutura. */
+    /** `create`: inside "New table"; `add`/`edit`: the Structure tab. */
     mode: 'create' | 'add' | 'edit'
     onremove?: () => void
   } = $props()
 
   const id = $props.id()
-  // Começa recolhido só na criação de tabela (muitas colunas na tela).
+  // Starts collapsed only when creating a table (many columns on screen).
   let expanded = $state(untrack(() => mode !== 'create'))
 
   const INTEGER = ['smallint', 'integer', 'bigint']
   const isInteger = $derived(INTEGER.includes(column.data_type.trim().toLowerCase()))
-  // Na edição, PK e identity vêm da criação e não mudam por aqui.
+  // When editing, PK and identity come from creation and do not change here.
   const structural = $derived(mode === 'edit')
 
-  /** Sugestões de DEFAULT conforme o tipo. */
+  /** DEFAULT suggestions by type. */
   const defaults = $derived.by(() => {
     const type = column.data_type.toLowerCase()
     if (type.startsWith('timestamp')) return ['now()']
@@ -57,18 +58,21 @@
     }
   }
 
-  const onDeleteLabel = (value: OnDelete) => ON_DELETE.find((o) => o.value === value)?.label ?? value
+  const onDeleteLabel = (value: OnDelete) => {
+    const key = ON_DELETE.find((o) => o.value === value)?.label
+    return key ? t(key) : value
+  }
 </script>
 
 <div class="rounded-lg border bg-card">
   <div class="flex flex-wrap items-center gap-2.5 p-3">
-    <Input bind:value={column.name} placeholder="nome" class="w-40 font-mono text-xs" aria-label="Nome da coluna" />
+    <Input bind:value={column.name} placeholder={t('tables.columns.name')} class="w-40 font-mono text-xs" aria-label={t('tables.columns.nameLabel')} />
     <Input
       bind:value={column.data_type}
       list={`${id}-types`}
-      placeholder="tipo"
+      placeholder={t('tables.columns.type')}
       class="w-40 font-mono text-xs"
-      aria-label="Tipo"
+      aria-label={t('tables.columns.typeLabel')}
     />
     <datalist id={`${id}-types`}>
       {#each pgTypes.base as type (type)}<option value={type}></option>{/each}
@@ -77,17 +81,17 @@
     <Input
       bind:value={() => column.default ?? '', (v) => (column.default = v || null)}
       list={`${id}-defaults`}
-      placeholder={column.identity ? 'identity' : 'default (SQL)'}
+      placeholder={column.identity ? 'identity' : t('tables.columns.defaultPlaceholder')}
       disabled={column.identity}
       class="min-w-32 flex-1 font-mono text-xs"
-      aria-label="Valor padrão"
+      aria-label={t('tables.columns.defaultLabel')}
     />
     <datalist id={`${id}-defaults`}>
       {#each defaults as value (value)}<option {value}></option>{/each}
     </datalist>
 
     {#if mode === 'create'}
-      <label class="flex cursor-pointer items-center gap-1.5 text-xs font-medium text-muted-foreground" title="Chave primária">
+      <label class="flex cursor-pointer items-center gap-1.5 text-xs font-medium text-muted-foreground" title={t('tables.columns.primaryKey')}>
         <Checkbox bind:checked={column.primary_key} />PK
       </label>
     {/if}
@@ -96,21 +100,21 @@
         checked={!column.nullable || column.primary_key}
         disabled={column.primary_key}
         onCheckedChange={(v) => (column.nullable = v !== true)}
-      />obrigatória
+      />{t('tables.columns.required')}
     </label>
 
     <div class="ml-auto flex items-center">
       <Button
         variant="ghost"
         size="icon-sm"
-        aria-label="Mais opções"
+        aria-label={t('tables.columns.more')}
         aria-expanded={expanded}
         onclick={() => (expanded = !expanded)}
       >
         <ChevronDown class={['transition-transform', expanded && 'rotate-180']} />
       </Button>
       {#if onremove}
-        <Button variant="ghost" size="icon-sm" aria-label="Remover coluna" onclick={onremove}><X /></Button>
+        <Button variant="ghost" size="icon-sm" aria-label={t('tables.columns.remove')} onclick={onremove}><X /></Button>
       {/if}
     </div>
   </div>
@@ -119,12 +123,12 @@
     <div class="grid gap-4 rounded-b-xl border-t bg-muted/30 p-4 text-xs">
       <div class="flex flex-wrap gap-4">
         <label class="flex items-center gap-1.5 text-muted-foreground">
-          <Checkbox bind:checked={column.unique} disabled={column.primary_key} />valor único (UNIQUE)
+          <Checkbox bind:checked={column.unique} disabled={column.primary_key} />{t('tables.columns.unique')}
         </label>
         {#if !structural}
           <label
             class={['flex items-center gap-1.5 text-muted-foreground', !isInteger && 'opacity-50']}
-            title="Só para smallint, integer e bigint"
+            title={t('tables.columns.identityOnlyIntegers')}
           >
             <Checkbox
               checked={column.identity}
@@ -133,19 +137,19 @@
                 column.identity = v === true
                 if (column.identity) column.default = null
               }}
-            />numeração automática (identity)
+            />{t('tables.columns.identity')}
           </label>
         {/if}
       </div>
 
       <div class="flex flex-wrap items-center gap-2">
-        <span class="w-24 text-muted-foreground">Referencia</span>
+        <span class="w-24 text-muted-foreground">{t('tables.columns.references')}</span>
         <Select.Root type="single" value={column.references?.table ?? ''} onValueChange={setReference}>
           <Select.Trigger size="sm" class="w-40 font-mono text-xs">
-            {column.references?.table ?? 'nenhuma tabela'}
+            {column.references?.table ?? t('tables.columns.noTable')}
           </Select.Trigger>
           <Select.Content>
-            <Select.Item value="" class="text-xs">nenhuma tabela</Select.Item>
+            <Select.Item value="" class="text-xs">{t('tables.columns.noTable')}</Select.Item>
             {#each Object.keys(tables) as table (table)}
               <Select.Item value={table} class="font-mono text-xs">{table}</Select.Item>
             {/each}
@@ -160,12 +164,12 @@
               {/each}
             </Select.Content>
           </Select.Root>
-          <span class="text-muted-foreground">ao apagar:</span>
+          <span class="text-muted-foreground">{t('tables.columns.onDeleteLabel')}</span>
           <Select.Root type="single" bind:value={column.references.on_delete}>
             <Select.Trigger size="sm" class="w-40 text-xs">{onDeleteLabel(column.references.on_delete)}</Select.Trigger>
             <Select.Content>
               {#each ON_DELETE as option (option.value)}
-                <Select.Item value={option.value} class="text-xs">{option.label}</Select.Item>
+                <Select.Item value={option.value} class="text-xs">{t(option.label)}</Select.Item>
               {/each}
             </Select.Content>
           </Select.Root>
@@ -173,10 +177,10 @@
       </div>
 
       <div class="flex items-center gap-2">
-        <span class="w-24 text-muted-foreground">Descrição</span>
+        <span class="w-24 text-muted-foreground">{t('tables.columns.description')}</span>
         <Input
           bind:value={() => column.comment ?? '', (v) => (column.comment = v || null)}
-          placeholder="opcional (vira COMMENT e aparece na documentação da API)"
+          placeholder={t('tables.columns.descriptionPlaceholder')}
           class="flex-1 text-xs"
         />
       </div>

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { POLICY_TEMPLATES, guessOwnerColumn, quoteIfNeeded } from './policy-templates'
+import { POLICY_TEMPLATES, guessOwnerColumn, quoteIfNeeded, templateText } from './policy-templates'
 import { policyFields, type ColumnInfo } from './ddl'
+import { i18n } from './i18n/index.svelte'
 
 const column = (name: string, data_type: string, primary_key = false): ColumnInfo => ({
   name,
@@ -15,35 +16,48 @@ const column = (name: string, data_type: string, primary_key = false): ColumnInf
   comment: null,
 })
 
-describe('modelos de policy', () => {
-  it('cada modelo usa só as expressões que o comando aceita', () => {
+describe('policy templates', () => {
+  it('each template only uses the expressions its command accepts', () => {
     for (const template of POLICY_TEMPLATES) {
-      const policy = template.build('dono')
+      const policy = template.build('owner')
       const fields = policyFields(policy.command)
-      expect(policy.using !== null, `${template.label}: USING`).toBe(fields.using)
-      if (!fields.check) expect(policy.check, `${template.label}: WITH CHECK`).toBeNull()
+      expect(policy.using !== null, `${template.id}: USING`).toBe(fields.using)
+      if (!fields.check) expect(policy.check, `${template.id}: WITH CHECK`).toBeNull()
     }
   })
 
-  it('modelos de dono comparam a coluna com auth.uid()', () => {
-    const insert = POLICY_TEMPLATES.find((t) => t.label.startsWith('Dono cria'))!.build('autor_id')
-    expect(insert.check).toBe('autor_id = auth.uid()')
+  it('owner templates compare the column with auth.uid()', () => {
+    const insert = POLICY_TEMPLATES.find((t) => t.id === 'ownerInsert')!.build('author_id')
+    expect(insert.check).toBe('author_id = auth.uid()')
   })
 
-  it('aspas só quando precisa', () => {
+  it('every template has text in both languages', () => {
+    for (const locale of ['pt-BR', 'en'] as const) {
+      i18n.locale = locale
+      for (const template of POLICY_TEMPLATES) {
+        const text = templateText(template.id)
+        expect(text.label).not.toContain('policies.templates')
+        expect(text.name).not.toBe('')
+      }
+    }
+    i18n.locale = 'en'
+    expect(templateText('publicRead').name).toBe('public read')
+  })
+
+  it('quotes only when needed', () => {
     expect(quoteIfNeeded('user_id')).toBe('user_id')
-    expect(quoteIfNeeded('Dono')).toBe('"Dono"')
-    expect(quoteIfNeeded('dono id')).toBe('"dono id"')
+    expect(quoteIfNeeded('Owner')).toBe('"Owner"')
+    expect(quoteIfNeeded('owner id')).toBe('"owner id"')
   })
 })
 
-describe('coluna do dono', () => {
-  it('prefere uuid com nome conhecido', () => {
-    expect(guessOwnerColumn([column('id', 'uuid', true), column('ref', 'uuid'), column('dono', 'uuid')])).toBe('dono')
+describe('owner column', () => {
+  it('prefers a uuid with a known name', () => {
+    expect(guessOwnerColumn([column('id', 'uuid', true), column('ref', 'uuid'), column('owner', 'uuid')])).toBe('owner')
   })
 
-  it('senão, o primeiro uuid que não é a PK; senão, user_id', () => {
-    expect(guessOwnerColumn([column('id', 'uuid', true), column('autor', 'uuid')])).toBe('autor')
+  it('else the first uuid that is not the PK; else user_id', () => {
+    expect(guessOwnerColumn([column('id', 'uuid', true), column('author', 'uuid')])).toBe('author')
     expect(guessOwnerColumn([column('id', 'bigint', true)])).toBe('user_id')
   })
 })

@@ -1,6 +1,6 @@
 [package]
 name = "nelcota-api"
-description = "API REST sobre o catálogo do Postgres, sempre executada sob RLS."
+description = "REST API over the Postgres catalog, always executed under RLS."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

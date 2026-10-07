@@ -1,6 +1,6 @@
-//! Exportação de tabela em CSV ou JSON, lida do Postgres em fluxo: um
-//! registro por vez vai direto para a resposta, sem montar o arquivo inteiro
-//! na memória. Respeita a mesma ordem e os mesmos filtros da grade.
+//! Table export as CSV or JSON, streamed from Postgres: one record at a time
+//! goes straight into the response, without building the whole file in
+//! memory. Follows the grid's sort and filters.
 
 use std::{error::Error, future::ready};
 
@@ -53,8 +53,7 @@ pub struct ExportQuery {
     filters: Option<String>,
 }
 
-/// Transforma cada registro (texto JSON vindo do `row_to_json`) num pedaço
-/// do arquivo.
+/// Turns each record (JSON text from `row_to_json`) into a chunk of the file.
 struct Encoder {
     format: Format,
     columns: Vec<String>,
@@ -63,7 +62,7 @@ struct Encoder {
 impl Encoder {
     fn header(&self) -> String {
         match self.format {
-            // BOM: o Excel só reconhece UTF-8 (acentos) com ele.
+            // BOM: Excel only recognises UTF-8 (accents) with it.
             Format::Csv => format!(
                 "\u{feff}{}",
                 csv_line(self.columns.iter().map(|c| Some(c.as_str())))
@@ -83,7 +82,7 @@ impl Encoder {
                     .collect();
                 Ok(csv_line(values.iter().map(Option::as_deref)))
             }
-            // O texto do Postgres vai intacto: numeric não perde casas.
+            // Postgres' text goes through untouched: numeric keeps every digit.
             Format::Json => Ok(format!("{}\n  {json}", if index == 0 { "" } else { "," })),
         }
     }
@@ -96,7 +95,7 @@ impl Encoder {
     }
 }
 
-/// Uma linha CSV (RFC 4180). `None` = NULL, exportado como campo vazio.
+/// One CSV line (RFC 4180). `None` = NULL, exported as an empty field.
 fn csv_line<'a>(values: impl Iterator<Item = Option<&'a str>>) -> String {
     let mut line = values
         .map(|v| v.map_or_else(String::new, csv_field))
@@ -114,7 +113,7 @@ fn csv_field(value: &str) -> String {
     }
 }
 
-/// Nome de arquivo seguro para o `Content-Disposition`.
+/// Safe file name for `Content-Disposition`.
 fn file_name(table: &str, format: Format) -> String {
     let base: String = table
         .chars()
@@ -127,7 +126,7 @@ fn file_name(table: &str, format: Format) -> String {
         })
         .collect();
     let base = if base.trim_matches('_').is_empty() {
-        "tabela".to_owned()
+        "table".to_owned()
     } else {
         base
     };
@@ -149,7 +148,7 @@ pub async fn export(
     let request = build_request(&table, &rows_query, None)?;
     let sql = query::select_rows(&schema, &table, &request);
 
-    // Erros de filtro aparecem aqui, antes do primeiro byte: viram 400.
+    // Filter errors show up here, before the first byte: they become a 400.
     let client = state.db.get().await?;
     let rows = client
         .query_raw(sql.text.as_str(), sql.param_refs())
@@ -169,14 +168,14 @@ pub async fn export(
     });
     let stream = stream::once(ready(Ok::<_, BoxError>(header)))
         .chain(body)
-        // A conexão fica com o fluxo até o fim e só então volta ao pool.
+        // The connection stays with the stream until the end, then returns to the pool.
         .chain(stream::once(async move {
             drop(client);
             Ok(footer.to_owned())
         }))
         .inspect(move |chunk| {
             if let Err(err) = chunk {
-                tracing::warn!(table = %table_name, error = %err, "exportação interrompida");
+                tracing::warn!(table = %table_name, error = %err, "export interrupted");
             }
         });
 
@@ -198,16 +197,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn csv_escapa_so_o_necessario() {
-        assert_eq!(csv_field("simples"), "simples");
+    fn csv_escapes_only_what_it_must() {
+        assert_eq!(csv_field("plain"), "plain");
         assert_eq!(csv_field("a,b"), "\"a,b\"");
-        assert_eq!(csv_field("diz \"oi\""), "\"diz \"\"oi\"\"\"");
-        assert_eq!(csv_field("linha\nnova"), "\"linha\nnova\"");
-        assert_eq!(csv_field(" espaço"), "\" espaço\"");
+        assert_eq!(csv_field("says \"hi\""), "\"says \"\"hi\"\"\"");
+        assert_eq!(csv_field("new\nline"), "\"new\nline\"");
+        assert_eq!(csv_field(" space"), "\" space\"");
     }
 
     #[test]
-    fn csv_null_vira_campo_vazio() {
+    fn csv_null_becomes_an_empty_field() {
         assert_eq!(
             csv_line([Some("1"), None, Some("x")].into_iter()),
             "1,,x\r\n"
@@ -215,19 +214,19 @@ mod tests {
     }
 
     #[test]
-    fn linhas_csv_seguem_a_ordem_das_colunas() {
+    fn csv_lines_follow_the_column_order() {
         let encoder = Encoder {
             format: Format::Csv,
-            columns: vec!["id".into(), "nome".into(), "extra".into()],
+            columns: vec!["id".into(), "name".into(), "extra".into()],
         };
         let line = encoder
-            .row(0, r#"{"nome":"Ana, a primeira","id":1,"extra":null}"#)
+            .row(0, r#"{"name":"Ana, the first","id":1,"extra":null}"#)
             .unwrap();
-        assert_eq!(line, "1,\"Ana, a primeira\",\r\n");
+        assert_eq!(line, "1,\"Ana, the first\",\r\n");
     }
 
     #[test]
-    fn json_separa_registros_por_virgula() {
+    fn json_separates_records_with_commas() {
         let encoder = Encoder {
             format: Format::Json,
             columns: vec![],
@@ -241,14 +240,14 @@ mod tests {
         .concat();
         let parsed: serde_json::Value = serde_json::from_str(&body).unwrap();
         assert_eq!(parsed.as_array().unwrap().len(), 2);
-        assert!(body.contains("2.50"), "numeric preservado: {body}");
+        assert!(body.contains("2.50"), "numeric preserved: {body}");
     }
 
     #[test]
-    fn nome_de_arquivo_sem_caracteres_perigosos() {
-        assert_eq!(file_name("pedidos", Format::Csv), "pedidos.csv");
+    fn file_name_without_dangerous_characters() {
+        assert_eq!(file_name("orders", Format::Csv), "orders.csv");
         assert_eq!(file_name("a\"b;c", Format::Json), "a_b_c.json");
-        assert_eq!(file_name("ção", Format::Csv), "__o.csv");
-        assert_eq!(file_name("çã", Format::Csv), "tabela.csv");
+        assert_eq!(file_name("über", Format::Csv), "_ber.csv");
+        assert_eq!(file_name("üö", Format::Csv), "table.csv");
     }
 }

@@ -1,6 +1,6 @@
 [package]
 name = "nelcota-admin"
-description = "Painel administrativo do nelcota (HTML no servidor, assets embutidos)."
+description = "nelcota admin panel: JSON API plus the embedded Svelte frontend."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

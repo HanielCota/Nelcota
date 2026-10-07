@@ -6,6 +6,7 @@
   import Copy from '@lucide/svelte/icons/copy'
   import { toast } from 'svelte-sonner'
   import { generatePassword, passwordProblem } from '$lib/password'
+  import { t } from '$lib/i18n/index.svelte'
 
   let { value = $bindable(''), id }: { value?: string; id: string } = $props()
 
@@ -14,13 +15,13 @@
 
   function generate() {
     value = generatePassword()
-    // Senha gerada fica visível: o admin precisa copiar para entregar ao usuário.
+    // A generated password stays visible: the admin has to copy it to hand it over.
     visible = true
   }
 
   async function copy() {
     await navigator.clipboard.writeText(value)
-    toast.success('Senha copiada')
+    toast.success(t('users.password.copied'))
   }
 </script>
 
@@ -39,17 +40,17 @@
       <button
         type="button"
         class="absolute top-1/2 right-1.5 grid size-7 -translate-y-1/2 cursor-pointer place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-        aria-label={visible ? 'Ocultar senha' : 'Mostrar senha'}
+        aria-label={visible ? t('users.password.hide') : t('users.password.show')}
         aria-pressed={visible}
         onclick={() => (visible = !visible)}
       >
         {#if visible}<EyeOff class="size-4" />{:else}<Eye class="size-4" />{/if}
       </button>
     </div>
-    <Button variant="outline" class="h-10" onclick={generate}>Gerar</Button>
-    <Button variant="outline" size="icon" class="size-10" aria-label="Copiar senha" disabled={!value} onclick={copy}><Copy /></Button>
+    <Button variant="outline" class="h-10" onclick={generate}>{t('users.password.generate')}</Button>
+    <Button variant="outline" size="icon" class="size-10" aria-label={t('users.password.copy')} disabled={!value} onclick={copy}><Copy /></Button>
   </div>
   <p id={`${id}-hint`} class={['text-xs', problem ? 'text-destructive' : 'text-muted-foreground']}>
-    {problem ?? 'Mínimo de 8 caracteres. Entregue a senha ao usuário por um canal seguro.'}
+    {problem ? t(`users.password.${problem}`) : t('users.password.hint')}
   </p>
 </div>

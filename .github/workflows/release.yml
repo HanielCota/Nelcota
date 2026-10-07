@@ -20,7 +20,7 @@ jobs:
         with:
           target: ${{ matrix.target }}
           args: "--release --locked -p nelcota-server"
-      - name: Empacota binário + checksum
+      - name: Package binary + checksum
         run: |
           cp target/${{ matrix.target }}/release/nelcota nelcota-${{ matrix.target }}
           sha256sum nelcota-${{ matrix.target }} > nelcota-${{ matrix.target }}.sha256
@@ -41,7 +41,7 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      # A tag da imagem é a versão sem o "v" (igual ao NELCOTA_VERSION do init).
+      # The image tag is the version without the "v" (same as NELCOTA_VERSION from init).
       - id: version
         run: echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
       - uses: docker/build-push-action@v6

@@ -1,5 +1,5 @@
-//! `nelcota init [DOMÍNIO] [--project NOME]`: cria o host (na primeira vez) e
-//! acrescenta um projeto. Só orquestra; cada passo vive no seu módulo.
+//! `nelcota init [DOMAIN] [--project NAME]`: creates the host (the first time)
+//! and adds a project. It only orchestrates; each step lives in its own module.
 
 use anyhow::bail;
 
@@ -29,7 +29,7 @@ pub fn run(host: &Host, args: InitArgs) -> anyhow::Result<()> {
     } else {
         let manifest = host.manifest()?;
         if args.local && !manifest.local {
-            bail!("este host não é local; --local só vale na criação do host");
+            bail!("this host is not local; --local only applies when the host is created");
         }
         manifest
     };
@@ -37,7 +37,7 @@ pub fn run(host: &Host, args: InitArgs) -> anyhow::Result<()> {
     if let Some(base) = &args.base_domain {
         let base = base.trim().trim_end_matches('.').to_lowercase();
         if !naming::is_valid_domain(&base) {
-            bail!("domínio base inválido: {base}");
+            bail!("invalid base domain: {base}");
         }
         manifest.base_domain = Some(base);
     }
@@ -49,20 +49,20 @@ pub fn run(host: &Host, args: InitArgs) -> anyhow::Result<()> {
         manifest.local,
     )?;
     if manifest.projects.iter().any(|p| p.name == name) {
-        bail!("já existe um projeto chamado '{name}' (use --project para outro nome)");
+        bail!("a project named '{name}' already exists (use --project for another name)");
     }
     if manifest.projects.iter().any(|p| p.domain == domain) {
-        bail!("o domínio {domain} já é usado por outro projeto");
+        bail!("the domain {domain} is already used by another project");
     }
 
-    step(&format!("Projeto \"{name}\" em {domain}"));
+    step(&format!("Project \"{name}\" at {domain}"));
     if !manifest.local && !args.skip_checks {
         checks::dns(&domain);
     }
     let ram = checks::total_ram_mb().unwrap_or(2048);
     let profile =
         scaffold::choose_profile(args.profile.as_deref(), ram, manifest.projects.len() + 1)?;
-    ok(&format!("perfil do Postgres: {profile}"));
+    ok(&format!("Postgres profile: {profile}"));
 
     let entry = ProjectEntry { name, domain };
     let version = args
@@ -85,45 +85,45 @@ pub fn run(host: &Host, args: InitArgs) -> anyhow::Result<()> {
     registry::write(host, &manifest)?;
     caddy::write(host, &manifest)?;
     caddy::reload(host)?;
-    ok(&format!("arquivos em {}", project.dir.display()));
+    ok(&format!("files in {}", project.dir.display()));
 
     println!();
-    println!("Pronto. Próximo passo:  nelcota up");
+    println!("Done. Next step:  nelcota up");
     println!();
     println!("  API:    {}/rest/v1/", entry.url());
     println!("  Auth:   {}/auth/v1/", entry.url());
-    println!("  Painel: {}/admin/", entry.url());
+    println!("  Panel:  {}/admin/", entry.url());
     let passwords: Vec<_> = host_password.into_iter().chain(project_password).collect();
     panel_login::print(&passwords);
     println!();
     println!(
-        "  Token service_role (IGNORA o RLS; só no seu backend): nelcota -p {} token service-role",
+        "  service_role token (BYPASSES RLS; backend only): nelcota -p {} token service-role",
         entry.name
     );
     Ok(())
 }
 
-/// Primeira vez: checagens, segredos do host, Caddy e configuração da máquina.
+/// First time: checks, host secrets, Caddy and machine setup.
 fn create_host(
     host: &Host,
     args: &InitArgs,
 ) -> anyhow::Result<(Manifest, Option<panel_login::NewPassword>)> {
-    step(&format!("Criando o host em {}", host.root().display()));
+    step(&format!("Creating the host at {}", host.root().display()));
     if args.skip_checks {
-        warn("checagens puladas (--skip-checks)");
+        warn("checks skipped (--skip-checks)");
     } else {
         checks::docker()?;
         checks::ports();
         match checks::total_ram_mb() {
             Some(mb) => ok(&format!("RAM: {mb} MB")),
-            None => warn("não foi possível medir a RAM; assumindo 2 GB"),
+            None => warn("could not measure RAM; assuming 2 GB"),
         }
     }
 
     let s3 = backup_destination(args);
     std::fs::create_dir_all(host.root())?;
     let mut secrets = format!(
-        "# Segredos do host nelcota (gerado em {}). Permissão 600, fora do git.\n",
+        "# nelcota host secrets (generated at {}). Mode 600, kept out of git.\n",
         util::timestamp()
     );
     if let Some(s3) = &s3 {
@@ -154,10 +154,7 @@ fn create_host(
         format!("admin@{domain}")
     });
     let shared = panel_login::init_host(host, &email)?;
-    ok(&format!(
-        "login dos painéis: {}",
-        manifest.panel_login.as_str()
-    ));
+    ok(&format!("panel login: {}", manifest.panel_login.as_str()));
 
     registry::write(host, &manifest)?;
     caddy::write(host, &manifest)?;
@@ -189,15 +186,17 @@ fn backup_destination(args: &InitArgs) -> Option<S3> {
     }
     if args.yes || !interactive() {
         warn(
-            "backup remoto não configurado (dumps ficam em projects/<nome>/backups/; veja docs/backup.md)",
+            "remote backup not configured (dumps stay in projects/<name>/backups/; see docs/backup.md)",
         );
         return None;
     }
     println!();
-    println!("Backup remoto em S3-compatible (AWS, Backblaze B2, Cloudflare R2, MinIO...).");
-    let endpoint = ask("Endpoint S3 (Enter para pular)", "");
+    println!(
+        "Remote backup to S3-compatible storage (AWS, Backblaze B2, Cloudflare R2, MinIO...)."
+    );
+    let endpoint = ask("S3 endpoint (Enter to skip)", "");
     if endpoint.is_empty() {
-        warn("backup remoto não configurado");
+        warn("remote backup not configured");
         return None;
     }
     Some(S3 {
@@ -205,6 +204,6 @@ fn backup_destination(args: &InitArgs) -> Option<S3> {
         bucket: ask("Bucket", "nelcota-backups"),
         access_key: ask("Access key", ""),
         secret_key: ask("Secret key", ""),
-        region: ask("Região", &args.s3_region),
+        region: ask("Region", &args.s3_region),
     })
 }

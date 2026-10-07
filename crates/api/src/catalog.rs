@@ -1,8 +1,8 @@
-//! Introspecção do catálogo do Postgres: tabelas, views, colunas, tipos, PKs,
-//! FKs, funções e privilégios das roles da API.
+//! Postgres catalog introspection: tables, views, columns, types, PKs, FKs,
+//! functions and the privileges of the API roles.
 //!
-//! O catálogo é a fonte de verdade dos identificadores: nenhuma tabela, coluna
-//! ou função vinda da URL chega ao SQL sem existir aqui.
+//! The catalog is the source of truth for identifiers: no table, column or
+//! function coming from the URL reaches SQL unless it exists here.
 
 use std::{
     collections::BTreeMap,
@@ -15,7 +15,7 @@ use nelcota_core::Role;
 use serde::Serialize;
 use tokio_postgres::{AsyncMessage, GenericClient, NoTls};
 
-/// Canal de `NOTIFY` que dispara a recarga (`NOTIFY nelcota, 'reload schema'`).
+/// `NOTIFY` channel that triggers a reload (`NOTIFY nelcota, 'reload schema'`).
 pub const RELOAD_CHANNEL: &str = "nelcota";
 
 #[derive(Clone, Copy, Debug, Default, Serialize)]
@@ -38,14 +38,14 @@ pub enum TableKind {
 #[derive(Clone, Debug, Serialize)]
 pub struct Column {
     pub name: String,
-    /// Tipo sem modificador, como o Postgres o formata (ex.: `character varying`,
-    /// `integer[]`, `public.humor`). Usado em casts.
+    /// Type without modifier, as Postgres formats it (e.g. `character varying`,
+    /// `integer[]`, `public.mood`). Used in casts.
     pub type_name: String,
-    /// Tipo com modificador (ex.: `character varying(80)`), para documentação.
+    /// Type with modifier (e.g. `character varying(80)`), for documentation.
     pub full_type: String,
-    /// Categoria do tipo (`pg_type.typcategory`): N número, S texto, B bool...
+    /// Type category (`pg_type.typcategory`): N number, S text, B bool...
     pub category: char,
-    /// Tipo do elemento, se for array.
+    /// Element type, for arrays.
     pub element_type: Option<String>,
     pub enum_values: Vec<String>,
     pub nullable: bool,
@@ -73,7 +73,7 @@ pub struct Table {
     pub rls_enabled: bool,
     pub rls_forced: bool,
     pub comment: Option<String>,
-    /// Privilégios de anon, authenticated e service_role (nessa ordem).
+    /// Privileges of anon, authenticated and service_role (in that order).
     pub privileges: [Privileges; 3],
 }
 
@@ -86,8 +86,8 @@ impl Table {
         self.privileges[role_index(role)]
     }
 
-    /// Tabela comum (não view) exposta sem RLS: qualquer role com GRANT vê
-    /// todas as linhas. O painel alerta sobre isso.
+    /// Plain table (not a view) exposed without RLS: any role with a GRANT sees
+    /// every row. The panel warns about it.
     pub fn exposed_without_rls(&self) -> bool {
         self.kind == TableKind::Table
             && !self.rls_enabled
@@ -111,10 +111,10 @@ pub struct Function {
     pub return_type: String,
     pub returns_set: bool,
     pub returns_void: bool,
-    /// `i` imutável, `s` estável, `v` volátil.
+    /// `i` immutable, `s` stable, `v` volatile.
     pub volatility: char,
     pub comment: Option<String>,
-    /// EXECUTE para anon, authenticated e service_role.
+    /// EXECUTE for anon, authenticated and service_role.
     pub executable: [bool; 3],
 }
 
@@ -128,7 +128,7 @@ impl Function {
 pub struct Catalog {
     pub schema: String,
     pub tables: BTreeMap<String, Table>,
-    /// Funções por nome (pode haver sobrecargas).
+    /// Functions by name (there may be overloads).
     pub functions: BTreeMap<String, Vec<Function>>,
 }
 
@@ -140,12 +140,12 @@ fn role_index(role: Role) -> usize {
     }
 }
 
-/// Objetos criados por extensões ficam de fora.
+/// Objects created by extensions are left out.
 const NOT_FROM_EXTENSION: &str =
     "NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.objid = c.oid AND d.deptype = 'e')";
 
 impl Catalog {
-    /// Lê o catálogo do schema exposto.
+    /// Reads the catalog of the exposed schema.
     pub async fn load(
         client: &impl GenericClient,
         schema: &str,
@@ -316,7 +316,7 @@ impl Catalog {
             let modes: Vec<String> = row.get(2);
             let types: Vec<String> = row.get(3);
             let defaults = usize::try_from(row.get::<_, i32>(4)).unwrap_or(0);
-            // Nomes dos argumentos de entrada (modos i, b, v; sem modos = todos IN).
+            // Names of the input arguments (modes i, b, v; no modes = all IN).
             let in_names: Vec<&String> = if modes.is_empty() {
                 names.iter().collect()
             } else {
@@ -330,7 +330,7 @@ impl Catalog {
             let mut args = Vec::with_capacity(types.len());
             let first_default = types.len().saturating_sub(defaults);
             for (i, type_name) in types.into_iter().enumerate() {
-                // Só funções com argumentos nomeados são chamáveis por JSON.
+                // Only functions with named arguments are callable through JSON.
                 let Some(name) = in_names.get(i).filter(|n| !n.is_empty()) else {
                     continue 'functions;
                 };
@@ -368,7 +368,7 @@ impl Catalog {
     }
 }
 
-/// Catálogo compartilhado, trocado atomicamente a cada recarga.
+/// Shared catalog, swapped atomically on each reload.
 pub struct CatalogHandle {
     current: RwLock<Arc<Catalog>>,
 }
@@ -398,17 +398,18 @@ impl CatalogHandle {
             .await
             .map_err(|e| e.to_string())?;
         tracing::info!(
-            tabelas = catalog.tables.len(),
-            funcoes = catalog.functions.len(),
-            "catálogo recarregado"
+            tables = catalog.tables.len(),
+            functions = catalog.functions.len(),
+            "catalog reloaded"
         );
         self.replace(catalog);
         Ok(())
     }
 }
 
-/// Mantém um `LISTEN nelcota` e recarrega o catálogo a cada notificação.
-/// Reconecta sozinho; a cada reconexão recarrega (pode ter perdido avisos).
+/// Keeps a `LISTEN nelcota` open and reloads the catalog on each notification.
+/// Reconnects on its own and reloads on each reconnection (notices may have
+/// been missed).
 pub fn spawn_reload_listener(
     handle: Arc<CatalogHandle>,
     pool: deadpool_postgres::Pool,
@@ -420,7 +421,7 @@ pub fn spawn_reload_listener(
             match listen_once(&handle, &pool, &config).await {
                 Ok(()) => backoff = Duration::from_secs(1),
                 Err(err) => {
-                    tracing::warn!(error = %err, "listener de recarga do catálogo caiu; reconectando");
+                    tracing::warn!(error = %err, "catalog reload listener dropped; reconnecting");
                 }
             }
             tokio::time::sleep(backoff).await;
@@ -453,14 +454,14 @@ async fn listen_once(
         .batch_execute(&format!("LISTEN {RELOAD_CHANNEL}"))
         .await?;
     if let Err(err) = handle.reload(pool).await {
-        tracing::error!(error = %err, "falha ao recarregar o catálogo");
+        tracing::error!(error = %err, "failed to reload the catalog");
     }
     while rx.recv().await.is_some() {
-        // Agrupa rajadas de DDL (ex.: uma migração inteira) numa recarga só.
+        // Groups bursts of DDL (e.g. a whole migration) into a single reload.
         tokio::time::sleep(Duration::from_millis(100)).await;
         while rx.try_recv().is_ok() {}
         if let Err(err) = handle.reload(pool).await {
-            tracing::error!(error = %err, "falha ao recarregar o catálogo");
+            tracing::error!(error = %err, "failed to reload the catalog");
         }
     }
     drop(client);

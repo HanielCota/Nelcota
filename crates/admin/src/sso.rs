@@ -1,15 +1,15 @@
-//! Login único entre os painéis dos projetos de um mesmo host.
+//! Single sign-on between the panels of projects on the same host.
 //!
-//! Cookies não atravessam domínios diferentes (`api.loja.com` → `api.blog.com`),
-//! então a sessão é passada por um *handoff*: o painel de origem, com o admin
-//! já logado, emite um token curto para o projeto de destino; o destino o
-//! valida e cria a própria sessão.
+//! Cookies do not cross domains (`api.shop.com` → `api.blog.com`), so the
+//! session is passed through a *handoff*: the source panel, with the admin
+//! already signed in, issues a short-lived token for the target project; the
+//! target validates it and creates its own session.
 //!
-//! - Token: JWT HS256 com o segredo compartilhado do host (`NELCOTA_ADMIN_SSO_SECRET`),
-//!   `aud` = projeto de destino, validade de 60 s e `jti` de uso único.
-//! - Ele viaja no fragmento da URL (`#sso=`), que não vai para logs de servidor
-//!   nem para o `Referer`; a SPA o lê e o envia por POST.
-//! - Sem segredo configurado (modo "login por projeto"), o handoff não existe.
+//! - Token: HS256 JWT with the host's shared secret (`NELCOTA_ADMIN_SSO_SECRET`),
+//!   `aud` = target project, 60 s validity and a single-use `jti`.
+//! - It travels in the URL fragment (`#sso=`), which reaches neither server
+//!   logs nor the `Referer`; the SPA reads it and sends it by POST.
+//! - Without a configured secret ("per-project login" mode), there is no handoff.
 
 use std::{
     collections::HashMap,
@@ -45,7 +45,7 @@ struct HandoffClaims {
     jti: String,
 }
 
-/// Chaves do handoff e o registro dos tokens já usados (anti-replay).
+/// Handoff keys and the record of tokens already used (anti-replay).
 pub struct Sso {
     encoding: EncodingKey,
     decoding: DecodingKey,
@@ -67,14 +67,14 @@ impl Sso {
         }
     }
 
-    /// Token para o admin `email` entrar no projeto `audience`.
+    /// Token for the admin `email` to enter the project `audience`.
     pub fn issue(
         &self,
         email: &str,
         audience: &str,
     ) -> Result<String, jsonwebtoken::errors::Error> {
         let mut jti = [0u8; 16];
-        getrandom::fill(&mut jti).expect("fonte de aleatoriedade do sistema indisponível");
+        getrandom::fill(&mut jti).expect("system randomness source unavailable");
         let now = get_current_timestamp();
         let claims = HandoffClaims {
             iss: ISSUER.into(),
@@ -87,8 +87,8 @@ impl Sso {
         jsonwebtoken::encode(&Header::new(Algorithm::HS256), &claims, &self.encoding)
     }
 
-    /// Valida um token emitido para este projeto e para o admin configurado.
-    /// Cada token só pode ser usado uma vez.
+    /// Validates a token issued for this project and the configured admin.
+    /// Each token can be used only once.
     pub fn redeem(&self, token: &str, project: &str, email: &str) -> Result<(), RedeemError> {
         let mut validation = Validation::new(Algorithm::HS256);
         validation.set_audience(&[project]);
@@ -118,17 +118,24 @@ pub struct HandoffRequest {
     project: String,
 }
 
-/// `POST /admin/api/sso/handoff {project}` (exige sessão): URL do painel do
-/// projeto de destino já com o token no fragmento.
+/// `POST /admin/api/sso/handoff {project}` (needs a session): URL of the
+/// target project's panel with the token already in the fragment.
 pub async fn handoff(
     State(state): State<AdminState>,
     Json(body): Json<HandoffRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let sso = state.host.sso.as_ref().ok_or_else(|| {
-        ApiError::bad_request("login único desligado: entre no painel de cada projeto")
+        ApiError::bad_request(
+            "sso_disabled",
+            "single sign-on is off: sign in to each project's panel",
+        )
     })?;
     let target = projects::find(&state.host, &body.project).ok_or_else(|| {
-        ApiError::not_found(format!("projeto '{}' não existe neste host", body.project))
+        ApiError::not_found(
+            "project_not_found",
+            format!("project '{}' does not exist on this host", body.project),
+        )
+        .params(json!({ "project": body.project }))
     })?;
     let token = sso.issue(&state.credentials.email, &target.name)?;
     Ok(Json(json!({
@@ -141,14 +148,19 @@ pub struct RedeemRequest {
     token: String,
 }
 
-/// `POST /admin/api/sso {token}` (público): troca o token por uma sessão.
+/// `POST /admin/api/sso {token}` (public): trades the token for a session.
 pub async fn redeem(State(state): State<AdminState>, Json(body): Json<RedeemRequest>) -> Response {
     let Some(sso) = state.host.sso.as_ref() else {
-        return ApiError(StatusCode::NOT_FOUND, "login único desligado".into()).into_response();
+        return ApiError::new(
+            StatusCode::NOT_FOUND,
+            "sso_disabled",
+            "single sign-on is off",
+        )
+        .into_response();
     };
     match sso.redeem(&body.token, &state.host.project, &state.credentials.email) {
         Ok(()) => {
-            tracing::info!("login no painel por handoff de SSO");
+            tracing::info!("panel login through an SSO handoff");
             (
                 [(header::SET_COOKIE, crate::new_session_cookie(&state))],
                 Json(json!({ "email": state.credentials.email })),
@@ -156,10 +168,11 @@ pub async fn redeem(State(state): State<AdminState>, Json(body): Json<RedeemRequ
                 .into_response()
         }
         Err(err) => {
-            tracing::warn!(?err, "handoff de SSO recusado");
-            ApiError(
+            tracing::warn!(?err, "SSO handoff refused");
+            ApiError::new(
                 StatusCode::UNAUTHORIZED,
-                "link de acesso inválido ou expirado: entre de novo".into(),
+                "sso_link_invalid",
+                "invalid or expired access link: sign in again",
             )
             .into_response()
         }
@@ -170,18 +183,18 @@ pub async fn redeem(State(state): State<AdminState>, Json(body): Json<RedeemRequ
 mod tests {
     use super::*;
 
-    const SECRET: &[u8] = b"segredo-compartilhado-de-teste-com-32+";
+    const SECRET: &[u8] = b"shared-test-secret-with-32-bytes-or-more";
 
     #[test]
-    fn token_vale_uma_vez_e_so_para_o_destino() {
+    fn token_works_once_and_only_for_the_target() {
         let sso = Sso::new(SECRET);
         let token = sso.issue("admin@x.com", "blog").unwrap();
         assert_eq!(
-            sso.redeem(&token, "loja", "admin@x.com"),
+            sso.redeem(&token, "shop", "admin@x.com"),
             Err(RedeemError::Invalid)
         );
         assert_eq!(
-            sso.redeem(&token, "blog", "outro@x.com"),
+            sso.redeem(&token, "blog", "other@x.com"),
             Err(RedeemError::Invalid)
         );
         assert_eq!(sso.redeem(&token, "blog", "ADMIN@x.com"), Ok(()));
@@ -192,9 +205,9 @@ mod tests {
     }
 
     #[test]
-    fn segredo_diferente_e_token_vencido_sao_recusados() {
+    fn other_secret_and_expired_token_are_refused() {
         let token = Sso::new(SECRET).issue("admin@x.com", "blog").unwrap();
-        let other = Sso::new(b"outro-segredo-qualquer-com-32-bytes!!");
+        let other = Sso::new(b"some-other-secret-with-32-bytes-too!!");
         assert_eq!(
             other.redeem(&token, "blog", "admin@x.com"),
             Err(RedeemError::Invalid)

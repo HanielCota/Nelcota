@@ -1,8 +1,8 @@
-//! Endpoints `/auth/v1/*`: cadastro, login, refresh com rotação, logout,
-//! usuário atual e JWKS.
+//! `/auth/v1/*` endpoints: signup, login, refresh with rotation, logout,
+//! current user, password recovery and JWKS.
 //!
-//! As tabelas `auth.*` são acessadas com `SET LOCAL ROLE nelcota_auth`, uma role
-//! interna que nenhum JWT consegue assumir.
+//! The `auth.*` tables are accessed with `SET LOCAL ROLE nelcota_auth`, an
+//! internal role that no JWT can assume.
 
 use std::{net::IpAddr, net::SocketAddr, sync::Arc};
 
@@ -29,7 +29,7 @@ use crate::{
     recovery,
 };
 
-/// Configuração dos endpoints de auth.
+/// Settings of the auth endpoints.
 #[derive(Clone, Debug)]
 pub struct AuthSettings {
     pub issuer: String,
@@ -37,7 +37,7 @@ pub struct AuthSettings {
     pub refresh_ttl_days: u32,
     pub signup_enabled: bool,
     pub trust_proxy: bool,
-    /// Página do app que recebe o link de recuperação de senha.
+    /// App page that receives the password recovery link.
     pub recovery_url: Option<String>,
 }
 
@@ -48,8 +48,8 @@ pub struct AuthState {
     pub passwords: Arc<Passwords>,
     pub limiter: Arc<RateLimiter>,
     pub settings: Arc<AuthSettings>,
-    /// Envio de email; sem ele (ou sem `recovery_url`), a recuperação de
-    /// senha responde `recovery_disabled`.
+    /// Email sending; without it (or without `recovery_url`), password
+    /// recovery answers `recovery_disabled`.
     pub mailer: Option<Arc<dyn Mailer>>,
 }
 
@@ -71,7 +71,7 @@ pub fn router(state: AuthState) -> Router {
         .with_state(state)
 }
 
-// ---------------------------------------------------------------- erros
+// ---------------------------------------------------------------- errors
 
 pub(crate) fn invalid_grant(message: &str) -> ApiError {
     ApiError::new(StatusCode::BAD_REQUEST, "invalid_grant", message)
@@ -91,7 +91,7 @@ pub(crate) fn db_error(err: tokio_postgres::Error) -> ApiError {
 
 // ---------------------------------------------------------------- helpers
 
-/// Endereço da conexão TCP, quando disponível (ausente em testes `oneshot`).
+/// Address of the TCP connection, when available (absent in `oneshot` tests).
 pub(crate) struct PeerAddr(pub(crate) Option<SocketAddr>);
 
 impl<S: Send + Sync> FromRequestParts<S> for PeerAddr {
@@ -107,8 +107,8 @@ impl<S: Send + Sync> FromRequestParts<S> for PeerAddr {
     }
 }
 
-/// IP do cliente. Atrás de proxy (`trust_proxy`), usa a entrada mais à
-/// direita do `X-Forwarded-For` (a que o NOSSO proxy adicionou).
+/// Client IP. Behind a proxy (`trust_proxy`), uses the rightmost entry of
+/// `X-Forwarded-For` (the one OUR proxy added).
 pub(crate) fn client_ip(
     settings: &AuthSettings,
     headers: &HeaderMap,
@@ -134,16 +134,16 @@ pub(crate) fn limit(state: &AuthState, key: &str) -> Result<(), ApiError> {
         .map_err(|wait| ApiError::rate_limited(wait.as_secs()))
 }
 
-/// Credencial recusada pelas regras de `credentials` vira erro de validação.
+/// A credential rejected by the `credentials` rules becomes a validation error.
 pub(crate) fn invalid(err: InvalidCredential) -> ApiError {
     validation(err.0)
 }
 
-/// Token opaco (refresh, link de recuperação): 32 bytes aleatórios. Só o
-/// SHA-256 vai para o banco.
+/// Opaque token (refresh, recovery link): 32 random bytes. Only the SHA-256
+/// goes to the database.
 pub(crate) fn new_opaque_token() -> (String, Vec<u8>) {
     let mut bytes = [0u8; 32];
-    getrandom::fill(&mut bytes).expect("fonte de aleatoriedade do sistema indisponível");
+    getrandom::fill(&mut bytes).expect("system randomness source unavailable");
     let token = URL_SAFE_NO_PAD.encode(bytes);
     let hash = Sha256::digest(token.as_bytes()).to_vec();
     (token, hash)
@@ -171,7 +171,7 @@ struct SessionUser {
     json: Value,
 }
 
-/// Cria sessão + primeiro refresh token, marca o login e devolve a resposta.
+/// Creates a session + first refresh token, records the login and returns the response.
 pub(crate) async fn start_session(
     state: &AuthState,
     tx: &Transaction<'_>,
@@ -205,7 +205,7 @@ pub(crate) async fn start_session(
     issue_tokens(state, tx, session_id, &user).await
 }
 
-/// Emite um JWT de acesso + um refresh token novo na sessão.
+/// Issues an access JWT + a new refresh token in the session.
 async fn issue_tokens(
     state: &AuthState,
     tx: &Transaction<'_>,
@@ -235,7 +235,7 @@ async fn issue_tokens(
         "exp": expires_at,
     });
     let access_token = state.keys.sign(&claims).map_err(|err| {
-        tracing::error!(error = %err, "falha ao assinar JWT");
+        tracing::error!(error = %err, "failed to sign JWT");
         ApiError::internal()
     })?;
 
@@ -265,7 +265,7 @@ struct SignupBody {
     data: Option<Value>,
 }
 
-/// `POST /auth/v1/signup` `{email, password, data?}` → 201 + sessão.
+/// `POST /auth/v1/signup` `{email, password, data?}` → 201 + session.
 async fn signup(
     State(state): State<AuthState>,
     PeerAddr(peer): PeerAddr,
@@ -276,7 +276,7 @@ async fn signup(
         return Err(ApiError::new(
             StatusCode::FORBIDDEN,
             "signup_disabled",
-            "cadastro desabilitado",
+            "signup is disabled",
         ));
     }
     let ip = client_ip(&state.settings, &headers, peer);
@@ -287,7 +287,7 @@ async fn signup(
     let metadata = match body.data {
         None => json!({}),
         Some(data @ Value::Object(_)) => data,
-        Some(_) => return Err(validation("data precisa ser um objeto JSON")),
+        Some(_) => return Err(validation("data must be a JSON object")),
     };
 
     let hash = state
@@ -311,7 +311,7 @@ async fn signup(
             return Err(ApiError::new(
                 StatusCode::CONFLICT,
                 "user_already_exists",
-                "já existe um usuário com este email",
+                "a user with this email already exists",
             ));
         }
         Err(err) => return Err(db_error(err)),
@@ -355,7 +355,7 @@ async fn token(
             return Err(ApiError::new(
                 StatusCode::BAD_REQUEST,
                 "unsupported_grant_type",
-                "grant_type deve ser password ou refresh_token",
+                "grant_type must be password or refresh_token",
             ));
         }
     };
@@ -369,12 +369,12 @@ async fn password_grant(
     headers: &HeaderMap,
 ) -> Result<Value, ApiError> {
     let (Some(email), Some(password)) = (body.email, body.password) else {
-        return Err(validation("email e password são obrigatórios"));
+        return Err(validation("email and password are required"));
     };
     let Ok(email) = normalize_email(&email) else {
-        return Err(invalid_grant("email ou senha inválidos"));
+        return Err(invalid_grant("invalid email or password"));
     };
-    // Limite por conta, além do limite por IP (atacante distribuído).
+    // Per-account limit on top of the per-IP one (distributed attacker).
     limit(state, &format!("login:{email}"))?;
 
     let mut client = state.pool.get().await.map_err(ApiError::from_pool)?;
@@ -390,7 +390,7 @@ async fn password_grant(
         tx.commit().await.map_err(db_error)?;
         row.map(|r| (r.get(0), r.get(1)))
     };
-    // A conexão fica livre enquanto o argon2 roda.
+    // The connection is released while argon2 runs.
     drop(client);
 
     let (user_id, phc) = match found {
@@ -398,9 +398,9 @@ async fn password_grant(
         None => (None, None),
     };
     if !state.passwords.verify(password, phc).await {
-        return Err(invalid_grant("email ou senha inválidos"));
+        return Err(invalid_grant("invalid email or password"));
     }
-    let user_id = user_id.expect("verify só passa com usuário existente");
+    let user_id = user_id.expect("verify only succeeds for an existing user");
 
     let mut client = state.pool.get().await.map_err(ApiError::from_pool)?;
     let tx = begin_auth(&mut client).await?;
@@ -414,13 +414,13 @@ async fn refresh_grant(state: &AuthState, body: TokenBody) -> Result<Value, ApiE
         .refresh_token
         .filter(|t| !t.is_empty() && t.len() <= 128)
     else {
-        return Err(validation("refresh_token é obrigatório"));
+        return Err(validation("refresh_token is required"));
     };
     let hash = Sha256::digest(token.as_bytes()).to_vec();
 
     let mut client = state.pool.get().await.map_err(ApiError::from_pool)?;
     let tx = begin_auth(&mut client).await?;
-    // FOR UPDATE serializa refreshes concorrentes do mesmo token.
+    // FOR UPDATE serializes concurrent refreshes of the same token.
     let row = tx
         .query_opt(
             &format!(
@@ -437,17 +437,17 @@ async fn refresh_grant(state: &AuthState, body: TokenBody) -> Result<Value, ApiE
         .await
         .map_err(db_error)?;
     let Some(row) = row else {
-        return Err(invalid_grant("refresh token inválido"));
+        return Err(invalid_grant("invalid refresh token"));
     };
     let (token_id, revoked, expired, session_id, session_revoked): (i64, bool, bool, Uuid, bool) =
         (row.get(0), row.get(1), row.get(2), row.get(3), row.get(4));
 
     if session_revoked {
-        return Err(invalid_grant("sessão encerrada"));
+        return Err(invalid_grant("session ended"));
     }
     if revoked {
-        // Reuso: alguém tem uma cópia de um token já rotacionado. Encerra a
-        // sessão inteira (todos os tokens da família deixam de valer).
+        // Reuse: someone holds a copy of an already rotated token. End the whole
+        // session (every token of the family stops working).
         tx.execute(
             "UPDATE auth.sessions SET revoked_at = now() WHERE id = $1",
             &[&session_id],
@@ -455,11 +455,11 @@ async fn refresh_grant(state: &AuthState, body: TokenBody) -> Result<Value, ApiE
         .await
         .map_err(db_error)?;
         tx.commit().await.map_err(db_error)?;
-        tracing::warn!(session_id = %session_id, "reuso de refresh token detectado; sessão revogada");
-        return Err(invalid_grant("refresh token reutilizado; sessão encerrada"));
+        tracing::warn!(session_id = %session_id, "refresh token reuse detected; session revoked");
+        return Err(invalid_grant("refresh token reused; session ended"));
     }
     if expired {
-        return Err(invalid_grant("refresh token expirado"));
+        return Err(invalid_grant("refresh token expired"));
     }
 
     tx.execute(
@@ -497,8 +497,8 @@ fn session_of(claims: &nelcota_core::Claims) -> Result<(Uuid, Uuid), ApiError> {
     Ok((user_id, session_id))
 }
 
-/// `POST /auth/v1/logout` (Bearer): encerra a sessão do token. O JWT de acesso
-/// continua válido até expirar (stateless); os refresh tokens morrem na hora.
+/// `POST /auth/v1/logout` (Bearer): ends the token's session. The access JWT
+/// stays valid until it expires (stateless); refresh tokens die immediately.
 async fn logout(
     State(state): State<AuthState>,
     Auth(claims): Auth,
@@ -517,7 +517,7 @@ async fn logout(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// `GET /auth/v1/user` (Bearer): dados do usuário do token.
+/// `GET /auth/v1/user` (Bearer): data of the token's user.
 async fn user(State(state): State<AuthState>, Auth(claims): Auth) -> Result<Json<Value>, ApiError> {
     let (user_id, _) = session_of(&claims)?;
     let mut client = state.pool.get().await.map_err(ApiError::from_pool)?;
@@ -534,13 +534,13 @@ async fn user(State(state): State<AuthState>, Auth(claims): Auth) -> Result<Json
         ApiError::new(
             StatusCode::NOT_FOUND,
             "user_not_found",
-            "usuário não existe mais",
+            "the user no longer exists",
         )
     })?;
     Ok(Json(row.get(0)))
 }
 
-/// `GET /auth/v1/.well-known/jwks.json`: chaves públicas para validar nossos JWTs.
+/// `GET /auth/v1/.well-known/jwks.json`: public keys to validate our JWTs.
 async fn jwks(State(state): State<AuthState>) -> impl IntoResponse {
     (
         [
@@ -556,7 +556,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn x_forwarded_for_so_com_trust_proxy() {
+    fn x_forwarded_for_only_with_trust_proxy() {
         let mut settings = AuthSettings {
             issuer: "t".into(),
             access_ttl_secs: 1,
@@ -573,7 +573,7 @@ mod tests {
             Some("9.9.9.9".parse().unwrap())
         );
         settings.trust_proxy = true;
-        // Só a entrada mais à direita é confiável (o cliente forja as demais).
+        // Only the rightmost entry is trustworthy (the client forges the rest).
         assert_eq!(
             client_ip(&settings, &headers, peer),
             Some("2.2.2.2".parse().unwrap())

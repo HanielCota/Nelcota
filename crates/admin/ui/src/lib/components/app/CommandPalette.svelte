@@ -10,6 +10,7 @@
   import { api } from '$lib/api'
   import { logout } from '$lib/auth'
   import { navItems } from '$lib/nav'
+  import { t } from '$lib/i18n/index.svelte'
   import { palette } from '$lib/palette.svelte'
   import { navigate } from '$lib/router.svelte'
   import { commandScore } from '$lib/search'
@@ -23,13 +24,13 @@
     try {
       tables = (await api.get<{ tables: TableSummary[] }>('/tables', { signal })).tables
     } catch {
-      // Sem a lista (ou cancelada), a paleta segue com páginas e ações.
+      // Without the list (or cancelled), the palette keeps pages and actions.
     }
   }
 
-  // Carrega já ao montar (quem digita rápido logo ao abrir encontra as tabelas)
-  // e atualiza a cada abertura, porque podem ter mudado; enquanto isso, a
-  // lista anterior continua visível.
+  // Load on mount (whoever types right after opening finds the tables) and
+  // refresh on every open, since they may have changed; meanwhile the previous
+  // list stays visible.
   $effect(() => {
     void palette.open
     const controller = new AbortController()
@@ -56,7 +57,6 @@
 
   const pages = navItems
 
-  // Ícone dentro de um quadrado, como nos itens da barra lateral.
 </script>
 
 <svelte:window onkeydown={onKeydown} />
@@ -64,27 +64,27 @@
 <Command.Dialog
   bind:open={palette.open}
   filter={commandScore}
-  title="Paleta de comandos"
-  description="Busque páginas, tabelas, consultas e ações"
+  title={t('palette.title')}
+  description={t('palette.description')}
   class="sm:max-w-xl"
 >
-  <Command.Input placeholder="Buscar páginas, tabelas, consultas…" />
+  <Command.Input placeholder={t('palette.placeholder')} />
   <Command.List class="max-h-[min(60vh,420px)]">
-    <Command.Empty class="py-8 text-muted-foreground">Nada encontrado.</Command.Empty>
+    <Command.Empty class="py-8 text-muted-foreground">{t('palette.empty')}</Command.Empty>
 
-    <Command.Group heading="Páginas">
+    <Command.Group heading={t('palette.groups.pages')}>
       {#each pages as page (page.path)}
-        <Command.Item value={`página ${page.title}`} onSelect={() => run(() => navigate(page.path))}>
-          <page.icon />{page.title}
+        <Command.Item value={`${t('palette.keywords.page')} ${t(page.title)}`} onSelect={() => run(() => navigate(page.path))}>
+          <page.icon />{t(page.title)}
         </Command.Item>
       {/each}
     </Command.Group>
 
     {#if tables.length}
-      <Command.Group heading="Tabelas">
+      <Command.Group heading={t('palette.groups.tables')}>
         {#each tables as table (table.name)}
           <Command.Item
-            value={`tabela ${table.name}`}
+            value={`${t('palette.keywords.table')} ${table.name}`}
             onSelect={() => run(() => navigate(`/tables/${encodeURIComponent(table.name)}`))}
           >
             <Table2 /><span class="truncate">{table.name}</span>
@@ -95,33 +95,33 @@
     {/if}
 
     {#if sqlStore.saved.length}
-      <Command.Group heading="Consultas salvas">
+      <Command.Group heading={t('palette.groups.saved')}>
         {#each sqlStore.sorted as query (query.id)}
-          <Command.Item value={`consulta ${query.name} ${query.id}`} onSelect={() => run(() => openSql(query.sql, query.id))}>
+          <Command.Item value={`${t('palette.keywords.query')} ${query.name} ${query.id}`} onSelect={() => run(() => openSql(query.sql, query.id))}>
             <FileCode /><span class="truncate">{query.name}</span>
           </Command.Item>
         {/each}
       </Command.Group>
     {/if}
 
-    <Command.Group heading="Modelos SQL">
+    <Command.Group heading={t('palette.groups.templates')}>
       {#each SQL_SNIPPETS as snippet (snippet.label)}
-        <Command.Item value={`modelo ${snippet.label}`} onSelect={() => run(() => openSql(snippet.sql))}>
-          <Sparkles />{snippet.label}
+        <Command.Item value={`${t('palette.keywords.template')} ${t(snippet.label)}`} onSelect={() => run(() => openSql(t(snippet.sql)))}>
+          <Sparkles />{t(snippet.label)}
         </Command.Item>
       {/each}
     </Command.Group>
 
     <Command.Separator />
-    <Command.Group heading="Ações">
-      <Command.Item value="ação alternar tema claro escuro" onSelect={() => run(toggleMode)}>
-        <SunMoon />Alternar tema
+    <Command.Group heading={t('palette.groups.actions')}>
+      <Command.Item value={t('palette.actions.themeKeywords')} onSelect={() => run(toggleMode)}>
+        <SunMoon />{t('palette.actions.theme')}
       </Command.Item>
-      <Command.Item value="ação documentação api openapi" onSelect={() => run(() => window.open('/rest/v1/', '_blank', 'noopener'))}>
-        <BookOpen />Abrir documentação da API
+      <Command.Item value={t('palette.actions.docsKeywords')} onSelect={() => run(() => window.open('/rest/v1/', '_blank', 'noopener'))}>
+        <BookOpen />{t('palette.actions.docs')}
       </Command.Item>
-      <Command.Item value="ação sair logout" onSelect={() => run(logout)}>
-        <LogOut />Sair
+      <Command.Item value={t('palette.actions.signOutKeywords')} onSelect={() => run(logout)}>
+        <LogOut />{t('palette.actions.signOut')}
       </Command.Item>
     </Command.Group>
   </Command.List>

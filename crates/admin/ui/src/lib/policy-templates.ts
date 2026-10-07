@@ -1,74 +1,75 @@
-// Modelos de policy mais comuns. Os de "dono" usam a coluna que guarda o
-// usuário (uuid), comparada com auth.uid().
+// Most common policy templates. The "owner" ones use the column holding the
+// user (uuid), compared with auth.uid(). Label, description and the default
+// policy name come from the i18n catalog (`policies.templates.<id>`), so they
+// follow the panel language.
 
 import type { ColumnInfo, PolicyDef } from './ddl'
+import { t } from './i18n/index.svelte'
+
+export type PolicyTemplateId =
+  | 'publicRead'
+  | 'signedInRead'
+  | 'ownerSelect'
+  | 'ownerInsert'
+  | 'ownerUpdate'
+  | 'ownerDelete'
+  | 'ownerAll'
 
 export interface PolicyTemplate {
-  label: string
-  description: string
-  build: (ownerColumn: string) => Omit<PolicyDef, 'permissive'>
+  id: PolicyTemplateId
+  build: (ownerColumn: string) => Omit<PolicyDef, 'permissive' | 'name'>
 }
 
 const owner = (column: string) => `${quoteIfNeeded(column)} = auth.uid()`
 
-/** Aspas só quando o nome não é um identificador simples em minúsculas. */
+/** Quotes only when the name is not a plain lowercase identifier. */
 export function quoteIfNeeded(name: string): string {
   return /^[a-z_][a-z0-9_]*$/.test(name) ? name : `"${name.replaceAll('"', '""')}"`
 }
 
 export const POLICY_TEMPLATES: readonly PolicyTemplate[] = [
   {
-    label: 'Leitura pública',
-    description: 'Qualquer um lê todas as linhas, logado ou não.',
-    build: () => ({ name: 'leitura pública', command: 'select', roles: ['anon', 'authenticated'], using: 'true', check: null }),
+    id: 'publicRead',
+    build: () => ({ command: 'select', roles: ['anon', 'authenticated'], using: 'true', check: null }),
   },
   {
-    label: 'Usuários logados leem',
-    description: 'Só quem está logado lê; anônimos não.',
-    build: () => ({ name: 'logados leem', command: 'select', roles: ['authenticated'], using: 'true', check: null }),
+    id: 'signedInRead',
+    build: () => ({ command: 'select', roles: ['authenticated'], using: 'true', check: null }),
   },
   {
-    label: 'Dono lê as próprias linhas',
-    description: 'Cada usuário vê só as linhas em que é o dono.',
-    build: (column) => ({ name: 'dono lê', command: 'select', roles: ['authenticated'], using: owner(column), check: null }),
+    id: 'ownerSelect',
+    build: (column) => ({ command: 'select', roles: ['authenticated'], using: owner(column), check: null }),
   },
   {
-    label: 'Dono cria as próprias linhas',
-    description: 'Só aceita linhas novas em nome de quem está logado.',
-    build: (column) => ({ name: 'dono cria', command: 'insert', roles: ['authenticated'], using: null, check: owner(column) }),
+    id: 'ownerInsert',
+    build: (column) => ({ command: 'insert', roles: ['authenticated'], using: null, check: owner(column) }),
   },
   {
-    label: 'Dono altera as próprias linhas',
-    description: 'Altera só o que é seu, sem passar a linha para outro dono.',
-    build: (column) => ({
-      name: 'dono altera',
-      command: 'update',
-      roles: ['authenticated'],
-      using: owner(column),
-      check: owner(column),
-    }),
+    id: 'ownerUpdate',
+    build: (column) => ({ command: 'update', roles: ['authenticated'], using: owner(column), check: owner(column) }),
   },
   {
-    label: 'Dono apaga as próprias linhas',
-    description: 'Apaga só o que é seu.',
-    build: (column) => ({ name: 'dono apaga', command: 'delete', roles: ['authenticated'], using: owner(column), check: null }),
+    id: 'ownerDelete',
+    build: (column) => ({ command: 'delete', roles: ['authenticated'], using: owner(column), check: null }),
   },
   {
-    label: 'Dono faz tudo nas próprias linhas',
-    description: 'Lê, cria, altera e apaga só o que é seu (uma policy para tudo).',
-    build: (column) => ({
-      name: 'dono faz tudo',
-      command: 'all',
-      roles: ['authenticated'],
-      using: owner(column),
-      check: owner(column),
-    }),
+    id: 'ownerAll',
+    build: (column) => ({ command: 'all', roles: ['authenticated'], using: owner(column), check: owner(column) }),
   },
 ]
 
-const OWNER_NAMES = ['user_id', 'usuario_id', 'dono', 'dono_id', 'owner', 'owner_id', 'autor_id', 'criado_por']
+/** Template label, description and default policy name in the current language. */
+export const templateText = (id: PolicyTemplateId) => ({
+  label: t(`policies.templates.${id}.label`),
+  description: t(`policies.templates.${id}.description`),
+  name: t(`policies.templates.${id}.name`),
+})
 
-/** Coluna mais provável de guardar o dono: uuid com nome conhecido, ou o primeiro uuid que não é a PK. */
+// Common owner column names. The Portuguese ones are kept on purpose: they
+// match columns in users' own databases, not text of this codebase.
+const OWNER_NAMES = ['user_id', 'usuario_id', 'dono', 'dono_id', 'owner', 'owner_id', 'autor_id', 'criado_por', 'author_id', 'created_by']
+
+/** Column most likely to hold the owner: a uuid with a known name, else the first uuid that is not the PK. */
 export function guessOwnerColumn(columns: readonly ColumnInfo[]): string {
   const uuids = columns.filter((c) => c.data_type === 'uuid')
   return (

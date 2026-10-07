@@ -3,12 +3,13 @@
   import { Button } from '$lib/components/ui/button'
   import { Input } from '$lib/components/ui/input'
   import { Label } from '$lib/components/ui/label'
+  import { t } from '$lib/i18n/index.svelte'
 
   let {
     open = $bindable(false),
     title,
     initialName = '',
-    confirmLabel = 'Salvar',
+    confirmLabel,
     onsubmit,
   }: {
     open?: boolean
@@ -20,7 +21,7 @@
 
   let name = $state('')
 
-  // Preenche o campo a cada abertura (salvar e renomear reaproveitam o diálogo).
+  // Fill the field on every open (save and rename share this dialog).
   $effect(() => {
     if (open) name = initialName
   })
@@ -39,15 +40,15 @@
     <form class="grid gap-5" onsubmit={submit}>
       <Dialog.Header>
         <Dialog.Title>{title}</Dialog.Title>
-        <Dialog.Description>Fica salva neste navegador, para este projeto.</Dialog.Description>
+        <Dialog.Description>{t('sql.dialog.description')}</Dialog.Description>
       </Dialog.Header>
       <div class="grid gap-2">
-        <Label for="query-name">Nome</Label>
-        <Input id="query-name" bind:value={name} placeholder="ex.: pedidos da semana" maxlength={120} />
+        <Label for="query-name">{t('common.name')}</Label>
+        <Input id="query-name" bind:value={name} placeholder={t('sql.dialog.placeholder')} maxlength={120} />
       </div>
       <Dialog.Footer>
-        <Button variant="outline" onclick={() => (open = false)}>Cancelar</Button>
-        <Button type="submit" disabled={!name.trim()}>{confirmLabel}</Button>
+        <Button variant="outline" onclick={() => (open = false)}>{t('common.cancel')}</Button>
+        <Button type="submit" disabled={!name.trim()}>{confirmLabel ?? t('common.save')}</Button>
       </Dialog.Footer>
     </form>
   </Dialog.Content>

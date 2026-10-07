@@ -1,11 +1,11 @@
-// Navegação entre os painéis dos projetos do host.
+// Navigation between the panels of the host's projects.
 import { api } from './api'
 import type { ProjectLink } from './types'
 
 /**
- * Abre o painel de outro projeto. Com login único, leva junto um token de
- * handoff (no fragmento da URL, que não vai para logs); sem ele, o outro
- * painel pede o próprio login.
+ * Opens another project's panel. With single sign-on it carries a handoff
+ * token (in the URL fragment, which never reaches logs); without it, the other
+ * panel asks for its own login.
  */
 export async function openProject(project: ProjectLink, sso: boolean) {
   if (project.current || !project.url) return
@@ -17,7 +17,7 @@ export async function openProject(project: ProjectLink, sso: boolean) {
   }
 }
 
-/** Token de handoff no fragmento (`#sso=...`), removido da URL na hora. */
+/** Handoff token in the fragment (`#sso=...`), removed from the URL right away. */
 export function takeHandoffToken(): string | null {
   const match = location.hash.match(/^#sso=([\w.-]+)$/)
   if (!match) return null

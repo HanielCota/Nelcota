@@ -1,15 +1,16 @@
 <script lang="ts">
   import Copy from '@lucide/svelte/icons/copy'
   import Check from '@lucide/svelte/icons/check'
+  import { t } from '$lib/i18n/index.svelte'
 
   let {
     code,
-    label = 'Copiar',
+    label,
     wrap = false,
   }: {
     code: string
     label?: string
-    /** Quebra linhas longas (tokens) em vez de rolar na horizontal. */
+    /** Wraps long lines (tokens) instead of scrolling horizontally. */
     wrap?: boolean
   } = $props()
 
@@ -22,14 +23,14 @@
   }
 </script>
 
-<!-- min-w-0: dentro de grid/flex, sem ele uma linha longa alarga a página. -->
+<!-- min-w-0: inside grid/flex, without it a long line widens the page. -->
 <div class="group relative min-w-0 rounded-md border bg-muted/40">
-  <!-- Bloco que rola na horizontal precisa de foco para rolar com as setas
-       (WCAG 2.1.1); por isso o tabindex num elemento não interativo. -->
+  <!-- A horizontally scrolling block needs focus to scroll with the arrow keys
+       (WCAG 2.1.1); hence the tabindex on a non-interactive element. -->
   <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
   <pre
     tabindex={wrap ? undefined : 0}
-    aria-label={wrap ? undefined : 'Código'}
+    aria-label={wrap ? undefined : t('connect.code.label')}
     class={[
       'px-4 py-3.5 pr-14 font-mono text-xs leading-relaxed sm:text-[0.8125rem]',
       wrap ? 'break-all whitespace-pre-wrap' : 'overflow-x-auto',
@@ -37,7 +38,7 @@
   <button
     type="button"
     class="absolute top-1.5 right-1.5 grid size-8 cursor-pointer place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-    aria-label={label}
+    aria-label={label ?? t('common.copy')}
     onclick={copy}
   >
     {#if copied}<Check class="size-4 text-brand" />{:else}<Copy class="size-4" />{/if}

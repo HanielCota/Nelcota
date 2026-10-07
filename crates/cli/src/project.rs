@@ -1,5 +1,5 @@
-//! Um projeto do host: pasta com `docker-compose.yml` e `.env`, e as
-//! operações de `docker compose` sobre ele.
+//! A project on the host: a folder with `docker-compose.yml` and `.env`, and
+//! the `docker compose` operations on it.
 
 use std::{
     path::{Path, PathBuf},
@@ -40,19 +40,19 @@ impl Project {
         compose_command(&self.dir)
     }
 
-    /// `docker compose <args>` com a saída no terminal.
+    /// `docker compose <args>` with the output on the terminal.
     pub fn compose(&self, args: &[&str]) -> anyhow::Result<ExitStatus> {
         self.compose_command()
             .args(args)
             .status()
-            .context("não foi possível executar `docker compose` (o Docker está instalado?)")
+            .context("could not run `docker compose` (is Docker installed?)")
     }
 
     pub fn compose_ok(&self, args: &[&str]) -> anyhow::Result<()> {
         let status = self.compose(args)?;
         if !status.success() {
             bail!(
-                "[{}] `docker compose {}` falhou ({status})",
+                "[{}] `docker compose {}` failed ({status})",
                 self.name,
                 args.join(" ")
             );
@@ -60,17 +60,17 @@ impl Project {
         Ok(())
     }
 
-    /// `docker compose <args>` capturando a saída padrão.
+    /// `docker compose <args>` capturing standard output.
     pub fn compose_output(&self, args: &[&str]) -> anyhow::Result<String> {
         let output = self
             .compose_command()
             .args(args)
             .stderr(Stdio::inherit())
             .output()
-            .context("não foi possível executar `docker compose`")?;
+            .context("could not run `docker compose`")?;
         if !output.status.success() {
             bail!(
-                "[{}] `docker compose {}` falhou ({})",
+                "[{}] `docker compose {}` failed ({})",
                 self.name,
                 args.join(" "),
                 output.status
@@ -79,7 +79,7 @@ impl Project {
         Ok(String::from_utf8_lossy(&output.stdout).into_owned())
     }
 
-    /// `docker compose` com stdin/stdout ligados a arquivos (pg_dump/pg_restore).
+    /// `docker compose` with stdin/stdout tied to files (pg_dump/pg_restore).
     pub fn compose_piped(
         &self,
         args: &[&str],
@@ -91,10 +91,10 @@ impl Project {
             .stdin(stdin)
             .stdout(stdout)
             .status()
-            .context("não foi possível executar `docker compose`")
+            .context("could not run `docker compose`")
     }
 
-    /// Roda `nelcota <args>` dentro do container `app`.
+    /// Runs `nelcota <args>` inside the `app` container.
     pub fn in_app(&self, args: &[&str]) -> anyhow::Result<()> {
         let mut full = vec!["exec", "-T", "app", "/usr/local/bin/nelcota"];
         full.extend_from_slice(args);
@@ -107,14 +107,14 @@ impl Project {
         self.compose_output(&full)
     }
 
-    /// O container do serviço existe (criado, rodando ou parado)?
+    /// Does the service's container exist (created, running or stopped)?
     pub fn has_container(&self, service: &str) -> bool {
         self.compose_output(&["ps", "-a", "-q", service])
             .map(|out| !out.trim().is_empty())
             .unwrap_or(false)
     }
 
-    /// Estado do healthcheck do serviço (`healthy`, `starting`, ...), se rodando.
+    /// Healthcheck state of the service (`healthy`, `starting`, ...), if running.
     pub fn health(&self, service: &str) -> Option<String> {
         let id = self.compose_output(&["ps", "-q", service]).ok()?;
         let id = id.trim();
@@ -128,18 +128,20 @@ impl Project {
         Some(String::from_utf8_lossy(&output.stdout).trim().to_owned())
     }
 
-    /// Espera o healthcheck do serviço ficar `healthy`.
+    /// Waits for the service's healthcheck to become `healthy`.
     pub fn wait_healthy(&self, service: &str, timeout: Duration) -> anyhow::Result<()> {
         let deadline = Instant::now() + timeout;
         loop {
             match self.health(service).as_deref() {
                 Some("healthy") => return Ok(()),
-                Some("unhealthy") => bail!("[{}] o serviço {service} ficou unhealthy", self.name),
+                Some("unhealthy") => {
+                    bail!("[{}] the {service} service became unhealthy", self.name)
+                }
                 _ => {}
             }
             if Instant::now() > deadline {
                 bail!(
-                    "[{}] o serviço {service} não ficou saudável em {}s",
+                    "[{}] the {service} service did not become healthy within {}s",
                     self.name,
                     timeout.as_secs()
                 );

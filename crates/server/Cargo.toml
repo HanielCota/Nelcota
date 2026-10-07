@@ -1,6 +1,6 @@
 [package]
 name = "nelcota-server"
-description = "Binário único do Nelcota: junta API, Auth e (futuramente) painel e CLI."
+description = "The single Nelcota binary: API, auth, admin panel and CLI together."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

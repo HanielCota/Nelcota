@@ -7,6 +7,7 @@
   import ConfirmDialog from './ConfirmDialog.svelte'
   import DropTableDialog from './DropTableDialog.svelte'
   import { ddl, type AlterAction, type ColumnInfo, type Structure } from '$lib/ddl'
+  import { errorMessage, t } from '$lib/i18n/index.svelte'
 
   let {
     name,
@@ -14,7 +15,7 @@
     ondropped,
   }: {
     name: string
-    /** A tabela mudou de nome: o editor troca a URL. */
+    /** The table was renamed: the editor switches the URL. */
     onrenamed: (name: string) => void
     ondropped: () => void
   } = $props()
@@ -32,7 +33,7 @@
       structure = await ddl.structure(name)
       error = ''
     } catch (e) {
-      error = (e as Error).message
+      error = errorMessage(e)
     }
   }
 
@@ -41,17 +42,17 @@
     load()
   })
 
-  /** Ponto único de alteração: aplica, avisa e recarrega (ou segue o rename). */
+  /** Single point of change: applies, notifies and reloads (or follows the rename). */
   async function alter(actions: AlterAction[]) {
     if (actions.length === 0) return
     try {
       const result = await ddl.alterTable(name, actions)
-      toast.success(result.message ?? 'Tabela alterada')
+      toast.success(t('tables.toast.tableAltered'))
       const renamed = actions.findLast((a) => a.action === 'rename_table')
       if (renamed) onrenamed(renamed.name)
       else await load()
     } catch (e) {
-      toast.error((e as Error).message)
+      toast.error(errorMessage(e))
       throw e
     }
   }
@@ -63,7 +64,7 @@
 </script>
 
 {#if error}
-  <p class="p-6 text-sm text-destructive">Não deu para carregar a estrutura: {error}</p>
+  <p class="p-6 text-sm text-destructive">{t('tables.structure.loadError', { message: error })}</p>
 {:else if !structure}
   <div class="mx-auto grid max-w-5xl gap-6 p-6 lg:p-8"><Skeleton class="h-72 rounded-lg" /><Skeleton class="h-36 rounded-lg" /></div>
 {:else}
@@ -85,9 +86,9 @@
   {#if toDelete}
     <ConfirmDialog
       bind:open={deleteOpen}
-      title={`Apagar a coluna ${toDelete.name}?`}
-      description="Os valores da coluna somem em todas as linhas. Não dá para desfazer."
-      confirmLabel="Apagar coluna"
+      title={t('tables.structure.deleteColumnTitle', { name: toDelete.name })}
+      description={t('tables.structure.deleteColumnDescription')}
+      confirmLabel={t('tables.structure.deleteColumn')}
       destructive
       onconfirm={() => alter([{ action: 'drop_column', name: toDelete!.name }])}
     />

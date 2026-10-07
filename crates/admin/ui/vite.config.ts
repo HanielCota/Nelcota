@@ -3,7 +3,7 @@ import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vite'
 
-// O build vai para dist/ e é embutido no binário (rust-embed) em /admin/.
+// The build goes to dist/ and is embedded in the binary (rust-embed) under /admin/.
 export default defineConfig({
   base: '/admin/',
   plugins: [tailwindcss(), svelte()],
@@ -14,12 +14,12 @@ export default defineConfig({
     outDir: 'dist',
     assetsDir: 'assets',
     emptyOutDir: true,
-    // Fontes e ícones como arquivos (CSP: nada de data: em scripts).
+    // Fonts and icons as files (CSP: no data: in scripts).
     assetsInlineLimit: 0,
     chunkSizeWarningLimit: 900,
   },
   server: {
-    // `npm run dev`: a API do painel vem do nelcota rodando localmente.
+    // `npm run dev`: the panel API comes from nelcota running locally.
     proxy: { '/admin/api': { target: 'https://localhost', secure: false, changeOrigin: true } },
   },
 })

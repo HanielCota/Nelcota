@@ -1,6 +1,6 @@
-// Casamento de padrões de rota, sem depender do navegador.
+// Route pattern matching, independent of the browser.
 
-/** `/tables/notas` contra o padrão `/tables/:name` → `{ name: 'notas' }`. */
+/** `/tables/notes` against the pattern `/tables/:name` → `{ name: 'notes' }`. */
 export function match(pattern: string, path: string): Record<string, string> | null {
   const p = pattern.split('/')
   const s = path.split('/')

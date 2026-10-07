@@ -1,110 +1,113 @@
 # Nelcota
 
-BaaS open source, simples e sem lock-in: **Postgres puro + um binário Rust +
-deploy em 5 minutos numa VPS.**
+Open source BaaS, simple and lock-in free: **plain Postgres + one Rust binary +
+a 5-minute deploy on a VPS.**
 
-- **O Postgres é o produto.** Schema, policies RLS e funções são SQL puro e
-  continuam funcionando sem o Nelcota.
-- **A autorização é do RLS.** A API só valida o JWT e assume a role dele
-  dentro de uma transação. Ela nunca decide permissão por conta própria.
-- **Um binário (~10 MB)** com API REST automática, auth (JWT EdDSA + JWKS,
-  argon2id, refresh com rotação, recuperação de senha por email), painel e CLI
-  de deploy.
-- **Padrões abertos:** JWT/JWKS, PHC argon2id, SQL puro, OpenAPI,
-  S3-compatible. Dá para sair levando tudo ([saida.md](docs/saida.md)).
+- **Postgres is the product.** Schema, RLS policies and functions are plain SQL
+  and keep working without Nelcota.
+- **Authorization belongs to RLS.** The API only validates the JWT and assumes
+  its role inside a transaction. It never decides permissions on its own.
+- **One binary (~10 MB)** with an automatic REST API, auth (EdDSA JWT + JWKS,
+  argon2id, refresh with rotation, password recovery by email), an admin panel
+  and a deploy CLI.
+- **Open standards:** JWT/JWKS, PHC argon2id, plain SQL, OpenAPI,
+  S3-compatible. You can leave and take everything with you
+  ([leaving.md](docs/leaving.md)).
 
-## Deploy (VPS zerada → HTTPS)
+## Deploy (fresh VPS → HTTPS)
 
 ```sh
 curl -fsSL https://nelcota.dev/install | sh
-nelcota init api.seudominio.com
+nelcota init api.yourdomain.com
 nelcota up
 ```
 
-**Vários projetos na mesma VPS**, cada um isolado (Postgres, usuários, chaves,
-backups), com domínio próprio ou subdomínio e um login único para todos os
-painéis:
+**Several projects on the same VPS**, each one isolated (Postgres, users, keys,
+backups), with its own domain or a subdomain and a single sign-on for every
+panel:
 
 ```sh
-nelcota init api.loja.com                              # domínio próprio
-nelcota init --project blog --base-domain exemplo.com  # subdomínio: blog.exemplo.com
+nelcota init api.shop.com                              # own domain
+nelcota init --project blog --base-domain example.com  # subdomain: blog.example.com
 nelcota up && nelcota projects
 ```
 
-Detalhes em [docs/deploy.md](docs/deploy.md). Backup e restore em
+Details in [docs/deploy.md](docs/deploy.md). Backup and restore in
 [docs/backup.md](docs/backup.md).
 
-## Uso em 1 minuto
+## Usage in 1 minute
 
 ```sql
--- migrations/V1__notas.sql  →  nelcota migrate
-CREATE TABLE public.notas (
-    id   bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    dono uuid NOT NULL DEFAULT auth.uid(),
-    texto text NOT NULL
+-- migrations/V1__notes.sql  →  nelcota migrate
+CREATE TABLE public.notes (
+    id    bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    owner uuid NOT NULL DEFAULT auth.uid(),
+    body  text NOT NULL
 );
-ALTER TABLE public.notas ENABLE ROW LEVEL SECURITY;
-CREATE POLICY dono ON public.notas FOR ALL TO authenticated
-    USING (dono = auth.uid()) WITH CHECK (dono = auth.uid());
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.notas TO authenticated;
+ALTER TABLE public.notes ENABLE ROW LEVEL SECURITY;
+CREATE POLICY owner ON public.notes FOR ALL TO authenticated
+    USING (owner = auth.uid()) WITH CHECK (owner = auth.uid());
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.notes TO authenticated;
 ```
 
 ```sh
-# cadastro → JWT
-curl -X POST https://api.seudominio.com/auth/v1/signup \
-  -H 'content-type: application/json' -d '{"email":"ana@x.com","password":"senha-forte-123"}'
+# sign up → JWT
+curl -X POST https://api.yourdomain.com/auth/v1/signup \
+  -H 'content-type: application/json' -d '{"email":"ana@x.com","password":"strong-password-123"}'
 
-# CRUD sob RLS
-curl -X POST https://api.seudominio.com/rest/v1/notas -H "authorization: Bearer $TOKEN" \
-  -H 'content-type: application/json' -H 'prefer: return=representation' -d '{"texto":"oi"}'
-curl "https://api.seudominio.com/rest/v1/notas?texto=ilike.*oi*&order=id.desc" -H "authorization: Bearer $TOKEN"
+# CRUD under RLS
+curl -X POST https://api.yourdomain.com/rest/v1/notes -H "authorization: Bearer $TOKEN" \
+  -H 'content-type: application/json' -H 'prefer: return=representation' -d '{"body":"hi"}'
+curl "https://api.yourdomain.com/rest/v1/notes?body=ilike.*hi*&order=id.desc" -H "authorization: Bearer $TOKEN"
 ```
 
-Tipos para o frontend: `nelcota types -o database.ts`. OpenAPI em `/rest/v1/`.
-Painel em `/admin/`: editor de tabelas com edição inline, editor SQL com
-autocomplete, usuários e policies RLS.
+Frontend types: `nelcota types -o database.ts`. OpenAPI at `/rest/v1/`.
+Panel at `/admin/`: table editor with inline editing, SQL editor with
+autocomplete, users, RLS policies and migrations generated from panel changes.
+The panel is available in Portuguese and English (picked from the browser,
+switchable in the account menu).
 
-## Desenvolvimento
+## Development
 
-Requisitos: Rust stable e Docker.
+Requirements: stable Rust and Docker.
 
 ```sh
-cargo run -- dev            # Postgres 17 em container + servidor em http://127.0.0.1:8000
-cargo test                  # testes de integração sobem Postgres 17 real (testcontainers)
+cargo run -- dev            # Postgres 17 in a container + server at http://127.0.0.1:8000
+cargo test                  # integration tests start a real Postgres 17 (testcontainers)
 cargo clippy --all-targets -- -D warnings && cargo fmt --all --check
 cargo audit && cargo deny check
 ./scripts/acceptance.sh --local   # init + up + HTTPS + migrate + backup/restore + rollback
 
-# painel (Svelte 5 + shadcn-svelte + Tailwind v4 + CodeMirror)
+# panel (Svelte 5 + shadcn-svelte + Tailwind v4 + CodeMirror)
 cd crates/admin/ui && npm install && npm run dev
 ```
 
-O build do painel (`crates/admin/ui/dist`) é versionado: compilar o binário não
-exige Node.
+The panel build (`crates/admin/ui/dist`) is versioned: compiling the binary
+does not need Node.
 
-Os testes provam, contra um Postgres real, que um usuário não lê nem altera
-dados de outro (em todos os verbos), que JWTs inválidos, expirados ou com role
-desconhecida dão 401, que role e claims não vazam entre requests do pool, que
-identificadores e valores maliciosos não viram SQL, e que o reuso de refresh
-token derruba a sessão.
+The tests prove, against a real Postgres, that a user cannot read or change
+another user's data (with every verb), that invalid, expired or unknown-role
+JWTs get 401, that role and claims do not leak between pooled requests, that
+malicious identifiers and values do not become SQL, and that reusing a refresh
+token kills the session.
 
-## Documentação
+## Documentation
 
-- [API REST](docs/api.md): filtros, escrita, RPC, OpenAPI, erros
-- [JWT e roles](docs/jwt-e-roles.md): o contrato do token e o fluxo JWT → RLS
-- [Schema auth](docs/schema-auth.md): tabelas, formato da senha, endpoints
-- [Painel](docs/painel.md)
-- [Deploy](docs/deploy.md) · [Backup](docs/backup.md) · [Saindo do Nelcota](docs/saida.md)
-- [Arquitetura](docs/arquitetura.md) · [Decisões](docs/decisoes.md) · [Benchmark](bench/README.md)
+- [REST API](docs/api.md): filters, writes, RPC, OpenAPI, errors
+- [JWT and roles](docs/jwt-and-roles.md): the token contract and the JWT → RLS flow
+- [Auth schema](docs/schema-auth.md): tables, password format, endpoints
+- [Panel](docs/panel.md)
+- [Deploy](docs/deploy.md) · [Backup](docs/backup.md) · [Leaving Nelcota](docs/leaving.md)
+- [Architecture](docs/architecture.md) · [Decisions](docs/decisions.md) · [Benchmark](bench/README.md)
 
-> **Atenção:** Um JWT com `role: service_role` ignora todo o RLS. Nunca o exponha no
-> frontend.
+> **Warning:** A JWT with `role: service_role` bypasses all RLS. Never expose it
+> in the frontend.
 
-## Fora do MVP
+## Out of the MVP
 
-Realtime, Storage (use qualquer S3), Edge Functions, OAuth/MFA/magic link,
-multi-tenant, embed de relações. A arquitetura deixa espaço para eles.
+Realtime, Storage (use any S3), Edge Functions, OAuth/MFA/magic link,
+multi-tenant, relation embedding. The architecture leaves room for them.
 
-## Licença
+## License
 
 [Apache-2.0](LICENSE)

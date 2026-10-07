@@ -1,5 +1,5 @@
 [advisories]
-# rsa (via jsonwebtoken/rust_crypto): o Marvin Attack afeta operações com a
-# chave PRIVADA RSA. O Nelcota nunca assina com RSA (HS256 no Marco 1, EdDSA no
-# Marco 2). Revisar se RS256 for adotado para assinatura. Ver docs/decisoes.md.
+# rsa (via jsonwebtoken/rust_crypto): the Marvin Attack affects operations with
+# the PRIVATE RSA key. Nelcota never signs with RSA (HS256 in milestone 1, EdDSA
+# in milestone 2). Revisit if RS256 is adopted for signing. See docs/decisions.md.
 ignore = ["RUSTSEC-2023-0071"]

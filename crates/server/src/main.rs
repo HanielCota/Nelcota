@@ -30,16 +30,16 @@ async fn serve(config: Config) -> anyhow::Result<()> {
         config.statement_timeout_secs,
     )
     .await
-    .context("falha ao preparar o banco")?;
+    .context("could not prepare the database")?;
 
     let keys = Arc::new(
         Keys::new(
             config.jwt_private_key(),
             config.jwt_secret().map(str::as_bytes),
         )
-        .context("chave de JWT inválida")?,
+        .context("invalid JWT key")?,
     );
-    tracing::info!(alg = ?keys.algorithm(), "assinatura de JWT");
+    tracing::info!(alg = ?keys.algorithm(), "JWT signing");
     let pool = db::api_pool(
         &admin,
         config.authenticator_password.expose(),
@@ -59,16 +59,13 @@ async fn serve(config: Config) -> anyhow::Result<()> {
             max_rows: config.max_rows,
         }),
     };
-    // Email do auth (recuperação de senha). Sem SMTP, o endpoint responde
-    // `recovery_disabled`; configuração pela metade já falhou no `validate`.
+    // Auth email (password recovery). Without SMTP the endpoint answers
+    // `recovery_disabled`; a half-done configuration already failed in `validate`.
     let mail = config.mail()?;
     let mailer = match &mail {
         Some(mail) => {
             let smtp = nelcota_auth::SmtpMailer::new(mail.smtp_url, mail.from)?;
-            tracing::info!(
-                remetente = mail.from,
-                "recuperação de senha por email ligada"
-            );
+            tracing::info!(sender = mail.from, "password recovery by email enabled");
             Some(Arc::new(smtp) as Arc<dyn nelcota_auth::Mailer>)
         }
         None => None,
@@ -91,7 +88,7 @@ async fn serve(config: Config) -> anyhow::Result<()> {
     let admin = match (&config.admin_email, &config.admin_password_hash) {
         (Some(email), Some(hash)) if !email.is_empty() && !hash.expose().is_empty() => {
             Some(nelcota_admin::AdminState {
-                // 3: uma exportação longa segura a dela e o painel segue com as outras.
+                // 3: a long export holds its own and the panel keeps going with the others.
                 db: db::admin_pool(&admin, 3),
                 db_config: admin.clone(),
                 catalog: state.catalog.clone(),
@@ -114,7 +111,7 @@ async fn serve(config: Config) -> anyhow::Result<()> {
         }
         _ => {
             tracing::info!(
-                "painel desligado (defina NELCOTA_ADMIN_EMAIL e NELCOTA_ADMIN_PASSWORD_HASH)"
+                "panel disabled (set NELCOTA_ADMIN_EMAIL and NELCOTA_ADMIN_PASSWORD_HASH)"
             );
             None
         }
@@ -128,8 +125,8 @@ async fn serve(config: Config) -> anyhow::Result<()> {
 
     let listener = tokio::net::TcpListener::bind(config.listen)
         .await
-        .with_context(|| format!("não foi possível escutar em {}", config.listen))?;
-    tracing::info!(addr = %config.listen, "nelcota no ar");
+        .with_context(|| format!("could not listen on {}", config.listen))?;
+    tracing::info!(addr = %config.listen, "nelcota is up");
     axum::serve(
         listener,
         router.into_make_service_with_connect_info::<SocketAddr>(),
@@ -139,7 +136,7 @@ async fn serve(config: Config) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Projeto atual, lista do host e login único (se houver segredo compartilhado).
+/// Current project, the host's list and single sign-on (if there is a shared secret).
 fn host_link(config: &Config) -> nelcota_admin::HostLink {
     let sso = config
         .admin_sso_secret
@@ -157,8 +154,8 @@ fn host_link(config: &Config) -> nelcota_admin::HostLink {
     }
 }
 
-/// Hashes argon2 simultâneos: cada um usa ~19 MiB; com até 4 o pico fica
-/// abaixo de 80 MiB mesmo sob ataque.
+/// Concurrent argon2 hashes: each uses ~19 MiB; with at most 4 the peak stays
+/// under 80 MiB even under attack.
 fn hash_concurrency() -> usize {
     std::thread::available_parallelism().map_or(1, |n| n.get().min(4))
 }
@@ -191,5 +188,5 @@ async fn shutdown_signal() {
         () = ctrl_c => {},
         () = terminate => {},
     }
-    tracing::info!("encerrando");
+    tracing::info!("shutting down");
 }

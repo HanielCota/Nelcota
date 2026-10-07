@@ -12,6 +12,7 @@
   import SqlSidebar from '$lib/components/app/SqlSidebar.svelte'
   import { api } from '$lib/api'
   import { downloadText, toCsv, toJson } from '$lib/download'
+  import { errorMessage, t } from '$lib/i18n/index.svelte'
   import { SQL_SNIPPETS } from '$lib/sql-snippets'
   import { sqlStore, type SavedQuery } from '$lib/sql-store.svelte'
   import type { SqlResponse, SqlResult } from '$lib/types'
@@ -22,7 +23,7 @@
   let response = $state<SqlResponse | null>(null)
   let elapsed = $state(0)
 
-  // Diálogo de nome: salvar como nova, ou renomear uma existente.
+  // Name dialog: save as a new query, or rename an existing one.
   let dialog = $state<{ mode: 'save' | 'rename'; query?: SavedQuery } | null>(null)
   let dialogOpen = $state(false)
   let toDelete = $state<SavedQuery | null>(null)
@@ -34,7 +35,7 @@
       schema = s.tables
       defaultSchema = s.schema
     } catch {
-      // Sem autocomplete de tabelas; o editor continua funcionando.
+      // No table autocomplete; the editor keeps working.
     }
   })
 
@@ -47,20 +48,20 @@
       response = await api.post<SqlResponse>('/sql', { sql: code })
       sqlStore.remember(code)
     } catch (e) {
-      response = { error: { message: (e as Error).message } }
+      response = { error: { message: errorMessage(e) } }
     } finally {
       elapsed = Math.round(performance.now() - started)
       running = false
     }
   }
 
-  /** Salva a consulta aberta; sem nenhuma aberta, pede um nome. */
+  /** Saves the open query; with none open, asks for a name. */
   function save() {
     if (!sqlStore.draft.trim()) return
     const current = sqlStore.current
     if (current) {
       sqlStore.save(current.name)
-      toast.success(`"${current.name}" salva`)
+      toast.success(t('sql.editor.savedToast', { name: current.name }))
     } else {
       openDialog({ mode: 'save' })
     }
@@ -76,7 +77,7 @@
       sqlStore.rename(dialog.query.id, name)
     } else {
       sqlStore.save(name, true)
-      toast.success(`"${name}" salva`)
+      toast.success(t('sql.editor.savedToast', { name }))
     }
   }
 
@@ -86,7 +87,7 @@
   }
 
   function exportResult(result: SqlResult, index: number, format: 'csv' | 'json') {
-    const base = (sqlStore.current?.name ?? 'resultado').replace(/[^\w-]+/g, '_')
+    const base = (sqlStore.current?.name ?? t('sql.editor.exportBaseName')).replace(/[^\w-]+/g, '_')
     const name = `${base}${index > 0 ? `-${index + 1}` : ''}.${format}`
     if (format === 'csv') downloadText(name, toCsv(result.columns, result.rows), 'text/csv;charset=utf-8')
     else downloadText(name, toJson(result.columns, result.rows), 'application/json')
@@ -113,47 +114,47 @@
     <div class="flex min-h-14 shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b px-4 py-2.5">
       <div class="flex min-w-0 items-center gap-2">
         <h1 class="truncate text-sm font-semibold">
-          {sqlStore.current?.name ?? 'Nova consulta'}
+          {sqlStore.current?.name ?? t('sql.editor.newQuery')}
         </h1>
         {#if sqlStore.dirty}
-          <span class="shrink-0 text-xs text-muted-foreground" title="Alterações não salvas">(não salva)</span>
+          <span class="shrink-0 text-xs text-muted-foreground" title={t('sql.editor.unsavedTitle')}>{t('sql.editor.unsaved')}</span>
         {/if}
       </div>
       <span
         class="hidden text-xs text-muted-foreground md:inline"
-        title="As consultas rodam como dono do banco: o RLS não se aplica."
-        >Roda como dono do banco, sem RLS</span
+        title={t('sql.editor.ownerNoteTitle')}
+        >{t('sql.editor.ownerNote')}</span
       >
       <div class="ml-auto flex flex-wrap items-center gap-2">
-        <!-- Em telas sem a barra lateral, modelos e salvas ficam num menu. -->
+        <!-- On screens without the sidebar, templates and saved queries live in a menu. -->
         <DropdownMenu.Root>
           <DropdownMenu.Trigger>
             {#snippet child({ props })}
-              <Button variant="ghost" size="sm" class="lg:hidden" {...props}>Abrir</Button>
+              <Button variant="ghost" size="sm" class="lg:hidden" {...props}>{t('sql.editor.open')}</Button>
             {/snippet}
           </DropdownMenu.Trigger>
           <DropdownMenu.Content align="end" class="w-64">
             {#if sqlStore.saved.length}
-              <DropdownMenu.Label class="text-xs text-muted-foreground">Salvas</DropdownMenu.Label>
+              <DropdownMenu.Label class="text-xs text-muted-foreground">{t('sql.editor.saved')}</DropdownMenu.Label>
               {#each sqlStore.sorted as query (query.id)}
                 <DropdownMenu.Item onclick={() => sqlStore.openSaved(query.id)}>{query.name}</DropdownMenu.Item>
               {/each}
               <DropdownMenu.Separator />
             {/if}
-            <DropdownMenu.Label class="text-xs text-muted-foreground">Modelos</DropdownMenu.Label>
+            <DropdownMenu.Label class="text-xs text-muted-foreground">{t('sql.editor.templates')}</DropdownMenu.Label>
             {#each SQL_SNIPPETS as snippet (snippet.label)}
-              <DropdownMenu.Item onclick={() => sqlStore.open(snippet.sql)}>{snippet.label}</DropdownMenu.Item>
+              <DropdownMenu.Item onclick={() => sqlStore.open(t(snippet.sql))}>{t(snippet.label)}</DropdownMenu.Item>
             {/each}
           </DropdownMenu.Content>
         </DropdownMenu.Root>
         <DropdownMenu.Root>
           <DropdownMenu.Trigger>
             {#snippet child({ props })}
-              <Button variant="ghost" size="sm" disabled={sqlStore.history.length === 0} {...props}>Histórico</Button>
+              <Button variant="ghost" size="sm" disabled={sqlStore.history.length === 0} {...props}>{t('sql.editor.history')}</Button>
             {/snippet}
           </DropdownMenu.Trigger>
           <DropdownMenu.Content align="end" class="w-96">
-            <DropdownMenu.Label class="text-xs text-muted-foreground">Executadas recentemente</DropdownMenu.Label>
+            <DropdownMenu.Label class="text-xs text-muted-foreground">{t('sql.editor.recentlyRun')}</DropdownMenu.Label>
             {#each sqlStore.history as item, i (i)}
               <DropdownMenu.Item class="font-mono text-xs" onclick={() => sqlStore.open(item)}
                 ><span class="truncate">{firstLine(item)}</span></DropdownMenu.Item
@@ -164,31 +165,31 @@
 
         <div class="flex">
           <Button variant="outline" size="sm" class="rounded-r-none" onclick={save} title={`${mod}+S`}>
-            Salvar
+            {t('common.save')}
           </Button>
           <DropdownMenu.Root>
             <DropdownMenu.Trigger>
               {#snippet child({ props })}
-                <Button variant="outline" size="icon-sm" class="rounded-l-none border-l-0" aria-label="Mais opções de salvar" {...props}>
+                <Button variant="outline" size="icon-sm" class="rounded-l-none border-l-0" aria-label={t('sql.editor.saveMore')} {...props}>
                   <ChevronDown />
                 </Button>
               {/snippet}
             </DropdownMenu.Trigger>
             <DropdownMenu.Content align="end" class="w-52">
               <DropdownMenu.Item disabled={!sqlStore.draft.trim()} onclick={() => openDialog({ mode: 'save' })}>
-                Salvar como nova…
+                {t('sql.editor.saveAsNew')}
               </DropdownMenu.Item>
               {#if sqlStore.current}
                 <DropdownMenu.Item onclick={() => openDialog({ mode: 'rename', query: sqlStore.current! })}>
-                  Renomear…
+                  {t('sql.editor.rename')}
                 </DropdownMenu.Item>
               {/if}
             </DropdownMenu.Content>
           </DropdownMenu.Root>
         </div>
 
-        <Button onclick={run} disabled={running} title={`Executar (${mod}+Enter)`} class="min-w-28">
-          <Play />{running ? 'Executando…' : 'Executar'}
+        <Button onclick={run} disabled={running} title={t('sql.editor.runTitle', { shortcut: `${mod}+Enter` })} class="min-w-28">
+          <Play />{running ? t('sql.editor.running') : t('sql.editor.run')}
         </Button>
       </div>
     </div>
@@ -210,8 +211,8 @@
       {/if}
       {#if !response}
         <EmptyState
-          title="Nenhum resultado ainda"
-          description="Escreva uma consulta e execute. Limite de 30 s e 1000 linhas por resultado."
+          title={t('sql.results.emptyTitle')}
+          description={t('sql.results.emptyDescription')}
         />
       {:else if response.error}
         <div class="p-4" role="alert">
@@ -219,30 +220,30 @@
             <p class="font-mono text-xs leading-relaxed text-destructive">
               {#if response.error.code}{response.error.code}: {/if}{response.error.message}
             </p>
-            {#if response.error.position}<p class="mt-2 text-muted-foreground">Posição {response.error.position} no texto.</p>{/if}
+            {#if response.error.position}<p class="mt-2 text-muted-foreground">{t('sql.results.position', { position: response.error.position })}</p>{/if}
             {#if response.error.detail}<p class="mt-2 text-muted-foreground">{response.error.detail}</p>{/if}
-            {#if response.error.hint}<p class="mt-2 text-muted-foreground">Dica: {response.error.hint}</p>{/if}
+            {#if response.error.hint}<p class="mt-2 text-muted-foreground">{t('sql.results.hint', { hint: response.error.hint })}</p>{/if}
           </div>
         </div>
       {:else if response.results}
         {#if response.results.length === 0}
           <p class="border-b px-4 py-2.5 text-sm text-muted-foreground">
-            Executado, sem linhas · <span class="tabular-nums">{elapsed} ms</span>
+            {t('sql.results.noRows')} · <span class="tabular-nums">{elapsed} ms</span>
           </p>
         {/if}
         {#each response.results as result, r (r)}
           <div class="flex min-h-10 items-center gap-2 border-b px-4 py-1 text-sm text-muted-foreground">
             <span class="tabular-nums">
-              {#if response.results.length > 1}Resultado {r + 1} de {response.results.length} · {/if}{result.count}
-              {result.count === 1 ? 'linha' : 'linhas'}{#if result.truncated}<span class="text-warning">
-                  (mostrando 1000)</span
+              {#if response.results.length > 1}{t('sql.results.resultOf', { index: r + 1, total: response.results.length })}
+                · {/if}{t('sql.results.rows', { count: result.count })}{#if result.truncated}<span class="text-warning">
+                  {t('sql.results.truncated')}</span
                 >{/if} · {elapsed} ms
             </span>
             {#if result.columns.length}
               <DropdownMenu.Root>
                 <DropdownMenu.Trigger>
                   {#snippet child({ props })}
-                    <Button variant="ghost" size="sm" class="ml-auto" {...props}>Exportar</Button>
+                    <Button variant="ghost" size="sm" class="ml-auto" {...props}>{t('common.export')}</Button>
                   {/snippet}
                 </DropdownMenu.Trigger>
                 <DropdownMenu.Content align="end" class="w-40">
@@ -282,18 +283,18 @@
 
 <SaveQueryDialog
   bind:open={dialogOpen}
-  title={dialog?.mode === 'rename' ? 'Renomear consulta' : 'Salvar consulta'}
+  title={dialog?.mode === 'rename' ? t('sql.dialog.renameTitle') : t('sql.dialog.saveTitle')}
   initialName={dialog?.mode === 'rename' ? (dialog.query?.name ?? '') : ''}
-  confirmLabel={dialog?.mode === 'rename' ? 'Renomear' : 'Salvar'}
+  confirmLabel={dialog?.mode === 'rename' ? t('sql.dialog.renameConfirm') : t('common.save')}
   onsubmit={submitName}
 />
 
 {#if toDelete}
   <ConfirmDialog
     bind:open={deleteOpen}
-    title={`Apagar "${toDelete.name}"?`}
-    description="A consulta salva some deste navegador. Não dá para desfazer."
-    confirmLabel="Apagar"
+    title={t('sql.dialog.deleteTitle', { name: toDelete.name })}
+    description={t('sql.dialog.deleteDescription')}
+    confirmLabel={t('common.delete')}
     destructive
     onconfirm={() => sqlStore.remove(toDelete!.id)}
   />

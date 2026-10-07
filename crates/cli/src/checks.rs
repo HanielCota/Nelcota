@@ -1,4 +1,4 @@
-//! Checagens do ambiente antes de instalar: Docker, portas, RAM e DNS.
+//! Environment checks before installing: Docker, ports, RAM and DNS.
 
 use std::{
     fs,
@@ -22,10 +22,10 @@ pub fn docker() -> anyhow::Result<()> {
             ));
         }
         Ok(_) => {
-            bail!("o Docker está instalado mas o daemon não responde (systemctl start docker)")
+            bail!("Docker is installed but the daemon does not answer (systemctl start docker)")
         }
         Err(_) => {
-            bail!("Docker não encontrado. Instale com: curl -fsSL https://get.docker.com | sh")
+            bail!("Docker not found. Install it with: curl -fsSL https://get.docker.com | sh")
         }
     }
     match Command::new("docker")
@@ -39,27 +39,27 @@ pub fn docker() -> anyhow::Result<()> {
             ));
             Ok(())
         }
-        _ => bail!("plugin `docker compose` não encontrado (apt install docker-compose-plugin)"),
+        _ => bail!("`docker compose` plugin not found (apt install docker-compose-plugin)"),
     }
 }
 
 pub fn ports() {
     for port in [80u16, 443] {
         match TcpListener::bind(("0.0.0.0", port)) {
-            Ok(_) => ok(&format!("porta {port} livre")),
+            Ok(_) => ok(&format!("port {port} free")),
             Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => {
                 warn(&format!(
-                    "sem permissão para testar a porta {port} (rode como root para checar)"
+                    "no permission to test port {port} (run as root to check)"
                 ));
             }
             Err(_) => warn(&format!(
-                "porta {port} em uso: pare o serviço que a ocupa (nginx? apache?)"
+                "port {port} in use: stop the service holding it (nginx? apache?)"
             )),
         }
     }
 }
 
-/// RAM total da máquina em MB (Linux).
+/// Total machine RAM in MB (Linux).
 pub fn total_ram_mb() -> Option<u64> {
     let meminfo = fs::read_to_string("/proc/meminfo").ok()?;
     let line = meminfo.lines().find(|l| l.starts_with("MemTotal:"))?;
@@ -67,7 +67,7 @@ pub fn total_ram_mb() -> Option<u64> {
     Some(kb / 1024)
 }
 
-/// O domínio aponta para o IP público desta máquina?
+/// Does the domain point at this machine's public IP?
 pub fn dns(domain: &str) {
     let resolved: Vec<IpAddr> = (domain, 443)
         .to_socket_addrs()
@@ -75,8 +75,8 @@ pub fn dns(domain: &str) {
         .unwrap_or_default();
     if resolved.is_empty() {
         warn(&format!(
-            "{domain} não resolve no DNS ainda: crie um registro A apontando para esta máquina \
-             (o HTTPS só funciona depois disso)"
+            "{domain} does not resolve in DNS yet: create an A record pointing at this machine \
+             (HTTPS only works after that)"
         ));
         return;
     }
@@ -92,12 +92,12 @@ pub fn dns(domain: &str) {
                 .ok()
         });
     match public {
-        Some(ip) if resolved.contains(&ip) => ok(&format!("DNS: {domain} → {ip} (esta máquina)")),
+        Some(ip) if resolved.contains(&ip) => ok(&format!("DNS: {domain} → {ip} (this machine)")),
         Some(ip) => warn(&format!(
-            "DNS: {domain} → {resolved:?}, mas o IP público desta máquina é {ip}"
+            "DNS: {domain} → {resolved:?}, but this machine's public IP is {ip}"
         )),
         None => ok(&format!(
-            "DNS: {domain} → {resolved:?} (IP público não verificado)"
+            "DNS: {domain} → {resolved:?} (public IP not verified)"
         )),
     }
 }

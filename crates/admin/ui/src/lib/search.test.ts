@@ -1,31 +1,31 @@
 import { describe, expect, it } from 'vitest'
 import { commandScore } from './search'
 
-describe('busca da paleta', () => {
-  it('não casa letras soltas (o problema da busca fuzzy)', () => {
-    expect(commandScore('página Editor SQL', 'pedidos')).toBe(0)
-    expect(commandScore('tabela pedidos', 'pedidos')).toBeGreaterThan(0)
+describe('palette search', () => {
+  it('does not match scattered letters (the fuzzy search problem)', () => {
+    expect(commandScore('page Our Data Records', 'orders')).toBe(0)
+    expect(commandScore('table orders', 'orders')).toBeGreaterThan(0)
   })
 
-  it('ignora acentos e maiúsculas', () => {
-    expect(commandScore('página Visão geral', 'VISAO')).toBeGreaterThan(0)
-    expect(commandScore('tabela usuarios', 'usuários')).toBeGreaterThan(0)
+  it('ignores accents and case', () => {
+    expect(commandScore('page Visão geral', 'VISAO')).toBeGreaterThan(0)
+    expect(commandScore('table cafe_orders', 'café')).toBeGreaterThan(0)
   })
 
-  it('todos os termos precisam aparecer, em qualquer ordem', () => {
-    expect(commandScore('consulta pedidos por status', 'status pedidos')).toBeGreaterThan(0)
-    expect(commandScore('consulta pedidos por status', 'status clientes')).toBe(0)
+  it('every term has to appear, in any order', () => {
+    expect(commandScore('query orders by status', 'status orders')).toBeGreaterThan(0)
+    expect(commandScore('query orders by status', 'status customers')).toBe(0)
   })
 
-  it('começo de palavra vem antes de meio de palavra', () => {
-    const start = commandScore('tabela pedidos', 'ped')
-    const middle = commandScore('tabela itens_expedidos', 'pedidos')
+  it('start of a word ranks above the middle of a word', () => {
+    const start = commandScore('table orders', 'ord')
+    const middle = commandScore('table items_reorders', 'orders')
     expect(start).toBeGreaterThan(middle)
-    expect(commandScore('tabela itens_pedido', 'pedido')).toBe(1)
+    expect(commandScore('table items_order', 'order')).toBe(1)
   })
 
-  it('busca vazia mostra tudo; palavras-chave também contam', () => {
-    expect(commandScore('qualquer', '  ')).toBe(1)
-    expect(commandScore('ação sair', 'logout', ['logout'])).toBeGreaterThan(0)
+  it('an empty search shows everything; keywords count too', () => {
+    expect(commandScore('anything', '  ')).toBe(1)
+    expect(commandScore('action sign out', 'logout', ['logout'])).toBeGreaterThan(0)
   })
 })

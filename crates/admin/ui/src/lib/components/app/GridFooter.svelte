@@ -7,6 +7,7 @@
   import ChevronsRight from '@lucide/svelte/icons/chevrons-right'
   import { pageInfo } from '$lib/grid'
   import type { TableData } from '$lib/types'
+  import { intlLocale, t } from '$lib/i18n/index.svelte'
 
   let {
     data,
@@ -14,7 +15,7 @@
     size = $bindable(),
   }: { data: TableData; page: number; size: string } = $props()
 
-  const fmt = new Intl.NumberFormat('pt-BR')
+  const fmt = $derived(new Intl.NumberFormat(intlLocale()))
   const info = $derived(pageInfo(data.page, data.size, data.rows.length, data.total, data.total_exact))
   const totalLabel = $derived(
     data.total === null ? null : `${data.total_exact ? '' : '~'}${fmt.format(data.total)}`,
@@ -23,18 +24,18 @@
 
 <footer class="flex min-h-12 shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-t bg-sidebar px-4 py-2 text-xs text-muted-foreground">
   <span class="tabular-nums" aria-live="polite">
-    {#if info.to === 0}Nenhuma linha
+    {#if info.to === 0}{t('tables.footer.noRows')}
     {:else}<span class="font-medium text-foreground">{fmt.format(info.from)}–{fmt.format(info.to)}</span>
-      {#if totalLabel}de {totalLabel}{/if}
-      {data.total === 1 ? 'linha' : 'linhas'}{/if}
+      {#if totalLabel}{t('tables.footer.of', { total: totalLabel })}{/if}
+      {t('tables.footer.rows', { count: data.total ?? info.to })}{/if}
   </span>
   <span class="hidden items-center gap-1 xl:inline-flex">
-    Setas navegam{#if data.table.editable}, Enter ou duplo clique edita{/if}, Ctrl+C copia.
+    {data.table.editable ? t('tables.footer.hintsEditable') : t('tables.footer.hints')}
   </span>
   <div class="ml-auto flex items-center gap-2">
-    <span class="mr-1 hidden sm:inline">Por página</span>
+    <span class="mr-1 hidden sm:inline">{t('tables.footer.perPage')}</span>
     <Select.Root type="single" bind:value={size} onValueChange={() => (page = 0)}>
-      <Select.Trigger size="sm" class="w-20" aria-label="Linhas por página">{size}</Select.Trigger>
+      <Select.Trigger size="sm" class="w-20" aria-label={t('tables.footer.rowsPerPage')}>{size}</Select.Trigger>
       <Select.Content>
         {#each ['25', '50', '100', '500'] as option (option)}
           <Select.Item value={option}>{option}</Select.Item>
@@ -42,15 +43,17 @@
       </Select.Content>
     </Select.Root>
     <span class="px-2 font-medium text-foreground tabular-nums">
-      Página {fmt.format(data.page + 1)}{#if info.pageCount}{` de ${fmt.format(info.pageCount)}`}{/if}
+      {info.pageCount
+        ? t('tables.footer.pageOf', { page: fmt.format(data.page + 1), count: fmt.format(info.pageCount) })
+        : t('tables.footer.page', { page: fmt.format(data.page + 1) })}
     </span>
-    <Button variant="outline" size="icon-sm" disabled={page === 0} onclick={() => (page = 0)} aria-label="Primeira página">
+    <Button variant="outline" size="icon-sm" disabled={page === 0} onclick={() => (page = 0)} aria-label={t('tables.footer.first')}>
       <ChevronsLeft />
     </Button>
-    <Button variant="outline" size="icon-sm" disabled={page === 0} onclick={() => page--} aria-label="Página anterior">
+    <Button variant="outline" size="icon-sm" disabled={page === 0} onclick={() => page--} aria-label={t('tables.footer.previous')}>
       <ChevronLeft />
     </Button>
-    <Button variant="outline" size="icon-sm" disabled={!data.has_next} onclick={() => page++} aria-label="Próxima página">
+    <Button variant="outline" size="icon-sm" disabled={!data.has_next} onclick={() => page++} aria-label={t('tables.footer.next')}>
       <ChevronRight />
     </Button>
     <Button
@@ -58,8 +61,8 @@
       size="icon-sm"
       disabled={info.lastPage === null || page >= info.lastPage}
       onclick={() => info.lastPage !== null && (page = info.lastPage)}
-      aria-label="Última página"
-      title={info.lastPage === null ? 'Total estimado: a última página não é conhecida' : undefined}
+      aria-label={t('tables.footer.last')}
+      title={info.lastPage === null ? t('tables.footer.estimated') : undefined}
     >
       <ChevronsRight />
     </Button>

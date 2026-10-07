@@ -1,10 +1,10 @@
-//! Acesso ao Postgres.
+//! Postgres access.
 //!
-//! - [`bootstrap`]: aplica as migrações internas e define a senha da role
-//!   `authenticator` (conexão administrativa, usada só na inicialização).
-//! - [`api_pool`]: pool da API, sempre conectado como `authenticator`.
-//! - [`begin_request`]: abre a transação de um request já com a role e as
-//!   claims do JWT. É o único caminho para executar SQL em nome de um usuário.
+//! - [`bootstrap`]: applies the internal migrations and sets the
+//!   `authenticator` role password (admin connection, used only at startup).
+//! - [`api_pool`]: the API pool, always connected as `authenticator`.
+//! - [`begin_request`]: opens a request transaction already carrying the JWT
+//!   role and claims. It is the only way to run SQL on behalf of a user.
 
 use std::time::Duration;
 
@@ -19,21 +19,21 @@ mod embedded {
     refinery::embed_migrations!("../../migrations");
 }
 
-/// Tabela de controle das migrações internas (documentada em docs/arquitetura.md).
+/// Control table of the internal migrations (documented in docs/architecture.md).
 pub const MIGRATIONS_TABLE: &str = "nelcota.schema_migrations";
 
 #[derive(Debug, thiserror::Error)]
 pub enum BootstrapError {
-    #[error("falha ao conectar no Postgres: {0}")]
+    #[error("failed to connect to Postgres: {0}")]
     Connect(#[source] tokio_postgres::Error),
-    #[error("falha ao preparar o banco: {0}")]
+    #[error("failed to prepare the database: {0}")]
     Sql(#[from] tokio_postgres::Error),
-    #[error("falha ao aplicar migrações: {0}")]
+    #[error("failed to apply migrations: {0}")]
     Migration(#[from] refinery::Error),
 }
 
-/// Aplica as migrações internas e (re)define a senha do `authenticator`.
-/// Idempotente; um advisory lock evita corrida entre instâncias.
+/// Applies the internal migrations and (re)sets the `authenticator` password.
+/// Idempotent; an advisory lock prevents races between instances.
 pub async fn bootstrap(
     admin: &tokio_postgres::Config,
     authenticator_password: &str,
@@ -45,7 +45,7 @@ pub async fn bootstrap(
         .map_err(BootstrapError::Connect)?;
     let connection = tokio::spawn(async move {
         if let Err(err) = connection.await {
-            tracing::error!(error = %err, "conexão administrativa encerrada com erro");
+            tracing::error!(error = %err, "admin connection closed with an error");
         }
     });
 
@@ -60,11 +60,11 @@ pub async fn bootstrap(
     runner.set_migration_table_name(MIGRATIONS_TABLE);
     let report = runner.run_async(&mut client).await?;
     for migration in report.applied_migrations() {
-        tracing::info!(migration = %migration, "migração aplicada");
+        tracing::info!(migration = %migration, "migration applied");
     }
 
-    // O verificador SCRAM é calculado aqui: a senha em texto puro nunca
-    // trafega nem aparece em log de statement do Postgres.
+    // The SCRAM verifier is computed here: the plain-text password never
+    // travels nor shows up in Postgres statement logs.
     let verifier = postgres_protocol::password::scram_sha_256(authenticator_password.as_bytes());
     let statement: String = client
         .query_one(
@@ -74,9 +74,9 @@ pub async fn bootstrap(
         .await?
         .get(0);
     client.batch_execute(&statement).await?;
-    // Teto de duração por statement nas conexões da API. Vale para todas as
-    // roles do request: `ALTER ROLE anon SET ...` não teria efeito, porque o
-    // Postgres só aplica as configurações por role no login (authenticator).
+    // Per-statement time cap on the API connections. It covers every request
+    // role: `ALTER ROLE anon SET ...` would have no effect, because Postgres
+    // only applies per-role settings at login (authenticator).
     let statement: String = client
         .query_one(
             "SELECT format('ALTER ROLE authenticator SET statement_timeout = %L', $1::text)",
@@ -94,7 +94,7 @@ pub async fn bootstrap(
     Ok(())
 }
 
-/// Config de conexão como `authenticator` (mesmo host/banco da URL administrativa).
+/// Connection config as `authenticator` (same host/database as the admin URL).
 pub fn authenticator_config(
     admin: &tokio_postgres::Config,
     authenticator_password: &str,
@@ -107,15 +107,15 @@ pub fn authenticator_config(
     config
 }
 
-/// Pool da API: mesmo host/banco da URL administrativa, mas como `authenticator`.
+/// API pool: same host/database as the admin URL, but as `authenticator`.
 pub fn api_pool(
     admin: &tokio_postgres::Config,
     authenticator_password: &str,
     max_size: usize,
 ) -> Pool {
     let config = authenticator_config(admin, authenticator_password);
-    // `Fast` não roda nada ao devolver a conexão: role e claims são definidas
-    // com escopo de transação (`is_local = true`) e morrem no COMMIT/ROLLBACK.
+    // `Fast` runs nothing when a connection is returned: role and claims are
+    // transaction-scoped (`is_local = true`) and die at COMMIT/ROLLBACK.
     let manager = Manager::from_config(
         config,
         NoTls,
@@ -129,11 +129,11 @@ pub fn api_pool(
         .wait_timeout(Some(Duration::from_secs(5)))
         .create_timeout(Some(Duration::from_secs(5)))
         .build()
-        .expect("runtime definido, build não falha")
+        .expect("runtime is set, build cannot fail")
 }
 
-/// Pool administrativo (role dona do schema), usado só pelo painel. Pequeno e
-/// com `statement_timeout` próprio.
+/// Admin pool (schema owner role), used only by the panel. Small and with its
+/// own `statement_timeout`.
 pub fn admin_pool(admin: &tokio_postgres::Config, max_size: usize) -> Pool {
     let mut config = admin.clone();
     config
@@ -152,15 +152,15 @@ pub fn admin_pool(admin: &tokio_postgres::Config, max_size: usize) -> Pool {
         .wait_timeout(Some(Duration::from_secs(5)))
         .create_timeout(Some(Duration::from_secs(5)))
         .build()
-        .expect("runtime definido, build não falha")
+        .expect("runtime is set, build cannot fail")
 }
 
-/// Abre a transação do request e assume a role/claims do JWT.
+/// Opens the request transaction and assumes the JWT role/claims.
 ///
-/// Equivale a `SET LOCAL ROLE <role>` + `set_config('request.jwt.claims', ..., true)`,
-/// numa única ida ao banco e com os dois valores como parâmetros. Se a
-/// transação não for confirmada (erro, panic, early return), o drop faz
-/// ROLLBACK e nada vaza para o próximo uso da conexão.
+/// Equivalent to `SET LOCAL ROLE <role>` + `set_config('request.jwt.claims', ..., true)`,
+/// in a single round trip and with both values as parameters. If the
+/// transaction is not committed (error, panic, early return), dropping it
+/// rolls back and nothing leaks into the connection's next use.
 pub async fn begin_request<'a>(
     client: &'a mut Object,
     claims: &Claims,

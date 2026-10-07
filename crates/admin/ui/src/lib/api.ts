@@ -1,10 +1,16 @@
-// Cliente da API do painel (/admin/api). Sessão via cookie HttpOnly.
+// Panel API client (/admin/api). The session lives in an HttpOnly cookie.
 import { session } from './session.svelte'
 
+/**
+ * Failed request. `message` is the server's English text; `code` and `params`
+ * let the panel show it in the chosen language (see `errorMessage` in i18n).
+ */
 export class ApiError extends Error {
   constructor(
     message: string,
     public status: number,
+    public code?: string,
+    public params?: Record<string, string | number>,
   ) {
     super(message)
   }
@@ -27,8 +33,8 @@ async function request<T>(method: string, path: string, body?: unknown, signal?:
   }
   if (!res.ok) {
     if (res.status === 401 && path !== '/login') session.email = null
-    const message = (data as { error?: string } | null)?.error ?? `HTTP ${res.status}`
-    throw new ApiError(message, res.status)
+    const body = data as { error?: string; code?: string; params?: Record<string, string | number> } | null
+    throw new ApiError(body?.error ?? `HTTP ${res.status}`, res.status, body?.code, body?.params)
   }
   return data as T
 }
@@ -47,5 +53,5 @@ export const api = {
 
 export const enc = encodeURIComponent
 
-/** Requisição cancelada por uma mais nova (não é erro para o usuário). */
+/** Request cancelled by a newer one (not an error for the user). */
 export const isAbort = (e: unknown) => e instanceof DOMException && e.name === 'AbortError'

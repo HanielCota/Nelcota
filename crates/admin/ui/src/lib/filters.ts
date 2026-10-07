@@ -1,8 +1,10 @@
-// Filtros da grade de tabelas.
+// Table grid filters.
 //
-// Na URL do painel ficam no formato da API REST (`?preco=gte.10&nome=ilike.*a*`),
-// então dá para compartilhar o link e voltar com o botão do navegador. Para a
-// API do painel vão como JSON tipado (`filters=[...]`), validado no servidor.
+// In the panel URL they use the REST API format (`?price=gte.10&name=ilike.*a*`),
+// so a link can be shared and the browser's back button works. To the panel
+// API they go as typed JSON (`filters=[...]`), validated by the server.
+
+import { t, type MessageKey, type Params } from './i18n/index.svelte'
 
 export type FilterOp = 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'ilike' | 'is'
 
@@ -16,19 +18,20 @@ export interface TableFilter {
 const OPS: readonly FilterOp[] = ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'ilike', 'is']
 const isOp = (op: string): op is FilterOp => (OPS as readonly string[]).includes(op)
 
-/** Operadores como aparecem no formulário (alguns viram dois campos no fio). */
+/** Operators as the form shows them (some become two fields on the wire). */
 export type UiOp = 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains' | 'null' | 'notnull'
 
-export const UI_OPERATORS: readonly { value: UiOp; label: string; needsValue: boolean }[] = [
-  { value: 'eq', label: 'igual a', needsValue: true },
-  { value: 'neq', label: 'diferente de', needsValue: true },
-  { value: 'contains', label: 'contém', needsValue: true },
-  { value: 'gt', label: 'maior que', needsValue: true },
-  { value: 'gte', label: 'maior ou igual a', needsValue: true },
-  { value: 'lt', label: 'menor que', needsValue: true },
-  { value: 'lte', label: 'menor ou igual a', needsValue: true },
-  { value: 'null', label: 'é NULL', needsValue: false },
-  { value: 'notnull', label: 'não é NULL', needsValue: false },
+/** `label` is a translation key: render it with `t(op.label)`. */
+export const UI_OPERATORS: readonly { value: UiOp; label: MessageKey; needsValue: boolean }[] = [
+  { value: 'eq', label: 'tables.filters.ops.eq', needsValue: true },
+  { value: 'neq', label: 'tables.filters.ops.neq', needsValue: true },
+  { value: 'contains', label: 'tables.filters.ops.contains', needsValue: true },
+  { value: 'gt', label: 'tables.filters.ops.gt', needsValue: true },
+  { value: 'gte', label: 'tables.filters.ops.gte', needsValue: true },
+  { value: 'lt', label: 'tables.filters.ops.lt', needsValue: true },
+  { value: 'lte', label: 'tables.filters.ops.lte', needsValue: true },
+  { value: 'null', label: 'tables.filters.ops.null', needsValue: false },
+  { value: 'notnull', label: 'tables.filters.ops.notnull', needsValue: false },
 ]
 
 export const needsValue = (op: UiOp) => UI_OPERATORS.find((o) => o.value === op)?.needsValue ?? true
@@ -53,15 +56,19 @@ export function toUi(filter: TableFilter): { op: UiOp; value: string } {
   return { op: filter.op as UiOp, value: filter.value }
 }
 
-/** Texto curto para o chip do filtro: `preco ≥ 10`, `nome contém a`. */
-export function describe(filter: TableFilter): string {
+/** Short text for the filter chip: `price greater than 10`, `name contains a`. */
+export function describe(
+  filter: TableFilter,
+  translate: (key: MessageKey, params?: Params) => string = t,
+): string {
   const { op, value } = toUi(filter)
-  const label = UI_OPERATORS.find((o) => o.value === op)?.label ?? filter.op
-  const prefix = filter.not && op !== 'notnull' ? 'não ' : ''
+  const key = UI_OPERATORS.find((o) => o.value === op)?.label
+  const label = key ? translate(key) : filter.op
+  const prefix = filter.not && op !== 'notnull' ? `${translate('tables.filters.not')} ` : ''
   return needsValue(op) ? `${filter.column} ${prefix}${label} ${value}` : `${filter.column} ${label}`
 }
 
-/** Lê os filtros da query string da URL; pares inválidos são ignorados. */
+/** Reads the filters from the URL query string; invalid pairs are ignored. */
 export function parseFilters(query: URLSearchParams): TableFilter[] {
   const filters: TableFilter[] = []
   for (const [column, raw] of query) {
@@ -76,14 +83,14 @@ export function parseFilters(query: URLSearchParams): TableFilter[] {
   return filters
 }
 
-/** Inverso de `parseFilters`: `preco=gte.10&nome=not.is.null`. */
+/** Inverse of `parseFilters`: `price=gte.10&name=not.is.null`. */
 export function filtersToSearch(filters: readonly TableFilter[]): string {
   const query = new URLSearchParams()
   for (const f of filters) query.append(f.column, `${f.not ? 'not.' : ''}${f.op}.${f.value}`)
   return query.toString()
 }
 
-/** Formato da API do painel: JSON, ou `undefined` sem filtros. */
+/** Panel API format: JSON, or `undefined` without filters. */
 export function filtersParam(filters: readonly TableFilter[]): string | undefined {
   return filters.length ? JSON.stringify(filters) : undefined
 }

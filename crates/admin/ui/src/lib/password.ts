@@ -1,9 +1,9 @@
-// Senha aleatória para contas criadas pelo painel. Sem caracteres ambíguos
-// (0/O, 1/l/I), para poder ser ditada ou digitada a partir da tela.
+// Random password for accounts created in the panel. No ambiguous characters
+// (0/O, 1/l/I), so it can be read out or typed from the screen.
 
 const ALPHABET = 'abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789-_'
 
-/** Índice uniforme em [0, n): descarta bytes que causariam viés de módulo. */
+/** Uniform index in [0, n): discards bytes that would cause modulo bias. */
 function uniform(n: number, random: () => number): number {
   const limit = 256 - (256 % n)
   for (;;) {
@@ -14,15 +14,18 @@ function uniform(n: number, random: () => number): number {
 
 const cryptoByte = () => crypto.getRandomValues(new Uint8Array(1))[0]
 
-/** 20 caracteres de 59 símbolos ≈ 117 bits de entropia. */
+/** 20 characters from 59 symbols ≈ 117 bits of entropy. */
 export function generatePassword(length = 20, random: () => number = cryptoByte): string {
   return Array.from({ length }, () => ALPHABET[uniform(ALPHABET.length, random)]).join('')
 }
 
-/** Mesma regra do servidor (nelcota_auth::validate_password), para avisar antes de enviar. */
-export function passwordProblem(password: string): string | null {
+/** What is wrong with a password; the panel shows it in the chosen language. */
+export type PasswordProblem = 'tooShort' | 'tooLong'
+
+/** Same rule as the server (nelcota_auth::validate_password), to warn before sending. */
+export function passwordProblem(password: string): PasswordProblem | null {
   const length = [...password].length
-  if (length < 8) return 'mínimo de 8 caracteres'
-  if (length > 256) return 'máximo de 256 caracteres'
+  if (length < 8) return 'tooShort'
+  if (length > 256) return 'tooLong'
   return null
 }

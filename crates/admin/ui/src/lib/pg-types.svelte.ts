@@ -1,5 +1,5 @@
-// Tipos de coluna que o servidor aceita (lista base + enums do schema).
-// Carregados uma vez por sessão (enums novos aparecem ao recarregar a página).
+// Column types the server accepts (base list + the schema's enums). Loaded
+// once per session (new enums show up after reloading the page).
 
 import { api } from './api'
 import { ddl } from './ddl'
@@ -17,15 +17,15 @@ export function loadTypes(): Promise<void> {
       pgTypes.loaded = true
     })
     .catch(() => {
-      // Sem a lista, o campo continua aceitando texto livre (o servidor valida).
+      // Without the list the field still accepts free text (the server validates).
       pending = undefined
     })
   return pending
 }
 
-/** Tabelas e colunas do schema exposto, para escolher a chave estrangeira. */
+/** Tables and columns of the exposed schema, to pick a foreign key. */
 export async function loadSchemaColumns(): Promise<Record<string, string[]>> {
   const { tables } = await api.get<{ tables: Record<string, string[]> }>('/schema')
-  // `auth.users` e afins ficam de fora: a FK é só para o schema exposto.
+  // `auth.users` and the like stay out: the FK is for the exposed schema only.
   return Object.fromEntries(Object.entries(tables).filter(([name]) => !name.includes('.')))
 }

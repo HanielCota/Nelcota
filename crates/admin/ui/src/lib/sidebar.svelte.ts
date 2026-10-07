@@ -2,8 +2,8 @@ import { readText, write } from './storage'
 
 const KEY = 'nelcota.sidebar'
 
-// Barra lateral fixada aberta (telas largas) ou recolhida em trilho de ícones,
-// que se expande por cima do conteúdo ao passar o mouse.
+// Sidebar pinned open (wide screens) or collapsed into an icon rail that
+// expands over the content on hover.
 export const sidebar = $state({ pinned: readText(KEY, 'pinned') === 'pinned' })
 
 export function togglePinned() {

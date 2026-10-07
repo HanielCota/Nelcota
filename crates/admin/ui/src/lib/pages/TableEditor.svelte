@@ -24,6 +24,7 @@
   import { href, navigate, route } from '$lib/router.svelte'
   import { cn } from '$lib/utils'
   import type { Column, RowData, TableData, TableSummary } from '$lib/types'
+  import { errorMessage, t } from '$lib/i18n/index.svelte'
 
   let { name, view = 'data' }: { name?: string; view?: 'data' | 'structure' } = $props()
 
@@ -43,7 +44,7 @@
   let filterPreset = $state<string | undefined>(undefined)
   let createOpen = $state(false)
 
-  // Colunas ocultas, lembradas por tabela.
+  // Hidden columns, remembered per table.
   const hidden = new HiddenColumns()
   $effect(() => {
     if (name) hidden.load(name)
@@ -52,8 +53,8 @@
     if (data) hidden.prune(data.table.columns.map((c) => c.name))
   })
 
-  // Filtros vêm da URL (`?preco=gte.10`): links compartilháveis e o voltar do
-  // navegador funcionam. A chave em texto evita recarregar sem mudança real.
+  // Filters come from the URL (`?price=gte.10`): links can be shared and the
+  // browser's back button works. The text key avoids reloading without a real change.
   const filters = $derived(parseFilters(route.query))
   const filtersKey = $derived(filtersToSearch(filters))
 
@@ -61,7 +62,7 @@
     try {
       tables = (await api.get<{ tables: TableSummary[] }>('/tables')).tables
     } catch (e) {
-      toast.error((e as Error).message)
+      toast.error(errorMessage(e))
     }
   }
 
@@ -82,7 +83,7 @@
     navigate('/tables')
   }
 
-  /** Ordem e filtros atuais, no formato da API (listagem e exportação). */
+  /** Current order and filters, in the API format (listing and export). */
   function rowsParams(): URLSearchParams {
     const params = new URLSearchParams()
     if (sort) {
@@ -98,7 +99,7 @@
 
   async function load() {
     if (!name) return
-    // Só a resposta mais recente vale: a anterior é cancelada.
+    // Only the latest response counts: the previous one is cancelled.
     inflight?.abort()
     const controller = (inflight = new AbortController())
     loading = true
@@ -111,14 +112,14 @@
       selected = new Set()
     } catch (e) {
       if (isAbort(e)) return
-      error = (e as Error).message
+      error = errorMessage(e)
       data = null
     } finally {
       if (inflight === controller) loading = false
     }
   }
 
-  // Recarrega ao trocar de tabela, página, tamanho, ordenação ou filtros.
+  // Reload when the table, page, size, sort or filters change.
   $effect(() => {
     void [name, view, page, size, sort, filtersKey]
     load()
@@ -139,7 +140,7 @@
     return href(`/api/tables/${enc(name!)}/export?${params}`)
   }
 
-  /** Link para a linha referenciada pela chave estrangeira. */
+  /** Link to the row referenced by the foreign key. */
   const referenceHref = (column: Column, value: string) =>
     href(
       `/tables/${enc(column.references!.table)}?${filtersToSearch([{ column: column.references!.column, op: 'eq', value }])}`,
@@ -155,7 +156,7 @@
     page = 0
   }
 
-  /** Menu da coluna: abre a barra de filtros com uma linha para ela. */
+  /** Column menu: opens the filter bar with a row for that column. */
   function filterBy(column: string) {
     filterPreset = column
     filterOpen = true
@@ -168,14 +169,14 @@
   async function commitCell(row: number, column: string, value: string | null) {
     if (!data || !name) return
     try {
-      const res = await api.patch<{ message: string }>(`/tables/${enc(name)}/rows`, {
+      const res = await api.patch<{ count: number }>(`/tables/${enc(name)}/rows`, {
         pk: pkOf(data.rows[row]),
         values: { [column]: value },
       })
       data.rows[row][column] = value
-      toast.success(res.message)
+      toast.success(t('tables.toast.rowsUpdated', { count: res.count }))
     } catch (e) {
-      toast.error((e as Error).message)
+      toast.error(errorMessage(e))
       throw e
     }
   }
@@ -184,11 +185,11 @@
     if (!data || !name) return
     const pks = [...selected].map((i) => pkOf(data!.rows[i]))
     try {
-      const res = await api.delete<{ message: string }>(`/tables/${enc(name)}/rows`, { pks })
-      toast.success(res.message)
+      const res = await api.delete<{ count: number }>(`/tables/${enc(name)}/rows`, { pks })
+      toast.success(t('tables.toast.rowsDeleted', { count: res.count }))
       await load()
     } catch (e) {
-      toast.error((e as Error).message)
+      toast.error(errorMessage(e))
     }
   }
 
@@ -204,9 +205,9 @@
   <section class={cn('min-w-0 flex-1 flex-col', name ? 'flex' : 'hidden md:flex')}>
     {#if !name}
       <div class="grid flex-1 place-items-center p-8">
-        <EmptyState title="Nenhuma tabela aberta" description="Escolha uma na lista ao lado.">
+        <EmptyState title={t('tables.editor.noneOpen')} description={t('tables.editor.pickOne')}>
           {#snippet actions()}
-            <Button variant="outline" onclick={() => (createOpen = true)}><Plus />Nova tabela</Button>
+            <Button variant="outline" onclick={() => (createOpen = true)}><Plus />{t('tables.editor.newTable')}</Button>
           {/snippet}
         </EmptyState>
       </div>
@@ -261,17 +262,17 @@
 
         {#if data?.table.exposed_without_rls}
           <p class="flex items-center gap-2 border-b border-destructive/30 bg-destructive/5 px-4 py-2 text-sm text-destructive">
-            <ShieldAlert class="size-4 shrink-0" />Sem RLS: quem tem GRANT nesta tabela lê e altera todas as linhas.
+            <ShieldAlert class="size-4 shrink-0" />{t('tables.editor.noRls')}
           </p>
         {:else if data && !data.table.editable && data.table.kind === 'table'}
           <p class="flex items-center gap-2 border-b bg-muted/40 px-4 py-2 text-sm text-muted-foreground">
-            <KeyRound class="size-4 shrink-0" />Sem chave primária: dá para ver as linhas, mas não editar por aqui.
+            <KeyRound class="size-4 shrink-0" />{t('tables.editor.noPrimaryKey')}
           </p>
         {/if}
 
         <div class="relative min-h-0 flex-1 overflow-auto" aria-busy={loading}>
-          <!-- Recarga (ordem, filtro, página): barra no topo e grade esmaecida,
-               para os dados antigos não parecerem já os novos. -->
+          <!-- Reload (order, filter, page): a bar at the top and a dimmed grid,
+               so the old data does not look like the new one. -->
           {#if loading && data}
             <div class="pointer-events-none sticky top-0 z-20 h-0.5 overflow-hidden bg-brand/15" aria-hidden="true">
               <div class="animate-progress h-full w-2/5 bg-brand"></div>
@@ -326,9 +327,9 @@
   />
   <ConfirmDialog
     bind:open={confirmOpen}
-    title={selected.size === 1 ? 'Apagar 1 linha?' : `Apagar ${selected.size} linhas?`}
-    description="Esta ação não pode ser desfeita. As linhas são apagadas numa transação só."
-    confirmLabel="Apagar"
+    title={t('tables.editor.deleteTitle', { count: selected.size })}
+    description={t('tables.editor.deleteDescription')}
+    confirmLabel={t('common.delete')}
     destructive
     onconfirm={deleteSelected}
   />

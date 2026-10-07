@@ -1,5 +1,5 @@
-//! Operação dos projetos: up/down/status/logs, backup/restore e upgrade com
-//! rollback automático.
+//! Project operations: up/down/status/logs, backup/restore and upgrade with
+//! automatic rollback.
 
 use std::{
     fs,
@@ -19,15 +19,15 @@ use crate::{
 
 const HEALTH_TIMEOUT: Duration = Duration::from_secs(120);
 
-/// Sobe os projetos (cada um até o healthcheck) e o Caddy.
+/// Starts the projects (each one until its healthcheck passes) and Caddy.
 pub fn up(host: &Host, manifest: &Manifest, projects: &[Project]) -> anyhow::Result<()> {
     caddy::ensure_network()?;
     caddy::write(host, manifest)?;
     for project in projects {
-        step(&format!("Subindo {}", project.name));
+        step(&format!("Starting {}", project.name));
         project.compose_ok(&["up", "-d"])?;
         project.wait_healthy("app", HEALTH_TIMEOUT)?;
-        ok(&format!("{} saudável", project.name));
+        ok(&format!("{} healthy", project.name));
     }
     caddy::up(host)?;
     println!();
@@ -44,7 +44,7 @@ pub fn up(host: &Host, manifest: &Manifest, projects: &[Project]) -> anyhow::Res
 pub fn down(project: &Project, volumes: bool) -> anyhow::Result<()> {
     if volumes {
         warn(&format!(
-            "--volumes: os dados de {} serão APAGADOS",
+            "--volumes: the data of {} will be DELETED",
             project.name
         ));
         project.compose_ok(&["down", "--volumes"])
@@ -54,14 +54,14 @@ pub fn down(project: &Project, volumes: bool) -> anyhow::Result<()> {
 }
 
 pub fn status(manifest: &Manifest, projects: &[Project]) -> anyhow::Result<()> {
-    println!("{:<16} {:<32} {:<10} VERSÃO", "PROJETO", "DOMÍNIO", "APP");
+    println!("{:<16} {:<32} {:<10} VERSION", "PROJECT", "DOMAIN", "APP");
     for project in projects {
         let domain = manifest
             .projects
             .iter()
             .find(|e| e.name == project.name)
             .map_or("", |e| e.domain.as_str());
-        let health = project.health("app").unwrap_or_else(|| "parado".into());
+        let health = project.health("app").unwrap_or_else(|| "stopped".into());
         let version = project.env().get("NELCOTA_VERSION")?.unwrap_or_default();
         println!(
             "{:<16} {:<32} {:<10} {}",
@@ -82,17 +82,17 @@ pub fn logs(project: &Project, follow: bool, service: Option<&str>) -> anyhow::R
     project.compose_ok(&args)
 }
 
-/// Recria os apps já criados (para aplicar mudanças no `.env`).
+/// Recreates the apps that already exist (to apply `.env` changes).
 pub fn recreate_apps(projects: &[Project]) -> anyhow::Result<()> {
     for project in projects.iter().filter(|p| p.has_container("app")) {
-        step(&format!("Reiniciando o app de {}", project.name));
+        step(&format!("Restarting the {} app", project.name));
         project.compose_ok(&["up", "-d", "--force-recreate", "app"])?;
         project.wait_healthy("app", HEALTH_TIMEOUT)?;
     }
     Ok(())
 }
 
-/// `pg_dump -Fc` dentro do container do Postgres, gravado em `backups/`.
+/// `pg_dump -Fc` inside the Postgres container, written to `backups/`.
 pub fn backup(
     host: &Host,
     project: &Project,
@@ -103,7 +103,7 @@ pub fn backup(
     fs::create_dir_all(&dir)?;
     let name = format!("nelcota-{}-{}.dump", project.name, util::timestamp());
     let path = dir.join(&name);
-    step(&format!("Backup de {}: {name}", project.name));
+    step(&format!("Backup of {}: {name}", project.name));
 
     let file = fs::File::create(&path)?;
     let status = project.compose_piped(
@@ -116,7 +116,7 @@ pub fn backup(
     let size = fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
     if !status.success() || size == 0 {
         let _ = fs::remove_file(&path);
-        bail!("[{}] pg_dump falhou ({status})", project.name);
+        bail!("[{}] pg_dump failed ({status})", project.name);
     }
     ok(&format!("{} ({} KB)", path.display(), size / 1024));
 
@@ -129,13 +129,13 @@ pub fn backup(
     Ok(path)
 }
 
-/// Envia ao S3-compatible (credenciais do `host.env`), em `<bucket>/<projeto>/`.
+/// Uploads to S3-compatible storage (credentials from `host.env`), under `<bucket>/<project>/`.
 fn upload_s3(host: &Host, project: &str, path: &Path, name: &str) -> anyhow::Result<()> {
     let secrets = host.secrets();
     let get = |key: &str| -> anyhow::Result<String> {
         secrets
             .get(key)?
-            .with_context(|| format!("{key} não configurado no host.env (veja docs/backup.md)"))
+            .with_context(|| format!("{key} is not set in host.env (see docs/backup.md)"))
     };
     let endpoint = get("NELCOTA_BACKUP_S3_ENDPOINT")?;
     let bucket = get("NELCOTA_BACKUP_S3_BUCKET")?;
@@ -146,7 +146,7 @@ fn upload_s3(host: &Host, project: &str, path: &Path, name: &str) -> anyhow::Res
         .unwrap_or_else(|| "us-east-1".into());
     let dir = fs::canonicalize(path.parent().unwrap_or(Path::new(".")))?;
 
-    step(&format!("Enviando para s3://{bucket}/{project}/{name}"));
+    step(&format!("Uploading to s3://{bucket}/{project}/{name}"));
     let status = Command::new("docker")
         .args(["run", "--rm", "-v"])
         .arg(format!("{}:/backups:ro", dir.display()))
@@ -166,11 +166,11 @@ fn upload_s3(host: &Host, project: &str, path: &Path, name: &str) -> anyhow::Res
         .arg(format!("s3://{bucket}/{project}/{name}"))
         .args(["--endpoint-url", &endpoint])
         .status()
-        .context("falha ao executar o aws-cli")?;
+        .context("could not run aws-cli")?;
     if !status.success() {
-        bail!("upload para o S3 falhou ({status})");
+        bail!("upload to S3 failed ({status})");
     }
-    ok("enviado");
+    ok("uploaded");
     Ok(())
 }
 
@@ -183,36 +183,36 @@ fn prune(dir: &Path, keep: usize) -> anyhow::Result<()> {
     let excess = dumps.len().saturating_sub(keep);
     for old in dumps.into_iter().take(excess) {
         fs::remove_file(&old)?;
-        ok(&format!("removido {}", old.display()));
+        ok(&format!("removed {}", old.display()));
     }
     Ok(())
 }
 
-/// Restaura um dump: para o app, recria os objetos numa transação só e sobe
-/// o app de novo.
+/// Restores a dump: stops the app, recreates the objects in a single
+/// transaction and starts the app again.
 pub fn restore(project: &Project, file: &Path, yes: bool) -> anyhow::Result<()> {
     if !file.is_file() {
-        bail!("arquivo não encontrado: {}", file.display());
+        bail!("file not found: {}", file.display());
     }
     if !yes
         && !(util::interactive()
             && util::confirm(&format!(
-                "Isso SUBSTITUI o banco de {} pelo conteúdo de {}. Continuar?",
+                "This REPLACES the {} database with the contents of {}. Continue?",
                 project.name,
                 file.display()
             )))
     {
-        bail!("restore cancelado (use --yes para não perguntar)");
+        bail!("restore cancelled (use --yes to skip the question)");
     }
-    step(&format!("Parando o app de {}", project.name));
+    step(&format!("Stopping the {} app", project.name));
     project.compose_ok(&["stop", "app"])?;
-    step(&format!("Restaurando {}", file.display()));
+    step(&format!("Restoring {}", file.display()));
     let result = restore_dump(project, file);
-    step("Subindo o app");
+    step("Starting the app");
     project.compose_ok(&["up", "-d", "app"])?;
     result?;
     project.wait_healthy("app", HEALTH_TIMEOUT)?;
-    ok("restore concluído e app saudável");
+    ok("restore finished and app healthy");
     Ok(())
 }
 
@@ -237,58 +237,58 @@ fn restore_dump(project: &Project, file: &Path) -> anyhow::Result<()> {
         Stdio::inherit(),
     )?;
     if !status.success() {
-        bail!("pg_restore falhou ({status}); o banco não foi alterado (transação única)");
+        bail!("pg_restore failed ({status}); the database was not changed (single transaction)");
     }
-    ok("dados restaurados");
+    ok("data restored");
     Ok(())
 }
 
-/// Backup → nova imagem → healthcheck. Se falhar: volta a imagem anterior e
-/// restaura o backup (a versão nova pode ter aplicado migrações).
+/// Backup → new image → healthcheck. On failure: goes back to the previous
+/// image and restores the backup (the new version may have applied migrations).
 pub fn upgrade(host: &Host, project: &Project, version: Option<&str>) -> anyhow::Result<()> {
     let env = project.env();
     let current = env
         .get("NELCOTA_VERSION")?
-        .context("NELCOTA_VERSION ausente no .env")?;
+        .context("NELCOTA_VERSION missing from .env")?;
     let target = version.map_or_else(|| env!("CARGO_PKG_VERSION").to_owned(), str::to_owned);
-    println!("Atualizando {}: {current} → {target}", project.name);
+    println!("Upgrading {}: {current} → {target}", project.name);
 
     let dump = backup(host, project, false, None)
-        .context("backup pré-upgrade falhou; nada foi alterado")?;
+        .context("pre-upgrade backup failed; nothing was changed")?;
 
     env.set("NELCOTA_VERSION", &target)?;
-    step("Baixando a imagem nova");
+    step("Pulling the new image");
     if !project
         .compose(&["pull", "app"])
         .map(|s| s.success())
         .unwrap_or(false)
     {
-        warn("não foi possível baixar a imagem (seguindo com a imagem local, se existir)");
+        warn("could not pull the image (continuing with the local image, if any)");
     }
-    step("Reiniciando o app na versão nova");
+    step("Restarting the app on the new version");
     let healthy = project
         .compose_ok(&["up", "-d", "app"])
         .and_then(|()| project.wait_healthy("app", HEALTH_TIMEOUT));
 
     match healthy {
         Ok(()) => {
-            ok(&format!("{} saudável na versão {target}", project.name));
-            println!("Backup pré-upgrade: {}", dump.display());
+            ok(&format!("{} healthy on version {target}", project.name));
+            println!("Pre-upgrade backup: {}", dump.display());
             Ok(())
         }
         Err(err) => {
-            warn(&format!("a versão {target} não ficou saudável: {err}"));
-            step(&format!("Rollback para {current}"));
+            warn(&format!("version {target} did not become healthy: {err}"));
+            step(&format!("Rolling back to {current}"));
             env.set("NELCOTA_VERSION", &current)?;
             project.compose_ok(&["stop", "app"])?;
             restore_dump(project, &dump)?;
             project.compose_ok(&["up", "-d", "app"])?;
             project.wait_healthy("app", HEALTH_TIMEOUT)?;
             ok(&format!(
-                "rollback concluído: versão {current}, banco restaurado"
+                "rollback finished: version {current}, database restored"
             ));
             bail!(
-                "upgrade de {} para {target} falhou e foi revertido",
+                "upgrade of {} to {target} failed and was reverted",
                 project.name
             )
         }

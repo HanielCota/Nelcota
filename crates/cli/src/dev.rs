@@ -1,5 +1,5 @@
-//! `nelcota dev`: Postgres 17 num container local + servidor em primeiro plano,
-//! com segredos de desenvolvimento gerados e guardados em `.nelcota/dev.env`.
+//! `nelcota dev`: Postgres 17 in a local container + the server in the
+//! foreground, with development secrets generated and kept in `.nelcota/dev.env`.
 
 use std::{
     fs,
@@ -37,7 +37,7 @@ fn load_state(root: &Path) -> anyhow::Result<Option<DevState>> {
         env.iter()
             .find(|(k, _)| k == key)
             .map(|(_, v)| v.clone())
-            .with_context(|| format!("{key} ausente em {STATE_FILE}"))
+            .with_context(|| format!("{key} missing from {STATE_FILE}"))
     };
     Ok(Some(DevState {
         postgres_password: get("POSTGRES_PASSWORD")?,
@@ -62,7 +62,7 @@ fn config_for(state: &DevState, listen: std::net::SocketAddr) -> Config {
     }
 }
 
-/// Configuração do ambiente de dev já criado (para `migrate`/`types`).
+/// Configuration of the already created dev environment (for `migrate`/`types`).
 pub fn saved_config(root: &Path) -> anyhow::Result<Option<Config>> {
     Ok(load_state(root)?.map(|s| config_for(&s, ([127, 0, 0, 1], 8000).into())))
 }
@@ -81,7 +81,7 @@ pub fn run(root: &Path, args: DevArgs) -> anyhow::Result<Outcome> {
             write_private(
                 &root.join(STATE_FILE),
                 &format!(
-                    "# Segredos do ambiente de desenvolvimento (não use em produção).\n\
+                    "# Development environment secrets (do not use in production).\n\
                      POSTGRES_PASSWORD={}\nAUTHENTICATOR_PASSWORD={}\nJWT_PRIVATE_KEY={}\nDB_PORT={}\n",
                     state.postgres_password,
                     state.authenticator_password,
@@ -95,11 +95,11 @@ pub fn run(root: &Path, args: DevArgs) -> anyhow::Result<Outcome> {
     };
 
     let container = format!("nelcota-dev-postgres-{}", state.db_port);
-    step(&format!("Postgres de desenvolvimento ({container})"));
+    step(&format!("Development Postgres ({container})"));
     let running = Command::new("docker")
         .args(["inspect", "-f", "{{.State.Running}}", &container])
         .output()
-        .context("Docker não encontrado")?;
+        .context("Docker not found")?;
     if !running.status.success() {
         let status = Command::new("docker")
             .args(["run", "-d", "--name", &container, "-e"])
@@ -116,7 +116,7 @@ pub fn run(root: &Path, args: DevArgs) -> anyhow::Result<Outcome> {
             ])
             .status()?;
         if !status.success() {
-            bail!("não foi possível criar o container {container}");
+            bail!("could not create the {container} container");
         }
     } else if String::from_utf8_lossy(&running.stdout).trim() != "true" {
         Command::new("docker")
@@ -126,7 +126,7 @@ pub fn run(root: &Path, args: DevArgs) -> anyhow::Result<Outcome> {
 
     let config = config_for(&state, args.listen);
     wait_for_postgres(&config)?;
-    ok(&format!("Postgres em 127.0.0.1:{}", state.db_port));
+    ok(&format!("Postgres at 127.0.0.1:{}", state.db_port));
 
     let keys = nelcota_auth::Keys::new(config.jwt_private_key(), None)?;
     let service = keys.service_role_token(&config.jwt_issuer, 30)?;
@@ -134,9 +134,9 @@ pub fn run(root: &Path, args: DevArgs) -> anyhow::Result<Outcome> {
     println!("  API:      http://{}/rest/v1/", args.listen);
     println!("  Auth:     http://{}/auth/v1/", args.listen);
     println!("  Postgres: {}", config.database_url.expose());
-    println!("  service_role (30 dias, ignora RLS): {service}");
+    println!("  service_role (30 days, bypasses RLS): {service}");
     println!();
-    println!("  Migrações: nelcota migrate   ·   Tipos: nelcota types -o database.ts");
+    println!("  Migrations: nelcota migrate   ·   Types: nelcota types -o database.ts");
     println!();
     Ok(Outcome::Serve(Box::new(config)))
 }
@@ -154,7 +154,7 @@ fn wait_for_postgres(config: &Config) -> anyhow::Result<()> {
                 Err(_) if Instant::now() < deadline => {
                     tokio::time::sleep(Duration::from_millis(500)).await;
                 }
-                Err(err) => bail!("o Postgres de desenvolvimento não respondeu: {err}"),
+                Err(err) => bail!("the development Postgres did not answer: {err}"),
             }
         }
     })

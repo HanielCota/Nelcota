@@ -8,12 +8,13 @@
   import ProjectSwitcher from './ProjectSwitcher.svelte'
   import AccountMenu from './AccountMenu.svelte'
   import { palette } from '$lib/palette.svelte'
+  import { t } from '$lib/i18n/index.svelte'
   import { href, route } from '$lib/router.svelte'
   import { isActive, navGroups } from '$lib/nav'
   import { crumbsFor } from '$lib/titles'
 
-  // Barra do topo da área de conteúdo: trilha e busca. Projeto, páginas e conta
-  // ficam na barra lateral (no celular, no menu que desliza da esquerda).
+  // Top bar of the content area: breadcrumb and search. Project, pages and
+  // account live in the sidebar (on phones, in the menu that slides in).
 
   const crumbs = $derived(crumbsFor(route.path))
 
@@ -23,16 +24,16 @@
 
 <header class="flex h-14 shrink-0 items-center gap-2 border-b border-sidebar-border bg-sidebar px-3 sm:px-4">
   <div class="flex shrink-0 items-center gap-1 md:hidden">
-    <Button variant="ghost" size="icon" onclick={() => (mobileOpen = true)} aria-label="Menu">
+    <Button variant="ghost" size="icon" onclick={() => (mobileOpen = true)} aria-label={t('shell.nav.menu')}>
       <Menu class="size-5" />
     </Button>
-    <a href={href('/')} aria-label="Visão geral"><Logo mark /></a>
+    <a href={href('/')} aria-label={t('shell.pages.overview')}><Logo mark /></a>
   </div>
 
-  <nav class="flex min-w-0 items-center gap-1.5 text-sm font-medium" aria-label="Trilha">
+  <nav class="flex min-w-0 items-center gap-1.5 text-sm font-medium" aria-label={t('shell.nav.breadcrumb')}>
     {#each crumbs as crumb, i (i)}
       {@const last = i === crumbs.length - 1}
-      <!-- No celular só a página atual cabe sem cortar. -->
+      <!-- On phones only the current page fits without truncation. -->
       <span class={['min-w-0 items-center gap-1.5', last ? 'flex' : 'hidden sm:flex']}>
         {#if i > 0}
           <svg viewBox="0 0 24 24" class="hidden size-4 shrink-0 text-border-strong sm:block" aria-hidden="true">
@@ -57,32 +58,32 @@
       type="button"
       onclick={() => (palette.open = true)}
       class="flex size-9 cursor-pointer items-center justify-center gap-2.5 rounded-md border border-border-strong bg-card text-sm text-muted-foreground transition-colors hover:border-ring hover:text-foreground sm:w-64 sm:justify-start sm:px-3 lg:w-80"
-      aria-label="Buscar"
+      aria-label={t('shell.topbar.searchLabel')}
     >
       <Search class="size-4 shrink-0" />
-      <span class="hidden flex-1 text-left sm:inline">Buscar…</span>
+      <span class="hidden flex-1 text-left sm:inline">{t('shell.topbar.search')}</span>
       <kbd class="hidden rounded border border-border-strong bg-muted px-1.5 font-sans text-2xs sm:inline"
         >{isMac ? '⌘' : 'Ctrl'} K</kbd
       >
     </button>
     <Button variant="outline" href={href('/connect')} class="hidden lg:inline-flex">
-      <Plug />Conectar
+      <Plug />{t('shell.topbar.connect')}
     </Button>
   </div>
 </header>
 
-<!-- Navegação em telas pequenas, onde a barra lateral some. -->
+<!-- Navigation on small screens, where the sidebar is hidden. -->
 <Sheet.Root bind:open={mobileOpen}>
   <Sheet.Content side="left" class="w-72 gap-0 bg-sidebar p-0">
     <div class="flex h-14 shrink-0 items-center gap-2 border-b border-sidebar-border px-4">
       <Logo mark />
       <div class="min-w-0 flex-1 pr-8"><ProjectSwitcher /></div>
     </div>
-    <nav class="grid flex-1 content-start gap-4 overflow-y-auto p-3" aria-label="Navegação principal">
+    <nav class="grid flex-1 content-start gap-4 overflow-y-auto p-3" aria-label={t('shell.nav.main')}>
       {#each navGroups as group, g (g)}
         <div>
           {#if group.label}
-            <p class="mb-1 px-3 text-xs font-medium text-muted-foreground">{group.label}</p>
+            <p class="mb-1 px-3 text-xs font-medium text-muted-foreground">{t(group.label)}</p>
           {/if}
           {#each group.items as item (item.path)}
             {@const active = isActive(item.path)}
@@ -95,7 +96,7 @@
                 active ? 'bg-sidebar-accent font-medium text-foreground' : 'text-sidebar-foreground hover:bg-sidebar-accent/60',
               ]}
             >
-              <item.icon class={['size-[18px]', active && 'text-brand']} strokeWidth={1.6} />{item.title}
+              <item.icon class={['size-[18px]', active && 'text-brand']} strokeWidth={1.6} />{t(item.title)}
             </a>
           {/each}
         </div>

@@ -1,6 +1,6 @@
-//! Rate limit em memória, por chave (IP, email), em janela fixa de 1 minuto.
+//! In-memory rate limit per key (IP, email), in a fixed 1-minute window.
 //!
-//! Simples de propósito: um único binário por instalação dispensa Redis.
+//! Simple on purpose: a single binary per install needs no Redis.
 
 use std::{
     collections::HashMap,
@@ -24,7 +24,7 @@ impl RateLimiter {
         }
     }
 
-    /// `Ok` se ainda cabe na janela; `Err(espera)` caso contrário.
+    /// `Ok` while the window has room; `Err(wait)` otherwise.
     pub fn check(&self, key: &str) -> Result<(), Duration> {
         self.check_at(key, Instant::now())
     }
@@ -52,13 +52,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn bloqueia_acima_do_limite_e_libera_na_janela_seguinte() {
+    fn blocks_above_the_limit_and_frees_in_the_next_window() {
         let limiter = RateLimiter::new(2);
         let t0 = Instant::now();
         assert!(limiter.check_at("ip", t0).is_ok());
         assert!(limiter.check_at("ip", t0).is_ok());
         assert!(limiter.check_at("ip", t0).is_err());
-        assert!(limiter.check_at("outro-ip", t0).is_ok());
+        assert!(limiter.check_at("other-ip", t0).is_ok());
         assert!(limiter.check_at("ip", t0 + WINDOW).is_ok());
     }
 }

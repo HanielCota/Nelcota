@@ -1,5 +1,5 @@
-//! Testes de integração do fluxo JWT → role → RLS, contra um Postgres 17 real
-//! (testcontainers). Nada de mock do banco: o que está sob teste é o RLS.
+//! Integration tests of the JWT → role → RLS flow, against a real Postgres 17
+//! (testcontainers). No database mocks: RLS is what is under test.
 
 mod common;
 
@@ -14,29 +14,29 @@ use uuid::Uuid;
 
 fn titles(body: &Value) -> Vec<&str> {
     body.as_array()
-        .expect("resposta deveria ser um array")
+        .expect("the response should be an array")
         .iter()
         .map(|t| t["title"].as_str().unwrap())
         .collect()
 }
 
 #[tokio::test]
-async fn usuario_so_le_os_proprios_dados() {
+async fn user_only_reads_their_own_data() {
     let app = TestApp::spawn().await;
 
     let (status, body) = app
         .get("/rest/v1/todos", Some(&user_token(app.user_a)))
         .await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(titles(&body), ["tarefa de A"]);
+    assert_eq!(titles(&body), ["task of A"]);
 
     let (status, body) = app
         .get("/rest/v1/todos", Some(&user_token(app.user_b)))
         .await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(titles(&body), ["tarefa de B"]);
+    assert_eq!(titles(&body), ["task of B"]);
 
-    // Usuário sem nenhuma linha recebe lista vazia, não erro.
+    // A user without rows gets an empty list, not an error.
     let (status, body) = app
         .get("/rest/v1/todos", Some(&user_token(Uuid::new_v4())))
         .await;
@@ -45,13 +45,13 @@ async fn usuario_so_le_os_proprios_dados() {
 }
 
 #[tokio::test]
-async fn anon_nao_acessa_tabela_protegida() {
+async fn anon_cannot_access_a_protected_table() {
     let app = TestApp::spawn().await;
     let (status, body) = app.get("/rest/v1/todos", None).await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
     assert_eq!(body["code"], "db_error");
 
-    // Mesmo com um token anon explícito.
+    // Even with an explicit anon token.
     let (status, _) = app
         .get("/rest/v1/todos", Some(&token(json!({ "role": "anon" }))))
         .await;
@@ -59,7 +59,7 @@ async fn anon_nao_acessa_tabela_protegida() {
 }
 
 #[tokio::test]
-async fn service_role_ignora_rls() {
+async fn service_role_bypasses_rls() {
     let app = TestApp::spawn().await;
     let (status, body) = app
         .get(
@@ -68,11 +68,11 @@ async fn service_role_ignora_rls() {
         )
         .await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(titles(&body), ["tarefa de A", "tarefa de B"]);
+    assert_eq!(titles(&body), ["task of A", "task of B"]);
 }
 
 #[tokio::test]
-async fn role_invalida_no_jwt_e_rejeitada() {
+async fn invalid_role_in_jwt_is_rejected() {
     let app = TestApp::spawn().await;
     let sub = app.user_a;
     for claims in [
@@ -80,9 +80,9 @@ async fn role_invalida_no_jwt_e_rejeitada() {
         json!({ "role": "authenticator", "sub": sub }),
         json!({ "role": "pg_read_all_data", "sub": sub }),
         json!({ "sub": sub }),
-        // authenticated exige `sub` em formato uuid.
+        // authenticated requires a uuid `sub`.
         json!({ "role": "authenticated" }),
-        json!({ "role": "authenticated", "sub": "nao-e-uuid" }),
+        json!({ "role": "authenticated", "sub": "not-a-uuid" }),
     ] {
         let (status, body) = app
             .get("/rest/v1/todos", Some(&token(claims.clone())))
@@ -93,52 +93,52 @@ async fn role_invalida_no_jwt_e_rejeitada() {
 }
 
 #[tokio::test]
-async fn jwt_expirado_ou_com_assinatura_invalida_retorna_401() {
+async fn expired_or_badly_signed_jwt_returns_401() {
     let app = TestApp::spawn().await;
     let sub = app.user_a;
 
-    let expirado = token(json!({
+    let expired = token(json!({
         "role": "authenticated",
         "sub": sub,
         "exp": get_current_timestamp() - 3600,
     }));
-    let assinatura_errada = token_with_secret(
+    let wrong_signature = token_with_secret(
         json!({ "role": "authenticated", "sub": sub }),
-        "outro-segredo-qualquer-com-32-caracteres!",
+        "some-other-secret-with-32-characters!!",
     );
-    // Payload adulterado: troca o `sub` mantendo a assinatura original.
-    let adulterado = {
+    // Tampered payload: swaps the `sub` while keeping the original signature.
+    let tampered = {
         let original = user_token(app.user_b);
         let parts: Vec<&str> = original.split('.').collect();
-        let forjado = user_token(app.user_a);
-        let payload_a = forjado.split('.').nth(1).unwrap();
+        let forged = user_token(app.user_a);
+        let payload_a = forged.split('.').nth(1).unwrap();
         format!("{}.{}.{}", parts[0], payload_a, parts[2])
     };
-    // `alg: none` (cabeçalho {"alg":"none","typ":"JWT"}).
+    // `alg: none` (header {"alg":"none","typ":"JWT"}).
     let alg_none = format!(
         "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.{}.",
         user_token(sub).split('.').nth(1).unwrap()
     );
 
-    for (caso, token) in [
-        ("expirado", expirado.as_str()),
-        ("assinatura errada", &assinatura_errada),
-        ("payload adulterado", &adulterado),
+    for (case, token) in [
+        ("expired", expired.as_str()),
+        ("wrong signature", &wrong_signature),
+        ("tampered payload", &tampered),
         ("alg none", &alg_none),
-        ("lixo", "isto.nao.e-um-jwt"),
+        ("garbage", "this.is.not-a-jwt"),
     ] {
         let (status, body) = app.get("/rest/v1/todos", Some(token)).await;
-        assert_eq!(status, StatusCode::UNAUTHORIZED, "{caso}");
-        assert_eq!(body["code"], "invalid_token", "{caso}");
+        assert_eq!(status, StatusCode::UNAUTHORIZED, "{case}");
+        assert_eq!(body["code"], "invalid_token", "{case}");
     }
 
-    // Esquema diferente de Bearer também é rejeitado (não vira anon).
+    // A scheme other than Bearer is rejected too (it does not become anon).
     let response = app
         .router
         .clone()
         .oneshot(
             Request::get("/rest/v1/todos")
-                .header(header::AUTHORIZATION, "Basic dXNlcjpzZW5oYQ==")
+                .header(header::AUTHORIZATION, "Basic dXNlcjpwYXNzd29yZA==")
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -148,10 +148,10 @@ async fn jwt_expirado_ou_com_assinatura_invalida_retorna_401() {
     assert!(response.headers().contains_key(header::WWW_AUTHENTICATE));
 }
 
-/// Com uma única conexão no pool, a role/claims de um request não podem
-/// vazar para o seguinte.
+/// With a single pooled connection, one request's role/claims cannot leak into
+/// the next.
 #[tokio::test]
-async fn role_e_claims_nao_vazam_entre_requests_do_pool() {
+async fn role_and_claims_do_not_leak_between_pooled_requests() {
     let app = TestApp::spawn_with(Options {
         pool_size: 1,
         ..Options::default()
@@ -169,15 +169,15 @@ async fn role_e_claims_nao_vazam_entre_requests_do_pool() {
         .get("/rest/v1/todos", Some(&user_token(app.user_a)))
         .await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(titles(&body), ["tarefa de A"]);
+    assert_eq!(titles(&body), ["task of A"]);
 
     let (status, body) = app
         .get("/rest/v1/todos", Some(&user_token(app.user_b)))
         .await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(titles(&body), ["tarefa de B"]);
+    assert_eq!(titles(&body), ["task of B"]);
 
-    // Fora de uma transação de request, a conexão volta a ser só `authenticator`.
+    // Outside a request transaction, the connection is plain `authenticator` again.
     let client = app.pool.get().await.unwrap();
     let row = client
         .query_one(
@@ -190,9 +190,9 @@ async fn role_e_claims_nao_vazam_entre_requests_do_pool() {
     assert_eq!(row.get::<_, String>(1), "");
 }
 
-/// Transação abortada (erro no meio do request) também não deixa resíduo.
+/// An aborted transaction (error mid-request) leaves nothing behind either.
 #[tokio::test]
-async fn transacao_com_erro_faz_rollback_da_role() {
+async fn failed_transaction_rolls_back_the_role() {
     let app = TestApp::spawn_with(Options {
         pool_size: 1,
         ..Options::default()
@@ -203,7 +203,7 @@ async fn transacao_com_erro_faz_rollback_da_role() {
         let mut client = app.pool.get().await.unwrap();
         let tx = db::begin_request(&mut client, &claims).await.unwrap();
         assert!(tx.execute("SELECT 1/0", &[]).await.is_err());
-        // drop sem commit
+        // dropped without commit
     }
     let client = app.pool.get().await.unwrap();
     let user: String = client
@@ -214,10 +214,10 @@ async fn transacao_com_erro_faz_rollback_da_role() {
     assert_eq!(user, "authenticator");
 }
 
-/// As policies valem também para escrita: A não insere linha em nome de B, e
-/// `auth.uid()`/`auth.role()` refletem o JWT dentro da transação.
+/// Policies also apply to writes: A cannot insert a row on behalf of B, and
+/// `auth.uid()`/`auth.role()` reflect the JWT inside the transaction.
 #[tokio::test]
-async fn rls_bloqueia_escrita_em_nome_de_outro_usuario() {
+async fn rls_blocks_writes_on_behalf_of_another_user() {
     let app = TestApp::spawn().await;
     let claims =
         Claims::from_payload(json!({ "role": "authenticated", "sub": app.user_a })).unwrap();
@@ -234,7 +234,7 @@ async fn rls_bloqueia_escrita_em_nome_de_outro_usuario() {
 
     let err = tx
         .execute(
-            "INSERT INTO public.todos (user_id, title) VALUES ($1, 'invasão')",
+            "INSERT INTO public.todos (user_id, title) VALUES ($1, 'intrusion')",
             &[&app.user_b],
         )
         .await
@@ -246,7 +246,7 @@ async fn rls_bloqueia_escrita_em_nome_de_outro_usuario() {
 }
 
 #[tokio::test]
-async fn health_responde_ok() {
+async fn health_answers_ok() {
     let app = TestApp::spawn().await;
     let (status, body) = app.get("/health", None).await;
     assert_eq!(status, StatusCode::OK);
@@ -254,10 +254,10 @@ async fn health_responde_ok() {
 }
 
 #[tokio::test]
-async fn bootstrap_e_idempotente() {
+async fn bootstrap_is_idempotent() {
     let app = TestApp::spawn().await;
     let client = app.pool.get().await.unwrap();
-    // `authenticator` não consegue ler a tabela de controle das migrações.
+    // `authenticator` cannot read the migrations control table.
     assert!(
         client
             .query("SELECT * FROM nelcota.schema_migrations", &[])
@@ -276,7 +276,7 @@ async fn bootstrap_e_idempotente() {
     let (status, _) = app.get("/health", None).await;
     assert_eq!(status, StatusCode::OK);
 
-    // Conexões novas do authenticator herdam o statement_timeout.
+    // New authenticator connections inherit the statement_timeout.
     let (client, connection) = db::authenticator_config(&app.admin, AUTHENTICATOR_PASSWORD)
         .connect(tokio_postgres::NoTls)
         .await

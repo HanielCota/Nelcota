@@ -5,16 +5,16 @@
 @import "@fontsource/ibm-plex-mono/latin-400.css";
 @import "@fontsource/ibm-plex-mono/latin-500.css";
 
-/* O dist/ é versionado (não está no .gitignore), então a detecção automática
-   do Tailwind o lia como fonte: classes do build anterior voltavam no seguinte
-   e o build deixava de depender só do código. */
+/* dist/ is versioned (not in .gitignore), so Tailwind's automatic detection
+   read it as a source: classes from the previous build came back in the next
+   one and the build stopped depending only on the code. */
 @source not "../dist";
 
 @custom-variant dark (&:is(.dark *));
 
-/* Claro: superfícies quase brancas, bordas suaves e verde da marca.
-   Cores de texto calibradas para contraste WCAG AA (4,5:1) sobre o fundo e
-   sobre os selos tingidos (fundo da cor com 10% de opacidade). */
+/* Light: near-white surfaces, soft borders and the brand green.
+   Text colours tuned for WCAG AA contrast (4.5:1) on the background and on
+   tinted badges (the colour at 10% opacity). */
 :root {
 	--background: #fafafa;
 	--foreground: #141414;
@@ -55,13 +55,13 @@
 	--sidebar-ring: #a3a3a3;
 	--warning: #9a4708;
 	--success: #137a4b;
-	/* Sombras em camadas: borda nítida + difusão suave. */
+	/* Layered shadows: a crisp edge plus a soft spread. */
 	--elev-card: 0 1px 2px rgb(0 0 0 / 0.04), 0 1px 3px rgb(0 0 0 / 0.03);
 	--elev-raised: 0 4px 12px -2px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.04);
 	--elev-overlay: 0 24px 48px -12px rgb(0 0 0 / 0.18), 0 8px 16px -8px rgb(0 0 0 / 0.08);
 }
 
-/* Escuro (padrão): grafite em camadas, como o console do Supabase. */
+/* Dark (default): layered graphite, like the Supabase console. */
 .dark {
 	--background: #171717;
 	--foreground: #ededed;
@@ -107,8 +107,8 @@
 }
 
 @theme inline {
-	/* Escala tipográfica do painel (um ponto acima do padrão do Tailwind).
-	   Ajustes de tamanho são feitos aqui, não com text-[Npx] nos componentes. */
+	/* Panel type scale (one step above Tailwind's default).
+	   Size tweaks happen here, not with text-[Npx] in components. */
 	--text-3xs: 0.6875rem;
 	--text-3xs--line-height: 1rem;
 	--text-2xs: 0.75rem;
@@ -186,7 +186,7 @@
 	}
 }
 
-/* Ajustes globais do painel. */
+/* Panel-wide adjustments. */
 @layer base {
 	:focus-visible {
 		outline: 2px solid var(--brand);
@@ -223,7 +223,7 @@
 	}
 }
 
-/* Barra de progresso indeterminada (recarga da grade). */
+/* Indeterminate progress bar (grid reload). */
 @keyframes progress-indeterminate {
 	from {
 		transform: translateX(-100%);
@@ -244,7 +244,7 @@
 	}
 }
 
-/* Barras de rolagem discretas. */
+/* Discreet scrollbars. */
 * {
 	scrollbar-width: thin;
 	scrollbar-color: var(--border-strong) transparent;

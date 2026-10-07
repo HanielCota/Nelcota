@@ -1,5 +1,5 @@
-//! Comandos sobre o conjunto de projetos: listar, remover e trocar o modo
-//! de login dos painéis.
+//! Commands over the set of projects: list, remove and switch the panel
+//! login mode.
 
 use std::fs;
 
@@ -16,38 +16,38 @@ use crate::{
 pub fn list(host: &Host) -> anyhow::Result<()> {
     let manifest = host.require()?;
     println!(
-        "Login dos painéis: {}{}",
+        "Panel login: {}{}",
         manifest.panel_login.as_str(),
         manifest
             .base_domain
             .as_deref()
-            .map(|b| format!(" · domínio base: {b}"))
+            .map(|b| format!(" · base domain: {b}"))
             .unwrap_or_default()
     );
     println!();
     if manifest.projects.is_empty() {
-        println!("Nenhum projeto. Crie com `nelcota init`.");
+        println!("No projects. Create one with `nelcota init`.");
         return Ok(());
     }
     ops::status(&manifest, &host.projects(&manifest))
 }
 
-/// `nelcota remove -p <nome>`: backup final em `archive/`, containers e dados
-/// apagados, projeto fora do Caddy e do registro.
+/// `nelcota remove -p <name>`: final backup in `archive/`, containers and data
+/// deleted, project out of Caddy and the registry.
 pub fn remove(host: &Host, name: &str, yes: bool, keep_files: bool) -> anyhow::Result<()> {
     naming::validate_project_name(name)?;
     let mut manifest = host.require()?;
     let Some(entry) = manifest.projects.iter().find(|p| p.name == name).cloned() else {
-        bail!("projeto '{name}' não existe");
+        bail!("project '{name}' does not exist");
     };
     if !yes
         && !(util::interactive()
             && util::confirm(&format!(
-                "Remover o projeto {name} ({})? Um backup final vai para archive/ e os dados são apagados.",
+                "Remove the project {name} ({})? A final backup goes to archive/ and the data is deleted.",
                 entry.domain
             )))
     {
-        bail!("remoção cancelada (use --yes para não perguntar)");
+        bail!("removal cancelled (use --yes to skip the question)");
     }
 
     let project = host.project(&entry);
@@ -58,9 +58,9 @@ pub fn remove(host: &Host, name: &str, yes: bool, keep_files: bool) -> anyhow::R
             .archive_dir()
             .join(dump.file_name().unwrap_or_default());
         fs::copy(&dump, &archived)?;
-        ok(&format!("backup final em {}", archived.display()));
+        ok(&format!("final backup at {}", archived.display()));
     } else {
-        warn("Postgres parado: removendo sem backup final");
+        warn("Postgres stopped: removing without a final backup");
     }
     if project.exists() {
         ops::down(&project, true)?;
@@ -73,12 +73,12 @@ pub fn remove(host: &Host, name: &str, yes: bool, keep_files: bool) -> anyhow::R
     caddy::reload(host)?;
 
     if keep_files {
-        ok(&format!("arquivos mantidos em {}", project.dir.display()));
+        ok(&format!("files kept at {}", project.dir.display()));
     } else {
         fs::remove_dir_all(&project.dir)?;
-        ok(&format!("pasta {} removida", project.dir.display()));
+        ok(&format!("folder {} removed", project.dir.display()));
     }
-    ok(&format!("projeto {name} removido"));
+    ok(&format!("project {name} removed"));
     Ok(())
 }
 
@@ -86,11 +86,11 @@ pub fn remove(host: &Host, name: &str, yes: bool, keep_files: bool) -> anyhow::R
 pub fn set_panel_login(host: &Host, mode: PanelLogin) -> anyhow::Result<()> {
     let mut manifest = host.require()?;
     if manifest.panel_login == mode {
-        println!("O login dos painéis já é {}.", mode.as_str());
+        println!("The panel login is already {}.", mode.as_str());
         return Ok(());
     }
     step(&format!(
-        "Login dos painéis: {} → {}",
+        "Panel login: {} → {}",
         manifest.panel_login.as_str(),
         mode.as_str()
     ));
@@ -99,8 +99,8 @@ pub fn set_panel_login(host: &Host, mode: PanelLogin) -> anyhow::Result<()> {
     ops::recreate_apps(&host.projects(&manifest))?;
     if mode == PanelLogin::Shared {
         println!();
-        println!("Login único ativo: use o email e a senha do host em qualquer painel.");
-        println!("(Esqueceu a senha? `nelcota admin-password`.)");
+        println!("Single sign-on on: use the host email and password on any panel.");
+        println!("(Forgot the password? `nelcota admin-password`.)");
     }
     panel_login::print(&generated);
     Ok(())

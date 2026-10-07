@@ -1,28 +1,39 @@
 import { describe, expect, it } from 'vitest'
 import { formatCell } from './format'
 
-describe('datas na grade', () => {
-  it('timestamptz vai para o fuso de quem vê, com o valor exato no tooltip', () => {
+const ptBR = { locale: 'pt-BR' }
+
+describe('dates in the grid', () => {
+  it("timestamptz goes to the viewer's time zone, exact value in the tooltip", () => {
     const raw = '2026-10-06T22:26:15.177028+00:00'
-    expect(formatCell(raw, 'timestamp with time zone', { timeZone: 'UTC' })).toEqual({
+    expect(formatCell(raw, 'timestamp with time zone', { ...ptBR, timeZone: 'UTC' })).toEqual({
       text: '06/10/2026, 22:26:15',
       raw,
     })
-    expect(formatCell(raw, 'timestamp with time zone', { timeZone: 'America/Sao_Paulo' }).text).toBe(
+    expect(formatCell(raw, 'timestamp with time zone', { ...ptBR, timeZone: 'America/Sao_Paulo' }).text).toBe(
       '06/10/2026, 19:26:15',
     )
   })
 
-  it('timestamp sem fuso fica como gravado (sem conversão)', () => {
-    expect(formatCell('2026-10-06T22:26:15.5', 'timestamp without time zone').text).toBe('06/10/2026, 22:26:15')
-    expect(formatCell('2026-01-02T03:04', 'timestamp without time zone').text).toBe('02/01/2026, 03:04:00')
+  it('timestamp without time zone stays as stored (no conversion)', () => {
+    expect(formatCell('2026-10-06T22:26:15.5', 'timestamp without time zone', ptBR).text).toBe(
+      '06/10/2026, 22:26:15',
+    )
+    expect(formatCell('2026-01-02T03:04', 'timestamp without time zone', ptBR).text).toBe('02/01/2026, 03:04:00')
   })
 
-  it('date no formato brasileiro', () => {
-    expect(formatCell('2026-10-06', 'date')).toEqual({ text: '06/10/2026', raw: '2026-10-06' })
+  it("date in the viewer's format", () => {
+    expect(formatCell('2026-10-06', 'date', ptBR)).toEqual({ text: '06/10/2026', raw: '2026-10-06' })
+    expect(formatCell('2026-10-06', 'date', { locale: 'en' }).text).toBe('10/6/26')
   })
 
-  it('valor desconhecido ou outro tipo sai como veio', () => {
+  it('follows the language without shifting the stored time', () => {
+    expect(formatCell('2026-10-06T22:26:15', 'timestamp without time zone', { locale: 'en' }).text).toBe(
+      '10/6/26, 10:26:15 PM',
+    )
+  })
+
+  it('unknown value or another type is shown as it came', () => {
     expect(formatCell('infinity', 'timestamp with time zone')).toEqual({ text: 'infinity', raw: null })
     expect(formatCell('infinity', 'date')).toEqual({ text: 'infinity', raw: null })
     expect(formatCell('2026-10-06', 'text')).toEqual({ text: '2026-10-06', raw: null })

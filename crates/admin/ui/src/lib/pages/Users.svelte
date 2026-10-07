@@ -15,6 +15,7 @@
   import SetPasswordDialog from '$lib/components/app/SetPasswordDialog.svelte'
   import { api, enc } from '$lib/api'
   import type { User } from '$lib/types'
+  import { errorMessage, intlLocale, t } from '$lib/i18n/index.svelte'
 
   let users = $state<User[] | null>(null)
   let total = $state(0)
@@ -36,7 +37,7 @@
       total = data.total
       hasNext = data.has_next
     } catch (e) {
-      toast.error((e as Error).message)
+      toast.error(errorMessage(e))
     }
   }
 
@@ -63,25 +64,27 @@
     if (!target) return
     const { user, action } = target
     try {
-      const res =
-        action === 'revoke'
-          ? await api.post<{ message: string }>(`/users/${enc(user.id)}/revoke`)
-          : await api.delete<{ message: string }>(`/users/${enc(user.id)}`)
-      toast.success(res.message)
+      if (action === 'revoke') {
+        await api.post(`/users/${enc(user.id)}/revoke`)
+        toast.success(t('users.revoked', { email: user.email }))
+      } else {
+        await api.delete(`/users/${enc(user.id)}`)
+        toast.success(t('users.deleted', { email: user.email }))
+      }
       await load()
     } catch (e) {
-      toast.error((e as Error).message)
+      toast.error(errorMessage(e))
     }
   }
 
-  const date = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+  const date = $derived(new Intl.DateTimeFormat(intlLocale(), { dateStyle: 'short', timeStyle: 'short' }))
   const when = (value: string | null) => (value ? date.format(new Date(value)) : '—')
 </script>
 
 <div class="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-10 lg:py-10">
   <PageHeader
-    title="Usuários"
-    description={users ? `${total} ${total === 1 ? 'usuário' : 'usuários'} em auth.users.` : undefined}
+    title={t('users.title')}
+    description={users ? t('users.count', { count: total }) : undefined}
   >
     {#snippet actions()}
       <div class="relative w-full sm:w-72">
@@ -90,12 +93,12 @@
           type="search"
           bind:value={query}
           oninput={onSearch}
-          placeholder="Buscar por email"
-          aria-label="Buscar usuários por email"
+          placeholder={t('users.searchPlaceholder')}
+          aria-label={t('users.searchLabel')}
           class="pl-9"
         />
       </div>
-      <Button onclick={() => (createOpen = true)}><UserPlus />Novo usuário</Button>
+      <Button onclick={() => (createOpen = true)}><UserPlus />{t('users.new')}</Button>
     {/snippet}
   </PageHeader>
 
@@ -104,10 +107,10 @@
   {:else if users.length === 0}
     <EmptyState
       class="rounded-lg border"
-      title={query.trim() ? 'Nenhum resultado' : 'Nenhum usuário'}
+      title={query.trim() ? t('users.noResults') : t('users.empty')}
       description={query.trim()
-        ? `Nada encontrado para "${query.trim()}".`
-        : 'Cadastros feitos pela API aparecem aqui.'}
+        ? t('users.noResultsFor', { query: query.trim() })
+        : t('users.emptyDescription')}
     >
       {#snippet actions()}
         {#if query.trim()}
@@ -117,10 +120,10 @@
               query = ''
               page = 0
               load()
-            }}>Limpar busca</Button
+            }}>{t('users.clearSearch')}</Button
           >
         {:else}
-          <Button variant="outline" onclick={() => (createOpen = true)}>Novo usuário</Button>
+          <Button variant="outline" onclick={() => (createOpen = true)}>{t('users.new')}</Button>
         {/if}
       {/snippet}
     </EmptyState>
@@ -129,11 +132,11 @@
       <Table.Root>
         <Table.Header>
           <Table.Row class="hover:bg-transparent">
-            <Table.Head>Email</Table.Head>
-            <Table.Head>Criado</Table.Head>
-            <Table.Head>Último login</Table.Head>
-            <Table.Head class="text-right">Sessões</Table.Head>
-            <Table.Head class="w-12"><span class="sr-only">Ações</span></Table.Head>
+            <Table.Head>{t('users.columns.email')}</Table.Head>
+            <Table.Head>{t('users.columns.created')}</Table.Head>
+            <Table.Head>{t('users.columns.lastSignIn')}</Table.Head>
+            <Table.Head class="text-right">{t('users.columns.sessions')}</Table.Head>
+            <Table.Head class="w-12"><span class="sr-only">{t('common.actions')}</span></Table.Head>
           </Table.Row>
         </Table.Header>
         <Table.Body>
@@ -158,26 +161,26 @@
                 <DropdownMenu.Root>
                   <DropdownMenu.Trigger>
                     {#snippet child({ props })}
-                      <Button variant="ghost" size="icon-sm" aria-label="Ações" {...props}><Ellipsis /></Button>
+                      <Button variant="ghost" size="icon-sm" aria-label={t('common.actions')} {...props}><Ellipsis /></Button>
                     {/snippet}
                   </DropdownMenu.Trigger>
                   <DropdownMenu.Content align="end" class="w-48">
                     <DropdownMenu.Item
                       onclick={() => {
                         navigator.clipboard.writeText(user.id)
-                        toast.success('ID copiado')
-                      }}>Copiar ID</DropdownMenu.Item
+                        toast.success(t('users.idCopied'))
+                      }}>{t('users.copyId')}</DropdownMenu.Item
                     >
                     <DropdownMenu.Item
                       onclick={() => {
                         passwordUser = user
                         passwordOpen = true
-                      }}>Redefinir senha…</DropdownMenu.Item
+                      }}>{t('users.resetPassword')}</DropdownMenu.Item
                     >
-                    <DropdownMenu.Item onclick={() => ask(user, 'revoke')}>Encerrar sessões</DropdownMenu.Item>
+                    <DropdownMenu.Item onclick={() => ask(user, 'revoke')}>{t('users.revokeSessions')}</DropdownMenu.Item>
                     <DropdownMenu.Separator />
                     <DropdownMenu.Item variant="destructive" onclick={() => ask(user, 'delete')}>
-                      Apagar usuário
+                      {t('users.delete')}
                     </DropdownMenu.Item>
                   </DropdownMenu.Content>
                 </DropdownMenu.Root>
@@ -190,10 +193,10 @@
   {/if}
 
   {#if page > 0 || hasNext}
-    <nav class="mt-4 flex items-center justify-end gap-2" aria-label="Paginação">
-      <span class="mr-1 text-sm text-muted-foreground">Página {page + 1}</span>
-      <Button variant="outline" size="sm" disabled={page === 0} onclick={() => page--}>Anterior</Button>
-        <Button variant="outline" size="sm" disabled={!hasNext} onclick={() => page++}>Próxima</Button>
+    <nav class="mt-4 flex items-center justify-end gap-2" aria-label={t('users.pagination')}>
+      <span class="mr-1 text-sm text-muted-foreground">{t('common.page', { page: page + 1 })}</span>
+      <Button variant="outline" size="sm" disabled={page === 0} onclick={() => page--}>{t('common.previous')}</Button>
+      <Button variant="outline" size="sm" disabled={!hasNext} onclick={() => page++}>{t('common.next')}</Button>
     </nav>
   {/if}
 </div>
@@ -206,11 +209,11 @@
 {#if target}
   <ConfirmDialog
     bind:open={confirmOpen}
-    title={target.action === 'revoke' ? 'Encerrar as sessões?' : 'Apagar o usuário?'}
+    title={target.action === 'revoke' ? t('users.confirmRevoke.title') : t('users.confirmDelete.title')}
     description={target.action === 'revoke'
-      ? `${target.user.email} vai precisar entrar de novo. JWTs já emitidos valem até expirar.`
-      : `${target.user.email} e as sessões dele serão apagados. Não dá para desfazer.`}
-    confirmLabel={target.action === 'revoke' ? 'Encerrar sessões' : 'Apagar'}
+      ? t('users.confirmRevoke.description', { email: target.user.email })
+      : t('users.confirmDelete.description', { email: target.user.email })}
+    confirmLabel={target.action === 'revoke' ? t('users.revokeSessions') : t('common.delete')}
     destructive={target.action === 'delete'}
     onconfirm={confirm}
   />

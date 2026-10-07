@@ -3,13 +3,13 @@
   import { session } from '$lib/session.svelte'
   import { cn } from '$lib/utils'
 
-  // Foto do admin ou, sem ela, a inicial do email. `src` força uma imagem
-  // (prévia de uma foto ainda não salva).
+  // The admin's photo or, without one, the email's initial. `src` forces an
+  // image (preview of a photo not saved yet).
   let { src = null, class: className = '' }: { src?: string | null; class?: string } = $props()
 
   const initial = $derived((session.email ?? '?').charAt(0).toUpperCase())
   const url = $derived(src ?? (profile.avatar !== null ? avatarUrl(profile.avatar) : null))
-  // Imagem que falhou ao carregar (removida em outra aba, por exemplo): mostra a inicial.
+  // Image that failed to load (removed in another tab, for example): show the initial.
   let failed = $state<string | null>(null)
 </script>
 

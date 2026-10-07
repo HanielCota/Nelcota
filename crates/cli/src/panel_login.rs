@@ -1,13 +1,13 @@
-//! Login dos painéis: único para o host (padrão) ou um por projeto.
+//! Panel login: one for the whole host (default) or one per project.
 //!
-//! Este módulo é o único que escreve as credenciais de admin nos `.env`.
+//! This module is the only one that writes admin credentials into the `.env` files.
 //!
-//! - **Único** (`shared`): email, hash e segredo de SSO ficam no `host.env` e
-//!   são copiados para todos os projetos. Entrar num painel abre os outros
-//!   (handoff de SSO no seletor de projetos).
-//! - **Por projeto** (`per-project`): cada projeto tem email e senha próprios;
-//!   sem segredo de SSO, o seletor só leva ao painel do outro projeto, que
-//!   pede o login dele.
+//! - **Single** (`shared`): email, hash and SSO secret live in `host.env` and
+//!   are copied to every project. Signing in to one panel opens the others
+//!   (SSO handoff in the project switcher).
+//! - **Per project** (`per-project`): each project has its own email and
+//!   password; without an SSO secret, the switcher only takes you to the other
+//!   project's panel, which asks for its own login.
 
 use crate::{
     envfile::EnvFile,
@@ -20,7 +20,7 @@ const EMAIL: &str = "NELCOTA_ADMIN_EMAIL";
 const HASH: &str = "NELCOTA_ADMIN_PASSWORD_HASH";
 const SSO_SECRET: &str = "NELCOTA_ADMIN_SSO_SECRET";
 
-/// Senha gerada agora (mostrada uma única vez; só o hash é gravado).
+/// Password generated now (shown only once; only the hash is stored).
 pub struct NewPassword {
     pub scope: String,
     pub email: String,
@@ -29,7 +29,7 @@ pub struct NewPassword {
 
 fn hash(password: &str) -> anyhow::Result<String> {
     nelcota_auth::hash_password(password)
-        .ok_or_else(|| anyhow::anyhow!("falha ao gerar o hash da senha"))
+        .ok_or_else(|| anyhow::anyhow!("could not hash the password"))
 }
 
 fn new_credentials(file: &EnvFile, email: &str, scope: &str) -> anyhow::Result<NewPassword> {
@@ -43,20 +43,20 @@ fn new_credentials(file: &EnvFile, email: &str, scope: &str) -> anyhow::Result<N
     })
 }
 
-/// Email padrão do admin do host.
+/// Default email of the host admin.
 pub fn host_email(host: &Host) -> anyhow::Result<Option<String>> {
     host.secrets().get(EMAIL)
 }
 
-/// Credenciais do host novas (email, senha e segredo de SSO) no `host.env`.
+/// New host credentials (email, password and SSO secret) in `host.env`.
 pub fn init_host(host: &Host, email: &str) -> anyhow::Result<NewPassword> {
     let secrets = host.secrets();
     secrets.set(SSO_SECRET, &util::secret(48))?;
-    new_credentials(&secrets, email, "todos os projetos")
+    new_credentials(&secrets, email, "all projects")
 }
 
-/// Escreve no `.env` do projeto as credenciais do modo atual. No modo por
-/// projeto, gera credenciais próprias se o projeto ainda não tiver.
+/// Writes the current mode's credentials into the project's `.env`. In
+/// per-project mode, generates its own credentials if the project has none yet.
 pub fn apply(
     host: &Host,
     manifest: &Manifest,
@@ -87,7 +87,7 @@ pub fn apply(
     }
 }
 
-/// Troca o modo de login do host e reaplica em todos os projetos.
+/// Switches the host's login mode and reapplies it to every project.
 pub fn switch(
     host: &Host,
     manifest: &mut Manifest,
@@ -98,7 +98,7 @@ pub fn switch(
         host.secrets().set(SSO_SECRET, &util::secret(48))?;
     }
     if mode == PanelLogin::PerProject {
-        // Força credenciais novas: a senha única não deve continuar valendo.
+        // Force new credentials: the single password must stop working.
         for project in host.projects(manifest) {
             project.env().remove(HASH)?;
         }
@@ -113,7 +113,7 @@ pub fn switch(
     Ok(generated)
 }
 
-/// Senha nova: do host (login único) ou do projeto (login por projeto).
+/// New password: the host's (single sign-on) or the project's (per-project login).
 pub fn reset(
     host: &Host,
     manifest: &Manifest,
@@ -122,7 +122,7 @@ pub fn reset(
     match (manifest.panel_login, project) {
         (PanelLogin::Shared, _) => {
             let email = host_email(host)?.unwrap_or_else(|| "admin@localhost".into());
-            let new = new_credentials(&host.secrets(), &email, "todos os projetos")?;
+            let new = new_credentials(&host.secrets(), &email, "all projects")?;
             for project in host.projects(manifest) {
                 apply(host, manifest, &project)?;
             }
@@ -136,7 +136,7 @@ pub fn reset(
             new_credentials(&env, &email, &project.name)
         }
         (PanelLogin::PerProject, None) => {
-            anyhow::bail!("login por projeto: escolha o projeto com -p <nome>")
+            anyhow::bail!("per-project login: pick the project with -p <name>")
         }
     }
 }
@@ -144,12 +144,12 @@ pub fn reset(
 pub fn print(passwords: &[NewPassword]) {
     for p in passwords {
         println!();
-        println!("  Painel ({}):", p.scope);
+        println!("  Panel ({}):", p.scope);
         println!("    email: {}", p.email);
-        println!("    senha: {}", p.password);
+        println!("    password: {}", p.password);
     }
     if !passwords.is_empty() {
-        println!("  (senhas mostradas só agora; os arquivos guardam apenas o hash argon2id)");
+        println!("  (passwords are shown only now; the files keep just the argon2id hash)");
     }
 }
 
@@ -171,8 +171,8 @@ mod tests {
             image: "nelcota".into(),
             projects: vec![
                 ProjectEntry {
-                    name: "loja".into(),
-                    domain: "loja.localhost".into(),
+                    name: "shop".into(),
+                    domain: "shop.localhost".into(),
                 },
                 ProjectEntry {
                     name: "blog".into(),
@@ -193,9 +193,9 @@ mod tests {
     }
 
     #[test]
-    fn login_unico_copia_credenciais_e_segredo_para_todos() {
+    fn single_login_copies_credentials_and_secret_to_all() {
         let (host, manifest) = setup("shared");
-        init_host(&host, "admin@exemplo.com").unwrap();
+        init_host(&host, "admin@example.com").unwrap();
         for project in host.projects(&manifest) {
             assert!(apply(&host, &manifest, &project).unwrap().is_none());
             let env = project.env();
@@ -208,9 +208,9 @@ mod tests {
     }
 
     #[test]
-    fn trocar_para_por_projeto_gera_senhas_proprias_e_tira_o_sso() {
+    fn switching_to_per_project_generates_own_passwords_and_drops_sso() {
         let (host, mut manifest) = setup("switch");
-        init_host(&host, "admin@exemplo.com").unwrap();
+        init_host(&host, "admin@example.com").unwrap();
         for project in host.projects(&manifest) {
             apply(&host, &manifest, &project).unwrap();
         }
@@ -224,7 +224,7 @@ mod tests {
         }
         assert_eq!(host.manifest().unwrap().panel_login, PanelLogin::PerProject);
 
-        // E de volta para o login único.
+        // And back to single sign-on.
         assert!(
             switch(&host, &mut manifest, PanelLogin::Shared)
                 .unwrap()

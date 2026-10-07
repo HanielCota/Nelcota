@@ -7,6 +7,7 @@
   import X from '@lucide/svelte/icons/x'
   import { UI_OPERATORS, fromUi, needsValue, toUi, type TableFilter, type UiOp } from '$lib/filters'
   import type { Column } from '$lib/types'
+  import { t } from '$lib/i18n/index.svelte'
 
   let {
     columns,
@@ -17,7 +18,7 @@
   }: {
     columns: Column[]
     filters: TableFilter[]
-    /** Coluna para uma linha nova já preenchida (menu da coluna). */
+    /** Column for a new, prefilled row (column menu). */
     preset?: string
     onapply: (filters: TableFilter[]) => void
     onclose: () => void
@@ -29,15 +30,18 @@
   const toRow = (f: TableFilter): Row => ({ key: nextKey++, column: f.column, ...toUi(f) })
   const blankRow = (column = columns[0]?.name ?? ''): Row => ({ key: nextKey++, column, op: 'eq', value: '' })
 
-  // Rascunho local, copiado uma vez ao abrir: só vai para a URL (e para a
-  // API) ao aplicar.
+  // Local draft, copied once on open: it only reaches the URL (and the API)
+  // when applied.
   let rows = $state<Row[]>(
     untrack(() =>
       preset ? [...filters.map(toRow), blankRow(preset)] : filters.length ? filters.map(toRow) : [blankRow()],
     ),
   )
 
-  const opLabel = (op: UiOp) => UI_OPERATORS.find((o) => o.value === op)?.label ?? op
+  const opLabel = (op: UiOp) => {
+    const key = UI_OPERATORS.find((o) => o.value === op)?.label
+    return key ? t(key) : op
+  }
   const complete = (r: Row) => r.column !== '' && (!needsValue(r.op) || r.value !== '')
 
   function apply(event: SubmitEvent) {
@@ -49,9 +53,9 @@
 <form class="grid gap-2.5 border-b bg-muted/40 px-4 py-4" onsubmit={apply}>
   {#each rows as row, i (row.key)}
     <div class="flex flex-wrap items-center gap-2">
-      <span class="w-12 text-right text-xs text-muted-foreground">{i === 0 ? 'onde' : 'e'}</span>
+      <span class="w-12 text-right text-xs text-muted-foreground">{i === 0 ? t('tables.filters.where') : t('tables.filters.and')}</span>
       <Select.Root type="single" bind:value={row.column}>
-        <Select.Trigger class="w-48 font-mono text-xs">{row.column || 'coluna'}</Select.Trigger>
+        <Select.Trigger class="w-48 font-mono text-xs">{row.column || t('tables.filters.column')}</Select.Trigger>
         <Select.Content>
           {#each columns as column (column.name)}
             <Select.Item value={column.name} class="font-mono text-xs">{column.name}</Select.Item>
@@ -62,17 +66,17 @@
         <Select.Trigger class="w-44 text-sm">{opLabel(row.op)}</Select.Trigger>
         <Select.Content>
           {#each UI_OPERATORS as op (op.value)}
-            <Select.Item value={op.value}>{op.label}</Select.Item>
+            <Select.Item value={op.value}>{t(op.label)}</Select.Item>
           {/each}
         </Select.Content>
       </Select.Root>
       {#if needsValue(row.op)}
-        <Input bind:value={row.value} placeholder="valor" class="w-56 font-mono text-xs" />
+        <Input bind:value={row.value} placeholder={t('tables.filters.value')} class="w-56 font-mono text-xs" />
       {/if}
       <Button
         variant="ghost"
         size="icon-sm"
-        aria-label="Remover filtro"
+        aria-label={t('tables.filters.remove')}
         onclick={() => (rows = rows.filter((r) => r.key !== row.key))}
       >
         <X />
@@ -82,14 +86,14 @@
 
   <div class="mt-1 flex flex-wrap items-center gap-2 pl-14">
     <Button variant="outline" size="sm" onclick={() => (rows = [...rows, blankRow()])}>
-      <Plus />Adicionar filtro
+      <Plus />{t('tables.filters.add')}
     </Button>
     <div class="ml-auto flex items-center gap-2">
       {#if filters.length}
-        <Button variant="ghost" size="sm" onclick={() => onapply([])}>Limpar</Button>
+        <Button variant="ghost" size="sm" onclick={() => onapply([])}>{t('tables.filters.clear')}</Button>
       {/if}
-      <Button variant="ghost" size="sm" onclick={onclose}>Fechar</Button>
-      <Button type="submit" size="sm">Aplicar</Button>
+      <Button variant="ghost" size="sm" onclick={onclose}>{t('common.close')}</Button>
+      <Button type="submit" size="sm">{t('tables.filters.apply')}</Button>
     </div>
   </div>
 </form>

@@ -1,21 +1,22 @@
 <script lang="ts">
   import type { Rls } from '$lib/types'
+  import { t } from '$lib/i18n/index.svelte'
 
   let { rls }: { rls: Rls } = $props()
 
-  // Cor só para problema: sem RLS (vermelho) e RLS sem policies (âmbar).
+  // Colour only for problems: no RLS (red) and RLS without policies (amber).
   const label = $derived.by(() => {
     switch (rls.state) {
       case 'danger':
-        return 'sem RLS'
+        return t('policies.rls.none')
       case 'warn':
-        return 'RLS sem policies'
+        return t('policies.rls.noPolicies')
       case 'ok':
-        return `RLS, ${rls.policies} ${rls.policies === 1 ? 'policy' : 'policies'}`
+        return t('policies.rls.policies', { count: rls.policies })
       case 'none':
-        return 'sem RLS, sem grants'
+        return t('policies.rls.noGrants')
       default:
-        return 'view'
+        return t('policies.rls.view')
     }
   })
 </script>

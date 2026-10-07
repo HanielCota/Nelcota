@@ -1,6 +1,6 @@
-//! Testes do fluxo de autenticação contra Postgres real: cadastro, login,
-//! refresh com rotação e detecção de reuso, logout, JWKS, rate limit e
-//! recuperação de senha por email.
+//! Authentication flow tests against a real Postgres: signup, login, refresh
+//! with rotation and reuse detection, logout, JWKS, rate limit and password
+//! recovery by email.
 
 mod common;
 
@@ -45,17 +45,17 @@ fn str_field<'a>(body: &'a Value, field: &str) -> &'a str {
 }
 
 #[tokio::test]
-async fn fluxo_completo_cadastro_login_e_acesso_sob_rls() {
+async fn full_flow_signup_login_and_access_under_rls() {
     let app = TestApp::spawn().await;
 
-    let reply = signup(&app, "Ana@Exemplo.com", "senha-forte-123").await;
+    let reply = signup(&app, "Ana@Example.com", "strong-pass-123").await;
     assert_eq!(reply.status, StatusCode::CREATED, "{}", reply.body);
     let session = reply.body;
     assert_eq!(session["token_type"], "bearer");
-    assert_eq!(session["user"]["email"], "ana@exemplo.com");
+    assert_eq!(session["user"]["email"], "ana@example.com");
     let user_id: Uuid = str_field(&session["user"], "id").parse().unwrap();
 
-    // O JWT emitido é EdDSA e traz as claims do contrato.
+    // The issued JWT is EdDSA and carries the contract's claims.
     let access = str_field(&session, "access_token");
     let header = jsonwebtoken::decode_header(access).unwrap();
     assert_eq!(header.alg, Algorithm::EdDSA);
@@ -65,10 +65,10 @@ async fn fluxo_completo_cadastro_login_e_acesso_sob_rls() {
     assert_eq!(status, StatusCode::OK);
     assert_eq!(me["id"], user_id.to_string());
 
-    // O token do auth funciona na API sob RLS: Ana só vê a própria tarefa.
+    // The auth token works in the API under RLS: Ana only sees her own todo.
     app.admin_client
         .execute(
-            "INSERT INTO public.todos (user_id, title) VALUES ($1, 'tarefa da Ana')",
+            "INSERT INTO public.todos (user_id, title) VALUES ($1, 'Ana''s todo')",
             &[&user_id],
         )
         .await
@@ -76,10 +76,10 @@ async fn fluxo_completo_cadastro_login_e_acesso_sob_rls() {
     let (status, todos) = app.get("/rest/v1/todos", Some(access)).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(todos, json!([todos[0].clone()]));
-    assert_eq!(todos[0]["title"], "tarefa da Ana");
+    assert_eq!(todos[0]["title"], "Ana's todo");
 
-    // Login com a mesma senha (email em outra caixa) abre outra sessão.
-    let reply = login(&app, "ANA@exemplo.com", "senha-forte-123").await;
+    // Login with the same password (email in a different case) opens another session.
+    let reply = login(&app, "ANA@example.com", "strong-pass-123").await;
     assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
     assert_ne!(
         str_field(&reply.body, "refresh_token"),
@@ -89,10 +89,10 @@ async fn fluxo_completo_cadastro_login_e_acesso_sob_rls() {
 }
 
 #[tokio::test]
-async fn senha_armazenada_em_phc_argon2id() {
+async fn password_stored_as_phc_argon2id() {
     let app = TestApp::spawn().await;
     assert_eq!(
-        signup(&app, "bia@exemplo.com", "senha-forte-123")
+        signup(&app, "bia@example.com", "strong-pass-123")
             .await
             .status,
         StatusCode::CREATED
@@ -100,16 +100,16 @@ async fn senha_armazenada_em_phc_argon2id() {
     let hash: String = app
         .admin_client
         .query_one(
-            "SELECT encrypted_password FROM auth.users WHERE email = 'bia@exemplo.com'",
+            "SELECT encrypted_password FROM auth.users WHERE email = 'bia@example.com'",
             &[],
         )
         .await
         .unwrap()
         .get(0);
     assert!(hash.starts_with("$argon2id$v=19$"), "{hash}");
-    assert!(!hash.contains("senha-forte-123"));
+    assert!(!hash.contains("strong-pass-123"));
 
-    // Refresh tokens também não são guardados em claro.
+    // Refresh tokens are not stored in the clear either.
     let stored: i64 = app
         .admin_client
         .query_one(
@@ -123,35 +123,35 @@ async fn senha_armazenada_em_phc_argon2id() {
 }
 
 #[tokio::test]
-async fn cadastro_valida_entrada_e_email_duplicado() {
+async fn signup_validates_input_and_duplicate_email() {
     let app = TestApp::spawn().await;
     assert_eq!(
-        signup(&app, "caio@exemplo.com", "senha-forte-123")
+        signup(&app, "caio@example.com", "strong-pass-123")
             .await
             .status,
         StatusCode::CREATED
     );
-    let dup = signup(&app, "CAIO@exemplo.com", "outra-senha-456").await;
+    let dup = signup(&app, "CAIO@example.com", "other-pass-456").await;
     assert_eq!(dup.status, StatusCode::CONFLICT);
     assert_eq!(dup.body["code"], "user_already_exists");
 
     assert_eq!(
-        signup(&app, "nao-e-email", "senha-forte-123").await.status,
+        signup(&app, "not-an-email", "strong-pass-123").await.status,
         StatusCode::UNPROCESSABLE_ENTITY
     );
     assert_eq!(
-        signup(&app, "dani@exemplo.com", "curta").await.status,
+        signup(&app, "dani@example.com", "short").await.status,
         StatusCode::UNPROCESSABLE_ENTITY
     );
 }
 
 #[tokio::test]
-async fn login_invalido_nao_revela_se_email_existe() {
+async fn invalid_login_does_not_reveal_whether_email_exists() {
     let app = TestApp::spawn().await;
-    signup(&app, "edu@exemplo.com", "senha-forte-123").await;
+    signup(&app, "edu@example.com", "strong-pass-123").await;
 
-    let wrong = login(&app, "edu@exemplo.com", "senha-errada-000").await;
-    let unknown = login(&app, "ninguem@exemplo.com", "senha-errada-000").await;
+    let wrong = login(&app, "edu@example.com", "wrong-pass-000").await;
+    let unknown = login(&app, "nobody@example.com", "wrong-pass-000").await;
     assert_eq!(wrong.status, StatusCode::BAD_REQUEST);
     assert_eq!(unknown.status, StatusCode::BAD_REQUEST);
     assert_eq!(wrong.body, unknown.body);
@@ -159,36 +159,36 @@ async fn login_invalido_nao_revela_se_email_existe() {
 }
 
 #[tokio::test]
-async fn refresh_rotaciona_e_reuso_invalida_a_familia() {
+async fn refresh_rotates_and_reuse_voids_the_family() {
     let app = TestApp::spawn().await;
-    let session = signup(&app, "fabi@exemplo.com", "senha-forte-123")
+    let session = signup(&app, "fabi@example.com", "strong-pass-123")
         .await
         .body;
     let r1 = str_field(&session, "refresh_token").to_owned();
 
-    // Uso legítimo: R1 -> R2.
+    // Legitimate use: R1 -> R2.
     let rotated = refresh(&app, &r1).await;
     assert_eq!(rotated.status, StatusCode::OK, "{}", rotated.body);
     let r2 = str_field(&rotated.body, "refresh_token").to_owned();
     assert_ne!(r1, r2);
     assert!(rotated.body["access_token"].is_string());
 
-    // R2 -> R3 continua funcionando.
+    // R2 -> R3 keeps working.
     let rotated = refresh(&app, &r2).await;
     assert_eq!(rotated.status, StatusCode::OK);
     let r3 = str_field(&rotated.body, "refresh_token").to_owned();
 
-    // Reuso de R1 (roubado): rejeitado e a sessão inteira é revogada...
+    // Reuse of R1 (stolen): rejected and the whole session is revoked...
     let reuse = refresh(&app, &r1).await;
     assert_eq!(reuse.status, StatusCode::BAD_REQUEST);
     assert_eq!(reuse.body["code"], "invalid_grant");
 
-    // ...inclusive o token mais novo da família.
+    // ...including the newest token of the family.
     let after = refresh(&app, &r3).await;
     assert_eq!(after.status, StatusCode::BAD_REQUEST);
 
-    // Outras sessões do mesmo usuário não são afetadas.
-    let other = login(&app, "fabi@exemplo.com", "senha-forte-123")
+    // Other sessions of the same user are not affected.
+    let other = login(&app, "fabi@example.com", "strong-pass-123")
         .await
         .body;
     assert_eq!(
@@ -199,15 +199,15 @@ async fn refresh_rotaciona_e_reuso_invalida_a_familia() {
     );
 
     assert_eq!(
-        refresh(&app, "token-inexistente").await.status,
+        refresh(&app, "no-such-token").await.status,
         StatusCode::BAD_REQUEST
     );
 }
 
 #[tokio::test]
-async fn logout_encerra_a_sessao() {
+async fn logout_ends_the_session() {
     let app = TestApp::spawn().await;
-    let session = signup(&app, "gabi@exemplo.com", "senha-forte-123")
+    let session = signup(&app, "gabi@example.com", "strong-pass-123")
         .await
         .body;
     let access = str_field(&session, "access_token");
@@ -221,7 +221,7 @@ async fn logout_encerra_a_sessao() {
         StatusCode::BAD_REQUEST
     );
 
-    // Logout exige um JWT de usuário.
+    // Logout requires a user JWT.
     let reply = app.post("/auth/v1/logout", None, json!({})).await;
     assert_eq!(reply.status, StatusCode::UNAUTHORIZED);
     let reply = app
@@ -231,9 +231,9 @@ async fn logout_encerra_a_sessao() {
 }
 
 #[tokio::test]
-async fn jwks_permite_validar_tokens_fora_do_nelcota() {
+async fn jwks_allows_validating_tokens_outside_nelcota() {
     let app = TestApp::spawn().await;
-    let session = signup(&app, "hugo@exemplo.com", "senha-forte-123")
+    let session = signup(&app, "hugo@example.com", "strong-pass-123")
         .await
         .body;
 
@@ -250,7 +250,7 @@ async fn jwks_permite_validar_tokens_fora_do_nelcota() {
     let jwks: JwkSet = serde_json::from_value(reply.body).unwrap();
     assert_eq!(jwks.keys.len(), 1);
 
-    // Um serviço externo valida o token só com a chave pública.
+    // An external service validates the token with the public key alone.
     let key = DecodingKey::from_jwk(&jwks.keys[0]).unwrap();
     let mut validation = Validation::new(Algorithm::EdDSA);
     validation.set_audience(&["authenticated"]);
@@ -259,31 +259,31 @@ async fn jwks_permite_validar_tokens_fora_do_nelcota() {
         jsonwebtoken::decode::<Value>(str_field(&session, "access_token"), &key, &validation)
             .unwrap();
     assert_eq!(data.claims["role"], "authenticated");
-    assert_eq!(data.claims["email"], "hugo@exemplo.com");
+    assert_eq!(data.claims["email"], "hugo@example.com");
     assert!(data.claims["session_id"].is_string());
 }
 
 #[tokio::test]
-async fn rate_limit_em_login() {
+async fn rate_limit_on_login() {
     let app = TestApp::spawn_with(Options {
         rate_limit_per_minute: 3,
         ..Options::default()
     })
     .await;
     for _ in 0..3 {
-        let reply = login(&app, "ivo@exemplo.com", "senha-errada-000").await;
+        let reply = login(&app, "ivo@example.com", "wrong-pass-000").await;
         assert_eq!(reply.status, StatusCode::BAD_REQUEST);
     }
-    let blocked = login(&app, "ivo@exemplo.com", "senha-errada-000").await;
+    let blocked = login(&app, "ivo@example.com", "wrong-pass-000").await;
     assert_eq!(blocked.status, StatusCode::TOO_MANY_REQUESTS);
     assert!(blocked.headers.contains_key(header::RETRY_AFTER));
 }
 
-/// As tabelas `auth.*` não são acessíveis pelas roles da API.
+/// The `auth.*` tables are not accessible to the API roles.
 #[tokio::test]
-async fn roles_da_api_nao_leem_o_schema_auth() {
+async fn api_roles_cannot_read_the_auth_schema() {
     let app = TestApp::spawn().await;
-    signup(&app, "julia@exemplo.com", "senha-forte-123").await;
+    signup(&app, "julia@example.com", "strong-pass-123").await;
 
     for payload in [
         json!({ "role": "anon" }),
@@ -295,7 +295,7 @@ async fn roles_da_api_nao_leem_o_schema_auth() {
             "SELECT encrypted_password FROM auth.users",
             "SELECT token_hash FROM auth.one_time_tokens",
         ] {
-            // Uma transação por consulta: o erro aborta a transação inteira.
+            // One transaction per query: the error aborts the whole transaction.
             let mut client = app.pool.get().await.unwrap();
             let tx = db::begin_request(&mut client, &claims).await.unwrap();
             let err = tx.query(query, &[]).await.unwrap_err();
@@ -307,7 +307,7 @@ async fn roles_da_api_nao_leem_o_schema_auth() {
         }
     }
 
-    // E nenhum JWT consegue assumir a role interna do auth.
+    // And no JWT can assume the internal auth role.
     let (status, _) = app
         .get(
             "/rest/v1/todos",
@@ -317,7 +317,7 @@ async fn roles_da_api_nao_leem_o_schema_auth() {
     assert_eq!(status, StatusCode::UNAUTHORIZED);
 }
 
-// ---------------------------------------------------------------- recuperação de senha
+// ---------------------------------------------------------------- password recovery
 
 async fn recover(app: &TestApp, email: &str) -> Reply {
     app.post("/auth/v1/recover", None, json!({ "email": email }))
@@ -333,7 +333,7 @@ async fn verify(app: &TestApp, token: &str, password: &str) -> Reply {
     .await
 }
 
-/// Token do link do email (`...#type=recovery&token=<token>`).
+/// Token of the email link (`...#type=recovery&token=<token>`).
 fn link_token(email: &nelcota_auth::Email) -> String {
     let link = email
         .text
@@ -346,22 +346,20 @@ fn link_token(email: &nelcota_auth::Email) -> String {
 }
 
 #[tokio::test]
-async fn recuperacao_de_senha_troca_a_senha_e_encerra_as_sessoes() {
+async fn password_recovery_changes_the_password_and_ends_sessions() {
     let app = TestApp::spawn().await;
-    let old = signup(&app, "ana@exemplo.com", "senha-antiga-123")
-        .await
-        .body;
+    let old = signup(&app, "ana@example.com", "old-pass-123").await.body;
     let old_refresh = str_field(&old, "refresh_token").to_owned();
     assert!(old["user"]["email_confirmed_at"].is_null());
 
-    let reply = recover(&app, "Ana@Exemplo.com").await;
+    let reply = recover(&app, "Ana@Example.com").await;
     assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
     assert_eq!(reply.body, json!({}));
     let sent = app.outbox.wait_for(1).await;
-    assert_eq!(sent[0].to, "ana@exemplo.com");
+    assert_eq!(sent[0].to, "ana@example.com");
     let token = link_token(&sent[0]);
 
-    // Só o SHA-256 do token fica no banco.
+    // Only the token's SHA-256 is stored in the database.
     let row = app
         .admin_client
         .query_one(
@@ -374,71 +372,71 @@ async fn recuperacao_de_senha_troca_a_senha_e_encerra_as_sessoes() {
         .unwrap();
     assert_eq!((row.get::<_, i64>(0), row.get::<_, i64>(1)), (1, 0));
 
-    let reply = verify(&app, &token, "senha-nova-456").await;
+    let reply = verify(&app, &token, "new-pass-456").await;
     assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
-    assert_eq!(reply.body["user"]["email"], "ana@exemplo.com");
-    // Abrir o link prova que a pessoa recebe os emails da conta.
+    assert_eq!(reply.body["user"]["email"], "ana@example.com");
+    // Opening the link proves the person receives the account's emails.
     assert!(reply.body["user"]["email_confirmed_at"].is_string());
     assert!(reply.body["access_token"].is_string());
 
     assert_eq!(
-        login(&app, "ana@exemplo.com", "senha-antiga-123")
-            .await
-            .status,
+        login(&app, "ana@example.com", "old-pass-123").await.status,
         StatusCode::BAD_REQUEST
     );
     assert_eq!(
-        login(&app, "ana@exemplo.com", "senha-nova-456")
-            .await
-            .status,
+        login(&app, "ana@example.com", "new-pass-456").await.status,
         StatusCode::OK
     );
-    // A sessão aberta com a senha antiga foi encerrada.
+    // The session opened with the old password was ended.
     let reply = refresh(&app, &old_refresh).await;
     assert_eq!(reply.status, StatusCode::BAD_REQUEST);
     assert_eq!(reply.body["code"], "invalid_grant");
 
-    // O link vale uma vez só.
-    let reply = verify(&app, &token, "outra-senha-789").await;
+    // The link works only once.
+    let reply = verify(&app, &token, "other-pass-789").await;
     assert_eq!(reply.status, StatusCode::BAD_REQUEST);
     assert_eq!(reply.body["code"], "invalid_grant");
 }
 
 #[tokio::test]
-async fn recuperacao_nao_revela_se_a_conta_existe() {
+async fn recovery_does_not_reveal_whether_the_account_exists() {
     let app = TestApp::spawn().await;
-    signup(&app, "bia@exemplo.com", "senha-forte-123").await;
+    signup(&app, "bia@example.com", "strong-pass-123").await;
 
-    let existing = recover(&app, "bia@exemplo.com").await;
-    let missing = recover(&app, "ninguem@exemplo.com").await;
+    let existing = recover(&app, "bia@example.com").await;
+    let missing = recover(&app, "nobody@example.com").await;
     assert_eq!(
         (existing.status, &existing.body),
         (missing.status, &missing.body)
     );
     app.outbox.wait_for(1).await;
     tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-    assert_eq!(app.outbox.sent().len(), 1, "só a conta que existe recebe");
+    assert_eq!(
+        app.outbox.sent().len(),
+        1,
+        "only the existing account receives it"
+    );
 
-    let reply = recover(&app, "não é email").await;
+    let reply = recover(&app, "not an email").await;
     assert_eq!(reply.status, StatusCode::UNPROCESSABLE_ENTITY);
 }
 
 #[tokio::test]
-async fn recuperacao_manda_um_email_por_minuto_e_so_o_ultimo_link_vale() {
+async fn recovery_sends_one_email_per_minute_and_only_the_last_link_works() {
     let app = TestApp::spawn().await;
-    signup(&app, "caio@exemplo.com", "senha-forte-123").await;
+    signup(&app, "caio@example.com", "strong-pass-123").await;
 
-    recover(&app, "caio@exemplo.com").await;
+    recover(&app, "caio@example.com").await;
     let first = link_token(&app.outbox.wait_for(1).await[0]);
-    // Pedido repetido logo em seguida: mesma resposta, nenhum email novo.
+    // A repeated request right away: same response, no new email.
     assert_eq!(
-        recover(&app, "caio@exemplo.com").await.status,
+        recover(&app, "caio@example.com").await.status,
         StatusCode::OK
     );
     tokio::time::sleep(std::time::Duration::from_millis(200)).await;
     assert_eq!(app.outbox.sent().len(), 1);
 
-    // Passado o intervalo, um novo pedido manda outro link e invalida o anterior.
+    // After the interval, a new request sends another link and voids the previous one.
     app.admin_client
         .execute(
             "UPDATE auth.one_time_tokens SET created_at = now() - interval '2 minutes'",
@@ -446,39 +444,39 @@ async fn recuperacao_manda_um_email_por_minuto_e_so_o_ultimo_link_vale() {
         )
         .await
         .unwrap();
-    recover(&app, "caio@exemplo.com").await;
+    recover(&app, "caio@example.com").await;
     let second = link_token(&app.outbox.wait_for(2).await[1]);
     assert_ne!(first, second);
     assert_eq!(
-        verify(&app, &first, "senha-nova-456").await.status,
+        verify(&app, &first, "new-pass-456").await.status,
         StatusCode::BAD_REQUEST
     );
     assert_eq!(
-        verify(&app, &second, "senha-nova-456").await.status,
+        verify(&app, &second, "new-pass-456").await.status,
         StatusCode::OK
     );
 }
 
 #[tokio::test]
-async fn link_expirado_invalido_ou_senha_fraca() {
+async fn expired_or_invalid_link_or_weak_password() {
     let app = TestApp::spawn().await;
-    signup(&app, "davi@exemplo.com", "senha-forte-123").await;
-    recover(&app, "davi@exemplo.com").await;
+    signup(&app, "davi@example.com", "strong-pass-123").await;
+    recover(&app, "davi@example.com").await;
     let token = link_token(&app.outbox.wait_for(1).await[0]);
 
-    // Senha fora das regras não consome o link.
-    let reply = verify(&app, &token, "curta").await;
+    // A password breaking the rules does not consume the link.
+    let reply = verify(&app, &token, "short").await;
     assert_eq!(reply.status, StatusCode::UNPROCESSABLE_ENTITY);
 
-    for bad in ["", "token-inventado", &"x".repeat(200)] {
-        let reply = verify(&app, bad, "senha-nova-456").await;
+    for bad in ["", "made-up-token", &"x".repeat(200)] {
+        let reply = verify(&app, bad, "new-pass-456").await;
         assert_eq!(reply.status, StatusCode::BAD_REQUEST, "{bad}");
     }
     let reply = app
         .post(
             "/auth/v1/verify",
             None,
-            json!({ "type": "signup", "token": token, "password": "senha-nova-456" }),
+            json!({ "type": "signup", "token": token, "password": "new-pass-456" }),
         )
         .await;
     assert_eq!(reply.body["code"], "unsupported_type");
@@ -490,26 +488,26 @@ async fn link_expirado_invalido_ou_senha_fraca() {
         )
         .await
         .unwrap();
-    let reply = verify(&app, &token, "senha-nova-456").await;
+    let reply = verify(&app, &token, "new-pass-456").await;
     assert_eq!(reply.status, StatusCode::BAD_REQUEST);
     assert_eq!(
-        login(&app, "davi@exemplo.com", "senha-forte-123")
+        login(&app, "davi@example.com", "strong-pass-123")
             .await
             .status,
         StatusCode::OK,
-        "a senha antiga continua valendo"
+        "the old password still works"
     );
 }
 
 #[tokio::test]
-async fn recuperacao_desligada_sem_smtp() {
+async fn recovery_disabled_without_smtp() {
     let app = TestApp::spawn_with(Options {
         mail: false,
         ..Options::default()
     })
     .await;
-    signup(&app, "eva@exemplo.com", "senha-forte-123").await;
-    let reply = recover(&app, "eva@exemplo.com").await;
+    signup(&app, "eva@example.com", "strong-pass-123").await;
+    let reply = recover(&app, "eva@example.com").await;
     assert_eq!(reply.status, StatusCode::FORBIDDEN);
     assert_eq!(reply.body["code"], "recovery_disabled");
 }

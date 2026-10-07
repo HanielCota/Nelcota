@@ -1,15 +1,15 @@
-//! API REST automática sobre o catálogo do Postgres, sempre executada sob RLS.
+//! Automatic REST API over the Postgres catalog, always executed under RLS.
 //!
-//! - `GET    /rest/v1/`                 OpenAPI (filtrado pela role)
-//! - `GET    /rest/v1/{tabela}`         leitura com filtros, ordem e paginação
-//! - `POST   /rest/v1/{tabela}`         inserção (objeto ou array)
-//! - `PATCH  /rest/v1/{tabela}?filtros` atualização
-//! - `DELETE /rest/v1/{tabela}?filtros` remoção
-//! - `POST   /rest/v1/rpc/{funcao}`     chamada de função SQL
+//! - `GET    /rest/v1/`                 OpenAPI (filtered by role)
+//! - `GET    /rest/v1/{table}`          read with filters, ordering and paging
+//! - `POST   /rest/v1/{table}`          insert (object or array)
+//! - `PATCH  /rest/v1/{table}?filters`  update
+//! - `DELETE /rest/v1/{table}?filters`  delete
+//! - `POST   /rest/v1/rpc/{function}`   SQL function call
 //!
-//! Cada request roda numa transação com a role e as claims do JWT
-//! (`nelcota_core::db::begin_request`). A API não decide permissão: quem
-//! decide é o Postgres (GRANTs + RLS).
+//! Each request runs in a transaction with the JWT role and claims
+//! (`nelcota_core::db::begin_request`). The API does not decide permissions:
+//! Postgres does (GRANTs + RLS).
 
 pub mod catalog;
 pub mod openapi;
@@ -36,7 +36,7 @@ use query::{QueryError, Sql};
 
 #[derive(Clone, Debug, Default)]
 pub struct ApiSettings {
-    /// Teto de linhas por leitura (`NELCOTA_MAX_ROWS`); `None` = sem teto.
+    /// Row cap per read (`NELCOTA_MAX_ROWS`); `None` = no cap.
     pub max_rows: Option<i64>,
 }
 
@@ -68,7 +68,7 @@ fn not_found(kind: &str, name: &str) -> ApiError {
     ApiError::new(
         StatusCode::NOT_FOUND,
         "not_found",
-        format!("{kind} '{name}' não existe no schema exposto"),
+        format!("{kind} '{name}' does not exist in the exposed schema"),
     )
 }
 
@@ -86,7 +86,7 @@ fn parse_body(bytes: &Bytes) -> Result<Value, ApiError> {
         ApiError::new(
             StatusCode::BAD_REQUEST,
             "invalid_body",
-            format!("JSON inválido: {e}"),
+            format!("invalid JSON: {e}"),
         )
     })
 }
@@ -132,7 +132,7 @@ fn json_response(status: StatusCode, body: String) -> Response {
     (status, [(header::CONTENT_TYPE, "application/json")], body).into_response()
 }
 
-/// Executa `run` numa transação com a role/claims do request.
+/// Runs the body in a transaction with the request role/claims.
 macro_rules! in_request_tx {
     ($pool:expr, $claims:expr, |$tx:ident| $body:block) => {{
         let role = $claims.role();
@@ -165,7 +165,7 @@ async fn read(
     let catalog = catalog.get();
     let table = catalog
         .table(&name)
-        .ok_or_else(|| not_found("tabela", &name))?;
+        .ok_or_else(|| not_found("table", &name))?;
     let request = query::parse_request(&pairs(raw), table).map_err(bad_query)?;
     let prefer = Prefer::from_headers(&headers);
     let sql = query::select(&catalog.schema, table, &request, settings.max_rows);
@@ -206,7 +206,7 @@ async fn read(
     Ok(response)
 }
 
-/// Resposta de uma escrita: representação (array JSON) ou só o status.
+/// Response of a write: the representation (JSON array) or just the status.
 async fn write(
     pool: &Pool,
     claims: &Claims,
@@ -236,11 +236,11 @@ async fn create(
     let catalog = catalog.get();
     let table = catalog
         .table(&name)
-        .ok_or_else(|| not_found("tabela", &name))?;
+        .ok_or_else(|| not_found("table", &name))?;
     let request = query::parse_request(&pairs(raw), table).map_err(bad_query)?;
     if !request.filters.is_empty() {
         return Err(bad_query(QueryError::Invalid(
-            "POST não aceita filtros".into(),
+            "POST does not accept filters".into(),
         )));
     }
     let prefer = Prefer::from_headers(&headers);
@@ -258,12 +258,13 @@ async fn create(
     .await
 }
 
-/// PATCH/DELETE exigem ao menos um filtro: evita apagar/alterar a tabela
-/// inteira por engano (para isso, use um filtro explícito como `id=not.is.null`).
+/// PATCH/DELETE require at least one filter: prevents deleting/changing the
+/// whole table by mistake (for that, use an explicit filter such as
+/// `id=not.is.null`).
 fn require_filters(request: &query::Request) -> Result<(), ApiError> {
     if request.filters.is_empty() {
         return Err(bad_query(QueryError::Invalid(
-            "informe ao menos um filtro (ex.: ?id=eq.1)".into(),
+            "provide at least one filter (e.g. ?id=eq.1)".into(),
         )));
     }
     Ok(())
@@ -281,7 +282,7 @@ async fn update(
     let catalog = catalog.get();
     let table = catalog
         .table(&name)
-        .ok_or_else(|| not_found("tabela", &name))?;
+        .ok_or_else(|| not_found("table", &name))?;
     let request = query::parse_request(&pairs(raw), table).map_err(bad_query)?;
     require_filters(&request)?;
     let prefer = Prefer::from_headers(&headers);
@@ -317,7 +318,7 @@ async fn remove(
     let catalog = catalog.get();
     let table = catalog
         .table(&name)
-        .ok_or_else(|| not_found("tabela", &name))?;
+        .ok_or_else(|| not_found("table", &name))?;
     let request = query::parse_request(&pairs(raw), table).map_err(bad_query)?;
     require_filters(&request)?;
     let prefer = Prefer::from_headers(&headers);
@@ -345,12 +346,12 @@ async fn rpc(
     let candidates = catalog
         .functions
         .get(&name)
-        .ok_or_else(|| not_found("função", &name))?;
+        .ok_or_else(|| not_found("function", &name))?;
     let Value::Object(args) = parse_body(&bytes)? else {
         return Err(ApiError::new(
             StatusCode::BAD_REQUEST,
             "invalid_body",
-            "os argumentos devem ser um objeto JSON",
+            "the arguments must be a JSON object",
         ));
     };
     let function = query::resolve_function(candidates, &args).map_err(bad_query)?;

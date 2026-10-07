@@ -1,9 +1,9 @@
-//! Autenticação: emissão e verificação de JWT, senhas, sessões e refresh
-//! tokens, e o extrator de claims para o axum.
+//! Authentication: JWT issuing and verification, passwords, sessions and
+//! refresh tokens, and the claims extractor for axum.
 //!
-//! A verificação fica atrás da trait [`JwtVerifier`] para que a origem dos
-//! tokens seja substituível (chaves locais hoje; um provedor OIDC externo
-//! depois). Este crate só AUTENTICA: autorização é exclusivamente do RLS.
+//! Verification sits behind the [`JwtVerifier`] trait so the token source can
+//! be swapped (local keys today; an external OIDC provider later). This crate
+//! only AUTHENTICATES: authorization belongs exclusively to RLS.
 
 mod credentials;
 mod handlers;
@@ -30,28 +30,28 @@ pub use rate_limit::RateLimiter;
 
 #[derive(Debug, thiserror::Error)]
 pub enum VerifyError {
-    #[error("token inválido: {0}")]
+    #[error("invalid token: {0}")]
     Token(#[from] jsonwebtoken::errors::Error),
-    #[error("algoritmo ou chave (kid) desconhecidos")]
+    #[error("unknown algorithm or key (kid)")]
     UnknownKey,
     #[error(transparent)]
     Claims(#[from] nelcota_core::InvalidClaims),
 }
 
-/// Valida um JWT (assinatura, expiração, formato das claims).
+/// Validates a JWT (signature, expiry, claims format).
 pub trait JwtVerifier: Send + Sync + 'static {
     fn verify(&self, token: &str) -> Result<Claims, VerifyError>;
 }
 
-/// Verificador compartilhado no estado do axum.
+/// Verifier shared in the axum state.
 pub type SharedVerifier = Arc<dyn JwtVerifier>;
 
-/// Extrator das claims do request.
+/// Extractor of the request claims.
 ///
-/// - sem `Authorization`: request `anon`;
-/// - `Authorization: Bearer <jwt>` válido: as claims do token;
-/// - qualquer outra coisa (token inválido, expirado, role desconhecida,
-///   esquema diferente de Bearer): 401. Nunca cai silenciosamente para `anon`.
+/// - no `Authorization`: an `anon` request;
+/// - a valid `Authorization: Bearer <jwt>`: the token's claims;
+/// - anything else (invalid or expired token, unknown role, a scheme other
+///   than Bearer): 401. Never silently falls back to `anon`.
 pub struct Auth(pub Claims);
 
 impl<S> FromRequestParts<S> for Auth
@@ -77,8 +77,8 @@ where
         match verifier.verify(token) {
             Ok(claims) => Ok(Auth(claims)),
             Err(err) => {
-                // O token em si nunca é logado.
-                tracing::debug!(error = %err, "JWT rejeitado");
+                // The token itself is never logged.
+                tracing::debug!(error = %err, "JWT rejected");
                 Err(ApiError::invalid_token())
             }
         }

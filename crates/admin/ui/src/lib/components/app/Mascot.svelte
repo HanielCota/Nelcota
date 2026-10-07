@@ -18,7 +18,7 @@
     class: className = '',
   }: {
     pose?: Pose
-    /** Ponto da tela para onde olhar (ex.: o texto sendo digitado); sem ele, segue o ponteiro. */
+    /** Screen point to look at (e.g. the text being typed); without it, follows the pointer. */
     lookAt?: Point | null
     class?: string
   } = $props()
@@ -27,14 +27,14 @@
 
   let root = $state<HTMLDivElement>()
   let pointer = $state<Point | null>(null)
-  // Direção atual de cada olho, suavizada a cada quadro.
+  // Current direction of each eye, smoothed every frame.
   let gaze = $state<Point[]>(ahead())
 
   const target = $derived(lookAt ?? pointer)
   const open = $derived(pose !== 'eyesClosed')
   const reduced = matchMedia('(prefers-reduced-motion: reduce)')
 
-  // Anima só enquanto o olhar não chegou ao alvo; parado, não gasta quadros.
+  // Animates only until the gaze reaches its target; at rest it spends no frames.
   let frame = 0
   function tick() {
     frame = 0
@@ -55,7 +55,7 @@
   function onMove(e: PointerEvent) {
     pointer = { x: e.clientX, y: e.clientY }
   }
-  // Ponteiro saiu da janela: volta a olhar para a frente.
+  // Pointer left the window: look straight ahead again.
   function onLeave(e: MouseEvent) {
     if (!e.relatedTarget) pointer = null
   }
@@ -64,14 +64,14 @@
 <svelte:window onpointermove={onMove} />
 <svelte:document onmouseout={onLeave} />
 
-<!-- cn: quem usa pode trocar o `relative` por `absolute` sem conflito de classes. -->
+<!-- cn: callers can swap `relative` for `absolute` without a class conflict. -->
 <div bind:this={root} class={cn('relative select-none', className)} aria-hidden="true">
-  <!-- Todas as poses ficam carregadas: trocar de expressão não pisca. -->
+  <!-- Every pose stays loaded: switching expressions never flickers. -->
   {#each Object.entries(frames) as [name, src] (name)}
     <img {src} alt="" draggable="false" class={['absolute inset-0 size-full', pose !== name && 'invisible']} />
   {/each}
 
-  <!-- Olhos vetoriais por cima dos do desenho: só a pupila se move. -->
+  <!-- Vector eyes over the drawn ones: only the pupil moves. -->
   {#if open}
     <svg viewBox="0 0 {FRAME_SIZE} {FRAME_SIZE}" class="absolute inset-0 size-full">
       {#each EYES as eye, i (i)}

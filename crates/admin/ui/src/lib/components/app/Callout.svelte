@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte'
 
-  // Aviso em bloco, para alertas que pedem atenção (segurança, perda de dados).
+  // Block notice for alerts that need attention (security, data loss).
   let {
     variant = 'warning',
     title,

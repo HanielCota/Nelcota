@@ -14,8 +14,8 @@ const col = (
   is_pk: extra.is_pk ?? false,
 })
 
-describe('categoria da coluna', () => {
-  it('pelo tipo do Postgres (nome do format_type)', () => {
+describe('column kind', () => {
+  it('from the Postgres type (format_type name)', () => {
     expect(columnKind(col('a', 'numeric'))).toBe('number')
     expect(columnKind(col('a', 'bigint'))).toBe('number')
     expect(columnKind(col('a', 'boolean'))).toBe('boolean')
@@ -26,31 +26,31 @@ describe('categoria da coluna', () => {
     expect(columnKind(col('a', 'character varying'))).toBe('text')
   })
 
-  it('enum vem antes do tipo', () => {
-    expect(columnKind(col('a', 'status_pedido', { enum_values: ['aberto', 'pago'] }))).toBe('enum')
+  it('enum wins over the type', () => {
+    expect(columnKind(col('a', 'order_status', { enum_values: ['open', 'paid'] }))).toBe('enum')
   })
 })
 
-describe('largura e alinhamento', () => {
-  it('largura por tipo, sem cortar o nome no cabeçalho', () => {
-    // PK numérica é estreita, mas com espaço para o nome, o tipo e o menu da coluna.
+describe('width and alignment', () => {
+  it('width by type, without clipping the name in the header', () => {
+    // A numeric PK is narrow, but leaves room for the name, the type and the column menu.
     const id = columnWidth(col('id', 'bigint', { is_pk: true }))
     expect(id).toBeGreaterThanOrEqual(Math.ceil('bigint'.length * 6.8 + 72))
-    expect(id).toBeLessThan(columnWidth(col('descricao', 'text')))
-    expect(columnWidth(col('feito', 'boolean'))).toBeGreaterThanOrEqual(104)
-    expect(columnWidth(col('um_nome_de_coluna_bem_comprido', 'boolean'))).toBeGreaterThan(104)
+    expect(id).toBeLessThan(columnWidth(col('description', 'text')))
+    expect(columnWidth(col('done', 'boolean'))).toBeGreaterThanOrEqual(104)
+    expect(columnWidth(col('a_rather_long_column_name', 'boolean'))).toBeGreaterThan(104)
     expect(columnWidth(col('x'.repeat(80), 'text'))).toBe(420)
   })
 
-  it('a linha do tipo também cabe (tipo completo e tabela da chave estrangeira)', () => {
-    const fk = col('cliente_id', 'bigint', { references: { table: 'clientes', column: 'id' } })
-    expect(columnWidth(fk)).toBeGreaterThanOrEqual(Math.ceil('bigint → clientes'.length * 6.8 + 72))
+  it('the type line fits too (full type and the foreign key table)', () => {
+    const fk = col('customer_id', 'bigint', { references: { table: 'customers', column: 'id' } })
+    expect(columnWidth(fk)).toBeGreaterThanOrEqual(Math.ceil('bigint → customers'.length * 6.8 + 72))
     const numeric = col('total', 'numeric', { full_type: 'numeric(10,2)' })
     expect(columnWidth(numeric)).toBeGreaterThanOrEqual(Math.ceil('numeric(10,2)'.length * 6.8 + 72))
-    expect(columnWidth(col('criado_em', 'timestamp with time zone'))).toBeGreaterThanOrEqual(188)
+    expect(columnWidth(col('created_at', 'timestamp with time zone'))).toBeGreaterThanOrEqual(188)
   })
 
-  it('números à direita e em mono; texto em fonte normal', () => {
+  it('numbers right-aligned and mono; text in the regular font', () => {
     expect(alignRight('number')).toBe(true)
     expect(alignRight('text')).toBe(false)
     expect(monospace('number')).toBe(true)
@@ -59,46 +59,46 @@ describe('largura e alinhamento', () => {
   })
 })
 
-describe('paginação', () => {
-  it('faixa e total de páginas com total exato', () => {
+describe('pagination', () => {
+  it('range and page count with an exact total', () => {
     expect(pageInfo(0, 50, 40, 40, true)).toEqual({ from: 1, to: 40, lastPage: 0, pageCount: 1 })
     expect(pageInfo(2, 25, 25, 120, true)).toEqual({ from: 51, to: 75, lastPage: 4, pageCount: 5 })
   })
 
-  it('total estimado ou desconhecido não arrisca a última página', () => {
+  it('an estimated or unknown total does not guess the last page', () => {
     expect(pageInfo(1, 50, 50, 12000, false)).toEqual({ from: 51, to: 100, lastPage: null, pageCount: null })
     expect(pageInfo(0, 50, 10, null, false).lastPage).toBeNull()
   })
 
-  it('sem linhas', () => {
+  it('no rows', () => {
     expect(pageInfo(0, 50, 0, 0, true)).toEqual({ from: 0, to: 0, lastPage: 0, pageCount: 1 })
   })
 })
 
-describe('navegação por teclado', () => {
+describe('keyboard navigation', () => {
   const at = (row: number, col: number) => ({ row, col })
 
-  it('setas movem uma célula e param nas bordas', () => {
+  it('arrows move one cell and stop at the edges', () => {
     expect(nextCell('ArrowDown', at(0, 0), 5, 3)).toEqual(at(1, 0))
     expect(nextCell('ArrowRight', at(0, 2), 5, 3)).toEqual(at(0, 2))
     expect(nextCell('ArrowUp', at(0, 1), 5, 3)).toEqual(at(0, 1))
     expect(nextCell('ArrowLeft', at(3, 0), 5, 3)).toEqual(at(3, 0))
   })
 
-  it('Home/End na linha; com Ctrl, primeira/última célula', () => {
+  it('Home/End within the row; with Ctrl, first/last cell', () => {
     expect(nextCell('Home', at(2, 2), 5, 3)).toEqual(at(2, 0))
     expect(nextCell('End', at(2, 0), 5, 3)).toEqual(at(2, 2))
     expect(nextCell('Home', at(4, 2), 5, 3, true)).toEqual(at(0, 0))
     expect(nextCell('End', at(0, 0), 5, 3, true)).toEqual(at(4, 2))
   })
 
-  it('PageUp/PageDown pulam 10 linhas sem passar do limite', () => {
+  it('PageUp/PageDown jump 10 rows without going past the edge', () => {
     expect(nextCell('PageDown', at(0, 1), 25, 3)).toEqual(at(10, 1))
     expect(nextCell('PageDown', at(20, 1), 25, 3)).toEqual(at(24, 1))
     expect(nextCell('PageUp', at(5, 1), 25, 3)).toEqual(at(0, 1))
   })
 
-  it('outras teclas e grade vazia não movem', () => {
+  it('other keys and an empty grid do not move', () => {
     expect(nextCell('a', at(0, 0), 5, 3)).toBeNull()
     expect(nextCell('ArrowDown', at(0, 0), 0, 3)).toBeNull()
   })

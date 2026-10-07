@@ -5,7 +5,7 @@
   let { value, type, kind }: { value: string | null; type: string; kind: ColumnKind } = $props()
 
   const display = $derived(value === null ? null : formatCell(value, type))
-  /** JSON numa linha só: a célula mostra o começo; o valor inteiro fica no tooltip. */
+  /** JSON on a single line: the cell shows the start; the whole value is in the tooltip. */
   const compactJson = (text: string) => {
     try {
       return JSON.stringify(JSON.parse(text))
@@ -15,7 +15,7 @@
   }
 </script>
 
-<!-- Só exibição; a edição e o tooltip usam o valor exato. -->
+<!-- Display only; editing and the tooltip use the exact value. -->
 <span
   class={[
     'block truncate',

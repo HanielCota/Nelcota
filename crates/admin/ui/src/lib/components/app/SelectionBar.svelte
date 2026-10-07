@@ -8,6 +8,7 @@
   import { toast } from 'svelte-sonner'
   import { downloadText, toCsv, toJson } from '$lib/download'
   import type { RowData } from '$lib/types'
+  import { t } from '$lib/i18n/index.svelte'
 
   let {
     table,
@@ -19,7 +20,7 @@
   }: {
     table: string
     columns: string[]
-    /** Linhas selecionadas, na ordem da grade. */
+    /** Selected rows, in grid order. */
     rows: RowData[]
     deletable: boolean
     onclear: () => void
@@ -27,34 +28,34 @@
   } = $props()
 
   const matrix = $derived(rows.map((row) => columns.map((c) => row[c] ?? null)))
-  const label = $derived(`${rows.length} ${rows.length === 1 ? 'linha selecionada' : 'linhas selecionadas'}`)
+  const label = $derived(t('tables.selection.selected', { count: rows.length }))
 
   async function copyJson() {
     await navigator.clipboard.writeText(toJson(columns, matrix))
-    toast.success(`${label.replace('selecionada', 'copiada')} como JSON`)
+    toast.success(t('tables.toast.rowsCopied', { count: rows.length }))
   }
 
   function exportAs(format: 'csv' | 'json') {
-    const name = `${table.replace(/[^\w-]+/g, '_')}-selecao.${format}`
+    const name = `${table.replace(/[^\w-]+/g, '_')}-${t('tables.selection.fileSuffix')}.${format}`
     if (format === 'csv') downloadText(name, toCsv(columns, matrix), 'text/csv;charset=utf-8')
     else downloadText(name, toJson(columns, matrix), 'application/json')
   }
 </script>
 
-<!-- Ações sobre a seleção; aparece só com linhas marcadas. -->
+<!-- Actions on the selection; only shown with ticked rows. -->
 <div
   class="flex min-h-12 shrink-0 flex-wrap items-center gap-2 border-b border-brand/20 bg-brand/5 px-4 py-2 text-sm"
   role="region"
-  aria-label="Linhas selecionadas"
+  aria-label={t('tables.selection.region')}
 >
   <span class="font-medium text-foreground" aria-live="polite">{label}</span>
-  <span class="text-muted-foreground">nesta página</span>
+  <span class="text-muted-foreground">{t('tables.selection.onPage')}</span>
   <div class="ml-auto flex flex-wrap items-center gap-2">
-    <Button variant="ghost" size="sm" onclick={copyJson}><Copy />Copiar JSON</Button>
+    <Button variant="ghost" size="sm" onclick={copyJson}><Copy />{t('tables.selection.copyJson')}</Button>
     <DropdownMenu.Root>
       <DropdownMenu.Trigger>
         {#snippet child({ props })}
-          <Button variant="ghost" size="sm" {...props}><Download />Exportar seleção</Button>
+          <Button variant="ghost" size="sm" {...props}><Download />{t('tables.selection.exportSelection')}</Button>
         {/snippet}
       </DropdownMenu.Trigger>
       <DropdownMenu.Content align="end" class="w-40">
@@ -63,8 +64,8 @@
       </DropdownMenu.Content>
     </DropdownMenu.Root>
     {#if deletable}
-      <Button variant="destructive" size="sm" onclick={ondelete}><Trash2 />Apagar</Button>
+      <Button variant="destructive" size="sm" onclick={ondelete}><Trash2 />{t('tables.selection.delete')}</Button>
     {/if}
-    <Button variant="ghost" size="icon-sm" aria-label="Limpar seleção" title="Limpar seleção (Esc)" onclick={onclear}><X /></Button>
+    <Button variant="ghost" size="icon-sm" aria-label={t('tables.selection.clear')} title={t('tables.selection.clearTitle')} onclick={onclear}><X /></Button>
   </div>
 </div>

@@ -8,6 +8,7 @@
   import GridColumnHeader from './GridColumnHeader.svelte'
   import { alignRight, columnKind, columnWidth, monospace, nextCell, type CellPos } from '$lib/grid'
   import type { Column, RowData, TableData } from '$lib/types'
+  import { t } from '$lib/i18n/index.svelte'
 
   let {
     data,
@@ -24,7 +25,7 @@
   }: {
     data: TableData
     sort: { column: string; desc: boolean } | null
-    /** Colunas ocultas pelo usuário. */
+    /** Columns the user hid. */
     hidden: string[]
     selected: Set<number>
     onsort: (column: string) => void
@@ -32,7 +33,7 @@
     onfilter: (column: string) => void
     onhide: (column: string) => void
     onexpand: (row: RowData) => void
-    /** Salva uma célula; resolve depois de gravar (ou rejeita com o erro já avisado). */
+    /** Saves a cell; resolves once stored (or rejects with the error already shown). */
     oncommit: (row: number, column: string, value: string | null) => Promise<void>
     referenceHref: (column: Column, value: string) => string
   } = $props()
@@ -44,18 +45,18 @@
   )
   const editable = $derived(data.table.editable)
 
-  // Edição inline: célula (linha, coluna) em edição e o rascunho.
+  // Inline editing: the cell (row, column) being edited and the draft.
   let editing = $state<{ row: number; column: string } | null>(null)
   let draft = $state('')
 
-  // Navegação por teclado (padrão "grid" do WAI-ARIA): uma célula ativa por
-  // vez recebe o foco (roving tabindex); Tab entra e sai da grade inteira.
+  // Keyboard navigation (WAI-ARIA "grid" pattern): one active cell at a time
+  // takes focus (roving tabindex); Tab enters and leaves the whole grid.
   let active = $state<CellPos>({ row: 0, col: 0 })
   let tableEl = $state<HTMLTableElement>()
 
-  // Página, filtro ou colunas mudaram: a célula ativa volta para dentro dos
-  // limites. Só atribui quando muda de fato: com 0 linhas a posição limitada
-  // é a mesma, e reatribuir um objeto novo reexecutaria este efeito sem fim.
+  // Page, filter or columns changed: the active cell moves back within
+  // bounds. Only assign on a real change: with 0 rows the clamped position is
+  // the same, and assigning a new object would rerun this effect forever.
   $effect(() => {
     const row = Math.min(active.row, Math.max(data.rows.length - 1, 0))
     const col = Math.min(active.col, Math.max(columns.length - 1, 0))
@@ -105,7 +106,7 @@
 
   async function copyCell(value: string | null) {
     await navigator.clipboard.writeText(value ?? '')
-    toast.success(value === null ? 'Célula vazia (NULL) copiada' : 'Valor copiado')
+    toast.success(value === null ? t('tables.toast.nullCopied') : t('tables.toast.valueCopied'))
   }
 
   function onCellKey(event: KeyboardEvent, row: number, col: number) {
@@ -145,17 +146,17 @@
 
   const sortOf = (name: string) => (sort?.column === name ? (sort.desc ? 'desc' : 'asc') : null)
 
-  // Coluna fixa à esquerda (seleção + expandir): fundo opaco para o conteúdo
-  // que rola por baixo não aparecer através dela.
+  // Column pinned to the left (selection + expand): opaque background so the
+  // content scrolling underneath does not show through.
   const stickyCell = 'sticky left-0 z-[1] border-r border-b bg-background'
 </script>
 
-<!-- table-layout fixed + larguras por coluna: editar uma célula não faz as
-     outras colunas mudarem de tamanho. A última coluna, sem largura, preenche. -->
+<!-- table-layout fixed + per-column widths: editing a cell does not resize
+     the other columns. The last column, without a width, fills the rest. -->
 <table
   bind:this={tableEl}
   role="grid"
-  aria-label={`Linhas de ${data.table.name}`}
+  aria-label={t('tables.grid.label', { table: data.table.name })}
   aria-multiselectable={editable}
   class="w-max min-w-full table-fixed border-separate border-spacing-0 text-xs"
 >
@@ -172,7 +173,7 @@
             checked={selected.size > 0 && selected.size === data.rows.length}
             indeterminate={selected.size > 0 && selected.size < data.rows.length}
             onCheckedChange={(v) => toggleAll(v === true)}
-            aria-label="Selecionar todas as linhas da página"
+            aria-label={t('tables.grid.selectAll')}
           />
         </th>
       {/if}
@@ -199,12 +200,12 @@
         {#if editable}
           <td role="gridcell" class={[stickyCell, 'px-3.5 py-2', isSelected ? 'bg-[color-mix(in_oklch,var(--brand)_7%,var(--background))]' : 'group-hover:bg-[color-mix(in_oklch,var(--muted)_60%,var(--background))]']}>
             <div class="flex items-center gap-2">
-              <Checkbox checked={isSelected} onCheckedChange={(v) => toggleRow(i, v === true)} aria-label={`Selecionar linha ${i + 1}`} />
+              <Checkbox checked={isSelected} onCheckedChange={(v) => toggleRow(i, v === true)} aria-label={t('tables.grid.selectRow', { n: i + 1 })} />
               <button
                 type="button"
                 class="grid size-7 cursor-pointer place-items-center rounded-md text-muted-foreground transition-opacity hover:bg-accent hover:text-foreground focus-visible:opacity-100 md:opacity-0 md:group-hover:opacity-100"
-                aria-label={`Expandir linha ${i + 1}`}
-                title="Ver e editar a linha inteira"
+                aria-label={t('tables.grid.expandRow', { n: i + 1 })}
+                title={t('tables.grid.expandTitle')}
                 onclick={() => onexpand(row)}
               >
                 <Maximize2 class="size-3.5" />
@@ -239,7 +240,7 @@
                   bind:value={draft}
                   onkeydown={onEditorKey}
                   onblur={() => (editing = null)}
-                  aria-label={`Editar ${column.name}`}
+                  aria-label={t('tables.grid.edit', { column: column.name })}
                 />
                 {#if column.nullable}
                   <button
@@ -258,8 +259,8 @@
                   <a
                     href={referenceHref(column, value)}
                     class="grid size-6 shrink-0 place-items-center rounded-md text-muted-foreground opacity-0 group-hover/cell:opacity-100 hover:bg-accent hover:text-brand focus-visible:opacity-100"
-                    title={`Abrir em ${column.references.table}`}
-                    aria-label={`Abrir linha referenciada em ${column.references.table}`}
+                    title={t('tables.grid.openIn', { table: column.references.table })}
+                    aria-label={t('tables.grid.openReferenced', { table: column.references.table })}
                     ondblclick={(e) => e.stopPropagation()}
                   >
                     <ArrowUpRight class="size-3.5" />
