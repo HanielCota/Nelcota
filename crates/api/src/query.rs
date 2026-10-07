@@ -107,7 +107,9 @@ impl Select {
 /// `(related column, this table's column)` pairs of a foreign key, ANDed.
 pub type JoinPairs = Vec<(String, String)>;
 
-/// A related table embedded through a foreign key (`customers(name)`).
+/// A related table embedded through a foreign key (`customers(name)`), with
+/// its own columns, nested embeds and, through `items.qty=gt.1`-style
+/// parameters, its own filters, ordering and paging.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Embed {
     /// Key of the embedded value in the JSON (the table name or `alias:`).
@@ -118,12 +120,19 @@ pub struct Embed {
     /// `false` when this table points there (many-to-one, an object or null).
     pub many: bool,
     pub join: JoinPairs,
-    pub star: bool,
-    pub columns: Vec<String>,
+    pub select: Select,
+    /// Narrow the embedded rows only; the parent rows stay.
+    pub filters: Vec<Condition>,
+    pub order: Vec<OrderTerm>,
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
 }
 
 /// Longest identifier Postgres keeps (longer aliases would be cut silently).
 const MAX_IDENTIFIER_BYTES: usize = 63;
+/// Deepest embedding accepted (`a(b(c(d(*))))`): bounds the recursion and
+/// the correlated subqueries a single request can stack.
+const MAX_EMBED_DEPTH: usize = 4;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum CmpOp {
@@ -167,6 +176,8 @@ enum Op {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Filter {
     column: String,
+    /// The column's type, for the parameter cast.
+    type_name: String,
     negate: bool,
     op: Op,
 }
@@ -285,10 +296,12 @@ fn column<'a>(table: &'a Table, name: &str) -> Result<&'a Column, QueryError> {
 
 /// `*`, columns and embedded relations: `id,total,customers(name),items(*)`.
 /// Relations need the catalog; without it (the panel), they are refused.
+/// `depth` is how many embeds this select sits inside.
 fn parse_select(
     value: &str,
     table: &Table,
     catalog: Option<&Catalog>,
+    depth: usize,
 ) -> Result<Select, QueryError> {
     let mut select = Select {
         star: false,
@@ -305,7 +318,9 @@ fn parse_select(
             let Some(catalog) = catalog else {
                 return Err(invalid("embedding relations is not available here"));
             };
-            select.embeds.push(parse_embed(item, table, catalog)?);
+            select
+                .embeds
+                .push(parse_embed(item, table, catalog, depth + 1)?);
         } else if item.contains(':') {
             return Err(invalid(format!(
                 "column aliases are not supported: '{item}'"
@@ -331,16 +346,24 @@ fn parse_select(
     Ok(select)
 }
 
-/// `[alias:]table[!hint](columns)`, one level deep. The hint picks among
-/// several foreign keys: the key's column or the constraint name.
-fn parse_embed(item: &str, parent: &Table, catalog: &Catalog) -> Result<Embed, QueryError> {
+/// `[alias:]table[!hint](select)`, where `select` may embed again, at most
+/// [`MAX_EMBED_DEPTH`] levels. The hint picks among several foreign keys:
+/// the key's column or the constraint name.
+fn parse_embed(
+    item: &str,
+    parent: &Table,
+    catalog: &Catalog,
+    depth: usize,
+) -> Result<Embed, QueryError> {
+    if depth > MAX_EMBED_DEPTH {
+        return Err(invalid(format!(
+            "embeds nested too deep (at most {MAX_EMBED_DEPTH} levels)"
+        )));
+    }
     let open = item.find('(').unwrap_or_default();
     let inner = item[open + 1..]
         .strip_suffix(')')
         .ok_or_else(|| invalid(format!("malformed embed: '{item}'")))?;
-    if inner.contains('(') {
-        return Err(invalid("only one level of embedding is supported"));
-    }
     let head = item[..open].trim();
     let (alias, rest) = match head.split_once(':') {
         Some((alias, rest)) => (Some(alias.trim()), rest.trim()),
@@ -360,28 +383,76 @@ fn parse_embed(item: &str, parent: &Table, catalog: &Catalog) -> Result<Embed, Q
         return Err(invalid(format!("invalid embed alias: '{alias}'")));
     }
     let (many, join) = resolve_relation(&catalog.schema, parent, target, hint)?;
-
-    let mut embed = Embed {
+    if inner.trim().is_empty() {
+        return Err(invalid(format!("empty column list in '{item}'")));
+    }
+    Ok(Embed {
         alias: alias.to_owned(),
         table: target.name.clone(),
         many,
         join,
-        star: false,
-        columns: Vec::new(),
-    };
-    for col in inner.split(',').map(str::trim) {
-        match col {
-            "" => return Err(invalid(format!("empty column list in '{item}'"))),
-            "*" => embed.star = true,
-            _ if col.contains(':') => {
-                return Err(invalid(format!(
-                    "column aliases are not supported: '{col}'"
-                )));
-            }
-            _ => embed.columns.push(column(target, col)?.name.clone()),
-        }
+        select: parse_select(inner, target, Some(catalog), depth)?,
+        filters: Vec::new(),
+        order: Vec::new(),
+        limit: None,
+        offset: None,
+    })
+}
+
+/// The embed a dotted parameter addresses (`items.qty`, `customers.addresses.order`)
+/// and the parameter left for it (`qty`, `order`); `None` when the key does
+/// not start with an embed's key.
+fn embedded_param<'s, 'k>(
+    select: &'s mut Select,
+    key: &'k str,
+) -> Option<(&'s mut Embed, &'k str)> {
+    let (head, rest) = key.split_once('.')?;
+    let embed = select.embeds.iter_mut().find(|e| e.alias == head)?;
+    // A deeper embed takes the parameter when the rest names one; the
+    // check runs first so the borrow of `embed` ends on the way back.
+    let deeper = rest
+        .split_once('.')
+        .is_some_and(|(next, _)| embed.select.embeds.iter().any(|e| e.alias == next));
+    if deeper {
+        embedded_param(&mut embed.select, rest)
+    } else {
+        Some((embed, rest))
     }
-    Ok(embed)
+}
+
+/// A filter, logic tree, `order`, `limit` or `offset` aimed at an embed.
+fn parse_embedded_param(
+    embed: &mut Embed,
+    key: &str,
+    value: &str,
+    catalog: &Catalog,
+) -> Result<(), QueryError> {
+    let table = catalog
+        .table(&embed.table)
+        .expect("embedded table resolved while parsing select");
+    let paging = matches!(key, "order" | "limit" | "offset");
+    if paging && !embed.many {
+        return Err(invalid(format!(
+            "'{}' is a single row: {key} only applies to embedded arrays",
+            embed.alias
+        )));
+    }
+    match key {
+        "order" => embed.order = parse_order(value, table)?,
+        "limit" => embed.limit = Some(parse_non_negative("limit", value)?),
+        "offset" => embed.offset = Some(parse_non_negative("offset", value)?),
+        "or" | "and" | "not.or" | "not.and" => embed.filters.push(parse_logic(table, key, value)?),
+        "select" | "on_conflict" => {
+            return Err(invalid(format!(
+                "{key} cannot be set on an embed: write it inside {}(...)",
+                embed.alias
+            )));
+        }
+        _ => embed
+            .filters
+            .push(Condition::Filter(parse_filter(table, key, value)?)),
+    }
+    Ok(())
 }
 
 /// The foreign key linking `parent` and `target`, in either direction.
@@ -568,6 +639,7 @@ fn parse_filter(table: &Table, key: &str, value: &str) -> Result<Filter, QueryEr
     };
     Ok(Filter {
         column: col.name.clone(),
+        type_name: col.type_name.clone(),
         negate,
         op,
     })
@@ -763,9 +835,20 @@ fn parse(
         offset: None,
         on_conflict: None,
     };
+    // `select` first: it defines the embeds that dotted parameters address,
+    // wherever it sits in the query string.
+    for (_, value) in pairs.iter().filter(|(key, _)| key == "select") {
+        request.select = parse_select(value, table, catalog, 0)?;
+    }
     for (key, value) in pairs {
+        if let Some(catalog) = catalog
+            && let Some((embed, rest)) = embedded_param(&mut request.select, key)
+        {
+            parse_embedded_param(embed, rest, value, catalog)?;
+            continue;
+        }
         match key.as_str() {
-            "select" => request.select = parse_select(value, table, catalog)?,
+            "select" => {}
             "order" => request.order = parse_order(value, table)?,
             "limit" => request.limit = Some(parse_non_negative("limit", value)?),
             "offset" => request.offset = Some(parse_non_negative("offset", value)?),
@@ -789,7 +872,9 @@ fn qualified(schema: &str, table: &Table) -> String {
     format!("{}.{}", ident(schema), ident(&table.name))
 }
 
-fn select_list(schema: &str, select: &Select, alias: &str) -> String {
+/// The select list over the row aliased `alias`. `path` numbers the embeds
+/// so nested subqueries get distinct aliases (`_e0`, `_e0_1`...).
+fn select_list(sql: &mut Sql, schema: &str, select: &Select, alias: &str, path: &str) -> String {
     let mut parts: Vec<String> = Vec::new();
     if select.star {
         parts.push(format!("{alias}.*"));
@@ -800,39 +885,43 @@ fn select_list(schema: &str, select: &Select, alias: &str) -> String {
             .iter()
             .map(|c| format!("{alias}.{}", ident(c))),
     );
-    parts.extend(
-        select
-            .embeds
-            .iter()
-            .enumerate()
-            .map(|(n, embed)| embed_sql(schema, embed, alias, n)),
-    );
+    for (n, embed) in select.embeds.iter().enumerate() {
+        let path = if path.is_empty() {
+            n.to_string()
+        } else {
+            format!("{path}_{n}")
+        };
+        parts.push(embed_sql(sql, schema, embed, alias, &path));
+    }
     parts.join(", ")
 }
 
 /// Correlated subquery for one embedded relation: an object (or null) for
 /// many-to-one, an array for one-to-many. It runs with the request's role,
 /// so the related table's RLS filters what comes back.
-fn embed_sql(schema: &str, embed: &Embed, parent: &str, n: usize) -> String {
-    let row = format!("_e{n}");
-    let json = format!("_j{n}");
-    let mut columns: Vec<String> = Vec::new();
-    if embed.star {
-        columns.push(format!("{row}.*"));
-    }
-    columns.extend(embed.columns.iter().map(|c| format!("{row}.{}", ident(c))));
-    let join = embed
+fn embed_sql(sql: &mut Sql, schema: &str, embed: &Embed, parent: &str, path: &str) -> String {
+    let row = format!("_e{path}");
+    let json = format!("_j{path}");
+    let columns = select_list(sql, schema, &embed.select, &row, path);
+    let mut conditions: Vec<String> = embed
         .join
         .iter()
         .map(|(related, own)| format!("{row}.{} = {parent}.{}", ident(related), ident(own)))
-        .collect::<Vec<_>>()
-        .join(" AND ");
-    let rows = format!(
-        "SELECT {} FROM {}.{} AS {row} WHERE {join}",
-        columns.join(", "),
+        .collect();
+    conditions.extend(
+        embed
+            .filters
+            .iter()
+            .map(|condition| condition_sql(sql, &row, condition)),
+    );
+    let mut rows = format!(
+        "SELECT {columns} FROM {}.{} AS {row} WHERE {}{}",
         ident(schema),
         ident(&embed.table),
+        conditions.join(" AND "),
+        order_clause(&row, &embed.order),
     );
+    rows.push_str(&paging(sql, embed.limit, embed.offset));
     let value = if embed.many {
         format!("(SELECT coalesce(json_agg({json}), '[]') FROM ({rows}) AS {json})")
     } else {
@@ -851,26 +940,28 @@ fn array_literal(items: &[String]) -> String {
     format!("{{{}}}", escaped.join(","))
 }
 
-fn where_clause(sql: &mut Sql, table: &Table, filters: &[Condition]) -> String {
+/// Filters on the row aliased `_t` (the request's own table).
+fn where_clause(sql: &mut Sql, filters: &[Condition]) -> String {
     if filters.is_empty() {
         return String::new();
     }
     let conditions: Vec<String> = filters
         .iter()
-        .map(|condition| condition_sql(sql, table, condition))
+        .map(|condition| condition_sql(sql, "_t", condition))
         .collect();
     format!(" WHERE {}", conditions.join(" AND "))
 }
 
-/// A tree node: groups become `(a OR b)` / `(a AND b)`, each wrapped so the
-/// precedence never depends on what surrounds it.
-fn condition_sql(sql: &mut Sql, table: &Table, condition: &Condition) -> String {
+/// A tree node on the row aliased `alias`: groups become `(a OR b)` /
+/// `(a AND b)`, each wrapped so the precedence never depends on what
+/// surrounds it.
+fn condition_sql(sql: &mut Sql, alias: &str, condition: &Condition) -> String {
     match condition {
-        Condition::Filter(filter) => filter_sql(sql, table, filter),
+        Condition::Filter(filter) => filter_sql(sql, alias, filter),
         Condition::Group { any, negate, items } => {
             let parts: Vec<String> = items
                 .iter()
-                .map(|item| condition_sql(sql, table, item))
+                .map(|item| condition_sql(sql, alias, item))
                 .collect();
             let joined = format!("({})", parts.join(if *any { " OR " } else { " AND " }));
             if *negate {
@@ -882,15 +973,13 @@ fn condition_sql(sql: &mut Sql, table: &Table, condition: &Condition) -> String 
     }
 }
 
-fn filter_sql(sql: &mut Sql, table: &Table, filter: &Filter) -> String {
-    let col = table
-        .column(&filter.column)
-        .expect("column validated while parsing");
-    let target = format!("_t.{}", ident(&col.name));
+fn filter_sql(sql: &mut Sql, alias: &str, filter: &Filter) -> String {
+    let target = format!("{alias}.{}", ident(&filter.column));
+    let type_name = &filter.type_name;
     let condition = match &filter.op {
         Op::Cmp(op, value) => {
             let p = sql.param(Param::Text(value.clone()));
-            format!("{target} {} {p}::text::{}", op.sql(), col.type_name)
+            format!("{target} {} {p}::text::{type_name}", op.sql())
         }
         Op::Like {
             insensitive,
@@ -903,7 +992,7 @@ fn filter_sql(sql: &mut Sql, table: &Table, filter: &Filter) -> String {
         Op::In(items) if items.is_empty() => "false".to_owned(),
         Op::In(items) => {
             let p = sql.param(Param::Text(array_literal(items)));
-            format!("{target} = ANY({p}::text::{}[])", col.type_name)
+            format!("{target} = ANY({p}::text::{type_name}[])")
         }
         Op::Is(value) => {
             let value = match value {
@@ -922,7 +1011,7 @@ fn filter_sql(sql: &mut Sql, table: &Table, filter: &Filter) -> String {
     }
 }
 
-fn order_clause(order: &[OrderTerm]) -> String {
+fn order_clause(alias: &str, order: &[OrderTerm]) -> String {
     if order.is_empty() {
         return String::new();
     }
@@ -930,7 +1019,7 @@ fn order_clause(order: &[OrderTerm]) -> String {
         .iter()
         .map(|o| {
             let mut term = format!(
-                "_t.{} {}",
+                "{alias}.{} {}",
                 ident(&o.column),
                 if o.desc { "DESC" } else { "ASC" }
             );
@@ -970,31 +1059,38 @@ fn rows_subquery(
     request: &Request,
     max_rows: Option<i64>,
 ) -> String {
-    let filters = where_clause(sql, table, &request.filters);
-    let mut tail = order_clause(&request.order);
+    let columns = select_list(sql, schema, &request.select, "_t", "");
+    let filters = where_clause(sql, &request.filters);
+    let order = order_clause("_t", &request.order);
     let limit = match (request.limit, max_rows) {
         (Some(l), Some(m)) => Some(l.min(m)),
         (l, m) => l.or(m),
     };
+    let paging = paging(sql, limit, request.offset);
+    format!(
+        "SELECT {columns} FROM {} AS _t{filters}{order}{paging}",
+        qualified(schema, table),
+    )
+}
+
+/// ` LIMIT $n OFFSET $m`, as far as each is set.
+fn paging(sql: &mut Sql, limit: Option<i64>, offset: Option<i64>) -> String {
+    let mut tail = String::new();
     if let Some(limit) = limit {
         let p = sql.param(Param::Int(limit));
         tail.push_str(&format!(" LIMIT {p}"));
     }
-    if let Some(offset) = request.offset {
+    if let Some(offset) = offset {
         let p = sql.param(Param::Int(offset));
         tail.push_str(&format!(" OFFSET {p}"));
     }
-    format!(
-        "SELECT {} FROM {} AS _t{filters}{tail}",
-        select_list(schema, &request.select, "_t"),
-        qualified(schema, table),
-    )
+    tail
 }
 
 /// Total rows the filters reach (for `Prefer: count=exact`).
 pub fn count(schema: &str, table: &Table, request: &Request) -> Sql {
     let mut sql = Sql::default();
-    let filters = where_clause(&mut sql, table, &request.filters);
+    let filters = where_clause(&mut sql, &request.filters);
     sql.text = format!(
         "SELECT count(*) FROM {} AS _t{filters}",
         qualified(schema, table)
@@ -1003,11 +1099,11 @@ pub fn count(schema: &str, table: &Table, request: &Request) -> Sql {
 }
 
 /// Wraps a write to return the representation (`Prefer: return=representation`).
-fn with_representation(schema: &str, write: String, select: &Select) -> String {
+fn with_representation(sql: &mut Sql, schema: &str, write: String, select: &Select) -> String {
     format!(
         "WITH _w AS ({write} RETURNING _t.*) \
          SELECT coalesce(json_agg(_r), '[]')::text, count(*) FROM (SELECT {} FROM _w AS _t) _r",
-        select_list(schema, select, "_t"),
+        select_list(sql, schema, select, "_t", ""),
     )
 }
 
@@ -1097,7 +1193,7 @@ pub fn insert(
     }
 
     sql.text = match (statements.len(), representation) {
-        (1, Some(select)) => with_representation(schema, statements.remove(0), select),
+        (1, Some(select)) => with_representation(&mut sql, schema, statements.remove(0), select),
         (1, None) => statements.remove(0),
         (_, Some(select)) => {
             let ctes: Vec<String> = statements
@@ -1111,7 +1207,7 @@ pub fn insert(
             format!(
                 "WITH {} SELECT coalesce(json_agg(_r), '[]')::text, count(*) FROM (SELECT {} FROM ({}) AS _t) _r",
                 ctes.join(", "),
-                select_list(schema, select, "_t"),
+                select_list(&mut sql, schema, select, "_t", ""),
                 union.join(" UNION ALL "),
             )
         }
@@ -1150,12 +1246,12 @@ pub fn update(
         .map(|c| format!("{0} = _b.{0}", ident(c)))
         .collect::<Vec<_>>()
         .join(", ");
-    let filters = where_clause(&mut sql, table, filters);
+    let filters = where_clause(&mut sql, filters);
     let write = format!(
         "UPDATE {target} AS _t SET {assignments} FROM json_populate_record(NULL::{target}, {p}::json) AS _b{filters}"
     );
     sql.text = match representation {
-        Some(select) => with_representation(schema, write, select),
+        Some(select) => with_representation(&mut sql, schema, write, select),
         None => write,
     };
     Ok(sql)
@@ -1168,10 +1264,10 @@ pub fn delete(
     representation: Option<&Select>,
 ) -> Sql {
     let mut sql = Sql::default();
-    let filters = where_clause(&mut sql, table, filters);
+    let filters = where_clause(&mut sql, filters);
     let write = format!("DELETE FROM {} AS _t{filters}", qualified(schema, table));
     sql.text = match representation {
-        Some(select) => with_representation(schema, write, select),
+        Some(select) => with_representation(&mut sql, schema, write, select),
         None => write,
     };
     sql
@@ -1700,13 +1796,16 @@ mod tests {
     fn bad_embeds_are_rejected() {
         let long = format!("{}:customers(name)", "a".repeat(64));
         for (table, select) in [
-            ("orders", "nope(id)"),                    // unknown table
-            ("customers", "users(email)"),             // no foreign key
-            ("orders", "customers(nope)"),             // unknown column
-            ("orders", "customers(name,orders(id))"),  // nested
-            ("orders", "customers(name"),              // unbalanced
-            ("orders", "customers()"),                 // empty list
-            ("orders", "users!nope(email)"),           // hint matches nothing
+            ("orders", "nope(id)"),        // unknown table
+            ("customers", "users(email)"), // no foreign key
+            ("orders", "customers(nope)"), // unknown column
+            (
+                "customers",
+                "orders(customers(orders(customers(orders(id)))))",
+            ), // too deep
+            ("orders", "customers(name"),  // unbalanced
+            ("orders", "customers()"),     // empty list
+            ("orders", "users!nope(email)"), // hint matches nothing
             ("orders", "total,total:customers(name)"), // alias collides with a column
             ("orders", "*,id:customers(name)"),
             ("orders", "customers(name),customers(id)"), // same key twice
@@ -1717,6 +1816,94 @@ mod tests {
         ] {
             assert!(select_of(table, select).is_err(), "{table}?select={select}");
         }
+    }
+
+    fn request_of(table: &str, q: &[(&str, &str)]) -> Result<(Request, Sql), QueryError> {
+        let catalog = shop();
+        let t = catalog.table(table).unwrap();
+        let req = parse_request_with_relations(&pairs(q), t, &catalog)?;
+        let sql = super::select("public", t, &req, None);
+        Ok((req, sql))
+    }
+
+    #[test]
+    fn embeds_nest_with_their_own_aliases() {
+        let (select, text) = select_of(
+            "customers",
+            "name,orders(id,items(qty),buyer:users!buyer_id(email))",
+        )
+        .unwrap();
+        let orders = &select.embeds[0];
+        assert_eq!(orders.select.columns, ["id"]);
+        assert_eq!(orders.select.embeds[0].alias, "items");
+        assert!(text.contains(
+            "(SELECT coalesce(json_agg(_j0_0), '[]') FROM (SELECT _e0_0.\"qty\" FROM \"public\".\"items\" AS _e0_0 WHERE _e0_0.\"order_id\" = _e0.\"id\") AS _j0_0) AS \"items\""
+        ), "{text}");
+        assert!(
+            text.contains("WHERE _e0_1.\"id\" = _e0.\"buyer_id\") AS _j0_1) AS \"buyer\""),
+            "{text}"
+        );
+        assert!(
+            text.contains("WHERE _e0.\"customer_id\" = _t.\"id\""),
+            "{text}"
+        );
+    }
+
+    #[test]
+    fn dotted_parameters_filter_order_and_page_the_embed() {
+        let (req, sql) = request_of(
+            "customers",
+            &[
+                ("orders.total", "gt.10"),
+                ("select", "id,orders(id,items(*))"),
+                ("orders.items.or", "(qty.eq.1,qty.gt.5)"),
+                ("orders.order", "total.desc"),
+                ("orders.limit", "2"),
+                ("id", "eq.7"),
+            ],
+        )
+        .unwrap();
+        let orders = &req.select.embeds[0];
+        assert_eq!((orders.filters.len(), orders.limit), (1, Some(2)));
+        assert_eq!(orders.select.embeds[0].filters.len(), 1);
+        assert_eq!(req.filters.len(), 1, "the parent keeps only its own filter");
+        let text = &sql.text;
+        assert!(
+            text.contains("WHERE _e0.\"customer_id\" = _t.\"id\" AND _e0.\"total\" > $"),
+            "{text}"
+        );
+        assert!(
+            text.contains("::text::numeric ORDER BY _e0.\"total\" DESC LIMIT $"),
+            "{text}"
+        );
+        assert!(
+            text.contains("WHERE _e0_0.\"order_id\" = _e0.\"id\" AND (_e0_0.\"qty\" = $"),
+            "{text}"
+        );
+        assert!(text.contains(" WHERE _t.\"id\" = $"), "{text}");
+        // Every value is a parameter: 10, 1, 5, 2 and 7.
+        assert_eq!(sql.params.len(), 5);
+    }
+
+    #[test]
+    fn bad_embedded_parameters_are_rejected() {
+        for q in [
+            [("select", "id,orders(id)"), ("orders.nope", "eq.1")], // unknown column
+            [("select", "id,orders(id)"), ("orders.select", "id")], // select belongs inside
+            [("select", "id,customers(id)"), ("customers.order", "id")], // single row
+            [("select", "id,customers(id)"), ("customers.limit", "1")],
+            [("select", "id,orders(id)"), ("orders.limit", "-1")],
+            [("select", "id,orders(id)"), ("orders.or", "(total.zz.1)")],
+        ] {
+            let table = if q[0].1.contains("customers") {
+                "orders"
+            } else {
+                "customers"
+            };
+            assert!(request_of(table, &q).is_err(), "{q:?}");
+        }
+        // Without the embed in select, the dotted key is not a column either.
+        assert!(request_of("customers", &[("orders.total", "gt.1")]).is_err());
     }
 
     #[test]
