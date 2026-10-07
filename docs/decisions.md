@@ -447,9 +447,22 @@ form a unique key is left to Postgres, and its `42P10` and `21000` errors now
 map to 400 instead of 500. RLS needs no special handling: Postgres applies the
 INSERT policy to the new row and the UPDATE policy to the existing one.
 
+**D72. Relation embedding through foreign keys, one level, as correlated
+subqueries.** `select=` accepts `[alias:]table[!hint](columns)`. The relation
+comes only from the catalog's foreign keys inside the exposed schema, in
+either direction: this table's key gives an object (`to_json` of a subquery
+that matches at most one row, since the key references a unique one), the
+other table's key gives an array (`json_agg`). Each embed is a subquery in the
+select list, so it runs in the same transaction with the request's role and
+the related table's RLS filters it like a direct read; there is no separate
+permission logic. Ambiguous links ask for a hint (column or constraint name);
+nesting and self-references are refused for now. The panel's parser keeps
+refusing embeds (`parse_request`), the API uses
+`parse_request_with_relations`.
+
 ### Known pending items
 
-- Relation embedding waits until after the MVP.
+- Embedding more than one level deep, and filtering embedded rows.
 - PITR with WAL-G (or pgBackRest) archiving WAL to S3.
 - Install without Docker (systemd): the binary no longer depends on Docker;
   `init` still has to generate the units.
