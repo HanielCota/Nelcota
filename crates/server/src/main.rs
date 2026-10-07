@@ -59,7 +59,22 @@ async fn serve(config: Config) -> anyhow::Result<()> {
             max_rows: config.max_rows,
         }),
     };
+    // Email do auth (recuperação de senha). Sem SMTP, o endpoint responde
+    // `recovery_disabled`; configuração pela metade já falhou no `validate`.
+    let mail = config.mail()?;
+    let mailer = match &mail {
+        Some(mail) => {
+            let smtp = nelcota_auth::SmtpMailer::new(mail.smtp_url, mail.from)?;
+            tracing::info!(
+                remetente = mail.from,
+                "recuperação de senha por email ligada"
+            );
+            Some(Arc::new(smtp) as Arc<dyn nelcota_auth::Mailer>)
+        }
+        None => None,
+    };
     let auth = AuthState {
+        mailer,
         pool,
         keys: keys.clone(),
         passwords: Arc::new(Passwords::new(hash_concurrency())),
@@ -70,6 +85,7 @@ async fn serve(config: Config) -> anyhow::Result<()> {
             refresh_ttl_days: config.refresh_token_ttl_days,
             signup_enabled: config.signup_enabled,
             trust_proxy: config.trust_proxy,
+            recovery_url: mail.map(|m| m.recovery_url.to_owned()),
         }),
     };
     let admin = match (&config.admin_email, &config.admin_password_hash) {

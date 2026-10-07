@@ -11,6 +11,7 @@ mod keys;
 mod mail;
 mod password;
 mod rate_limit;
+mod recovery;
 
 use std::sync::Arc;
 
