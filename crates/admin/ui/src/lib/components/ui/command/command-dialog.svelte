@@ -33,8 +33,8 @@
 		{showCloseButton}
 		{portalProps}
 	>
-		<!-- Dentro do Content: fora dele o título ficava solto na página, mesmo
-		     com a paleta fechada, e o leitor de tela o anunciava em toda tela. -->
+		<!-- Inside Content: outside it the title stayed loose on the page, even
+		     with the palette closed, and screen readers announced it everywhere. -->
 		<Dialog.Header class="sr-only">
 			<Dialog.Title>{title}</Dialog.Title>
 			<Dialog.Description>{description}</Dialog.Description>

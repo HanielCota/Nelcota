@@ -1,6 +1,6 @@
-// Estado do editor SQL: rascunho, histórico e consultas salvas. Fica fora do
-// componente para a paleta de comandos poder abrir uma consulta no editor.
-// Persistido no navegador (por projeto, já que cada painel tem a sua origem).
+// SQL editor state: draft, history and saved queries. Lives outside the
+// component so the command palette can open a query in the editor.
+// Persisted in the browser (per project, since each panel has its own origin).
 
 import { newId, readJson, readText, write } from './storage'
 
@@ -24,7 +24,7 @@ const isSaved = (item: unknown): item is SavedQuery =>
   typeof (item as SavedQuery).sql === 'string' &&
   typeof (item as SavedQuery).updatedAt === 'number'
 
-// Formato versionado: `{ v: 1, items }`, para poder migrar no futuro.
+// Versioned format: `{ v: 1, items }`, so it can be migrated later.
 const parseSaved = (data: unknown): SavedQuery[] | null =>
   typeof data === 'object' && data !== null && (data as { v?: unknown }).v === 1
     ? ((data as { items?: unknown }).items as unknown[] | undefined)?.filter(isSaved) ?? []
@@ -37,13 +37,13 @@ class SqlStore {
   draft = $state(readText(DRAFT_KEY, 'select now();'))
   history = $state<string[]>(readJson(HISTORY_KEY, parseHistory, []))
   saved = $state<SavedQuery[]>(readJson(SAVED_KEY, parseSaved, []))
-  /** Consulta salva aberta no editor (`null` = rascunho solto). */
+  /** Saved query open in the editor (`null` = a loose draft). */
   currentId = $state<string | null>(null)
 
   current = $derived(this.saved.find((q) => q.id === this.currentId) ?? null)
-  /** Texto do editor difere do que está salvo. */
+  /** The editor text differs from what is saved. */
   dirty = $derived(this.current !== null && this.current.sql !== this.draft)
-  /** Mais recentes primeiro. */
+  /** Most recent first. */
   sorted = $derived([...this.saved].sort((a, b) => b.updatedAt - a.updatedAt))
 
   setDraft(sql: string) {
@@ -51,7 +51,7 @@ class SqlStore {
     write(DRAFT_KEY, sql)
   }
 
-  /** Abre um texto no editor; com `id`, passa a editar aquela consulta salva. */
+  /** Opens a text in the editor; with `id`, starts editing that saved query. */
   open(sql: string, id: string | null = null) {
     this.setDraft(sql)
     this.currentId = id
@@ -67,7 +67,7 @@ class SqlStore {
     write(HISTORY_KEY, JSON.stringify(this.history))
   }
 
-  /** Atualiza a consulta aberta ou cria uma nova (`asNew`). */
+  /** Updates the open query or creates a new one (`asNew`). */
   save(name: string, asNew = false): SavedQuery {
     const now = Date.now()
     const existing = asNew ? null : this.current

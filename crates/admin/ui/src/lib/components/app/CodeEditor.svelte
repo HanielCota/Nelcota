@@ -15,7 +15,7 @@
     onrun,
   }: {
     value?: string
-    /** `{ "tabela": ["col", ...], "auth.users": [...] }` para o autocomplete. */
+    /** `{ "table": ["col", ...], "auth.users": [...] }` for autocomplete. */
     schema?: Record<string, string[]>
     defaultSchema?: string
     onrun: () => void
@@ -25,7 +25,7 @@
   let view: EditorView | undefined
   const language = new Compartment()
 
-  // Cores do tema vêm das variáveis CSS do painel: acompanham claro/escuro.
+  // Theme colours come from the panel's CSS variables: they follow light/dark.
   const theme = EditorView.theme({
     '&': { height: '100%', fontSize: '14px', backgroundColor: 'transparent', color: 'var(--foreground)' },
     '.cm-scroller': { fontFamily: 'var(--font-mono)', lineHeight: '1.75' },
@@ -60,7 +60,7 @@
   })
 
   const highlight = HighlightStyle.define([
-    // Paleta contida: palavras-chave em destaque, literais e comentários atenuados.
+    // Restrained palette: keywords stand out, literals and comments are muted.
     { tag: [t.keyword, t.operatorKeyword, t.modifier], color: 'var(--foreground)', fontWeight: '500' },
     { tag: [t.string, t.special(t.string)], color: 'oklch(0.72 0.09 150)' },
     { tag: [t.number, t.bool, t.null], color: 'oklch(0.72 0.08 60)' },
@@ -108,7 +108,7 @@
     return () => view?.destroy()
   })
 
-  // Schema carregado depois (autocomplete) ou texto trocado por fora (histórico).
+  // Schema loaded later (autocomplete) or text replaced from outside (history).
   $effect(() => {
     void schema
     view?.dispatch({ effects: language.reconfigure(sqlExtension()) })

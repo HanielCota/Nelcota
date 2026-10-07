@@ -11,7 +11,7 @@
 	}: CommandPrimitive.InputProps = $props();
 </script>
 
-<!-- Campo simples com ícone (sem o input-group do estilo nova). -->
+<!-- Plain field with an icon (without the input-group of the "nova" style). -->
 <div data-slot="command-input-wrapper" class="flex items-center gap-2.5 border-b px-4">
 	<SearchIcon class="size-4 shrink-0 text-muted-foreground" />
 	<CommandPrimitive.Input
