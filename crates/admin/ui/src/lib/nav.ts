@@ -29,16 +29,17 @@ export const navGroups: NavGroup[] = [
     ],
   },
   {
-    label: 'Projeto',
-    items: [
-      // /connect, não /api: /admin/api/* é o prefixo da API do painel.
-      { title: 'API', path: '/connect', icon: Plug },
-      { title: 'Projetos', path: '/projects', icon: Boxes },
-    ],
+    label: 'Integração',
+    // /connect, não /api: /admin/api/* é o prefixo da API do painel.
+    items: [{ title: 'API', path: '/connect', icon: Plug }],
   },
 ]
 
-export const navItems: NavItem[] = navGroups.flatMap((group) => group.items)
+// Projetos fica fora do menu: o seletor de projeto, no topo da barra, já leva lá.
+export const navItems: NavItem[] = [
+  ...navGroups.flatMap((group) => group.items),
+  { title: 'Projetos', path: '/projects', icon: Boxes },
+]
 
 export const isActive = (path: string) =>
   path === '/' ? route.path === '/' : route.path === path || route.path.startsWith(path + '/')
