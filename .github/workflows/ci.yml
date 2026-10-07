@@ -48,6 +48,15 @@ jobs:
       - run: npm ci
       - run: npm audit --audit-level=high
       - run: npm run check
+      - run: npm test
       - run: npm run build
+      # status (e não diff): pega também arquivo novo que faltou versionar ou
+      # arquivo versionado que o build não gera mais.
       - name: dist versionado está atualizado
-        run: git diff --exit-code -- dist
+        run: |
+          changes=$(git status --porcelain -- dist)
+          if [ -n "$changes" ]; then
+            echo "$changes"
+            echo "::error::dist desatualizado: rode npm run build e versione o resultado"
+            exit 1
+          fi

@@ -3,7 +3,10 @@
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu'
   import { Button } from '$lib/components/ui/button'
   import { Input } from '$lib/components/ui/input'
+  import { Skeleton } from '$lib/components/ui/skeleton'
   import Ellipsis from '@lucide/svelte/icons/ellipsis'
+  import Search from '@lucide/svelte/icons/search'
+  import UsersIcon from '@lucide/svelte/icons/users'
   import { toast } from 'svelte-sonner'
   import PageHeader from '$lib/components/app/PageHeader.svelte'
   import ConfirmDialog from '$lib/components/app/ConfirmDialog.svelte'
@@ -69,20 +72,31 @@
   const when = (value: string | null) => (value ? date.format(new Date(value)) : '—')
 </script>
 
-<div class="mx-auto max-w-5xl p-6">
-  <PageHeader title="Usuários">
+<div class="mx-auto max-w-6xl px-6 py-10 lg:px-10">
+  <PageHeader
+    title="Usuários"
+    description={users ? `${total} ${total === 1 ? 'usuário cadastrado' : 'usuários cadastrados'} em auth.users.` : 'Contas de auth.users.'}
+  >
     {#snippet actions()}
-      <Input bind:value={query} oninput={onSearch} placeholder="Buscar por email" class="h-8 w-64" />
+      <div class="relative">
+        <Search class="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+        <Input bind:value={query} oninput={onSearch} placeholder="Buscar por email" class="h-8 w-64 bg-card pl-8" />
+      </div>
     {/snippet}
   </PageHeader>
 
   {#if users === null}
-    <p class="text-sm text-muted-foreground">Carregando…</p>
+    <Skeleton class="h-64 rounded-lg" />
   {:else if users.length === 0}
-    <p class="text-sm text-muted-foreground">Nenhum usuário.</p>
+    <div class="rounded-lg border border-dashed px-6 py-12 text-center">
+      <UsersIcon class="mx-auto size-6 text-muted-foreground" strokeWidth={1.4} />
+      <p class="mt-3 text-sm font-medium">Nenhum usuário</p>
+      <p class="mt-1 text-sm font-light text-muted-foreground">
+        {query.trim() ? 'Nada encontrado para essa busca.' : 'Os cadastros feitos pela API aparecem aqui.'}
+      </p>
+    </div>
   {:else}
-    <p class="mb-3 text-sm text-muted-foreground">{total} {total === 1 ? 'usuário' : 'usuários'}</p>
-    <div class="rounded border">
+    <div class="overflow-hidden rounded-lg border bg-card">
       <Table.Root>
         <Table.Header>
           <Table.Row class="hover:bg-transparent">
@@ -97,8 +111,16 @@
           {#each users as user (user.id)}
             <Table.Row>
               <Table.Cell>
-                <p>{user.email}</p>
-                <p class="font-mono text-[11px] text-muted-foreground">{user.id}</p>
+                <div class="flex items-center gap-3">
+                  <span
+                    class="grid size-8 shrink-0 place-items-center rounded-full border border-border-strong bg-muted text-xs font-medium"
+                    >{user.email.charAt(0).toUpperCase()}</span
+                  >
+                  <div class="min-w-0">
+                    <p class="font-medium">{user.email}</p>
+                    <p class="font-mono text-[11px] text-muted-foreground">{user.id}</p>
+                  </div>
+                </div>
               </Table.Cell>
               <Table.Cell class="text-muted-foreground">{when(user.created_at)}</Table.Cell>
               <Table.Cell class="text-muted-foreground">{when(user.last_sign_in_at)}</Table.Cell>
@@ -133,9 +155,10 @@
   {/if}
 
   {#if page > 0 || hasNext}
-    <div class="mt-3 flex justify-end gap-2">
-      <Button variant="ghost" size="sm" disabled={page === 0} onclick={() => page--}>Anterior</Button>
-      <Button variant="ghost" size="sm" disabled={!hasNext} onclick={() => page++}>Próxima</Button>
+    <div class="mt-4 flex items-center justify-end gap-2 text-xs text-muted-foreground">
+      <span class="mr-1">Página {page + 1}</span>
+      <Button variant="outline" size="sm" disabled={page === 0} onclick={() => page--}>Anterior</Button>
+      <Button variant="outline" size="sm" disabled={!hasNext} onclick={() => page++}>Próxima</Button>
     </div>
   {/if}
 </div>

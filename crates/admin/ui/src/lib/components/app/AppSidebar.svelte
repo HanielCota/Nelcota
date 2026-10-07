@@ -1,94 +1,54 @@
 <script lang="ts">
-  import * as Sidebar from '$lib/components/ui/sidebar'
-  import LayoutDashboard from '@lucide/svelte/icons/layout-dashboard'
-  import Table2 from '@lucide/svelte/icons/table-2'
-  import SquareTerminal from '@lucide/svelte/icons/square-terminal'
-  import Users from '@lucide/svelte/icons/users'
-  import ShieldCheck from '@lucide/svelte/icons/shield-check'
   import BookOpen from '@lucide/svelte/icons/book-open'
-  import Boxes from '@lucide/svelte/icons/boxes'
-  import Logo from './Logo.svelte'
-  import { href, route } from '$lib/router.svelte'
+  import { href } from '$lib/router.svelte'
+  import { isActive, navGroups } from '$lib/nav'
 
-  // Ícones ficam porque a sidebar recolhe para só ícones.
-  const groups = [
-    {
-      label: '',
-      items: [
-        { title: 'Visão geral', path: '/', icon: LayoutDashboard },
-        { title: 'Tabelas', path: '/tables', icon: Table2 },
-        { title: 'SQL', path: '/sql', icon: SquareTerminal },
-      ],
-    },
-    {
-      label: 'Autenticação',
-      items: [
-        { title: 'Usuários', path: '/users', icon: Users },
-        { title: 'Policies', path: '/policies', icon: ShieldCheck },
-      ],
-    },
-    {
-      label: 'Host',
-      items: [{ title: 'Projetos', path: '/projects', icon: Boxes }],
-    },
-  ]
-
-  const isActive = (path: string) =>
-    path === '/' ? route.path === '/' : route.path === path || route.path.startsWith(path + '/')
+  // Trilho de ícones que se expande por cima do conteúdo ao passar o mouse.
 </script>
 
-<Sidebar.Root collapsible="icon">
-  <Sidebar.Header class="h-12 justify-center px-4 group-data-[collapsible=icon]:px-2">
-    <a href={href('/')} class="group-data-[collapsible=icon]:hidden"><Logo /></a>
-    <a href={href('/')} class="hidden text-center font-semibold group-data-[collapsible=icon]:block">n</a>
-  </Sidebar.Header>
-
-  <Sidebar.Content>
-    {#each groups as group, g (g)}
-      <Sidebar.Group>
-        {#if group.label}<Sidebar.GroupLabel>{group.label}</Sidebar.GroupLabel>{/if}
-        <Sidebar.GroupContent>
-          <Sidebar.Menu>
-            {#each group.items as item (item.path)}
-              <Sidebar.MenuItem>
-                <Sidebar.MenuButton isActive={isActive(item.path)} tooltipContent={item.title}>
-                  {#snippet child({ props })}
-                    <a href={href(item.path)} {...props}>
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </a>
-                  {/snippet}
-                </Sidebar.MenuButton>
-              </Sidebar.MenuItem>
-            {/each}
-          </Sidebar.Menu>
-        </Sidebar.GroupContent>
-      </Sidebar.Group>
+<aside class="relative z-30 hidden w-14 shrink-0 md:block">
+  <nav
+    class="group/rail absolute inset-y-0 left-0 flex w-14 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar py-2 transition-[width,box-shadow] duration-200 ease-out hover:w-52 hover:shadow-2xl hover:shadow-black/30"
+  >
+    {#each navGroups as group, g (g)}
+      {#if g > 0}<div class="mx-3 my-2 border-t border-sidebar-border"></div>{/if}
+      <ul class="flex flex-col gap-0.5 px-2">
+        {#each group as item (item.path)}
+          {@const active = isActive(item.path)}
+          <li>
+            <a
+              href={href(item.path)}
+              aria-current={active ? 'page' : undefined}
+              class={[
+                'flex h-9 items-center gap-3 overflow-hidden rounded-md px-[9px] text-sm whitespace-nowrap transition-colors',
+                active
+                  ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                  : 'text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground',
+              ]}
+            >
+              <item.icon class={['size-[18px] shrink-0', active && 'text-brand']} strokeWidth={1.6} />
+              <span class="opacity-0 transition-opacity duration-150 group-hover/rail:opacity-100">{item.title}</span>
+            </a>
+          </li>
+        {/each}
+      </ul>
     {/each}
 
-    <Sidebar.Group>
-      <Sidebar.GroupLabel>API</Sidebar.GroupLabel>
-      <Sidebar.GroupContent>
-        <Sidebar.Menu>
-          <Sidebar.MenuItem>
-            <Sidebar.MenuButton tooltipContent="OpenAPI">
-              {#snippet child({ props })}
-                <a href="/rest/v1/" target="_blank" rel="noopener" {...props}>
-                  <BookOpen />
-                  <span>OpenAPI</span>
-                </a>
-              {/snippet}
-            </Sidebar.MenuButton>
-          </Sidebar.MenuItem>
-        </Sidebar.Menu>
-      </Sidebar.GroupContent>
-    </Sidebar.Group>
-  </Sidebar.Content>
-
-  <Sidebar.Footer class="group-data-[collapsible=icon]:hidden">
-    <p class="px-2 pb-1 text-[11px] leading-snug text-muted-foreground">
-      A chave <span class="font-mono">service_role</span> ignora o RLS. Use só no backend.
-    </p>
-  </Sidebar.Footer>
-  <Sidebar.Rail />
-</Sidebar.Root>
+    <div class="mt-auto px-2">
+      <a
+        href="/rest/v1/"
+        target="_blank"
+        rel="noopener"
+        class="flex h-9 items-center gap-3 overflow-hidden rounded-md px-[9px] text-sm whitespace-nowrap text-sidebar-foreground transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
+      >
+        <BookOpen class="size-[18px] shrink-0" strokeWidth={1.6} />
+        <span class="opacity-0 transition-opacity duration-150 group-hover/rail:opacity-100">API (OpenAPI)</span>
+      </a>
+      <p
+        class="mt-2 w-48 px-2 pb-1 text-[11px] leading-snug font-light text-muted-foreground opacity-0 transition-opacity duration-150 group-hover/rail:opacity-100"
+      >
+        A chave <span class="font-mono">service_role</span> ignora o RLS. Use só no backend.
+      </p>
+    </div>
+  </nav>
+</aside>

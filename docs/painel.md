@@ -46,7 +46,13 @@ ligado sem policies (âmbar), erros e ações destrutivas. O resto é neutro.
 | Editar ou inserir linha completa | lápis no fim da linha / "Inserir linha" (painel lateral) |
 | Apagar várias linhas | marque as caixas e "Apagar N" (uma transação só) |
 | Ordenar | clique no cabeçalho da coluna (asc → desc → sem ordem) |
+| Filtrar | "Filtrar" na grade: igual, diferente, contém, maior/menor, é/não é NULL. Os filtros ficam na URL no formato da API REST (`/admin/tables/pedidos?status=eq.pago`): dá para compartilhar o link e voltar com o navegador |
+| Exportar tabela | "Exportar" → CSV ou JSON, com a ordem e os filtros da grade. O servidor lê em fluxo (sem limite de linhas, sem carregar tudo na memória); o CSV tem BOM para o Excel reconhecer acentos |
+| Seguir chave estrangeira | a seta numa célula de FK abre a linha referenciada na outra tabela; o cabeçalho mostra `→ tabela` |
 | Executar SQL | Ctrl+Enter; autocomplete de tabelas e colunas; modelos e histórico |
+| Salvar consultas | Ctrl+S ou "Salvar"; ficam na barra lateral do editor e na paleta. Guardadas no navegador, por projeto |
+| Exportar resultado do SQL | "Exportar" acima de cada resultado → CSV ou JSON |
+| Paleta de comandos | Ctrl+K (⌘K no Mac) ou "Buscar…" na barra superior: páginas, tabelas, consultas salvas, modelos e ações |
 
 | Página | O que tem |
 |---|---|

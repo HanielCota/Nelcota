@@ -2,10 +2,10 @@
   import { onMount } from 'svelte'
   import { ModeWatcher } from 'mode-watcher'
   import { Toaster } from '$lib/components/ui/sonner'
-  import * as Sidebar from '$lib/components/ui/sidebar'
   import * as Tooltip from '$lib/components/ui/tooltip'
   import AppSidebar from '$lib/components/app/AppSidebar.svelte'
   import Topbar from '$lib/components/app/Topbar.svelte'
+  import CommandPalette from '$lib/components/app/CommandPalette.svelte'
   import Login from '$lib/pages/Login.svelte'
   import Overview from '$lib/pages/Overview.svelte'
   import TableEditor from '$lib/pages/TableEditor.svelte'
@@ -45,16 +45,18 @@
 <Toaster position="bottom-right" />
 
 {#if session.email === undefined}
-  <div class="grid h-screen place-items-center text-sm text-muted-foreground">Carregando…</div>
+  <div class="grid h-screen place-items-center">
+    <span class="size-5 animate-spin rounded-full border-2 border-border-strong border-t-brand"></span>
+  </div>
 {:else if session.email === null}
   <Login />
 {:else}
   <Tooltip.Provider delayDuration={200}>
-    <Sidebar.Provider>
-      <AppSidebar />
-      <Sidebar.Inset class="flex h-screen min-w-0 flex-col overflow-hidden">
-        <Topbar />
-        <main class="min-h-0 flex-1 overflow-auto">
+    <div class="flex h-screen flex-col overflow-hidden bg-background">
+      <Topbar />
+      <div class="flex min-h-0 flex-1">
+        <AppSidebar />
+        <main class="min-w-0 flex-1 overflow-auto">
           {#key route.path}
             {#if path === '/'}
               <Overview />
@@ -76,7 +78,8 @@
             {/if}
           {/key}
         </main>
-      </Sidebar.Inset>
-    </Sidebar.Provider>
+      </div>
+    </div>
+    <CommandPalette />
   </Tooltip.Provider>
 {/if}

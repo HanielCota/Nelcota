@@ -10,9 +10,10 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+async function request<T>(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   const res = await fetch(`/admin/api${path}`, {
     method,
+    signal,
     credentials: 'same-origin',
     headers: body === undefined ? {} : { 'content-type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -33,10 +34,14 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 }
 
 export const api = {
-  get: <T>(path: string) => request<T>('GET', path),
+  get: <T>(path: string, options: { signal?: AbortSignal } = {}) =>
+    request<T>('GET', path, undefined, options.signal),
   post: <T>(path: string, body: unknown = {}) => request<T>('POST', path, body),
   patch: <T>(path: string, body: unknown) => request<T>('PATCH', path, body),
   delete: <T>(path: string, body?: unknown) => request<T>('DELETE', path, body),
 }
 
 export const enc = encodeURIComponent
+
+/** Requisição cancelada por uma mais nova (não é erro para o usuário). */
+export const isAbort = (e: unknown) => e instanceof DOMException && e.name === 'AbortError'

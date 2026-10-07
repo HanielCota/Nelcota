@@ -7,6 +7,7 @@ use axum::{
     Json,
     extract::{Path, Query, State},
 };
+use futures_util::future::{join_all, try_join, try_join3};
 use nelcota_api::{
     Catalog,
     catalog::{Table, TableKind},
@@ -14,17 +15,18 @@ use nelcota_api::{
 };
 use serde::Deserialize;
 use serde_json::{Map, Value, json, value::RawValue};
+use tokio_postgres::Client;
 
 use crate::{AdminState, ApiError};
 
 type ApiResult = Result<Json<Value>, ApiError>;
-type Row = HashMap<String, Box<RawValue>>;
+pub(crate) type Row = HashMap<String, Box<RawValue>>;
 
 const MAX_PAGE_SIZE: i64 = 500;
 
 /// Texto de um valor JSON vindo do Postgres, sem passar por `f64` (numeric
 /// mantém todas as casas). `None` = NULL.
-fn raw_text(value: Option<&RawValue>) -> Option<String> {
+pub(crate) fn raw_text(value: Option<&RawValue>) -> Option<String> {
     let raw = value?.get();
     if raw == "null" {
         None
@@ -35,7 +37,7 @@ fn raw_text(value: Option<&RawValue>) -> Option<String> {
     }
 }
 
-fn table_or_404(state: &AdminState, name: &str) -> Result<Table, ApiError> {
+pub(crate) fn table_or_404(state: &AdminState, name: &str) -> Result<Table, ApiError> {
     state
         .catalog
         .get()
@@ -44,11 +46,7 @@ fn table_or_404(state: &AdminState, name: &str) -> Result<Table, ApiError> {
         .ok_or_else(|| ApiError::not_found(format!("tabela '{name}' não existe no schema exposto")))
 }
 
-async fn policy_counts(
-    state: &AdminState,
-    schema: &str,
-) -> Result<HashMap<String, usize>, ApiError> {
-    let client = state.db.get().await?;
+async fn policy_counts(client: &Client, schema: &str) -> Result<HashMap<String, usize>, ApiError> {
     let rows = client
         .query(
             "SELECT tablename::text, count(*) FROM pg_policies WHERE schemaname = $1 GROUP BY 1",
@@ -118,7 +116,7 @@ fn exposed(catalog: &Catalog) -> Vec<&str> {
 /// Contagem exata para tabelas pequenas (ou nunca analisadas); estimativa do
 /// planejador nas grandes, para não custar um seq scan.
 async fn row_count(
-    client: &deadpool_postgres::Object,
+    client: &Client,
     schema: &str,
     table: &Table,
     estimate: i64,
@@ -136,8 +134,7 @@ async fn row_count(
     ((estimate >= 0).then_some(estimate), false)
 }
 
-async fn estimates(state: &AdminState, schema: &str) -> Result<HashMap<String, i64>, ApiError> {
-    let client = state.db.get().await?;
+async fn estimates(client: &Client, schema: &str) -> Result<HashMap<String, i64>, ApiError> {
     Ok(client
         .query(
             "SELECT c.relname::text, c.reltuples::int8 FROM pg_class c
@@ -152,18 +149,30 @@ async fn estimates(state: &AdminState, schema: &str) -> Result<HashMap<String, i
 
 pub async fn overview(State(state): State<AdminState>) -> ApiResult {
     let catalog = state.catalog.get();
-    let policies = policy_counts(&state, &catalog.schema).await?;
-    let estimates = estimates(&state, &catalog.schema).await?;
+    // Uma conexão só, com as consultas independentes em pipeline nela.
     let client = state.db.get().await?;
-    let users: i64 = client
-        .query_one("SELECT count(*) FROM auth.users", &[])
-        .await?
-        .get(0);
+    let (policies, estimates, users) = try_join3(
+        policy_counts(&client, &catalog.schema),
+        estimates(&client, &catalog.schema),
+        async {
+            Ok::<_, ApiError>(
+                client
+                    .query_one("SELECT count(*) FROM auth.users", &[])
+                    .await?,
+            )
+        },
+    )
+    .await?;
+    let users: i64 = users.get(0);
+
+    let counts = join_all(catalog.tables.values().map(|table| {
+        let estimate = estimates.get(&table.name).copied().unwrap_or(-1);
+        row_count(&client, &catalog.schema, table, estimate)
+    }))
+    .await;
 
     let mut tables = Vec::new();
-    for table in catalog.tables.values() {
-        let estimate = estimates.get(&table.name).copied().unwrap_or(-1);
-        let (rows, exact) = row_count(&client, &catalog.schema, table, estimate).await;
+    for (table, (rows, exact)) in catalog.tables.values().zip(counts) {
         tables.push(json!({
             "name": table.name,
             "kind": kind(table),
@@ -189,7 +198,8 @@ pub async fn overview(State(state): State<AdminState>) -> ApiResult {
 
 pub async fn tables(State(state): State<AdminState>) -> ApiResult {
     let catalog = state.catalog.get();
-    let policies = policy_counts(&state, &catalog.schema).await?;
+    let client = state.db.get().await?;
+    let policies = policy_counts(&client, &catalog.schema).await?;
     let list: Vec<Value> = catalog
         .tables
         .values()
@@ -228,30 +238,88 @@ pub async fn schema(State(state): State<AdminState>) -> ApiResult {
     Ok(Json(json!({ "schema": catalog.schema, "tables": tables })))
 }
 
-#[derive(Deserialize)]
-pub struct TableQuery {
-    #[serde(default)]
-    page: i64,
-    size: Option<i64>,
-    sort: Option<String>,
-    #[serde(default)]
-    desc: bool,
+/// Operadores de filtro aceitos pelo painel (subconjunto dos da API REST).
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum FilterOp {
+    Eq,
+    Neq,
+    Gt,
+    Gte,
+    Lt,
+    Lte,
+    Like,
+    Ilike,
+    Is,
 }
 
-pub async fn table(
-    State(state): State<AdminState>,
-    Path(name): Path<String>,
-    Query(params): Query<TableQuery>,
-) -> ApiResult {
-    let table = table_or_404(&state, &name)?;
-    let catalog = state.catalog.get();
-    let page = params.page.max(0);
-    let size = params.size.unwrap_or(50).clamp(1, MAX_PAGE_SIZE);
-    let mut pairs = vec![
-        ("limit".to_owned(), (size + 1).to_string()),
-        ("offset".to_owned(), (page * size).to_string()),
-    ];
-    // Ordenação: a coluna pedida (validada pelo parser contra o catálogo) ou a PK.
+impl FilterOp {
+    fn as_str(self) -> &'static str {
+        match self {
+            FilterOp::Eq => "eq",
+            FilterOp::Neq => "neq",
+            FilterOp::Gt => "gt",
+            FilterOp::Gte => "gte",
+            FilterOp::Lt => "lt",
+            FilterOp::Lte => "lte",
+            FilterOp::Like => "like",
+            FilterOp::Ilike => "ilike",
+            FilterOp::Is => "is",
+        }
+    }
+}
+
+/// Um filtro da grade: `coluna operador valor`, opcionalmente negado.
+#[derive(Debug, Deserialize)]
+pub(crate) struct FilterSpec {
+    column: String,
+    op: FilterOp,
+    value: String,
+    #[serde(default)]
+    not: bool,
+}
+
+impl FilterSpec {
+    /// Par no formato da API REST (`coluna=not.op.valor`), validado depois
+    /// pelo mesmo parser dela contra o catálogo.
+    fn to_pair(&self) -> (String, String) {
+        let not = if self.not { "not." } else { "" };
+        (
+            self.column.clone(),
+            format!("{not}{}.{}", self.op.as_str(), self.value),
+        )
+    }
+}
+
+/// Ordem e filtros comuns à listagem e à exportação.
+#[derive(Debug, Default, Deserialize)]
+pub(crate) struct RowsQuery {
+    pub sort: Option<String>,
+    #[serde(default)]
+    pub desc: bool,
+    /// Array JSON de [`FilterSpec`] (na query string, por ser um GET).
+    pub filters: Option<String>,
+}
+
+/// Monta a requisição validada (colunas e operadores conferidos contra o
+/// catálogo). `page` = `Some((página, tamanho))` para paginar.
+pub(crate) fn build_request(
+    table: &Table,
+    params: &RowsQuery,
+    page: Option<(i64, i64)>,
+) -> Result<query::Request, ApiError> {
+    let filters: Vec<FilterSpec> = match params.filters.as_deref() {
+        None | Some("") => Vec::new(),
+        Some(json) => serde_json::from_str(json)
+            .map_err(|e| ApiError::bad_request(format!("filtros inválidos: {e}")))?,
+    };
+    let mut pairs: Vec<(String, String)> = filters.iter().map(FilterSpec::to_pair).collect();
+    if let Some((page, size)) = page {
+        // Uma linha a mais para saber se existe a próxima página.
+        pairs.push(("limit".into(), (size + 1).to_string()));
+        pairs.push(("offset".into(), (page * size).to_string()));
+    }
+    // Ordenação: a coluna pedida (validada pelo parser) ou a PK.
     let order = match &params.sort {
         Some(col) => Some(format!(
             "{col}.{}",
@@ -263,13 +331,99 @@ pub async fn table(
     if let Some(order) = order {
         pairs.push(("order".into(), order));
     }
-    let request =
-        query::parse_request(&pairs, &table).map_err(|e| ApiError::bad_request(e.to_string()))?;
-    let sql = query::select(&catalog.schema, &table, &request, None);
-    let client = state.db.get().await?;
-    let row = client
+    query::parse_request(&pairs, table).map_err(|e| ApiError::bad_request(e.to_string()))
+}
+
+/// Erro de uma consulta montada a partir do que o admin digitou (filtro com
+/// valor do tipo errado, violação de constraint…): 400 com o texto do Postgres.
+pub(crate) fn user_query_error(err: tokio_postgres::Error) -> ApiError {
+    ApiError::bad_request(
+        err.as_db_error()
+            .map_or_else(|| err.to_string(), |db| db.message().to_owned()),
+    )
+}
+
+/// Contagem com teto de tempo: filtro sem índice numa tabela grande não pode
+/// travar a grade. `None` quando passa do limite.
+async fn bounded_count(client: &mut Client, sql: &query::Sql) -> Option<i64> {
+    let tx = client.transaction().await.ok()?;
+    tx.batch_execute("SET LOCAL statement_timeout = '3s'")
+        .await
+        .ok()?;
+    let count = tx
         .query_one(sql.text.as_str(), &sql.param_refs())
-        .await?;
+        .await
+        .ok()?
+        .get(0);
+    tx.commit().await.ok()?;
+    Some(count)
+}
+
+/// Chave estrangeira simples (uma coluna) para outra tabela exposta: a grade
+/// usa para navegar até a linha referenciada.
+fn references(catalog: &Catalog, table: &Table, column: &str) -> Value {
+    table
+        .foreign_keys
+        .iter()
+        .find(|fk| {
+            fk.columns.len() == 1
+                && fk.columns[0] == column
+                && fk.foreign_schema == catalog.schema
+                && catalog.tables.contains_key(&fk.foreign_table)
+        })
+        .map_or(
+            Value::Null,
+            |fk| json!({ "table": fk.foreign_table, "column": fk.foreign_columns[0] }),
+        )
+}
+
+// Campos repetidos de `RowsQuery` em vez de `#[serde(flatten)]`: com flatten o
+// serde_urlencoded entrega tudo como texto e `page`/`desc` deixam de converter.
+#[derive(Deserialize)]
+pub struct TableQuery {
+    #[serde(default)]
+    page: i64,
+    size: Option<i64>,
+    sort: Option<String>,
+    #[serde(default)]
+    desc: bool,
+    filters: Option<String>,
+}
+
+pub async fn table(
+    State(state): State<AdminState>,
+    Path(name): Path<String>,
+    Query(params): Query<TableQuery>,
+) -> ApiResult {
+    let table = table_or_404(&state, &name)?;
+    let catalog = state.catalog.get();
+    let page = params.page.max(0);
+    let size = params.size.unwrap_or(50).clamp(1, MAX_PAGE_SIZE);
+    let rows_query = RowsQuery {
+        sort: params.sort,
+        desc: params.desc,
+        filters: params.filters,
+    };
+    let request = build_request(&table, &rows_query, Some((page, size)))?;
+    let filtered = !request.filters.is_empty();
+    let sql = query::select(&catalog.schema, &table, &request, None);
+
+    // Linhas, estimativas e policies em pipeline na mesma conexão.
+    let mut client = state.db.get().await?;
+    let (row, (estimates, policies)) = try_join(
+        async {
+            client
+                .query_one(sql.text.as_str(), &sql.param_refs())
+                .await
+                .map_err(user_query_error)
+        },
+        try_join(
+            estimates(&client, &catalog.schema),
+            policy_counts(&client, &catalog.schema),
+        ),
+    )
+    .await?;
+
     let raw_rows: Vec<Row> = serde_json::from_str(&row.get::<_, String>(0))?;
     let has_next = raw_rows.len() as i64 > size;
     let rows: Vec<Value> = raw_rows
@@ -288,13 +442,14 @@ pub async fn table(
         })
         .collect();
 
-    let estimate = estimates(&state, &catalog.schema)
-        .await?
-        .get(&table.name)
-        .copied()
-        .unwrap_or(-1);
-    let (total, exact) = row_count(&client, &catalog.schema, &table, estimate).await;
-    let policies = policy_counts(&state, &catalog.schema).await?;
+    let estimate = estimates.get(&table.name).copied().unwrap_or(-1);
+    let (total, exact) = if filtered {
+        let count = query::count(&catalog.schema, &table, &request);
+        let total = bounded_count(&mut client, &count).await;
+        (total, total.is_some())
+    } else {
+        row_count(&client, &catalog.schema, &table, estimate).await
+    };
     let columns: Vec<Value> = table
         .columns
         .iter()
@@ -310,6 +465,7 @@ pub async fn table(
                 "enum_values": c.enum_values,
                 "is_pk": table.primary_key.contains(&c.name),
                 "comment": c.comment,
+                "references": references(&catalog, &table, &c.name),
             })
         })
         .collect();
@@ -395,12 +551,7 @@ async fn execute(state: &AdminState, sql: &query::Sql) -> Result<u64, ApiError> 
     client
         .execute(sql.text.as_str(), &sql.param_refs())
         .await
-        .map_err(|e| {
-            ApiError::bad_request(
-                e.as_db_error()
-                    .map_or_else(|| e.to_string(), |db| db.message().to_owned()),
-            )
-        })
+        .map_err(user_query_error)
 }
 
 #[derive(Deserialize)]

@@ -4,21 +4,30 @@
   import { Input } from '$lib/components/ui/input'
   import { Checkbox } from '$lib/components/ui/checkbox'
   import * as Select from '$lib/components/ui/select'
+  import * as DropdownMenu from '$lib/components/ui/dropdown-menu'
   import Search from '@lucide/svelte/icons/search'
   import RefreshCw from '@lucide/svelte/icons/refresh-cw'
   import Trash2 from '@lucide/svelte/icons/trash-2'
   import Pencil from '@lucide/svelte/icons/pencil'
+  import Plus from '@lucide/svelte/icons/plus'
+  import Table2 from '@lucide/svelte/icons/table-2'
   import ArrowUp from '@lucide/svelte/icons/arrow-up'
   import ArrowDown from '@lucide/svelte/icons/arrow-down'
   import ChevronLeft from '@lucide/svelte/icons/chevron-left'
   import ChevronRight from '@lucide/svelte/icons/chevron-right'
+  import Funnel from '@lucide/svelte/icons/funnel'
+  import Download from '@lucide/svelte/icons/download'
+  import ArrowUpRight from '@lucide/svelte/icons/arrow-up-right'
+  import X from '@lucide/svelte/icons/x'
   import { toast } from 'svelte-sonner'
   import RlsBadge from '$lib/components/app/RlsBadge.svelte'
   import RlsDot from '$lib/components/app/RlsDot.svelte'
   import RowSheet from '$lib/components/app/RowSheet.svelte'
   import ConfirmDialog from '$lib/components/app/ConfirmDialog.svelte'
-  import { api, enc } from '$lib/api'
-  import { href } from '$lib/router.svelte'
+  import FilterBar from '$lib/components/app/FilterBar.svelte'
+  import { api, enc, isAbort } from '$lib/api'
+  import { describe, filtersParam, filtersToSearch, parseFilters, type TableFilter } from '$lib/filters'
+  import { href, navigate, route } from '$lib/router.svelte'
   import type { Column, RowData, TableData, TableSummary } from '$lib/types'
 
   let { name }: { name?: string } = $props()
@@ -36,6 +45,12 @@
   let sheetOpen = $state(false)
   let sheetRow = $state<RowData | null>(null)
   let confirmOpen = $state(false)
+  let filterOpen = $state(false)
+
+  // Filtros vêm da URL (`?preco=gte.10`): links compartilháveis e o voltar do
+  // navegador funcionam. A chave em texto evita recarregar sem mudança real.
+  const filters = $derived(parseFilters(route.query))
+  const filtersKey = $derived(filtersToSearch(filters))
 
   // Edição inline: célula (linha, coluna) em edição e o rascunho.
   let editing = $state<{ row: number; column: string } | null>(null)
@@ -56,31 +71,67 @@
     }
   })
 
+  /** Ordem e filtros atuais, no formato da API (listagem e exportação). */
+  function rowsParams(): URLSearchParams {
+    const params = new URLSearchParams()
+    if (sort) {
+      params.set('sort', sort.column)
+      if (sort.desc) params.set('desc', 'true')
+    }
+    const f = filtersParam(filters)
+    if (f) params.set('filters', f)
+    return params
+  }
+
+  let inflight: AbortController | undefined
+
   async function load() {
     if (!name) return
+    // Só a resposta mais recente vale: a anterior é cancelada.
+    inflight?.abort()
+    const controller = (inflight = new AbortController())
     loading = true
     error = ''
     try {
-      const params = new URLSearchParams({ page: String(page), size })
-      if (sort) {
-        params.set('sort', sort.column)
-        if (sort.desc) params.set('desc', 'true')
-      }
-      data = await api.get<TableData>(`/tables/${enc(name)}?${params}`)
+      const params = rowsParams()
+      params.set('page', String(page))
+      params.set('size', size)
+      data = await api.get<TableData>(`/tables/${enc(name)}?${params}`, { signal: controller.signal })
       selected = new Set()
     } catch (e) {
+      if (isAbort(e)) return
       error = (e as Error).message
       data = null
     } finally {
-      loading = false
+      if (inflight === controller) loading = false
     }
   }
 
-  // Recarrega ao trocar de tabela, página, tamanho ou ordenação.
+  // Recarrega ao trocar de tabela, página, tamanho, ordenação ou filtros.
   $effect(() => {
-    void [name, page, size, sort]
+    void [name, page, size, sort, filtersKey]
     load()
+    return () => inflight?.abort()
   })
+
+  function setFilters(next: TableFilter[]) {
+    filterOpen = false
+    page = 0
+    const search = filtersToSearch(next)
+    navigate(`/tables/${enc(name!)}${search ? `?${search}` : ''}`)
+  }
+
+  const exportHref = (format: 'csv' | 'json') => {
+    const params = rowsParams()
+    params.set('format', format)
+    return href(`/api/tables/${enc(name!)}/export?${params}`)
+  }
+
+  /** Link para a linha referenciada pela chave estrangeira. */
+  const referenceHref = (column: Column, value: string) =>
+    href(
+      `/tables/${enc(column.references!.table)}?${filtersToSearch([{ column: column.references!.column, op: 'eq', value }])}`,
+    )
 
   function toggleSort(column: string) {
     sort = sort?.column === column ? (sort.desc ? null : { column, desc: true }) : { column, desc: false }
@@ -158,26 +209,31 @@
 
 <div class="flex h-full min-h-0">
   <!-- Lista de tabelas -->
-  <aside class="hidden w-60 shrink-0 flex-col border-r bg-sidebar/50 md:flex">
-    <div class="border-b p-3">
+  <aside class="hidden w-64 shrink-0 flex-col border-r bg-sidebar md:flex">
+    <div class="grid gap-3 border-b p-3">
+      <p class="px-1 text-sm font-medium">Editor de tabelas</p>
       <div class="relative">
         <Search class="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
-        <Input bind:value={filter} placeholder="Buscar tabelas…" class="h-8 pl-8 text-sm" />
+        <Input bind:value={filter} placeholder="Buscar tabelas…" class="h-8 bg-card pl-8 text-sm" />
       </div>
     </div>
-    <nav class="flex-1 overflow-y-auto p-2">
+    <p class="px-4 pt-3 pb-1 text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
+      Tabelas ({visibleTables.length})
+    </p>
+    <nav class="flex-1 overflow-y-auto px-2 pb-2">
       {#each visibleTables as table (table.name)}
         <a
           href={href(`/tables/${encodeURIComponent(table.name)}`)}
           title={table.rls.label}
           class={[
-            'flex items-center gap-2 rounded px-2 py-1 text-sm text-muted-foreground hover:bg-accent hover:text-foreground',
-            table.name === name && 'bg-accent font-medium text-foreground',
+            'flex h-8 items-center gap-2 rounded-md px-2 text-sm text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground',
+            table.name === name && 'bg-accent text-foreground',
           ]}
         >
-          <RlsDot state={table.rls.state} />
+          <Table2 class={['size-3.5 shrink-0', table.name === name && 'text-brand']} strokeWidth={1.6} />
           <span class="truncate">{table.name}</span>
-          {#if table.kind !== 'table'}<span class="ml-auto text-xs">view</span>{/if}
+          <span class="ml-auto flex"><RlsDot state={table.rls.state} /></span>
+          {#if table.kind !== 'table'}<span class="text-[11px]">view</span>{/if}
         </a>
       {:else}
         <p class="px-2 py-4 text-sm text-muted-foreground">Nenhuma tabela.</p>
@@ -188,10 +244,16 @@
   <!-- Área principal -->
   <section class="flex min-w-0 flex-1 flex-col">
     {#if !name}
-      <p class="p-6 text-sm text-muted-foreground">Escolha uma tabela na lista.</p>
+      <div class="grid flex-1 place-items-center p-8 text-center">
+        <div>
+          <Table2 class="mx-auto size-7 text-muted-foreground" strokeWidth={1.3} />
+          <p class="mt-3 text-sm font-medium">Escolha uma tabela</p>
+          <p class="mt-1 text-sm font-light text-muted-foreground">Selecione na lista ao lado para ver e editar as linhas.</p>
+        </div>
+      </div>
     {:else}
-      <div class="flex shrink-0 flex-wrap items-center gap-2 border-b px-4 py-2.5">
-        <h1 class="font-semibold">{name}</h1>
+      <div class="flex h-12 shrink-0 flex-wrap items-center gap-3 border-b px-4">
+        <h1 class="text-sm font-medium">{name}</h1>
         {#if data}<RlsBadge rls={data.table.rls} />{/if}
         <div class="ml-auto flex items-center gap-2">
           {#if selected.size > 0}
@@ -199,21 +261,69 @@
               <Trash2 />Apagar {selected.size}
             </Button>
           {/if}
+          <Button
+            variant={filterOpen || filters.length ? 'secondary' : 'ghost'}
+            size="sm"
+            onclick={() => (filterOpen = !filterOpen)}
+            aria-expanded={filterOpen}
+          >
+            <Funnel />Filtrar{#if filters.length}<span
+                class="rounded-full bg-brand/15 px-1.5 text-[10px] text-brand tabular-nums">{filters.length}</span
+              >{/if}
+          </Button>
+          <DropdownMenu.Root>
+            <DropdownMenu.Trigger>
+              {#snippet child({ props })}
+                <Button variant="ghost" size="sm" {...props}><Download />Exportar</Button>
+              {/snippet}
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Content align="end" class="w-56">
+              <DropdownMenu.Label class="text-xs font-normal text-muted-foreground">
+                {filters.length ? 'Linhas filtradas, na ordem atual' : 'Todas as linhas, na ordem atual'}
+              </DropdownMenu.Label>
+              <DropdownMenu.Item>
+                {#snippet child({ props })}<a {...props} href={exportHref('csv')} download>CSV</a>{/snippet}
+              </DropdownMenu.Item>
+              <DropdownMenu.Item>
+                {#snippet child({ props })}<a {...props} href={exportHref('json')} download>JSON</a>{/snippet}
+              </DropdownMenu.Item>
+            </DropdownMenu.Content>
+          </DropdownMenu.Root>
           <Button variant="ghost" size="icon-sm" onclick={load} aria-label="Recarregar" title="Recarregar">
             <RefreshCw class={loading ? 'animate-spin' : ''} />
           </Button>
           {#if data?.table.insertable}
-            <Button size="sm" onclick={() => openSheet(null)}>Inserir linha</Button>
+            <Button size="sm" onclick={() => openSheet(null)}><Plus />Inserir linha</Button>
           {/if}
         </div>
       </div>
 
+      {#if filterOpen && data}
+        <FilterBar columns={data.table.columns} {filters} onapply={setFilters} onclose={() => (filterOpen = false)} />
+      {:else if filters.length}
+        <div class="flex shrink-0 flex-wrap items-center gap-1.5 border-b px-4 py-2">
+          {#each filters as filter, i (i)}
+            <span
+              class="inline-flex h-6 items-center gap-1 rounded-md border border-border-strong bg-muted pr-0.5 pl-2 font-mono text-[11px]"
+            >
+              {describe(filter)}
+              <button
+                class="grid size-5 place-items-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+                aria-label="Remover filtro"
+                onclick={() => setFilters(filters.filter((_, j) => j !== i))}><X class="size-3" /></button
+              >
+            </span>
+          {/each}
+          <Button variant="ghost" size="xs" class="text-muted-foreground" onclick={() => setFilters([])}>Limpar</Button>
+        </div>
+      {/if}
+
       {#if data?.table.exposed_without_rls}
-        <p class="border-b px-4 py-2 text-sm text-destructive">
+        <p class="border-b border-destructive/30 bg-destructive/5 px-4 py-2 text-xs text-destructive">
           Sem RLS: quem tem GRANT nesta tabela lê e altera todas as linhas.
         </p>
       {:else if data && !data.table.editable && data.table.kind === 'table'}
-        <p class="border-b px-4 py-2 text-sm text-muted-foreground">
+        <p class="border-b bg-muted/40 px-4 py-2 text-xs text-muted-foreground">
           Sem chave primária: dá para ver as linhas, mas não editar por aqui.
         </p>
       {/if}
@@ -228,7 +338,7 @@
             <thead class="sticky top-0 z-10">
               <tr>
                 {#if editable}
-                  <th class="w-10 border-r border-b bg-muted px-3 py-2">
+                  <th class="w-10 border-r border-b bg-card px-3 py-2">
                     <Checkbox
                       checked={selected.size > 0 && selected.size === data.rows.length}
                       indeterminate={selected.size > 0 && selected.size < data.rows.length}
@@ -238,7 +348,7 @@
                   </th>
                 {/if}
                 {#each columns as column (column.name)}
-                  <th class="border-r border-b bg-muted p-0 text-left font-medium">
+                  <th class="border-r border-b bg-card p-0 text-left font-medium">
                     <button
                       class="group flex w-full min-w-36 items-start gap-1.5 px-3 py-2 text-left hover:bg-accent"
                       onclick={() => toggleSort(column.name)}
@@ -248,7 +358,11 @@
                         <span class="text-[12.5px] text-foreground"
                           >{column.name}{#if column.is_pk}<span class="ml-1.5 font-mono text-[10px] font-normal text-muted-foreground">pk</span>{/if}</span
                         >
-                        <span class="font-mono text-[10.5px] font-normal text-muted-foreground">{column.full_type}</span>
+                        <span class="font-mono text-[10.5px] font-normal text-muted-foreground"
+                          >{column.full_type}{#if column.references}<span class="text-brand/80"
+                              >{` → ${column.references.table}`}</span
+                            >{/if}</span
+                        >
                       </span>
                       {#if sort?.column === column.name}
                         {#if sort.desc}<ArrowDown class="ml-auto size-3.5" />{:else}<ArrowUp class="ml-auto size-3.5" />{/if}
@@ -256,12 +370,12 @@
                     </button>
                   </th>
                 {/each}
-                {#if editable}<th class="w-12 border-b bg-muted"></th>{/if}
+                {#if editable}<th class="w-12 border-b bg-card"></th>{/if}
               </tr>
             </thead>
             <tbody>
               {#each data.rows as row, i (i)}
-                <tr class={['group', selected.has(i) ? 'bg-muted/60' : 'hover:bg-muted/40']}>
+                <tr class={['group', selected.has(i) ? 'bg-brand/5' : 'hover:bg-muted/50']}>
                   {#if editable}
                     <td class="border-r border-b px-3 py-1.5">
                       <Checkbox checked={selected.has(i)} onCheckedChange={(v) => toggleRow(i, v === true)} aria-label="Selecionar linha" />
@@ -271,13 +385,13 @@
                     {@const value = row[column.name]}
                     <td
                       class={[
-                        'max-w-96 border-r border-b p-0 font-mono',
+                        'group/cell max-w-96 border-r border-b p-0 font-mono',
                         editable && !column.generated && 'cursor-text',
                       ]}
                       ondblclick={() => startEdit(i, column)}
                     >
                       {#if editing?.row === i && editing.column === column.name}
-                        <div class="flex items-center gap-1 bg-background p-0.5 ring-1 ring-foreground/40 ring-inset">
+                        <div class="flex items-center gap-1 bg-background p-0.5 ring-1 ring-brand/70 ring-inset">
                           <input
                             id="inline-editor"
                             class="w-full min-w-40 bg-transparent px-2 py-1 font-mono text-xs outline-none"
@@ -296,11 +410,20 @@
                           {/if}
                         </div>
                       {:else}
-                        <div class="truncate px-3 py-1.5" title={value ?? 'NULL'}>
-                          {#if value === null}
-                            <span class="text-muted-foreground">NULL</span>
-                          {:else}
-                            {value}
+                        <div class="flex items-center gap-1 px-3 py-1.5" title={value ?? 'NULL'}>
+                          <span class="truncate">
+                            {#if value === null}<span class="text-muted-foreground">NULL</span>{:else}{value}{/if}
+                          </span>
+                          {#if column.references && value !== null}
+                            <a
+                              href={referenceHref(column, value)}
+                              class="ml-auto grid size-5 shrink-0 place-items-center rounded text-muted-foreground opacity-0 group-hover/cell:opacity-100 hover:bg-accent hover:text-brand focus-visible:opacity-100"
+                              title={`Abrir em ${column.references.table}`}
+                              aria-label={`Abrir linha referenciada em ${column.references.table}`}
+                              ondblclick={(e) => e.stopPropagation()}
+                            >
+                              <ArrowUpRight class="size-3.5" />
+                            </a>
                           {/if}
                         </div>
                       {/if}
@@ -324,13 +447,15 @@
             </tbody>
           </table>
           {#if data.rows.length === 0}
-            <p class="py-12 text-center text-sm text-muted-foreground">Nenhuma linha.</p>
+            <p class="py-12 text-center text-sm text-muted-foreground">
+              {filters.length ? 'Nenhuma linha para esses filtros.' : 'Nenhuma linha.'}
+            </p>
           {/if}
         {/if}
       </div>
 
       {#if data}
-        <footer class="flex shrink-0 flex-wrap items-center gap-3 border-t px-4 py-2 text-xs text-muted-foreground">
+        <footer class="flex shrink-0 flex-wrap items-center gap-3 border-t bg-sidebar px-4 py-2 text-xs text-muted-foreground">
           <span>
             {#if data.total !== null}{data.total_exact ? '' : '~'}{fmt.format(data.total)} {data.total === 1 ? 'linha' : 'linhas'}{:else}{data.rows.length} nesta página{/if}
           </span>
