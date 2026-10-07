@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { alignRight, columnKind, columnWidth, monospace, pageInfo } from './grid'
+import { alignRight, columnKind, columnWidth, monospace, nextCell, pageInfo } from './grid'
 
 const col = (
   name: string,
@@ -72,5 +72,34 @@ describe('paginação', () => {
 
   it('sem linhas', () => {
     expect(pageInfo(0, 50, 0, 0, true)).toEqual({ from: 0, to: 0, lastPage: 0, pageCount: 1 })
+  })
+})
+
+describe('navegação por teclado', () => {
+  const at = (row: number, col: number) => ({ row, col })
+
+  it('setas movem uma célula e param nas bordas', () => {
+    expect(nextCell('ArrowDown', at(0, 0), 5, 3)).toEqual(at(1, 0))
+    expect(nextCell('ArrowRight', at(0, 2), 5, 3)).toEqual(at(0, 2))
+    expect(nextCell('ArrowUp', at(0, 1), 5, 3)).toEqual(at(0, 1))
+    expect(nextCell('ArrowLeft', at(3, 0), 5, 3)).toEqual(at(3, 0))
+  })
+
+  it('Home/End na linha; com Ctrl, primeira/última célula', () => {
+    expect(nextCell('Home', at(2, 2), 5, 3)).toEqual(at(2, 0))
+    expect(nextCell('End', at(2, 0), 5, 3)).toEqual(at(2, 2))
+    expect(nextCell('Home', at(4, 2), 5, 3, true)).toEqual(at(0, 0))
+    expect(nextCell('End', at(0, 0), 5, 3, true)).toEqual(at(4, 2))
+  })
+
+  it('PageUp/PageDown pulam 10 linhas sem passar do limite', () => {
+    expect(nextCell('PageDown', at(0, 1), 25, 3)).toEqual(at(10, 1))
+    expect(nextCell('PageDown', at(20, 1), 25, 3)).toEqual(at(24, 1))
+    expect(nextCell('PageUp', at(5, 1), 25, 3)).toEqual(at(0, 1))
+  })
+
+  it('outras teclas e grade vazia não movem', () => {
+    expect(nextCell('a', at(0, 0), 5, 3)).toBeNull()
+    expect(nextCell('ArrowDown', at(0, 0), 0, 3)).toBeNull()
   })
 })

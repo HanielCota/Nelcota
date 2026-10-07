@@ -3,9 +3,10 @@
   import { Checkbox } from '$lib/components/ui/checkbox'
   import Maximize2 from '@lucide/svelte/icons/maximize-2'
   import ArrowUpRight from '@lucide/svelte/icons/arrow-up-right'
+  import { toast } from 'svelte-sonner'
   import GridCell from './GridCell.svelte'
   import GridColumnHeader from './GridColumnHeader.svelte'
-  import { alignRight, columnKind, columnWidth, monospace } from '$lib/grid'
+  import { alignRight, columnKind, columnWidth, monospace, nextCell, type CellPos } from '$lib/grid'
   import type { Column, RowData, TableData } from '$lib/types'
 
   let {
@@ -47,6 +48,28 @@
   let editing = $state<{ row: number; column: string } | null>(null)
   let draft = $state('')
 
+  // Navegação por teclado (padrão "grid" do WAI-ARIA): uma célula ativa por
+  // vez recebe o foco (roving tabindex); Tab entra e sai da grade inteira.
+  let active = $state<CellPos>({ row: 0, col: 0 })
+  let tableEl = $state<HTMLTableElement>()
+
+  // Página, filtro ou colunas mudaram: a célula ativa volta para dentro dos
+  // limites. Só atribui quando muda de fato: com 0 linhas a posição limitada
+  // é a mesma, e reatribuir um objeto novo reexecutaria este efeito sem fim.
+  $effect(() => {
+    const row = Math.min(active.row, Math.max(data.rows.length - 1, 0))
+    const col = Math.min(active.col, Math.max(columns.length - 1, 0))
+    if (row !== active.row || col !== active.col) active = { row, col }
+  })
+
+  async function focusCell(pos: CellPos) {
+    active = pos
+    await tick()
+    const cell = tableEl?.querySelector<HTMLElement>(`[data-cell="${pos.row}:${pos.col}"]`)
+    cell?.focus({ preventScroll: true })
+    cell?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }
+
   async function startEdit(rowIndex: number, column: Column) {
     if (!editable || column.generated) return
     editing = { row: rowIndex, column: column.name }
@@ -60,8 +83,14 @@
     const { row, column } = editing
     const value = asNull ? null : draft
     editing = null
+    focusCell(active)
     if (value === data.rows[row][column]) return
     await oncommit(row, column, value).catch(() => {})
+  }
+
+  function cancelEdit() {
+    editing = null
+    focusCell(active)
   }
 
   function onEditorKey(event: KeyboardEvent) {
@@ -69,7 +98,37 @@
       event.preventDefault()
       commitEdit()
     } else if (event.key === 'Escape') {
-      editing = null
+      event.preventDefault()
+      cancelEdit()
+    }
+  }
+
+  async function copyCell(value: string | null) {
+    await navigator.clipboard.writeText(value ?? '')
+    toast.success(value === null ? 'Célula vazia (NULL) copiada' : 'Valor copiado')
+  }
+
+  function onCellKey(event: KeyboardEvent, row: number, col: number) {
+    if (editing) return
+    const ctrl = event.ctrlKey || event.metaKey
+    const next = nextCell(event.key, { row, col }, data.rows.length, columns.length, ctrl)
+    if (next) {
+      event.preventDefault()
+      focusCell(next)
+      return
+    }
+    const column = columns[col].column
+    if (event.key === 'Enter' || event.key === 'F2') {
+      event.preventDefault()
+      startEdit(row, column)
+    } else if (event.key === ' ' && editable) {
+      event.preventDefault()
+      toggleRow(row, !selected.has(row))
+    } else if (event.key === 'Escape' && selected.size) {
+      selected = new Set()
+    } else if (ctrl && event.key.toLowerCase() === 'c' && !window.getSelection()?.toString()) {
+      event.preventDefault()
+      copyCell(data.rows[row][column.name])
     }
   }
 
@@ -93,7 +152,13 @@
 
 <!-- table-layout fixed + larguras por coluna: editar uma célula não faz as
      outras colunas mudarem de tamanho. A última coluna, sem largura, preenche. -->
-<table class="w-max min-w-full table-fixed border-separate border-spacing-0 text-xs">
+<table
+  bind:this={tableEl}
+  role="grid"
+  aria-label={`Linhas de ${data.table.name}`}
+  aria-multiselectable={editable}
+  class="w-max min-w-full table-fixed border-separate border-spacing-0 text-xs"
+>
   <colgroup>
     {#if editable}<col style:width="76px" />{/if}
     {#each columns as { column, width } (column.name)}<col style:width={`${width}px`} />{/each}
@@ -132,7 +197,7 @@
       {@const isSelected = selected.has(i)}
       <tr class={['group', isSelected ? 'bg-brand/5' : 'hover:bg-muted/50']}>
         {#if editable}
-          <td class={[stickyCell, 'px-3 py-1.5', isSelected ? 'bg-[color-mix(in_oklch,var(--brand)_5%,var(--background))]' : 'group-hover:bg-[color-mix(in_oklch,var(--muted)_50%,var(--background))]']}>
+          <td role="gridcell" class={[stickyCell, 'px-3 py-1.5', isSelected ? 'bg-[color-mix(in_oklch,var(--brand)_5%,var(--background))]' : 'group-hover:bg-[color-mix(in_oklch,var(--muted)_50%,var(--background))]']}>
             <div class="flex items-center gap-1.5">
               <Checkbox checked={isSelected} onCheckedChange={(v) => toggleRow(i, v === true)} aria-label={`Selecionar linha ${i + 1}`} />
               <button
@@ -147,10 +212,19 @@
             </div>
           </td>
         {/if}
-        {#each columns as { column, kind } (column.name)}
+        {#each columns as { column, kind }, c (column.name)}
           {@const value = row[column.name]}
           <td
-            class={['group/cell border-r border-b p-0', editable && !column.generated && 'cursor-text']}
+            role="gridcell"
+            data-cell={`${i}:${c}`}
+            tabindex={active.row === i && active.col === c ? 0 : -1}
+            aria-selected={isSelected}
+            class={[
+              'group/cell border-r border-b p-0 focus-visible:outline-offset-[-2px]',
+              editable && !column.generated && 'cursor-text',
+            ]}
+            onfocus={() => (active = { row: i, col: c })}
+            onkeydown={(e) => onCellKey(e, i, c)}
             ondblclick={() => startEdit(i, column)}
           >
             {#if editing?.row === i && editing.column === column.name}

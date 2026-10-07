@@ -28,7 +28,9 @@
       {#if totalLabel}de {totalLabel}{/if}
       {data.total === 1 ? 'linha' : 'linhas'}{/if}
   </span>
-  {#if data.table.editable}<span class="hidden xl:inline">Duplo clique numa célula para editar.</span>{/if}
+  <span class="hidden xl:inline">
+    Setas navegam{#if data.table.editable}, Enter ou duplo clique edita{/if}, Ctrl+C copia.
+  </span>
   <div class="ml-auto flex items-center gap-1.5">
     <span class="mr-1 hidden sm:inline">Por página</span>
     <Select.Root type="single" bind:value={size} onValueChange={() => (page = 0)}>

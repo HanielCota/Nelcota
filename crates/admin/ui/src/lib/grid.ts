@@ -66,3 +66,43 @@ export function pageInfo(page: number, size: number, rowsOnPage: number, total: 
   const pageCount = Math.max(1, Math.ceil(total / size))
   return { from, to, lastPage: pageCount - 1, pageCount }
 }
+
+export interface CellPos {
+  row: number
+  col: number
+}
+
+const PAGE_ROWS = 10
+
+/**
+ * Navegação por teclado na grade (padrão "grid" do WAI-ARIA): setas, Home/End
+ * (com Ctrl, primeira/última célula) e PageUp/PageDown. `null` para teclas que
+ * não movem. Sempre dentro dos limites.
+ */
+export function nextCell(key: string, pos: CellPos, rows: number, cols: number, ctrl = false): CellPos | null {
+  if (rows === 0 || cols === 0) return null
+  const clamp = (row: number, col: number) => ({
+    row: Math.min(Math.max(row, 0), rows - 1),
+    col: Math.min(Math.max(col, 0), cols - 1),
+  })
+  switch (key) {
+    case 'ArrowUp':
+      return clamp(pos.row - 1, pos.col)
+    case 'ArrowDown':
+      return clamp(pos.row + 1, pos.col)
+    case 'ArrowLeft':
+      return clamp(pos.row, pos.col - 1)
+    case 'ArrowRight':
+      return clamp(pos.row, pos.col + 1)
+    case 'Home':
+      return ctrl ? clamp(0, 0) : clamp(pos.row, 0)
+    case 'End':
+      return ctrl ? clamp(rows - 1, cols - 1) : clamp(pos.row, cols - 1)
+    case 'PageUp':
+      return clamp(pos.row - PAGE_ROWS, pos.col)
+    case 'PageDown':
+      return clamp(pos.row + PAGE_ROWS, pos.col)
+    default:
+      return null
+  }
+}
