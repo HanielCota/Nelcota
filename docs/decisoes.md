@@ -350,6 +350,19 @@ versão (`?v=`), então a imagem pode ficar em cache.
 `embed_migrations!` lê a pasta sem avisar o compilador; um `build.rs` com
 `rerun-if-changed` evita builds incrementais com a lista antiga.
 
+**D66. Recuperação de senha por email, com o SMTP do projeto.** O Nelcota
+não roda servidor de email: `NELCOTA_SMTP_URL`, `NELCOTA_SMTP_FROM` e
+`NELCOTA_PASSWORD_RECOVERY_URL` (os três ou nenhum; pela metade, o servidor não
+sobe). O link vai para a página do app com o token no fragmento; tokens ficam
+em `auth.one_time_tokens` (migração V5) só como SHA-256, valem 1 hora e uma
+vez, no máximo um email por minuto por conta. O envio é em segundo plano para
+o tempo de resposta não revelar se a conta existe. Usar o link troca a senha,
+encerra as sessões e marca o email como confirmado. Envio com `lettre` sobre
+rustls + ring, com as raízes da Mozilla embutidas (`webpki-roots`): a imagem
+`scratch` não tem certificados do sistema e o build musl segue sem OpenSSL.
+Isso trouxe duas licenças permissivas para o `deny.toml`: CDLA-Permissive-2.0
+(a lista de raízes, que é dado) e 0BSD (`quoted_printable`).
+
 ### Pendências conhecidas
 
 - Embed de relações, `or=`/`and=` e upsert ficam para depois do MVP.

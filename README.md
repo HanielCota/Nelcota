@@ -8,7 +8,8 @@ deploy em 5 minutos numa VPS.**
 - **A autorização é do RLS.** A API só valida o JWT e assume a role dele
   dentro de uma transação. Ela nunca decide permissão por conta própria.
 - **Um binário (~10 MB)** com API REST automática, auth (JWT EdDSA + JWKS,
-  argon2id, refresh com rotação), painel e CLI de deploy.
+  argon2id, refresh com rotação, recuperação de senha por email), painel e CLI
+  de deploy.
 - **Padrões abertos:** JWT/JWKS, PHC argon2id, SQL puro, OpenAPI,
   S3-compatible. Dá para sair levando tudo ([saida.md](docs/saida.md)).
 
