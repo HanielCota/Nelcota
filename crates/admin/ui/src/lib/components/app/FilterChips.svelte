@@ -17,16 +17,16 @@
     onclearsort: () => void
   } = $props()
 
-  const chip = 'inline-flex h-7 items-center gap-1.5 rounded-full border border-border-strong bg-card pr-1 pl-3 text-xs shadow-card'
-  const remove = 'grid size-5 cursor-pointer place-items-center rounded-full text-muted-foreground hover:bg-accent hover:text-foreground'
+  const chip = 'inline-flex h-7 items-center gap-1.5 rounded-md border border-border-strong bg-card pr-1 pl-2.5 text-xs'
+  const remove = 'grid size-5 cursor-pointer place-items-center rounded text-muted-foreground hover:bg-accent hover:text-foreground'
 </script>
 
 <!-- O que está moldando a grade (ordem e filtros), cada um removível. -->
 <div class="flex shrink-0 flex-wrap items-center gap-2 border-b px-4 py-2.5">
   {#if sort}
     <span class={chip}>
-      {#if sort.desc}<ArrowDown class="size-3 text-brand" />{:else}<ArrowUp class="size-3 text-brand" />{/if}
-      ordenado por <span class="font-mono font-semibold">{sort.column}</span>
+      {#if sort.desc}<ArrowDown class="size-3 text-muted-foreground" />{:else}<ArrowUp class="size-3 text-muted-foreground" />{/if}
+      ordenado por <span class="font-mono">{sort.column}</span>
       <button class={remove} aria-label="Remover ordenação" onclick={onclearsort}><X class="size-3" /></button>
     </span>
   {/if}

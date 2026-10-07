@@ -75,7 +75,7 @@
     <form id="column-form" class="flex-1 space-y-6 overflow-y-auto px-6 py-6" onsubmit={submit}>
       <ColumnFields bind:column {tables} mode={original ? 'edit' : 'add'} />
       {#if original && column.data_type.trim() !== original.data_type}
-        <p class="rounded-xl border border-border-strong bg-muted/50 px-4 py-3 text-xs text-muted-foreground">
+        <p class="rounded-lg border bg-muted/40 px-4 py-3 text-xs text-muted-foreground">
           Os valores atuais são convertidos com <code>{original.name}::{column.data_type}</code>. Se algum não converter, nada é
           alterado.
         </p>

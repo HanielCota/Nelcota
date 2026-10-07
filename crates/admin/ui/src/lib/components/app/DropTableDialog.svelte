@@ -48,7 +48,7 @@
         <span class="text-muted-foreground">Digite <code class="text-foreground">{table}</code> para confirmar</span>
         <Input bind:value={typed} autocomplete="off" class="font-mono" />
       </label>
-      <label class="flex cursor-pointer items-start gap-3 rounded-xl border bg-muted/30 p-3 text-sm">
+      <label class="flex cursor-pointer items-start gap-3 text-sm">
         <Checkbox bind:checked={cascade} class="mt-0.5" />
         <span>
           Apagar também o que depende dela (CASCADE)

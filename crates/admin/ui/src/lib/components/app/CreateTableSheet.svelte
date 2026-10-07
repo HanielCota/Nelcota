@@ -95,11 +95,11 @@
     <form id="create-table" class="flex-1 space-y-8 overflow-y-auto px-6 py-6" onsubmit={submit}>
       <div class="grid gap-4 sm:grid-cols-2">
         <div class="grid gap-2">
-          <Label for="table-name" class="font-semibold">Nome</Label>
+          <Label for="table-name">Nome</Label>
           <Input id="table-name" bind:value={spec.name} placeholder="ex.: pedidos" class="font-mono" required />
         </div>
         <div class="grid gap-2">
-          <Label for="table-comment" class="font-semibold">Descrição</Label>
+          <Label for="table-comment">Descrição</Label>
           <Input
             id="table-comment"
             bind:value={() => spec.comment ?? '', (v) => (spec.comment = v || null)}
@@ -108,24 +108,24 @@
         </div>
       </div>
 
-      <label class="flex cursor-pointer items-start gap-3 rounded-xl border bg-card p-4 shadow-card transition-colors hover:border-border-strong has-data-checked:border-brand/40 has-data-checked:bg-brand-soft/50">
+      <label class="flex cursor-pointer items-start gap-3">
         <Checkbox bind:checked={spec.rls} class="mt-0.5" />
-        <span class="text-sm font-semibold">
+        <span class="text-sm font-medium">
           Ativar Row Level Security (recomendado)
-          <span class="mt-1 block text-xs font-normal text-muted-foreground">
+          <span class="mt-0.5 block text-sm font-normal text-muted-foreground">
             Sem policies, só o <code>service_role</code> acessa as linhas. Crie policies depois, na página Policies.
           </span>
         </span>
       </label>
       {#if !spec.rls}
-        <p class="flex gap-2.5 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-          <ShieldAlert class="size-4 shrink-0" />
+        <p class="flex gap-2 text-sm text-destructive">
+          <ShieldAlert class="mt-0.5 size-4 shrink-0" />
           Sem RLS, quem tiver GRANT na tabela lê e altera todas as linhas.
         </p>
       {/if}
 
       <section class="grid gap-3">
-        <h3 class="text-base font-semibold">Colunas</h3>
+        <h3 class="text-sm font-semibold">Colunas</h3>
         {#each spec.columns as _, i (keys[i])}
           <ColumnFields
             bind:column={spec.columns[i]}
@@ -138,7 +138,7 @@
       </section>
 
       <section class="grid gap-3">
-        <h3 class="text-base font-semibold">Acesso pela API (GRANT)</h3>
+        <h3 class="text-sm font-semibold">Acesso pela API (GRANT)</h3>
         <GrantsEditor bind:grants={spec.grants} />
       </section>
 

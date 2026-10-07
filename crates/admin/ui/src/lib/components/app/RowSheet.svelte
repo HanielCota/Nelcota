@@ -92,8 +92,8 @@
     <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <form id="row-form" class="flex-1 space-y-6 overflow-y-auto px-6 py-6" onsubmit={save} onkeydown={onKeydown}>
       {#if generated.length}
-        <div class="rounded-xl border bg-muted/40 px-4 py-3 text-xs">
-          <p class="font-semibold text-muted-foreground">Gerado pelo Postgres, não editável</p>
+        <div class="rounded-lg border bg-muted/40 px-4 py-3 text-xs">
+          <p class="font-medium text-muted-foreground">Gerado pelo Postgres, não editável</p>
           <dl class="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
             {#each generated as column (column.name)}
               <dt class="font-mono text-muted-foreground">{column.name}</dt>

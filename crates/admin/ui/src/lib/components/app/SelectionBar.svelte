@@ -43,22 +43,18 @@
 
 <!-- Ações sobre a seleção; aparece só com linhas marcadas. -->
 <div
-  class="flex min-h-12 shrink-0 flex-wrap items-center gap-2 border-b border-brand/25 bg-brand/[0.07] px-4 py-2 text-sm"
+  class="flex min-h-12 shrink-0 flex-wrap items-center gap-2 border-b border-brand/20 bg-brand/5 px-4 py-2 text-sm"
   role="region"
   aria-label="Linhas selecionadas"
 >
-  <span class="inline-flex items-center gap-2 font-semibold text-foreground" aria-live="polite"
-    ><span class="grid h-6 min-w-6 place-items-center rounded-full bg-brand px-1.5 text-2xs font-bold text-white tabular-nums dark:text-[#0b2a1c]"
-      >{rows.length}</span
-    >{label}</span
-  >
-  <span class="text-xs text-muted-foreground">nesta página</span>
+  <span class="font-medium text-foreground" aria-live="polite">{label}</span>
+  <span class="text-muted-foreground">nesta página</span>
   <div class="ml-auto flex flex-wrap items-center gap-2">
-    <Button variant="outline" size="sm" onclick={copyJson}><Copy />Copiar JSON</Button>
+    <Button variant="ghost" size="sm" onclick={copyJson}><Copy />Copiar JSON</Button>
     <DropdownMenu.Root>
       <DropdownMenu.Trigger>
         {#snippet child({ props })}
-          <Button variant="outline" size="sm" {...props}><Download />Exportar seleção</Button>
+          <Button variant="ghost" size="sm" {...props}><Download />Exportar seleção</Button>
         {/snippet}
       </DropdownMenu.Trigger>
       <DropdownMenu.Content align="end" class="w-40">

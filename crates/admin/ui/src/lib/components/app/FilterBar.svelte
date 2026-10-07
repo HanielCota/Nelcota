@@ -49,7 +49,7 @@
 <form class="grid gap-2.5 border-b bg-muted/40 px-4 py-4" onsubmit={apply}>
   {#each rows as row, i (row.key)}
     <div class="flex flex-wrap items-center gap-2">
-      <span class="w-12 text-right text-xs font-semibold text-muted-foreground uppercase">{i === 0 ? 'onde' : 'e'}</span>
+      <span class="w-12 text-right text-xs text-muted-foreground">{i === 0 ? 'onde' : 'e'}</span>
       <Select.Root type="single" bind:value={row.column}>
         <Select.Trigger class="w-48 font-mono text-xs">{row.column || 'coluna'}</Select.Trigger>
         <Select.Content>

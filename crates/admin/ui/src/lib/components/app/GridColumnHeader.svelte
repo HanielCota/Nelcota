@@ -68,8 +68,8 @@
     aria-label={`${column.name}, ${column.full_type}, ${sortLabel}. Clique para ordenar.`}
   >
     <span class="grid min-w-0 flex-1">
-      <span class={['flex items-center gap-1.5 truncate text-xs font-semibold text-foreground', alignRight(kind) && 'justify-end']}>
-        {#if column.is_pk}<KeyRound class="size-3.5 shrink-0 text-brand" aria-hidden="true" />{/if}
+      <span class={['flex items-center gap-1.5 truncate text-xs font-medium text-foreground', alignRight(kind) && 'justify-end']}>
+        {#if column.is_pk}<KeyRound class="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />{/if}
         <span class="truncate">{column.name}</span>
       </span>
       <span class="mt-0.5 truncate font-mono text-3xs font-normal text-muted-foreground"

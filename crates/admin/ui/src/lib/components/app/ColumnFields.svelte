@@ -60,7 +60,7 @@
   const onDeleteLabel = (value: OnDelete) => ON_DELETE.find((o) => o.value === value)?.label ?? value
 </script>
 
-<div class="rounded-xl border bg-card shadow-card">
+<div class="rounded-lg border bg-card">
   <div class="flex flex-wrap items-center gap-2.5 p-3">
     <Input bind:value={column.name} placeholder="nome" class="w-40 font-mono text-xs" aria-label="Nome da coluna" />
     <Input
@@ -139,7 +139,7 @@
       </div>
 
       <div class="flex flex-wrap items-center gap-2">
-        <span class="w-24 font-semibold text-muted-foreground">Referencia</span>
+        <span class="w-24 text-muted-foreground">Referencia</span>
         <Select.Root type="single" value={column.references?.table ?? ''} onValueChange={setReference}>
           <Select.Trigger size="sm" class="w-40 font-mono text-xs">
             {column.references?.table ?? 'nenhuma tabela'}
@@ -173,7 +173,7 @@
       </div>
 
       <div class="flex items-center gap-2">
-        <span class="w-24 font-semibold text-muted-foreground">Descrição</span>
+        <span class="w-24 text-muted-foreground">Descrição</span>
         <Input
           bind:value={() => column.comment ?? '', (v) => (column.comment = v || null)}
           placeholder="opcional (vira COMMENT e aparece na documentação da API)"

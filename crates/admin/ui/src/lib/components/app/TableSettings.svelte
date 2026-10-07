@@ -2,8 +2,6 @@
   import { Button } from '$lib/components/ui/button'
   import { Input } from '$lib/components/ui/input'
   import { Label } from '$lib/components/ui/label'
-  import ShieldCheck from '@lucide/svelte/icons/shield-check'
-  import ShieldAlert from '@lucide/svelte/icons/shield-alert'
   import GrantsEditor from './GrantsEditor.svelte'
   import ConfirmDialog from './ConfirmDialog.svelte'
   import { API_ROLES, grantChanges, type AlterAction, type GrantDef, type Structure } from '$lib/ddl'
@@ -44,7 +42,7 @@
 </script>
 
 <div class="grid gap-6">
-  <section class="rounded-xl border bg-card p-5 shadow-card">
+  <section class="rounded-lg border bg-card p-5">
     <h2 class="text-base font-semibold">Tabela</h2>
     <form
       class="mt-3 grid gap-3 sm:grid-cols-[1fr_2fr_auto] sm:items-end"
@@ -54,36 +52,34 @@
       }}
     >
       <div class="grid gap-2">
-        <Label for="settings-name" class="font-semibold">Nome</Label>
+        <Label for="settings-name">Nome</Label>
         <Input id="settings-name" bind:value={name} class="font-mono" />
       </div>
       <div class="grid gap-2">
-        <Label for="settings-comment" class="font-semibold">Descrição</Label>
+        <Label for="settings-comment">Descrição</Label>
         <Input id="settings-comment" bind:value={comment} placeholder="aparece na documentação da API" />
       </div>
       <Button type="submit" variant="outline" disabled={identityChanges.length === 0}>Salvar</Button>
     </form>
   </section>
 
-  <section class="flex flex-wrap items-center gap-4 rounded-xl border bg-card p-5 shadow-card">
+  <section class="flex flex-wrap items-center gap-4 rounded-lg border bg-card p-5">
     {#if structure.rls_enabled}
-      <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-brand-soft text-brand"><ShieldCheck class="size-5" /></span>
       <div class="flex-1">
-        <h2 class="text-base font-semibold">Row Level Security ativo</h2>
-        <p class="mt-0.5 text-sm text-muted-foreground">As policies decidem quais linhas cada role enxerga.</p>
+        <h2 class="text-base font-semibold">Row Level Security</h2>
+        <p class="mt-0.5 text-sm text-muted-foreground">Ativo. As policies decidem quais linhas cada role enxerga.</p>
       </div>
       <Button variant="outline" onclick={() => (disableRlsOpen = true)}>Desativar</Button>
     {:else}
-      <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-destructive/10 text-destructive"><ShieldAlert class="size-5" /></span>
       <div class="flex-1">
-        <h2 class="text-base font-semibold text-destructive">Row Level Security desligado</h2>
-        <p class="mt-0.5 text-sm text-muted-foreground">Quem tem GRANT lê e altera todas as linhas.</p>
+        <h2 class="text-base font-semibold">Row Level Security</h2>
+        <p class="mt-0.5 text-sm text-destructive">Desligado. Quem tem GRANT lê e altera todas as linhas.</p>
       </div>
       <Button onclick={() => onalter([{ action: 'set_rls', enabled: true }])}>Ativar RLS</Button>
     {/if}
   </section>
 
-  <section class="grid gap-3 rounded-xl border bg-card p-5 shadow-card">
+  <section class="grid gap-3 rounded-lg border bg-card p-5">
     <div class="flex items-center justify-between gap-3">
       <div>
         <h2 class="text-base font-semibold">Acesso pela API (GRANT)</h2>
@@ -96,9 +92,9 @@
     <GrantsEditor bind:grants />
   </section>
 
-  <section class="flex flex-wrap items-center gap-4 rounded-xl border border-destructive/30 bg-destructive/[0.03] p-5">
+  <section class="flex flex-wrap items-center gap-4 rounded-lg border border-destructive/30 p-5">
     <div class="flex-1">
-      <h2 class="text-base font-semibold text-destructive">Apagar tabela</h2>
+      <h2 class="text-base font-semibold">Apagar tabela</h2>
       <p class="mt-0.5 text-sm text-muted-foreground">Remove a tabela, as linhas e as policies. Não dá para desfazer.</p>
     </div>
     <Button variant="destructive" onclick={ondrop}>Apagar tabela</Button>

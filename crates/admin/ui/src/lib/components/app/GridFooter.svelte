@@ -24,7 +24,7 @@
 <footer class="flex min-h-12 shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-t bg-sidebar px-4 py-2 text-xs text-muted-foreground">
   <span class="tabular-nums" aria-live="polite">
     {#if info.to === 0}Nenhuma linha
-    {:else}<span class="font-semibold text-foreground">{fmt.format(info.from)}–{fmt.format(info.to)}</span>
+    {:else}<span class="font-medium text-foreground">{fmt.format(info.from)}–{fmt.format(info.to)}</span>
       {#if totalLabel}de {totalLabel}{/if}
       {data.total === 1 ? 'linha' : 'linhas'}{/if}
   </span>

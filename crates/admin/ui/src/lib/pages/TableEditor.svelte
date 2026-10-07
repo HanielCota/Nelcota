@@ -2,7 +2,6 @@
   import { onMount } from 'svelte'
   import { Button } from '$lib/components/ui/button'
   import Plus from '@lucide/svelte/icons/plus'
-  import Table2 from '@lucide/svelte/icons/table-2'
   import ShieldAlert from '@lucide/svelte/icons/shield-alert'
   import KeyRound from '@lucide/svelte/icons/key-round'
   import { toast } from 'svelte-sonner'
@@ -205,14 +204,9 @@
   <section class={cn('min-w-0 flex-1 flex-col', name ? 'flex' : 'hidden md:flex')}>
     {#if !name}
       <div class="grid flex-1 place-items-center p-8">
-        <EmptyState
-          icon={Table2}
-          title="Escolha uma tabela"
-          description="Selecione na lista ao lado para ver e editar as linhas, ou crie uma nova."
-          class="w-full max-w-lg"
-        >
+        <EmptyState title="Nenhuma tabela aberta" description="Escolha uma na lista ao lado.">
           {#snippet actions()}
-            <Button onclick={() => (createOpen = true)}><Plus />Criar tabela</Button>
+            <Button variant="outline" onclick={() => (createOpen = true)}><Plus />Nova tabela</Button>
           {/snippet}
         </EmptyState>
       </div>
@@ -233,7 +227,7 @@
       />
 
       {#if view === 'structure'}
-        <div class="min-h-0 flex-1 overflow-auto bg-muted/20">
+        <div class="min-h-0 flex-1 overflow-auto">
           <StructureView {name} onrenamed={onRenamed} ondropped={onDropped} />
         </div>
       {:else}
@@ -266,14 +260,12 @@
         {/if}
 
         {#if data?.table.exposed_without_rls}
-          <p class="flex items-center gap-2 border-b border-destructive/30 bg-destructive/5 px-4 py-2.5 text-sm text-destructive">
-            <ShieldAlert class="size-4 shrink-0" />
-            <span><span class="font-semibold">Sem RLS:</span> quem tem GRANT nesta tabela lê e altera todas as linhas.</span>
+          <p class="flex items-center gap-2 border-b border-destructive/30 bg-destructive/5 px-4 py-2 text-sm text-destructive">
+            <ShieldAlert class="size-4 shrink-0" />Sem RLS: quem tem GRANT nesta tabela lê e altera todas as linhas.
           </p>
         {:else if data && !data.table.editable && data.table.kind === 'table'}
-          <p class="flex items-center gap-2 border-b bg-muted/40 px-4 py-2.5 text-sm text-muted-foreground">
-            <KeyRound class="size-4 shrink-0" />
-            <span><span class="font-semibold text-foreground">Sem chave primária:</span> dá para ver as linhas, mas não editar por aqui.</span>
+          <p class="flex items-center gap-2 border-b bg-muted/40 px-4 py-2 text-sm text-muted-foreground">
+            <KeyRound class="size-4 shrink-0" />Sem chave primária: dá para ver as linhas, mas não editar por aqui.
           </p>
         {/if}
 
@@ -281,7 +273,7 @@
           <!-- Recarga (ordem, filtro, página): barra no topo e grade esmaecida,
                para os dados antigos não parecerem já os novos. -->
           {#if loading && data}
-            <div class="pointer-events-none sticky top-0 z-20 h-[3px] overflow-hidden bg-brand/15" aria-hidden="true">
+            <div class="pointer-events-none sticky top-0 z-20 h-0.5 overflow-hidden bg-brand/15" aria-hidden="true">
               <div class="animate-progress h-full w-2/5 bg-brand"></div>
             </div>
           {/if}

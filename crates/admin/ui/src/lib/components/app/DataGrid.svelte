@@ -197,7 +197,7 @@
       {@const isSelected = selected.has(i)}
       <tr class={['group transition-colors', isSelected ? 'bg-brand/[0.07]' : 'hover:bg-muted/60']}>
         {#if editable}
-          <td role="gridcell" class={[stickyCell, 'px-3.5 py-2', isSelected ? 'bg-[color-mix(in_oklch,var(--brand)_7%,var(--background))] shadow-[inset_3px_0_0_var(--brand)]' : 'group-hover:bg-[color-mix(in_oklch,var(--muted)_60%,var(--background))]']}>
+          <td role="gridcell" class={[stickyCell, 'px-3.5 py-2', isSelected ? 'bg-[color-mix(in_oklch,var(--brand)_7%,var(--background))]' : 'group-hover:bg-[color-mix(in_oklch,var(--muted)_60%,var(--background))]']}>
             <div class="flex items-center gap-2">
               <Checkbox checked={isSelected} onCheckedChange={(v) => toggleRow(i, v === true)} aria-label={`Selecionar linha ${i + 1}`} />
               <button
@@ -243,7 +243,7 @@
                 />
                 {#if column.nullable}
                   <button
-                    class="shrink-0 cursor-pointer rounded-md border border-border-strong bg-muted px-1.5 py-0.5 font-mono text-3xs font-semibold text-muted-foreground hover:text-foreground"
+                    class="shrink-0 cursor-pointer rounded border border-border-strong bg-muted px-1.5 py-0.5 font-mono text-3xs text-muted-foreground hover:text-foreground"
                     onmousedown={(e) => {
                       e.preventDefault()
                       commitEdit(true)

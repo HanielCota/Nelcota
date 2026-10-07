@@ -2,9 +2,6 @@
   import { Button } from '$lib/components/ui/button'
   import { Skeleton } from '$lib/components/ui/skeleton'
   import Plus from '@lucide/svelte/icons/plus'
-  import FunnelX from '@lucide/svelte/icons/funnel-x'
-  import TriangleAlert from '@lucide/svelte/icons/triangle-alert'
-  import Inbox from '@lucide/svelte/icons/inbox'
   import RotateCw from '@lucide/svelte/icons/rotate-cw'
   import EmptyState from './EmptyState.svelte'
 
@@ -29,7 +26,7 @@
 
 {#if state === 'loading'}
   <div class="grid gap-px p-0" aria-busy="true" aria-label="Carregando linhas">
-    <div class="flex gap-3 border-b bg-card px-4 py-3.5">
+    <div class="flex gap-3 border-b px-4 py-3.5">
       {#each [1, 2, 3, 4, 5] as i (i)}<Skeleton class="h-6 w-32" />{/each}
     </div>
     {#each Array.from({ length: 10 }, (_, i) => i) as i (i)}
@@ -39,32 +36,20 @@
     {/each}
   </div>
 {:else if state === 'error'}
-  <EmptyState icon={TriangleAlert} title="Não deu para carregar as linhas" class="m-6 border-destructive/30 bg-destructive/5 [&>span:first-child]:text-destructive">
-    <span class="break-words">{message}</span>
-    {#snippet actions()}
-      {#if onretry}<Button variant="outline" onclick={onretry}><RotateCw />Tentar de novo</Button>{/if}
-    {/snippet}
-  </EmptyState>
+  <div class="grid justify-items-start gap-3 p-6 text-sm">
+    <p class="break-words text-destructive">Não deu para carregar as linhas: {message}</p>
+    {#if onretry}<Button variant="outline" size="sm" onclick={onretry}><RotateCw />Tentar de novo</Button>{/if}
+  </div>
 {:else if state === 'no-match'}
-  <EmptyState
-    icon={FunnelX}
-    title="Nenhuma linha para esses filtros"
-    description="Ajuste ou remova os filtros para ver mais linhas."
-    class="m-6"
-  >
+  <EmptyState title="Nenhuma linha para esses filtros">
     {#snippet actions()}
       {#if onclearfilters}<Button variant="outline" onclick={onclearfilters}>Limpar filtros</Button>{/if}
     {/snippet}
   </EmptyState>
 {:else}
-  <EmptyState
-    icon={Inbox}
-    title="Esta tabela está vazia"
-    description={insertable ? 'Insira a primeira linha aqui ou pela API.' : 'As linhas aparecem aqui quando forem criadas.'}
-    class="m-6"
-  >
+  <EmptyState title="Tabela vazia">
     {#snippet actions()}
-      {#if insertable && oninsert}<Button onclick={oninsert}><Plus />Inserir linha</Button>{/if}
+      {#if insertable && oninsert}<Button variant="outline" onclick={oninsert}><Plus />Inserir linha</Button>{/if}
     {/snippet}
   </EmptyState>
 {/if}

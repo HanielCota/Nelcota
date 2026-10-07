@@ -6,7 +6,6 @@
   import ColumnSheet from './ColumnSheet.svelte'
   import ConfirmDialog from './ConfirmDialog.svelte'
   import DropTableDialog from './DropTableDialog.svelte'
-  import Callout from './Callout.svelte'
   import { ddl, type AlterAction, type ColumnInfo, type Structure } from '$lib/ddl'
 
   let {
@@ -64,9 +63,9 @@
 </script>
 
 {#if error}
-  <div class="p-6"><Callout variant="danger" title="Não deu para carregar a estrutura">{error}</Callout></div>
+  <p class="p-6 text-sm text-destructive">Não deu para carregar a estrutura: {error}</p>
 {:else if !structure}
-  <div class="mx-auto grid max-w-5xl gap-6 p-6 lg:p-8"><Skeleton class="h-72 rounded-xl" /><Skeleton class="h-36 rounded-xl" /></div>
+  <div class="mx-auto grid max-w-5xl gap-6 p-6 lg:p-8"><Skeleton class="h-72 rounded-lg" /><Skeleton class="h-36 rounded-lg" /></div>
 {:else}
   <div class="mx-auto grid max-w-5xl gap-6 p-6 lg:p-8">
     <StructureColumns

@@ -44,11 +44,11 @@
 
 <div class="grid gap-2">
   <div class="flex items-center gap-2">
-    <label for={id} class="flex items-center gap-1.5 text-sm font-semibold">
-      {#if column.is_pk}<KeyRound class="size-3.5 text-brand" aria-label="chave primária" />{/if}{column.name}
+    <label for={id} class="flex items-center gap-1.5 text-sm font-medium">
+      {#if column.is_pk}<KeyRound class="size-3.5 text-muted-foreground" aria-label="chave primária" />{/if}{column.name}
     </label>
     <span class="rounded-md bg-muted px-1.5 py-0.5 font-mono text-3xs text-muted-foreground">{column.full_type}</span>
-    {#if required}<span class="text-3xs font-semibold text-warning">obrigatória</span>{/if}
+    {#if required}<span class="text-2xs text-muted-foreground">obrigatória</span>{/if}
     {#if column.nullable}
       <label class="ml-auto flex cursor-pointer items-center gap-1.5 text-xs font-medium text-muted-foreground">
         <Checkbox checked={field.isNull} onCheckedChange={(v) => (field.isNull = v === true)} />

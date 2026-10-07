@@ -21,7 +21,7 @@
   const tag = 'rounded-md border border-border-strong bg-muted px-1.5 py-0.5 text-3xs font-medium text-muted-foreground'
 </script>
 
-<section class="overflow-hidden rounded-xl border bg-card shadow-card">
+<section class="overflow-hidden rounded-lg border bg-card">
   <header class="flex items-center justify-between gap-4 border-b px-5 py-4">
     <div>
       <h2 class="text-base font-semibold">Colunas</h2>
@@ -33,7 +33,7 @@
     {#each structure.columns as column (column.name)}
       <div class="group grid items-center gap-x-4 gap-y-1 px-5 py-3 text-sm transition-colors hover:bg-muted/40 md:grid-cols-[minmax(10rem,14rem)_minmax(8rem,12rem)_1fr_auto]">
         <div class="flex min-w-0 items-center gap-2">
-          {#if column.primary_key}<KeyRound class="size-3.5 shrink-0 text-brand" aria-label="chave primária" />{/if}
+          {#if column.primary_key}<KeyRound class="size-3.5 shrink-0 text-muted-foreground" aria-label="chave primária" />{/if}
           <span class="truncate font-mono text-sm font-medium">{column.name}</span>
         </div>
         <span class="truncate font-mono text-xs text-muted-foreground">{column.data_type}</span>
@@ -43,7 +43,7 @@
           {#if !column.nullable}<span class={tag}>obrigatória</span>{/if}
           {#if column.unique}<span class={tag}>única</span>{/if}
           {#if column.references}
-            <span class={[tag, 'text-brand']}>→ {column.references.table}.{column.references.column}</span>
+            <span class={tag}>→ {column.references.table}.{column.references.column}</span>
           {/if}
           {#if column.default && !column.identity && !column.generated}
             <span class="truncate font-mono text-2xs text-muted-foreground" title={column.default}>= {column.default}</span>

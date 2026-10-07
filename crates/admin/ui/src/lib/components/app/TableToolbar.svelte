@@ -7,7 +7,6 @@
   import Funnel from '@lucide/svelte/icons/funnel'
   import Download from '@lucide/svelte/icons/download'
   import Columns3 from '@lucide/svelte/icons/columns-3'
-  import Table2 from '@lucide/svelte/icons/table-2'
   import RlsBadge from './RlsBadge.svelte'
   import { enc } from '$lib/api'
   import { href } from '$lib/router.svelte'
@@ -50,22 +49,19 @@
 <div class="flex min-h-14 shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b bg-background px-4 py-2.5">
   <a
     href={href('/tables')}
-    class="-ml-1 grid size-9 place-items-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground md:hidden"
+    class="-ml-1 grid size-9 place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground md:hidden"
     aria-label="Voltar para a lista de tabelas"><ChevronLeft class="size-4" /></a
   >
-  <span class="hidden size-8 shrink-0 place-items-center rounded-lg bg-brand-soft text-brand sm:grid" aria-hidden="true"
-    ><Table2 class="size-4" strokeWidth={1.75} /></span
-  >
-  <h1 class="min-w-0 truncate text-base font-semibold tracking-tight">{name}</h1>
+  <h1 class="min-w-0 truncate text-base font-semibold">{name}</h1>
   {#if data}<RlsBadge rls={data.table.rls} />{/if}
-  <nav class="ml-1 flex h-9 items-center gap-0.5 rounded-lg bg-muted p-1 text-sm" aria-label="Visão da tabela">
+  <nav class="ml-1 flex h-9 items-center gap-0.5 rounded-md border bg-muted/50 p-0.5 text-sm" aria-label="Visão da tabela">
     {#each tabs as tab (tab.view)}
       <a
         href={href(`/tables/${enc(name)}${tab.suffix}`)}
         aria-current={view === tab.view ? 'page' : undefined}
         class={[
-          'flex h-full items-center rounded-md px-3 font-medium transition-colors',
-          view === tab.view ? 'bg-card text-foreground shadow-card' : 'text-muted-foreground hover:text-foreground',
+          'flex h-full items-center rounded px-3 transition-colors',
+          view === tab.view ? 'bg-background font-medium text-foreground ring-1 ring-border' : 'text-muted-foreground hover:text-foreground',
         ]}>{tab.label}</a
       >
     {/each}
@@ -78,9 +74,7 @@
         onclick={() => (filterOpen = !filterOpen)}
         aria-expanded={filterOpen}
       >
-        <Funnel />Filtrar{#if filterCount}<span class="grid h-5 min-w-5 place-items-center rounded-full bg-brand px-1.5 text-3xs font-bold text-white tabular-nums dark:text-[#0b2a1c]"
-            >{filterCount}</span
-          >{/if}
+        <Funnel />Filtrar{#if filterCount}<span class="text-muted-foreground tabular-nums">{filterCount}</span>{/if}
       </Button>
       {#if data}
         <DropdownMenu.Root>
@@ -88,7 +82,7 @@
             {#snippet child({ props })}
               <Button variant={hiddenColumns.length ? 'secondary' : 'ghost'} size="sm" {...props}>
                 <Columns3 />Colunas{#if hiddenColumns.length}<span
-                    class="grid h-5 min-w-5 place-items-center rounded-full bg-brand px-1.5 text-3xs font-bold text-white tabular-nums dark:text-[#0b2a1c]"
+                    class="text-muted-foreground tabular-nums"
                     title={`${hiddenColumns.length} oculta(s)`}>{hiddenColumns.length}</span
                   >{/if}
               </Button>
@@ -129,7 +123,7 @@
           </DropdownMenu.Item>
         </DropdownMenu.Content>
       </DropdownMenu.Root>
-      <Button variant="outline" size="icon-sm" onclick={onreload} aria-label="Recarregar" title="Recarregar">
+      <Button variant="ghost" size="icon-sm" onclick={onreload} aria-label="Recarregar" title="Recarregar">
         <RefreshCw class={loading ? 'animate-spin' : ''} />
       </Button>
       {#if data?.table.insertable}
