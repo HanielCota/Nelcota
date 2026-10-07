@@ -664,3 +664,68 @@ async fn basic_read_performance() {
     println!("simple read: average of {average:?} per request ({requests} requests)");
     assert!(average < Duration::from_millis(100), "average {average:?}");
 }
+
+#[tokio::test]
+async fn or_and_groups_filter_like_postgrest() {
+    let app = TestApp::spawn().await;
+    let get = |q: &str| {
+        let path = format!("/rest/v1/products?{q}");
+        let app = &app;
+        async move { app.get(&path, None).await }
+    };
+
+    let (_, b) = get("or=(stock.eq.0,price.lt.3)&order=name").await;
+    assert_eq!(names(&b), ["Backpack", "Pen"]);
+    // Nested group, and a quoted value with a comma.
+    let (_, b) = get("or=(name.eq.\"Ruler, 30cm\",and(price.gt.10,stock.gt.0))&order=name").await;
+    assert_eq!(names(&b), ["Notebook", "Ruler, 30cm"]);
+    let (_, b) = get("not.or=(stock.eq.0,price.lt.3)&order=name").await;
+    assert_eq!(names(&b), ["Notebook", "Ruler, 30cm"]);
+    // A tree is ANDed with the other filters.
+    let (_, b) = get("or=(price.gt.100,price.lt.3)&stock=gt.0").await;
+    assert_eq!(names(&b), ["Pen"]);
+    let (_, b) = get("and=(price.gte.4,price.lte.15)&order=price").await;
+    assert_eq!(names(&b), ["Ruler, 30cm", "Notebook"]);
+
+    let (status, b) = get("or=(name.eq.Pen").await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(b["code"], "invalid_query");
+}
+
+/// An `or` cannot widen what RLS allows: the policy is ANDed by Postgres.
+#[tokio::test]
+async fn rls_still_filters_inside_or() {
+    let app = TestApp::spawn().await;
+    let a = user_token(app.user_a);
+    let b = user_token(app.user_b);
+    let titles = |body: &Value| -> Vec<String> {
+        body.as_array()
+            .unwrap()
+            .iter()
+            .map(|r| r["title"].as_str().unwrap().to_owned())
+            .collect()
+    };
+
+    let path = format!(
+        "/rest/v1/todos?or=(user_id.eq.{},title.eq.task of B,title.eq.task of A)",
+        app.user_b
+    );
+    let (status, body) = app.get(&path, Some(&a)).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(titles(&body), ["task of A"]);
+
+    // PATCH with the same tree changes only A's row.
+    let reply = app
+        .request_with(
+            Method::PATCH,
+            "/rest/v1/todos?or=(title.eq.task of A,title.eq.task of B)",
+            Some(&a),
+            Some(json!({ "done": true })),
+            &[REPR],
+        )
+        .await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+    assert_eq!(titles(&reply.body), ["task of A"]);
+    let (_, theirs) = app.get("/rest/v1/todos", Some(&b)).await;
+    assert_eq!(theirs[0]["done"], false, "B's row is untouched");
+}

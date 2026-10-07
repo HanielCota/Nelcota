@@ -137,6 +137,24 @@ pub struct Filter {
     op: Op,
 }
 
+/// One filter, or a parenthesized group joined by OR/AND (`or=(...)`,
+/// `and=(...)`, optionally negated), nested as a tree.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Condition {
+    Filter(Filter),
+    Group {
+        /// `true` joins the items with OR, `false` with AND.
+        any: bool,
+        negate: bool,
+        items: Vec<Condition>,
+    },
+}
+
+/// Deepest nesting accepted in `or=`/`and=`: bounds the recursion on hostile input.
+const MAX_DEPTH: usize = 8;
+/// Most conditions accepted in one logic tree.
+const MAX_CONDITIONS: usize = 100;
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct OrderTerm {
     column: String,
@@ -148,7 +166,8 @@ pub struct OrderTerm {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Request {
     pub select: Select,
-    pub filters: Vec<Filter>,
+    /// Joined with AND, like separate query parameters.
+    pub filters: Vec<Condition>,
     pub order: Vec<OrderTerm>,
     pub limit: Option<i64>,
     pub offset: Option<i64>,
@@ -303,6 +322,150 @@ fn parse_filter(table: &Table, key: &str, value: &str) -> Result<Filter, QueryEr
     })
 }
 
+/// `or=(a.eq.1,and(b.gt.2,c.lt.3))`, `and=(...)`, `not.or=(...)`: the
+/// PostgREST logic tree. `key` is the query parameter (`or`, `not.and`...).
+fn parse_logic(table: &Table, key: &str, value: &str) -> Result<Condition, QueryError> {
+    let (negate, op) = match key.strip_prefix("not.") {
+        Some(op) => (true, op),
+        None => (false, key),
+    };
+    let mut count = 0;
+    Ok(Condition::Group {
+        any: op == "or",
+        negate,
+        items: parse_group(table, value, 1, &mut count)?,
+    })
+}
+
+/// `(item,item,...)` at nesting `depth`.
+fn parse_group(
+    table: &Table,
+    value: &str,
+    depth: usize,
+    count: &mut usize,
+) -> Result<Vec<Condition>, QueryError> {
+    if depth > MAX_DEPTH {
+        return Err(invalid(format!(
+            "or/and nested too deep (at most {MAX_DEPTH} levels)"
+        )));
+    }
+    let inner = value
+        .strip_prefix('(')
+        .and_then(|v| v.strip_suffix(')'))
+        .ok_or_else(|| invalid("or/and expects a parenthesized list: or=(a.eq.1,b.eq.2)"))?;
+    let items = split_top_level(inner)?;
+    if items.iter().all(|i| i.trim().is_empty()) {
+        return Err(invalid("empty or/and list"));
+    }
+    items
+        .into_iter()
+        .map(|item| parse_logic_item(table, item.trim(), depth, count))
+        .collect()
+}
+
+/// A group item: a nested `or(...)`/`and(...)` (maybe `not.`), or a filter
+/// written `column.operator.value`.
+fn parse_logic_item(
+    table: &Table,
+    item: &str,
+    depth: usize,
+    count: &mut usize,
+) -> Result<Condition, QueryError> {
+    *count += 1;
+    if *count > MAX_CONDITIONS {
+        return Err(invalid(format!(
+            "too many conditions in or/and (at most {MAX_CONDITIONS})"
+        )));
+    }
+    let (negate, rest) = match item.strip_prefix("not.") {
+        Some(rest) if rest.starts_with("or(") || rest.starts_with("and(") => (true, rest),
+        _ => (false, item),
+    };
+    for (prefix, any) in [("or", true), ("and", false)] {
+        if let Some(group) = rest.strip_prefix(prefix).filter(|g| g.starts_with('(')) {
+            return Ok(Condition::Group {
+                any,
+                negate,
+                items: parse_group(table, group, depth + 1, count)?,
+            });
+        }
+    }
+    let (column, filter) = item.split_once('.').ok_or_else(|| {
+        invalid(format!(
+            "invalid condition '{item}': use column.operator.value"
+        ))
+    })?;
+    parse_filter(table, column, &unquote_operand(filter)?).map(Condition::Filter)
+}
+
+/// In a logic tree, a value with commas or parentheses is double-quoted:
+/// `name.eq."a,b"`. `in` lists keep their own quoting rules.
+fn unquote_operand(filter: &str) -> Result<String, QueryError> {
+    let (negation, rest) = match filter.strip_prefix("not.") {
+        Some(rest) => ("not.", rest),
+        None => ("", filter),
+    };
+    let Some((op, operand)) = rest.split_once('.') else {
+        return Ok(filter.to_owned());
+    };
+    if op == "in" || !operand.starts_with('"') {
+        return Ok(filter.to_owned());
+    }
+    let inner = operand
+        .strip_prefix('"')
+        .and_then(|v| v.strip_suffix('"'))
+        .ok_or_else(|| invalid("unclosed quotes in an or/and value"))?;
+    let mut value = String::with_capacity(inner.len());
+    let mut chars = inner.chars();
+    while let Some(c) = chars.next() {
+        match c {
+            '\\' => value.extend(chars.next()),
+            c => value.push(c),
+        }
+    }
+    Ok(format!("{negation}{op}.{value}"))
+}
+
+/// Splits on commas outside parentheses and double quotes (`\` escapes inside
+/// quotes). Unbalanced parentheses or quotes are an error.
+fn split_top_level(input: &str) -> Result<Vec<&str>, QueryError> {
+    let mut parts = Vec::new();
+    let mut depth = 0usize;
+    let mut quoted = false;
+    let mut escaped = false;
+    let mut start = 0;
+    for (i, c) in input.char_indices() {
+        if quoted {
+            match c {
+                _ if escaped => escaped = false,
+                '\\' => escaped = true,
+                '"' => quoted = false,
+                _ => {}
+            }
+            continue;
+        }
+        match c {
+            '"' => quoted = true,
+            '(' => depth += 1,
+            ')' => {
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("unbalanced parentheses in or/and"))?;
+            }
+            ',' if depth == 0 => {
+                parts.push(&input[start..i]);
+                start = i + 1;
+            }
+            _ => {}
+        }
+    }
+    if quoted || depth != 0 {
+        return Err(invalid("unbalanced parentheses or quotes in or/and"));
+    }
+    parts.push(&input[start..]);
+    Ok(parts)
+}
+
 /// Parses the query string. Every column mentioned is validated against the table.
 pub fn parse_request(pairs: &[(String, String)], table: &Table) -> Result<Request, QueryError> {
     let mut request = Request {
@@ -318,7 +481,14 @@ pub fn parse_request(pairs: &[(String, String)], table: &Table) -> Result<Reques
             "order" => request.order = parse_order(value, table)?,
             "limit" => request.limit = Some(parse_non_negative("limit", value)?),
             "offset" => request.offset = Some(parse_non_negative("offset", value)?),
-            _ => request.filters.push(parse_filter(table, key, value)?),
+            // Logic trees, as in PostgREST: a column named `or`/`and` cannot
+            // be filtered directly (it still can inside a tree).
+            "or" | "and" | "not.or" | "not.and" => {
+                request.filters.push(parse_logic(table, key, value)?);
+            }
+            _ => request
+                .filters
+                .push(Condition::Filter(parse_filter(table, key, value)?)),
         }
     }
     Ok(request)
@@ -350,51 +520,75 @@ fn array_literal(items: &[String]) -> String {
     format!("{{{}}}", escaped.join(","))
 }
 
-fn where_clause(sql: &mut Sql, table: &Table, filters: &[Filter]) -> String {
+fn where_clause(sql: &mut Sql, table: &Table, filters: &[Condition]) -> String {
     if filters.is_empty() {
         return String::new();
     }
-    let mut conditions = Vec::with_capacity(filters.len());
-    for filter in filters {
-        let col = table
-            .column(&filter.column)
-            .expect("column validated while parsing");
-        let target = format!("_t.{}", ident(&col.name));
-        let condition = match &filter.op {
-            Op::Cmp(op, value) => {
-                let p = sql.param(Param::Text(value.clone()));
-                format!("{target} {} {p}::text::{}", op.sql(), col.type_name)
+    let conditions: Vec<String> = filters
+        .iter()
+        .map(|condition| condition_sql(sql, table, condition))
+        .collect();
+    format!(" WHERE {}", conditions.join(" AND "))
+}
+
+/// A tree node: groups become `(a OR b)` / `(a AND b)`, each wrapped so the
+/// precedence never depends on what surrounds it.
+fn condition_sql(sql: &mut Sql, table: &Table, condition: &Condition) -> String {
+    match condition {
+        Condition::Filter(filter) => filter_sql(sql, table, filter),
+        Condition::Group { any, negate, items } => {
+            let parts: Vec<String> = items
+                .iter()
+                .map(|item| condition_sql(sql, table, item))
+                .collect();
+            let joined = format!("({})", parts.join(if *any { " OR " } else { " AND " }));
+            if *negate {
+                format!("NOT {joined}")
+            } else {
+                joined
             }
-            Op::Like {
-                insensitive,
-                pattern,
-            } => {
-                let p = sql.param(Param::Text(pattern.clone()));
-                let op = if *insensitive { "ILIKE" } else { "LIKE" };
-                format!("{target}::text {op} {p}::text")
-            }
-            Op::In(items) if items.is_empty() => "false".to_owned(),
-            Op::In(items) => {
-                let p = sql.param(Param::Text(array_literal(items)));
-                format!("{target} = ANY({p}::text::{}[])", col.type_name)
-            }
-            Op::Is(value) => {
-                let value = match value {
-                    IsValue::Null => "NULL",
-                    IsValue::True => "TRUE",
-                    IsValue::False => "FALSE",
-                    IsValue::Unknown => "UNKNOWN",
-                };
-                format!("{target} IS {value}")
-            }
-        };
-        if filter.negate {
-            conditions.push(format!("NOT ({condition})"));
-        } else {
-            conditions.push(condition);
         }
     }
-    format!(" WHERE {}", conditions.join(" AND "))
+}
+
+fn filter_sql(sql: &mut Sql, table: &Table, filter: &Filter) -> String {
+    let col = table
+        .column(&filter.column)
+        .expect("column validated while parsing");
+    let target = format!("_t.{}", ident(&col.name));
+    let condition = match &filter.op {
+        Op::Cmp(op, value) => {
+            let p = sql.param(Param::Text(value.clone()));
+            format!("{target} {} {p}::text::{}", op.sql(), col.type_name)
+        }
+        Op::Like {
+            insensitive,
+            pattern,
+        } => {
+            let p = sql.param(Param::Text(pattern.clone()));
+            let op = if *insensitive { "ILIKE" } else { "LIKE" };
+            format!("{target}::text {op} {p}::text")
+        }
+        Op::In(items) if items.is_empty() => "false".to_owned(),
+        Op::In(items) => {
+            let p = sql.param(Param::Text(array_literal(items)));
+            format!("{target} = ANY({p}::text::{}[])", col.type_name)
+        }
+        Op::Is(value) => {
+            let value = match value {
+                IsValue::Null => "NULL",
+                IsValue::True => "TRUE",
+                IsValue::False => "FALSE",
+                IsValue::Unknown => "UNKNOWN",
+            };
+            format!("{target} IS {value}")
+        }
+    };
+    if filter.negate {
+        format!("NOT ({condition})")
+    } else {
+        condition
+    }
 }
 
 fn order_clause(order: &[OrderTerm]) -> String {
@@ -602,7 +796,7 @@ pub fn update(
     schema: &str,
     table: &Table,
     body: Value,
-    filters: &[Filter],
+    filters: &[Condition],
     representation: Option<&Select>,
 ) -> Result<Sql, QueryError> {
     let Value::Object(map) = body else {
@@ -634,7 +828,7 @@ pub fn update(
 pub fn delete(
     schema: &str,
     table: &Table,
-    filters: &[Filter],
+    filters: &[Condition],
     representation: Option<&Select>,
 ) -> Sql {
     let mut sql = Sql::default();
@@ -879,5 +1073,107 @@ mod tests {
         assert!(sql.text.starts_with("WITH _w0 AS (INSERT"), "{}", sql.text);
         assert!(sql.text.contains("DEFAULT VALUES"));
         assert_eq!(sql.params.len(), 2);
+    }
+
+    // ------------------------------------------------------------- or / and
+
+    fn where_of(q: &[(&str, &str)]) -> (String, Vec<String>) {
+        let t = table();
+        let req = parse_request(&pairs(q), &t).unwrap();
+        let sql = count("public", &t, &req);
+        let params = sql
+            .params
+            .iter()
+            .map(|p| match p {
+                Param::Text(v) => v.clone(),
+                other => format!("{other:?}"),
+            })
+            .collect();
+        let text = sql
+            .text
+            .split(" WHERE ")
+            .nth(1)
+            .unwrap_or_default()
+            .to_owned();
+        (text, params)
+    }
+
+    #[test]
+    fn or_joins_its_items_and_ands_with_other_filters() {
+        let (text, params) = where_of(&[("or", "(title.eq.a,title.eq.b)"), ("done", "is.false")]);
+        assert_eq!(
+            text,
+            "(_t.\"title\" = $1::text::text OR _t.\"title\" = $2::text::text) AND _t.\"done\" IS FALSE"
+        );
+        assert_eq!(params, ["a", "b"]);
+    }
+
+    #[test]
+    fn groups_nest_and_negate() {
+        let (text, params) = where_of(&[("or", "(id.eq.1,and(done.is.true,title.not.like.*x*))")]);
+        assert_eq!(
+            text,
+            "(_t.\"id\" = $1::text::bigint OR (_t.\"done\" IS TRUE AND NOT (_t.\"title\"::text LIKE $2::text)))"
+        );
+        assert_eq!(params, ["1", "%x%"]);
+
+        let (text, _) = where_of(&[("not.and", "(id.gt.1,not.or(done.is.true,id.lt.0))")]);
+        assert_eq!(
+            text,
+            "NOT (_t.\"id\" > $1::text::bigint AND NOT (_t.\"done\" IS TRUE OR _t.\"id\" < $2::text::bigint))"
+        );
+    }
+
+    #[test]
+    fn quoted_values_may_hold_commas_and_parentheses() {
+        let (_, params) = where_of(&[(
+            "or",
+            r#"(title.eq."a,b",title.eq."f(x)",title.eq."say \"hi\"",title.in.("x,y",z))"#,
+        )]);
+        assert_eq!(params, ["a,b", "f(x)", "say \"hi\"", r#"{"x,y","z"}"#]);
+    }
+
+    #[test]
+    fn logic_values_stay_parameters() {
+        let malicious = "x') OR true; DROP TABLE todos; --";
+        let (text, params) = where_of(&[("or", &format!("(title.eq.\"{malicious}\",id.eq.1)"))]);
+        assert!(!text.contains("DROP"), "{text}");
+        assert_eq!(params[0], malicious);
+    }
+
+    #[test]
+    fn malformed_or_hostile_trees_are_rejected() {
+        let t = table();
+        let deep = format!(
+            "({}id.eq.1{})",
+            "or(".repeat(MAX_DEPTH),
+            ")".repeat(MAX_DEPTH)
+        );
+        let wide = format!("({})", vec!["id.eq.1"; MAX_CONDITIONS + 1].join(","));
+        for (key, value) in [
+            ("or", "title.eq.a"),                // no parentheses
+            ("or", "()"),                        // empty
+            ("or", "(title.eq.a,)"),             // empty item
+            ("or", "(title.eq.a"),               // unbalanced
+            ("or", "(title.eq.\"a)"),            // unclosed quote
+            ("or", "(nope.eq.1)"),               // unknown column
+            ("or", "(title)"),                   // no operator
+            ("or", "(title.eq.a,xor(id.eq.1))"), // not a group keyword
+            ("and", "(\"x\"\"; drop table todos; --\".eq.1)"),
+            ("or", deep.as_str()),
+            ("or", wide.as_str()),
+        ] {
+            assert!(
+                parse_request(&pairs(&[(key, value)]), &t).is_err(),
+                "{key}={value}"
+            );
+        }
+        // The deepest accepted tree still parses.
+        let ok = format!(
+            "({}id.eq.1{})",
+            "or(".repeat(MAX_DEPTH - 1),
+            ")".repeat(MAX_DEPTH - 1)
+        );
+        assert!(parse_request(&pairs(&[("or", &ok)]), &t).is_ok());
     }
 }

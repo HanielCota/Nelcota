@@ -102,6 +102,16 @@ pub fn document(catalog: &Catalog, role: Role) -> Value {
                     "description": "Filter: eq, neq, gt, gte, lt, lte, like, ilike, in, is (e.g. eq.value, in.(a,b), not.is.null)",
                 })
             })
+            .chain(["or", "and"].map(|logic| {
+                json!({
+                    "name": logic, "in": "query", "required": false,
+                    "schema": { "type": "string" },
+                    "description": format!(
+                        "Group of filters joined with {}: ({logic}=(col.op.value,...)); nests with and(...)/or(...), negate with not.{logic}",
+                        logic.to_uppercase()
+                    ),
+                })
+            }))
             .collect();
         let mut item = Map::new();
         if privileges.select {
