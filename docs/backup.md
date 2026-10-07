@@ -1,73 +1,74 @@
-# Backup e restore
+# Backup and restore
 
 ## Backup
 
 ```sh
-nelcota -p loja backup            # pg_dump -Fc → projects/loja/backups/nelcota-loja-<data>.dump
-nelcota -p loja backup --upload   # e envia ao S3-compatible configurado (s3://<bucket>/loja/)
-nelcota backup --all --keep 7     # todos os projetos; mantém os 7 dumps locais mais recentes
+nelcota -p shop backup            # pg_dump -Fc → projects/shop/backups/nelcota-shop-<date>.dump
+nelcota -p shop backup --upload   # and uploads it to the configured S3-compatible storage (s3://<bucket>/shop/)
+nelcota backup --all --keep 7     # every project; keeps the 7 most recent local dumps
 ```
 
-O primeiro `init` (como root) instala um cron diário às 03:00
-(`/etc/cron.d/nelcota-backup`) com `backup --all`, e `--upload` quando há S3
-configurado. Um projeto com problema não impede o backup dos outros.
+The first `init` (as root) installs a daily cron job at 03:00
+(`/etc/cron.d/nelcota-backup`) running `backup --all`, plus `--upload` when S3
+is configured. A broken project does not stop the others from being backed up.
 
-O dump é o formato custom do `pg_dump`: inclui schema, dados, policies RLS,
-funções e o schema `auth` (usuários com os hashes argon2id). As roles do
-cluster (`anon`, `authenticated`...) não vão no dump, mas são recriadas pelas
-migrações do Nelcota em qualquer instalação nova.
+The dump uses `pg_dump`'s custom format: it includes schema, data, RLS
+policies, functions and the `auth` schema (users with their argon2id hashes).
+Cluster roles (`anon`, `authenticated`...) are not in the dump, but Nelcota's
+migrations recreate them on any new install.
 
 ### S3-compatible
 
-Qualquer serviço com API S3: AWS S3, Backblaze B2, Cloudflare R2, Wasabi,
-MinIO. Variáveis no `host.env` (valem para todos os projetos):
+Any service with an S3 API: AWS S3, Backblaze B2, Cloudflare R2, Wasabi,
+MinIO. Variables in `host.env` (they apply to every project):
 
 ```sh
 NELCOTA_BACKUP_S3_ENDPOINT=https://s3.us-west-002.backblazeb2.com
-NELCOTA_BACKUP_S3_BUCKET=meus-backups
+NELCOTA_BACKUP_S3_BUCKET=my-backups
 NELCOTA_BACKUP_S3_ACCESS_KEY=...
 NELCOTA_BACKUP_S3_SECRET_KEY=...
 NELCOTA_BACKUP_S3_REGION=us-west-002
 ```
 
-O envio usa a imagem oficial `amazon/aws-cli` (nada a instalar no host).
-Configure no bucket a retenção (lifecycle) que você quiser.
+Uploads use the official `amazon/aws-cli` image (nothing to install on the
+host). Configure whatever retention (lifecycle) you want on the bucket.
 
-> **Guarde o `host.env` e o `.env` de cada projeto em lugar seguro, separados
-> do bucket.** Eles não vão no backup (contêm segredos). Sem o `.env` do
-> projeto, um restore funciona, mas a chave dos JWTs muda e todos os usuários
-> precisam logar de novo (as senhas continuam valendo).
+> **Keep `host.env` and each project's `.env` somewhere safe, apart from the
+> bucket.** They are not in the backup (they hold secrets). Without the
+> project's `.env` a restore still works, but the JWT key changes and every
+> user has to sign in again (passwords keep working).
 
 ## Restore
 
 ```sh
-nelcota -p loja restore projects/loja/backups/nelcota-loja-20261006T030000Z.dump
+nelcota -p shop restore projects/shop/backups/nelcota-shop-20261006T030000Z.dump
 ```
 
-O restore para o app, executa `pg_restore --clean --if-exists` em **uma
-transação** (se algo falhar, o banco fica como estava) e sobe o app de novo.
+The restore stops the app, runs `pg_restore --clean --if-exists` in **a single
+transaction** (if anything fails, the database stays as it was) and starts the
+app again.
 
-### Restore numa VPS nova
+### Restore on a new VPS
 
 ```sh
 curl -fsSL https://nelcota.dev/install | sh
 mkdir -p /opt/nelcota && cd /opt/nelcota
-nelcota init api.loja.com --yes
-cp /caminho/seguro/loja.env projects/loja/.env   # opcional: mantém a chave dos JWTs
+nelcota init api.shop.com --yes
+cp /safe/place/shop.env projects/shop/.env   # optional: keeps the JWT key
 nelcota up
-aws s3 cp s3://meus-backups/loja/nelcota-loja-....dump projects/loja/backups/ --endpoint-url ...
-nelcota -p loja restore projects/loja/backups/nelcota-loja-....dump --yes
+aws s3 cp s3://my-backups/shop/nelcota-shop-....dump projects/shop/backups/ --endpoint-url ...
+nelcota -p shop restore projects/shop/backups/nelcota-shop-....dump --yes
 ```
 
-O teste de aceitação (`scripts/acceptance.sh --local`) faz backup, escreve
-mais dados, restaura e confere que o estado voltou ao do backup.
+The acceptance test (`scripts/acceptance.sh --local`) takes a backup, writes
+more data, restores and checks that the state went back to the backup's.
 
-Ao remover um projeto (`nelcota -p <nome> remove`), um backup final fica em
-`archive/`, na pasta do host.
+When a project is removed (`nelcota -p <name> remove`), a final backup is kept
+in `archive/`, in the host folder.
 
 ## PITR (point-in-time recovery)
 
-Dumps diários perdem até 24 h de escrita no pior caso. Para recuperar até o
-último segundo, a evolução planejada é arquivar o WAL continuamente com
-**WAL-G** (ou pgBackRest) no mesmo S3. Isso ainda não é gerado pelo `init`;
-está registrado como pendência em [decisoes.md](decisoes.md).
+Daily dumps lose up to 24 h of writes in the worst case. To recover up to the
+last second, the planned evolution is to archive the WAL continuously with
+**WAL-G** (or pgBackRest) to the same S3. `init` does not set this up yet; it
+is listed as pending in [decisions.md](decisions.md).

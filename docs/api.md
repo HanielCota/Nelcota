@@ -1,116 +1,115 @@
-# API REST
+# REST API
 
-Gerada do schema exposto (`NELCOTA_DB_SCHEMA`, padrão `public`). Toda tabela,
-view e função do schema vira endpoint, e **quem decide o acesso é o Postgres**:
-GRANTs dizem quais roles podem usar cada objeto e o RLS diz quais linhas cada
-usuário enxerga.
+Generated from the exposed schema (`NELCOTA_DB_SCHEMA`, default `public`). Every
+table, view and function in the schema becomes an endpoint, and **Postgres
+decides access**: GRANTs say which roles may use each object and RLS says which
+rows each user sees.
 
-> Tabelas novas não têm GRANT para `anon`/`authenticated`: até você conceder,
-> a API responde 401/403. Isso é intencional.
+> New tables have no GRANT for `anon`/`authenticated`: until you grant it, the
+> API answers 401/403. This is intentional.
 >
 > ```sql
-> GRANT SELECT, INSERT, UPDATE, DELETE ON public.minha_tabela TO authenticated;
-> ALTER TABLE public.minha_tabela ENABLE ROW LEVEL SECURITY;
+> GRANT SELECT, INSERT, UPDATE, DELETE ON public.my_table TO authenticated;
+> ALTER TABLE public.my_table ENABLE ROW LEVEL SECURITY;
 > CREATE POLICY ... ;
 > ```
 
-## Leitura: `GET /rest/v1/{tabela}`
+## Reads: `GET /rest/v1/{table}`
 
-| Parâmetro | Exemplo | Efeito |
+| Parameter | Example | Effect |
 |---|---|---|
-| `select` | `select=id,titulo` | colunas (padrão `*`) |
-| `{coluna}` | `preco=gt.10` | filtro (vários são combinados com AND) |
-| `order` | `order=criado_em.desc.nullslast,id` | ordenação |
-| `limit`, `offset` | `limit=20&offset=40` | paginação |
+| `select` | `select=id,title` | columns (default `*`) |
+| `{column}` | `price=gt.10` | filter (several are combined with AND) |
+| `order` | `order=created_at.desc.nullslast,id` | ordering |
+| `limit`, `offset` | `limit=20&offset=40` | pagination |
 
-### Operadores
+### Operators
 
-| Operador | SQL | Exemplo |
+| Operator | SQL | Example |
 |---|---|---|
-| `eq`, `neq` | `=`, `<>` | `status=eq.ativo` |
-| `gt`, `gte`, `lt`, `lte` | `>`, `>=`, `<`, `<=` | `idade=gte.18` |
-| `like`, `ilike` | `LIKE`, `ILIKE` (`*` vira `%`) | `nome=ilike.*silva*` |
-| `in` | `= ANY(...)` | `id=in.(1,2,3)`, `nome=in.("a,b",c)` |
-| `is` | `IS NULL/TRUE/FALSE/UNKNOWN` | `apagado_em=is.null` |
-| `not.` | `NOT (...)` | `status=not.eq.cancelado`, `x=not.is.null` |
+| `eq`, `neq` | `=`, `<>` | `status=eq.active` |
+| `gt`, `gte`, `lt`, `lte` | `>`, `>=`, `<`, `<=` | `age=gte.18` |
+| `like`, `ilike` | `LIKE`, `ILIKE` (`*` becomes `%`) | `name=ilike.*silva*` |
+| `in` | `= ANY(...)` | `id=in.(1,2,3)`, `name=in.("a,b",c)` |
+| `is` | `IS NULL/TRUE/FALSE/UNKNOWN` | `deleted_at=is.null` |
+| `not.` | `NOT (...)` | `status=not.eq.cancelled`, `x=not.is.null` |
 
-Os valores chegam ao Postgres como parâmetros e são convertidos para o tipo da
-coluna pelo próprio Postgres (`$1::text::<tipo>`). Valor inválido para o tipo
-dá 400.
+Values reach Postgres as parameters and Postgres itself converts them to the
+column type (`$1::text::<type>`). A value invalid for the type gives 400.
 
-### Respostas
+### Responses
 
-- Corpo: array JSON montado pelo Postgres (`json_agg`).
-- `Content-Range: 0-19/*`, ou `0-19/137` com `Prefer: count=exact`.
-- `NELCOTA_MAX_ROWS` (opcional) limita o número de linhas por leitura.
+- Body: a JSON array built by Postgres (`json_agg`).
+- `Content-Range: 0-19/*`, or `0-19/137` with `Prefer: count=exact`.
+- `NELCOTA_MAX_ROWS` (optional) caps the number of rows per read.
 
-## Escrita
+## Writes
 
-| Verbo | Corpo | Filtros | Sem `return=representation` | Com `return=representation` |
+| Verb | Body | Filters | Without `return=representation` | With `return=representation` |
 |---|---|---|---|---|
-| `POST` | objeto ou array | não aceita | 201 vazio | 201 + array |
-| `PATCH` | objeto | **obrigatórios** | 204 | 200 + array |
-| `DELETE` | - | **obrigatórios** | 204 | 200 + array |
+| `POST` | object or array | not accepted | 201 empty | 201 + array |
+| `PATCH` | object | **required** | 204 | 200 + array |
+| `DELETE` | - | **required** | 204 | 200 + array |
 
-- `select=` também escolhe as colunas da representação.
-- No `POST`, colunas ausentes recebem o `DEFAULT`, mesmo num lote com chaves
-  diferentes entre os objetos.
-- `PATCH`/`DELETE` sem filtro são recusados (400), para evitar alterar ou
-  apagar a tabela inteira por engano. Para isso de propósito, use um filtro
-  explícito (`?id=not.is.null`).
-- `return=representation` executa `RETURNING`, que exige permissão de
-  `SELECT` (GRANT + policy) nas linhas escritas.
+- `select=` also picks the columns of the representation.
+- On `POST`, missing columns get their `DEFAULT`, even in a batch whose
+  objects have different keys.
+- `PATCH`/`DELETE` without a filter are refused (400), to avoid changing or
+  deleting the whole table by mistake. To do that on purpose, use an explicit
+  filter (`?id=not.is.null`).
+- `return=representation` runs `RETURNING`, which requires `SELECT`
+  permission (GRANT + policy) on the written rows.
 
-## Funções: `POST /rest/v1/rpc/{funcao}`
+## Functions: `POST /rest/v1/rpc/{function}`
 
-Corpo: objeto com os argumentos **nomeados** (`{"a": 1, "b": 2}`); argumentos
-com `DEFAULT` são opcionais. Com sobrecarga, vale a assinatura cujos nomes
-batem com as chaves.
+Body: an object with the **named** arguments (`{"a": 1, "b": 2}`); arguments
+with a `DEFAULT` are optional. With overloads, the signature whose names match
+the keys wins.
 
-| Retorno da função | Resposta |
+| Function returns | Response |
 |---|---|
-| `SETOF`/`TABLE` | array JSON |
-| escalar ou composto | valor JSON |
+| `SETOF`/`TABLE` | JSON array |
+| scalar or composite | JSON value |
 | `void` | 204 |
 
-`RAISE EXCEPTION` vira 400 com a mensagem. A função roda com a role do JWT
-(a menos que seja `SECURITY DEFINER`): `auth.uid()` funciona dentro dela.
+`RAISE EXCEPTION` becomes 400 with the message. The function runs with the
+JWT's role (unless it is `SECURITY DEFINER`): `auth.uid()` works inside it.
 
-> **Atenção:** Por padrão, o Postgres concede `EXECUTE` de funções novas a `PUBLIC`
-> (inclusive `anon`). Para funções sensíveis:
+> **Warning:** By default, Postgres grants `EXECUTE` on new functions to
+> `PUBLIC` (including `anon`). For sensitive functions:
 > `REVOKE EXECUTE ON FUNCTION f() FROM PUBLIC; GRANT EXECUTE ON FUNCTION f() TO authenticated;`
 
 ## OpenAPI: `GET /rest/v1/`
 
-Documento OpenAPI 3.0 gerado do catálogo e **filtrado pela role do request**:
-`anon` só vê o que `anon` pode usar.
+An OpenAPI 3.0 document generated from the catalog and **filtered by the
+request's role**: `anon` only sees what `anon` may use.
 
-## Recarga do catálogo
+## Catalog reload
 
-A API guarda a introspecção em memória. Um event trigger (migração V3) avisa o
-servidor a cada DDL e a recarga acontece em ~100 ms. Sem superusuário (alguns
-Postgres gerenciados), recarregue à mão:
+The API keeps the introspection in memory. An event trigger (migration V3)
+notifies the server on every DDL and the reload happens in ~100 ms. Without a
+superuser (some managed Postgres services), reload by hand:
 
 ```sql
 NOTIFY nelcota, 'reload schema';
 ```
 
-## Erros
+## Errors
 
 `{"code": "...", "message": "..."}`
 
-| Status | Quando |
+| Status | When |
 |---|---|
-| 400 `invalid_query` | coluna/operador/ordem inválidos na URL |
-| 400 `invalid_body` | corpo não é JSON válido |
-| 400 `db_error` | valor inválido para o tipo, check, not null, coluna gerada, `RAISE EXCEPTION` |
-| 401 | JWT inválido, ou `anon` sem permissão |
-| 403 | role sem permissão, ou policy violada na escrita |
-| 404 `not_found` | tabela/função fora do schema exposto |
-| 409 | chave única ou FK violada |
-| 504 | `statement_timeout` (`NELCOTA_STATEMENT_TIMEOUT_SECS`, padrão 10 s) |
+| 400 `invalid_query` | invalid column/operator/order in the URL |
+| 400 `invalid_body` | the body is not valid JSON |
+| 400 `db_error` | value invalid for the type, check, not null, generated column, `RAISE EXCEPTION` |
+| 401 | invalid JWT, or `anon` without permission |
+| 403 | role without permission, or a policy violated on write |
+| 404 `not_found` | table/function outside the exposed schema |
+| 409 | unique key or FK violated |
+| 504 | `statement_timeout` (`NELCOTA_STATEMENT_TIMEOUT_SECS`, default 10 s) |
 
-## Fora do MVP
+## Out of the MVP
 
-Embed de relações (`select=*,pedidos(*)`), `or=`/`and=`, upsert
-(`on_conflict`), `GET` em `/rpc`, `Accept: application/vnd.pgrst.object+json`.
+Relation embedding (`select=*,orders(*)`), `or=`/`and=`, upsert
+(`on_conflict`), `GET` on `/rpc`, `Accept: application/vnd.pgrst.object+json`.

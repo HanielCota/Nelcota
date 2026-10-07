@@ -1,96 +1,97 @@
-# Schema `auth`
+# The `auth` schema
 
-Contrato público e estável. Todas as tabelas são SQL comum: dá para ler,
-exportar e migrar sem o Nelcota (ver [saida.md](saida.md)).
+A public, stable contract. Every table is ordinary SQL: you can read, export
+and migrate it without Nelcota (see [leaving.md](leaving.md)).
 
-As tabelas **não** são expostas pela API REST. O servidor as acessa com a role
-interna `nelcota_auth`, que nenhum JWT pode assumir. `anon`, `authenticated` e
-`service_role` não têm GRANT nelas (há teste para isso).
+The tables are **not** exposed by the REST API. The server reaches them with
+the internal role `nelcota_auth`, which no JWT can assume. `anon`,
+`authenticated` and `service_role` have no GRANT on them (there is a test for
+that).
 
 ## `auth.users`
 
-| Coluna | Tipo | Notas |
+| Column | Type | Notes |
 |---|---|---|
-| `id` | `uuid` PK | `gen_random_uuid()`; é o `sub` do JWT e o `auth.uid()` |
-| `email` | `text` único | sempre minúsculo, ≤ 254 caracteres |
-| `encrypted_password` | `text` | **PHC string argon2id** (ver abaixo); `NULL` = sem senha |
-| `email_confirmed_at` | `timestamptz` | preenchido quando a pessoa usa um link de recuperação (prova que recebe os emails); confirmação no cadastro ainda fora do MVP |
-| `raw_user_meta_data` | `jsonb` | campo `data` do cadastro; devolvido como `user_metadata` |
+| `id` | `uuid` PK | `gen_random_uuid()`; it is the JWT `sub` and `auth.uid()` |
+| `email` | `text` unique | always lowercase, ≤ 254 characters |
+| `encrypted_password` | `text` | **argon2id PHC string** (see below); `NULL` = no password |
+| `email_confirmed_at` | `timestamptz` | set when the person uses a recovery link (proves they receive the email); confirmation at signup is still out of the MVP |
+| `raw_user_meta_data` | `jsonb` | the signup `data` field; returned as `user_metadata` |
 | `created_at`, `updated_at` | `timestamptz` | |
-| `last_sign_in_at` | `timestamptz` | atualizado em cada login |
+| `last_sign_in_at` | `timestamptz` | updated on every login |
 
-### Formato da senha
+### Password format
 
 ```
 $argon2id$v=19$m=19456,t=2,p=1$<salt base64>$<hash base64>
 ```
 
-É o formato PHC padrão. Os parâmetros (19 MiB, 2 iterações, paralelismo 1)
-seguem a recomendação da OWASP. Funciona direto em qualquer biblioteca argon2:
-Python `argon2-cffi` (`PasswordHasher().verify(hash, senha)`), Node `argon2`
-(`argon2.verify(hash, senha)`), Go `alexedwards/argon2id`, PHP
-`password_verify()`, Keycloak/Authentik via import.
+It is the standard PHC format. The parameters (19 MiB, 2 iterations,
+parallelism 1) follow the OWASP recommendation. It works directly with any
+argon2 library: Python `argon2-cffi` (`PasswordHasher().verify(hash,
+password)`), Node `argon2` (`argon2.verify(hash, password)`), Go
+`alexedwards/argon2id`, PHP `password_verify()`, Keycloak/Authentik via import.
 
 ## `auth.sessions`
 
-Uma linha por login.
+One row per login.
 
-| Coluna | Tipo | Notas |
+| Column | Type | Notes |
 |---|---|---|
-| `id` | `uuid` PK | vai no JWT como claim `session_id` |
+| `id` | `uuid` PK | goes into the JWT as the `session_id` claim |
 | `user_id` | `uuid` → `auth.users` | `ON DELETE CASCADE` |
 | `created_at`, `refreshed_at` | `timestamptz` | |
-| `revoked_at` | `timestamptz` | logout ou reuso de refresh token detectado |
-| `user_agent`, `ip` | `text`, `inet` | informativos |
+| `revoked_at` | `timestamptz` | logout or detected refresh token reuse |
+| `user_agent`, `ip` | `text`, `inet` | informative |
 
 ## `auth.refresh_tokens`
 
-| Coluna | Tipo | Notas |
+| Column | Type | Notes |
 |---|---|---|
 | `id` | `bigint` PK | |
-| `session_id` | `uuid` → `auth.sessions` | a "família" do token |
-| `token_hash` | `bytea` único | **SHA-256** do token opaco; o token em si nunca é guardado |
-| `revoked` | `boolean` | `true` depois de usado (rotação) |
-| `created_at`, `expires_at` | `timestamptz` | validade padrão: 30 dias |
+| `session_id` | `uuid` → `auth.sessions` | the token's "family" |
+| `token_hash` | `bytea` unique | **SHA-256** of the opaque token; the token itself is never stored |
+| `revoked` | `boolean` | `true` once used (rotation) |
+| `created_at`, `expires_at` | `timestamptz` | default validity: 30 days |
 
-### Rotação e detecção de reuso
+### Rotation and reuse detection
 
-1. `POST /auth/v1/token?grant_type=refresh_token` com o token R1.
-2. R1 válido → marcado `revoked = true`; R2 é emitido na mesma sessão.
-3. Se R1 for usado **de novo** (alguém tem uma cópia), a sessão inteira é
-   revogada: R2, R3... deixam de valer. Outras sessões do usuário continuam.
+1. `POST /auth/v1/token?grant_type=refresh_token` with token R1.
+2. R1 valid → marked `revoked = true`; R2 is issued in the same session.
+3. If R1 is used **again** (someone has a copy), the whole session is revoked:
+   R2, R3... stop working. The user's other sessions continue.
 
-Dois refreshes simultâneos com o mesmo token (duas abas) também disparam a
-detecção. O cliente deve serializar o refresh. Uma janela de tolerância pode
-entrar depois, se necessário.
+Two simultaneous refreshes with the same token (two tabs) also trigger the
+detection. The client should serialize refreshes. A grace window may come
+later, if needed.
 
 ## `auth.one_time_tokens`
 
-Links enviados por email (hoje, só recuperação de senha).
+Links sent by email (today, only password recovery).
 
-| Coluna | Tipo | Notas |
+| Column | Type | Notes |
 |---|---|---|
 | `id` | `bigint` PK | |
 | `user_id` | `uuid` → `auth.users` | `ON DELETE CASCADE` |
 | `kind` | `text` | `recovery` |
-| `token_hash` | `bytea` único | **SHA-256** do token; o token em si nunca é guardado |
-| `created_at`, `expires_at` | `timestamptz` | validade: 1 hora |
-| `used_at` | `timestamptz` | preenchido no uso; o link não vale de novo |
+| `token_hash` | `bytea` unique | **SHA-256** of the token; the token itself is never stored |
+| `created_at`, `expires_at` | `timestamptz` | validity: 1 hour |
+| `used_at` | `timestamptz` | set on use; the link does not work again |
 
 ## Endpoints
 
-| Método e rota | Corpo | Resposta |
+| Method and route | Body | Response |
 |---|---|---|
-| `POST /auth/v1/signup` | `{email, password, data?}` | 201 + sessão |
-| `POST /auth/v1/token?grant_type=password` | `{email, password}` | 200 + sessão |
-| `POST /auth/v1/token?grant_type=refresh_token` | `{refresh_token}` | 200 + sessão |
-| `POST /auth/v1/logout` | Bearer | 204 (revoga a sessão) |
-| `GET /auth/v1/user` | Bearer | dados do usuário |
-| `GET /auth/v1/.well-known/jwks.json` | - | JWKS público |
-| `POST /auth/v1/recover` | `{email}` | 200 `{}` (exista ou não a conta) |
-| `POST /auth/v1/verify` | `{type: "recovery", token, password}` | 200 + sessão |
+| `POST /auth/v1/signup` | `{email, password, data?}` | 201 + session |
+| `POST /auth/v1/token?grant_type=password` | `{email, password}` | 200 + session |
+| `POST /auth/v1/token?grant_type=refresh_token` | `{refresh_token}` | 200 + session |
+| `POST /auth/v1/logout` | Bearer | 204 (revokes the session) |
+| `GET /auth/v1/user` | Bearer | user data |
+| `GET /auth/v1/.well-known/jwks.json` | - | public JWKS |
+| `POST /auth/v1/recover` | `{email}` | 200 `{}` (whether or not the account exists) |
+| `POST /auth/v1/verify` | `{type: "recovery", token, password}` | 200 + session |
 
-Sessão:
+Session:
 
 ```json
 {
@@ -98,52 +99,57 @@ Sessão:
   "token_type": "bearer",
   "expires_in": 900,
   "expires_at": 1767225600,
-  "refresh_token": "<opaco>",
+  "refresh_token": "<opaque>",
   "user": { "id": "...", "email": "...", "user_metadata": {}, "created_at": "...", "last_sign_in_at": "...", "email_confirmed_at": null }
 }
 ```
 
-Erros: `422 validation_failed` (email ou senha fora das regras), `409
-user_already_exists`, `400 invalid_grant` (credenciais ou refresh inválidos, com
-a mesma mensagem para email inexistente e senha errada), `429 rate_limited` com
-`Retry-After`, `403 signup_disabled`.
+Errors: `422 validation_failed` (email or password outside the rules), `409
+user_already_exists`, `400 invalid_grant` (invalid credentials or refresh, with
+the same message for an unknown email and a wrong password), `429
+rate_limited` with `Retry-After`, `403 signup_disabled`.
 
-Recuperação: `403 recovery_disabled` (projeto sem SMTP), `400 invalid_grant`
-(link inválido, expirado ou já usado), `400 unsupported_type`.
+Recovery: `403 recovery_disabled` (project without SMTP), `400 invalid_grant`
+(invalid, expired or already used link), `400 unsupported_type`.
 
-Senha: de 8 a 256 caracteres. Rate limit: `NELCOTA_AUTH_RATE_LIMIT_PER_MINUTE`
-por IP (padrão 30) e o mesmo limite por email no login.
+Password: 8 to 256 characters. Rate limit:
+`NELCOTA_AUTH_RATE_LIMIT_PER_MINUTE` per IP (default 30) and the same limit
+per email on login.
 
-## Recuperação de senha
+## Password recovery
 
-Desligada até o projeto configurar um SMTP (o Nelcota não tem servidor de
-email próprio; use o do seu provedor: Postmark, SES, Resend...). No `.env` do
-projeto, os três juntos:
+Off until the project configures SMTP (Nelcota has no mail server of its own;
+use your provider's: Postmark, SES, Resend...). In the project's `.env`, all
+three together:
 
 ```sh
-NELCOTA_SMTP_URL=smtps://usuario:senha@smtp.exemplo.com:465   # ou smtp://...:587?tls=required
-NELCOTA_SMTP_FROM=Loja <nao-responda@loja.com>
-NELCOTA_PASSWORD_RECOVERY_URL=https://app.loja.com/nova-senha
+NELCOTA_SMTP_URL=smtps://user:password@smtp.example.com:465   # or smtp://...:587?tls=required
+NELCOTA_SMTP_FROM=Shop <no-reply@shop.com>
+NELCOTA_PASSWORD_RECOVERY_URL=https://app.shop.com/new-password
 ```
 
-Configuração pela metade impede o servidor de subir (melhor do que descobrir
-no primeiro "esqueci minha senha").
+A half-configured setup stops the server from starting (better than finding
+out on the first "forgot my password").
 
-1. O app chama `POST /auth/v1/recover {email}`. A resposta é sempre `200 {}`,
-   para não revelar quem tem conta. Se a conta existe, chega um email com o
-   link `https://app.loja.com/nova-senha#type=recovery&token=...`.
-2. Essa página do app lê o token do fragmento (`location.hash`), pede a senha
-   nova e chama `POST /auth/v1/verify {type: "recovery", token, password}`.
-3. A resposta é uma sessão (mesmo formato do login): a pessoa já entra.
+1. The app calls `POST /auth/v1/recover {email}`. The answer is always
+   `200 {}`, so it does not reveal who has an account. If the account exists,
+   an email arrives (in English, subject "Reset your password") with the link
+   `https://app.shop.com/new-password#type=recovery&token=...`.
+2. That app page reads the token from the fragment (`location.hash`), asks for
+   the new password and calls `POST /auth/v1/verify {type: "recovery", token,
+   password}`.
+3. The response is a session (same format as login): the person is signed in.
 
-Garantias:
+Guarantees:
 
-- O token vai no fragmento da URL, que o navegador não envia a nenhum
-  servidor: não aparece em logs nem no `Referer`.
-- Vale 1 hora e uma vez só. Pedir de novo invalida o link anterior.
-- No máximo um email por minuto para a mesma conta, além do rate limit por IP:
-  o endpoint não serve para lotar a caixa de entrada de alguém.
-- O email sai em segundo plano: o tempo de resposta não revela se a conta
-  existe, e uma falha do SMTP vai para o log em vez de virar erro.
-- Trocar a senha encerra todas as sessões da conta (os refresh tokens deixam de
-  valer na hora; JWTs de acesso já emitidos valem até expirar).
+- The token travels in the URL fragment, which the browser sends to no server:
+  it does not show up in logs or in the `Referer`.
+- It is valid for 1 hour and only once. Asking again voids the previous link.
+- At most one email per minute for the same account, on top of the per-IP
+  rate limit: the endpoint cannot be used to flood someone's inbox.
+- The email goes out in the background: response time does not reveal whether
+  the account exists, and an SMTP failure goes to the log instead of becoming
+  an error.
+- Changing the password ends every session of the account (refresh tokens stop
+  working immediately; access JWTs already issued stay valid until they
+  expire).
