@@ -3,6 +3,8 @@
   import { Button } from '$lib/components/ui/button'
   import Plus from '@lucide/svelte/icons/plus'
   import Table2 from '@lucide/svelte/icons/table-2'
+  import ShieldAlert from '@lucide/svelte/icons/shield-alert'
+  import KeyRound from '@lucide/svelte/icons/key-round'
   import { toast } from 'svelte-sonner'
   import TableSidebar from '$lib/components/app/TableSidebar.svelte'
   import TableToolbar from '$lib/components/app/TableToolbar.svelte'
@@ -16,6 +18,7 @@
   import FilterBar from '$lib/components/app/FilterBar.svelte'
   import CreateTableSheet from '$lib/components/app/CreateTableSheet.svelte'
   import StructureView from '$lib/components/app/StructureView.svelte'
+  import EmptyState from '$lib/components/app/EmptyState.svelte'
   import { api, enc, isAbort } from '$lib/api'
   import { HiddenColumns } from '$lib/hidden-columns.svelte'
   import { filtersParam, filtersToSearch, parseFilters, type TableFilter } from '$lib/filters'
@@ -201,13 +204,17 @@
 
   <section class={cn('min-w-0 flex-1 flex-col', name ? 'flex' : 'hidden md:flex')}>
     {#if !name}
-      <div class="grid flex-1 place-items-center p-8 text-center">
-        <div>
-          <Table2 class="mx-auto size-7 text-muted-foreground" strokeWidth={1.3} />
-          <h2 class="mt-3 text-sm font-medium">Escolha uma tabela</h2>
-          <p class="mt-1 text-sm font-light text-muted-foreground">Selecione na lista ao lado para ver e editar as linhas.</p>
-          <Button variant="outline" size="sm" class="mt-4" onclick={() => (createOpen = true)}><Plus />Criar tabela</Button>
-        </div>
+      <div class="grid flex-1 place-items-center p-8">
+        <EmptyState
+          icon={Table2}
+          title="Escolha uma tabela"
+          description="Selecione na lista ao lado para ver e editar as linhas, ou crie uma nova."
+          class="w-full max-w-lg"
+        >
+          {#snippet actions()}
+            <Button onclick={() => (createOpen = true)}><Plus />Criar tabela</Button>
+          {/snippet}
+        </EmptyState>
       </div>
     {:else}
       <TableToolbar
@@ -259,12 +266,14 @@
         {/if}
 
         {#if data?.table.exposed_without_rls}
-          <p class="border-b border-destructive/30 bg-destructive/5 px-4 py-2 text-xs text-destructive">
-            Sem RLS: quem tem GRANT nesta tabela lê e altera todas as linhas.
+          <p class="flex items-center gap-2 border-b border-destructive/30 bg-destructive/5 px-4 py-2.5 text-sm text-destructive">
+            <ShieldAlert class="size-4 shrink-0" />
+            <span><span class="font-semibold">Sem RLS:</span> quem tem GRANT nesta tabela lê e altera todas as linhas.</span>
           </p>
         {:else if data && !data.table.editable && data.table.kind === 'table'}
-          <p class="border-b bg-muted/40 px-4 py-2 text-xs text-muted-foreground">
-            Sem chave primária: dá para ver as linhas, mas não editar por aqui.
+          <p class="flex items-center gap-2 border-b bg-muted/40 px-4 py-2.5 text-sm text-muted-foreground">
+            <KeyRound class="size-4 shrink-0" />
+            <span><span class="font-semibold text-foreground">Sem chave primária:</span> dá para ver as linhas, mas não editar por aqui.</span>
           </p>
         {/if}
 
@@ -272,7 +281,7 @@
           <!-- Recarga (ordem, filtro, página): barra no topo e grade esmaecida,
                para os dados antigos não parecerem já os novos. -->
           {#if loading && data}
-            <div class="pointer-events-none sticky top-0 z-20 h-0.5 overflow-hidden bg-brand/15" aria-hidden="true">
+            <div class="pointer-events-none sticky top-0 z-20 h-[3px] overflow-hidden bg-brand/15" aria-hidden="true">
               <div class="animate-progress h-full w-2/5 bg-brand"></div>
             </div>
           {/if}

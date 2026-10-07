@@ -25,16 +25,16 @@
   ]}
 >
   {#if value === null}
-    <span class="rounded bg-muted px-1 py-px font-mono text-3xs text-muted-foreground">NULL</span>
+    <span class="rounded-md bg-muted px-1.5 py-0.5 font-mono text-3xs font-medium text-muted-foreground">NULL</span>
   {:else if kind === 'boolean'}
     <span
       class={[
-        'inline-flex h-5 items-center rounded-full px-2 font-mono text-2xs',
-        value === 'true' ? 'bg-brand/10 text-brand dark:bg-brand/15' : 'bg-muted text-muted-foreground',
+        'inline-flex h-5 items-center rounded-full px-2 font-mono text-2xs font-medium',
+        value === 'true' ? 'bg-brand/10 text-brand ring-1 ring-brand/20 ring-inset dark:bg-brand/15' : 'bg-muted text-muted-foreground ring-1 ring-border ring-inset',
       ]}>{value}</span
     >
   {:else if kind === 'enum'}
-    <span class="inline-flex h-5 items-center rounded-md border border-border-strong bg-muted/60 px-1.5 text-2xs">{value}</span>
+    <span class="inline-flex h-5 items-center rounded-md border border-border-strong bg-muted/60 px-1.5 text-2xs font-medium">{value}</span>
   {:else if kind === 'json'}
     <span class="text-muted-foreground">{compactJson(value)}</span>
   {:else}

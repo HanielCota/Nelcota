@@ -43,16 +43,16 @@
         Todas as linhas, policies e GRANTs da tabela somem. Não dá para desfazer (só restaurando um backup).
       </AlertDialog.Description>
     </AlertDialog.Header>
-    <div class="grid gap-3">
-      <label class="grid gap-1.5 text-sm">
+    <div class="grid gap-4">
+      <label class="grid gap-2 text-sm">
         <span class="text-muted-foreground">Digite <code class="text-foreground">{table}</code> para confirmar</span>
         <Input bind:value={typed} autocomplete="off" class="font-mono" />
       </label>
-      <label class="flex items-start gap-2 text-sm">
+      <label class="flex cursor-pointer items-start gap-3 rounded-xl border bg-muted/30 p-3 text-sm">
         <Checkbox bind:checked={cascade} class="mt-0.5" />
         <span>
           Apagar também o que depende dela (CASCADE)
-          <span class="block text-xs font-light text-muted-foreground">
+          <span class="mt-0.5 block text-xs text-muted-foreground">
             Chaves estrangeiras de outras tabelas e views que usam esta tabela.
           </span>
         </span>

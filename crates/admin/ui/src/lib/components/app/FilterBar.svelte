@@ -46,12 +46,12 @@
   }
 </script>
 
-<form class="grid gap-2 border-b bg-muted/30 px-4 py-3" onsubmit={apply}>
+<form class="grid gap-2.5 border-b bg-muted/40 px-4 py-4" onsubmit={apply}>
   {#each rows as row, i (row.key)}
     <div class="flex flex-wrap items-center gap-2">
-      <span class="w-10 text-right text-xs text-muted-foreground">{i === 0 ? 'onde' : 'e'}</span>
+      <span class="w-12 text-right text-xs font-semibold text-muted-foreground uppercase">{i === 0 ? 'onde' : 'e'}</span>
       <Select.Root type="single" bind:value={row.column}>
-        <Select.Trigger size="sm" class="h-8 w-44 bg-card font-mono text-xs">{row.column || 'coluna'}</Select.Trigger>
+        <Select.Trigger class="w-48 font-mono text-xs">{row.column || 'coluna'}</Select.Trigger>
         <Select.Content>
           {#each columns as column (column.name)}
             <Select.Item value={column.name} class="font-mono text-xs">{column.name}</Select.Item>
@@ -59,15 +59,15 @@
         </Select.Content>
       </Select.Root>
       <Select.Root type="single" bind:value={row.op}>
-        <Select.Trigger size="sm" class="h-8 w-40 bg-card text-xs">{opLabel(row.op)}</Select.Trigger>
+        <Select.Trigger class="w-44 text-sm">{opLabel(row.op)}</Select.Trigger>
         <Select.Content>
           {#each UI_OPERATORS as op (op.value)}
-            <Select.Item value={op.value} class="text-xs">{op.label}</Select.Item>
+            <Select.Item value={op.value}>{op.label}</Select.Item>
           {/each}
         </Select.Content>
       </Select.Root>
       {#if needsValue(row.op)}
-        <Input bind:value={row.value} placeholder="valor" class="h-8 w-52 bg-card font-mono text-xs" />
+        <Input bind:value={row.value} placeholder="valor" class="w-56 font-mono text-xs" />
       {/if}
       <Button
         variant="ghost"
@@ -80,8 +80,8 @@
     </div>
   {/each}
 
-  <div class="flex flex-wrap items-center gap-2 pl-12">
-    <Button variant="ghost" size="sm" onclick={() => (rows = [...rows, blankRow()])}>
+  <div class="mt-1 flex flex-wrap items-center gap-2 pl-14">
+    <Button variant="outline" size="sm" onclick={() => (rows = [...rows, blankRow()])}>
       <Plus />Adicionar filtro
     </Button>
     <div class="ml-auto flex items-center gap-2">

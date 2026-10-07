@@ -60,7 +60,7 @@
   <button
     type="button"
     class={[
-      'flex min-w-0 flex-1 items-start gap-1.5 py-2 pl-3 text-left transition-colors hover:bg-accent',
+      'flex min-w-0 flex-1 cursor-pointer items-start gap-1.5 py-2.5 pl-3.5 text-left transition-colors hover:bg-accent/70',
       alignRight(kind) && 'flex-row-reverse text-right',
     ]}
     onclick={onsort}
@@ -68,11 +68,11 @@
     aria-label={`${column.name}, ${column.full_type}, ${sortLabel}. Clique para ordenar.`}
   >
     <span class="grid min-w-0 flex-1">
-      <span class={['flex items-center gap-1 truncate text-xs font-medium text-foreground', alignRight(kind) && 'justify-end']}>
-        {#if column.is_pk}<KeyRound class="size-3 shrink-0 text-brand" aria-hidden="true" />{/if}
+      <span class={['flex items-center gap-1.5 truncate text-xs font-semibold text-foreground', alignRight(kind) && 'justify-end']}>
+        {#if column.is_pk}<KeyRound class="size-3.5 shrink-0 text-brand" aria-hidden="true" />{/if}
         <span class="truncate">{column.name}</span>
       </span>
-      <span class="truncate font-mono text-3xs font-normal text-muted-foreground"
+      <span class="mt-0.5 truncate font-mono text-3xs font-normal text-muted-foreground"
         >{column.full_type}{#if column.references}<span class="text-brand">{` → ${column.references.table}`}</span>{/if}</span
       >
     </span>
@@ -89,14 +89,14 @@
         <button
           {...props}
           type="button"
-          class="grid w-6 shrink-0 place-items-center text-muted-foreground transition-opacity hover:bg-accent hover:text-foreground focus-visible:opacity-100 aria-expanded:bg-accent aria-expanded:opacity-100 md:opacity-0 md:group-hover/head:opacity-100"
+          class="grid w-7 shrink-0 cursor-pointer place-items-center text-muted-foreground transition-opacity hover:bg-accent hover:text-foreground focus-visible:opacity-100 aria-expanded:bg-accent aria-expanded:opacity-100 md:opacity-0 md:group-hover/head:opacity-100"
           aria-label={`Opções da coluna ${column.name}`}
         >
           <ChevronDown class="size-3.5" />
         </button>
       {/snippet}
     </DropdownMenu.Trigger>
-    <DropdownMenu.Content align="end" class="w-52">
+    <DropdownMenu.Content align="end" class="w-56">
       <DropdownMenu.Label class="truncate font-mono text-xs font-normal text-muted-foreground">{column.name}</DropdownMenu.Label>
       <DropdownMenu.Item onclick={afterClose(() => onsortset('asc'))} disabled={sort === 'asc'}
         ><ArrowUp />Ordenar crescente</DropdownMenu.Item

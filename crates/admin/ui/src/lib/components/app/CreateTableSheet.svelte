@@ -87,19 +87,19 @@
 
 <Sheet.Root bind:open>
   <Sheet.Content class="flex w-full flex-col gap-0 p-0 data-[side=right]:sm:max-w-3xl">
-    <Sheet.Header class="border-b px-6 py-4">
+    <Sheet.Header class="border-b px-6 pt-6 pb-5">
       <Sheet.Title>Nova tabela</Sheet.Title>
       <Sheet.Description>Criada no schema exposto pela API, numa transação só.</Sheet.Description>
     </Sheet.Header>
 
-    <form id="create-table" class="flex-1 space-y-6 overflow-y-auto px-6 py-5" onsubmit={submit}>
+    <form id="create-table" class="flex-1 space-y-8 overflow-y-auto px-6 py-6" onsubmit={submit}>
       <div class="grid gap-4 sm:grid-cols-2">
-        <div class="grid gap-1.5">
-          <Label for="table-name" class="font-normal text-muted-foreground">Nome</Label>
+        <div class="grid gap-2">
+          <Label for="table-name" class="font-semibold">Nome</Label>
           <Input id="table-name" bind:value={spec.name} placeholder="ex.: pedidos" class="font-mono" required />
         </div>
-        <div class="grid gap-1.5">
-          <Label for="table-comment" class="font-normal text-muted-foreground">Descrição</Label>
+        <div class="grid gap-2">
+          <Label for="table-comment" class="font-semibold">Descrição</Label>
           <Input
             id="table-comment"
             bind:value={() => spec.comment ?? '', (v) => (spec.comment = v || null)}
@@ -108,24 +108,24 @@
         </div>
       </div>
 
-      <label class="flex items-start gap-3 rounded-lg border p-3">
+      <label class="flex cursor-pointer items-start gap-3 rounded-xl border bg-card p-4 shadow-card transition-colors hover:border-border-strong has-data-checked:border-brand/40 has-data-checked:bg-brand-soft/50">
         <Checkbox bind:checked={spec.rls} class="mt-0.5" />
-        <span class="text-sm">
+        <span class="text-sm font-semibold">
           Ativar Row Level Security (recomendado)
-          <span class="mt-0.5 block text-xs font-light text-muted-foreground">
+          <span class="mt-1 block text-xs font-normal text-muted-foreground">
             Sem policies, só o <code>service_role</code> acessa as linhas. Crie policies depois, na página Policies.
           </span>
         </span>
       </label>
       {#if !spec.rls}
-        <p class="flex gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+        <p class="flex gap-2.5 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
           <ShieldAlert class="size-4 shrink-0" />
           Sem RLS, quem tiver GRANT na tabela lê e altera todas as linhas.
         </p>
       {/if}
 
-      <section class="grid gap-2">
-        <h3 class="text-sm font-medium">Colunas</h3>
+      <section class="grid gap-3">
+        <h3 class="text-base font-semibold">Colunas</h3>
         {#each spec.columns as _, i (keys[i])}
           <ColumnFields
             bind:column={spec.columns[i]}
@@ -137,15 +137,15 @@
         <Button variant="outline" size="sm" class="justify-self-start" onclick={addColumn}><Plus />Adicionar coluna</Button>
       </section>
 
-      <section class="grid gap-2">
-        <h3 class="text-sm font-medium">Acesso pela API (GRANT)</h3>
+      <section class="grid gap-3">
+        <h3 class="text-base font-semibold">Acesso pela API (GRANT)</h3>
         <GrantsEditor bind:grants={spec.grants} />
       </section>
 
       <SqlPreview {preview} placeholder="Dê um nome à tabela e às colunas para ver o SQL." />
     </form>
 
-    <Sheet.Footer class="flex-row justify-end gap-2 border-t px-6 py-4">
+    <Sheet.Footer class="flex-row justify-end gap-2 border-t bg-muted/40 px-6 py-4">
       <Button variant="outline" onclick={() => (open = false)}>Cancelar</Button>
       <Button type="submit" form="create-table" disabled={saving || !ready}>
         {saving ? 'Criando…' : 'Criar tabela'}

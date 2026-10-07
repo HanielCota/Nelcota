@@ -167,7 +167,7 @@
   <thead class="sticky top-0 z-10">
     <tr>
       {#if editable}
-        <th class={[stickyCell, 'z-[2] bg-card px-3 py-2 text-left']}>
+        <th class={[stickyCell, 'z-[2] bg-card px-3.5 py-2.5 text-left shadow-[inset_0_-1px_0_var(--border)]']}>
           <Checkbox
             checked={selected.size > 0 && selected.size === data.rows.length}
             indeterminate={selected.size > 0 && selected.size < data.rows.length}
@@ -177,7 +177,7 @@
         </th>
       {/if}
       {#each columns as { column, kind } (column.name)}
-        <th class="border-r border-b bg-card p-0 align-top font-normal">
+        <th class="border-r border-b bg-card p-0 align-top font-normal shadow-[inset_0_-1px_0_var(--border)]">
           <GridColumnHeader
             {column}
             {kind}
@@ -195,14 +195,14 @@
   <tbody>
     {#each data.rows as row, i (i)}
       {@const isSelected = selected.has(i)}
-      <tr class={['group', isSelected ? 'bg-brand/5' : 'hover:bg-muted/50']}>
+      <tr class={['group transition-colors', isSelected ? 'bg-brand/[0.07]' : 'hover:bg-muted/60']}>
         {#if editable}
-          <td role="gridcell" class={[stickyCell, 'px-3 py-1.5', isSelected ? 'bg-[color-mix(in_oklch,var(--brand)_5%,var(--background))]' : 'group-hover:bg-[color-mix(in_oklch,var(--muted)_50%,var(--background))]']}>
-            <div class="flex items-center gap-1.5">
+          <td role="gridcell" class={[stickyCell, 'px-3.5 py-2', isSelected ? 'bg-[color-mix(in_oklch,var(--brand)_7%,var(--background))] shadow-[inset_3px_0_0_var(--brand)]' : 'group-hover:bg-[color-mix(in_oklch,var(--muted)_60%,var(--background))]']}>
+            <div class="flex items-center gap-2">
               <Checkbox checked={isSelected} onCheckedChange={(v) => toggleRow(i, v === true)} aria-label={`Selecionar linha ${i + 1}`} />
               <button
                 type="button"
-                class="grid size-6 place-items-center rounded text-muted-foreground transition-opacity hover:bg-accent hover:text-foreground focus-visible:opacity-100 md:opacity-0 md:group-hover:opacity-100"
+                class="grid size-7 cursor-pointer place-items-center rounded-md text-muted-foreground transition-opacity hover:bg-accent hover:text-foreground focus-visible:opacity-100 md:opacity-0 md:group-hover:opacity-100"
                 aria-label={`Expandir linha ${i + 1}`}
                 title="Ver e editar a linha inteira"
                 onclick={() => onexpand(row)}
@@ -220,7 +220,7 @@
             tabindex={active.row === i && active.col === c ? 0 : -1}
             aria-selected={isSelected}
             class={[
-              'group/cell border-r border-b p-0 focus-visible:outline-offset-[-2px]',
+              'group/cell border-r border-b p-0 focus-visible:bg-brand/[0.06] focus-visible:outline-offset-[-2px]',
               editable && !column.generated && 'cursor-text',
             ]}
             onfocus={() => (active = { row: i, col: c })}
@@ -232,7 +232,7 @@
                 <input
                   id="inline-editor"
                   class={[
-                    'w-full min-w-0 bg-transparent px-2 py-1 text-xs outline-none',
+                    'w-full min-w-0 bg-transparent px-2.5 py-1.5 text-xs outline-none',
                     monospace(kind) && 'font-mono',
                     alignRight(kind) && 'text-right',
                   ]}
@@ -243,7 +243,7 @@
                 />
                 {#if column.nullable}
                   <button
-                    class="shrink-0 rounded border px-1.5 text-3xs text-muted-foreground hover:text-foreground"
+                    class="shrink-0 cursor-pointer rounded-md border border-border-strong bg-muted px-1.5 py-0.5 font-mono text-3xs font-semibold text-muted-foreground hover:text-foreground"
                     onmousedown={(e) => {
                       e.preventDefault()
                       commitEdit(true)
@@ -252,12 +252,12 @@
                 {/if}
               </div>
             {:else}
-              <div class="flex items-center gap-1 px-3 py-1.5" title={value ?? 'NULL'}>
+              <div class="flex min-h-10 items-center gap-1 px-3.5 py-2" title={value ?? 'NULL'}>
                 <span class="min-w-0 flex-1"><GridCell {value} type={column.type} {kind} /></span>
                 {#if column.references && value !== null}
                   <a
                     href={referenceHref(column, value)}
-                    class="grid size-5 shrink-0 place-items-center rounded text-muted-foreground opacity-0 group-hover/cell:opacity-100 hover:bg-accent hover:text-brand focus-visible:opacity-100"
+                    class="grid size-6 shrink-0 place-items-center rounded-md text-muted-foreground opacity-0 group-hover/cell:opacity-100 hover:bg-accent hover:text-brand focus-visible:opacity-100"
                     title={`Abrir em ${column.references.table}`}
                     aria-label={`Abrir linha referenciada em ${column.references.table}`}
                     ondblclick={(e) => e.stopPropagation()}

@@ -60,14 +60,14 @@
   const onDeleteLabel = (value: OnDelete) => ON_DELETE.find((o) => o.value === value)?.label ?? value
 </script>
 
-<div class="rounded-lg border bg-card">
-  <div class="flex flex-wrap items-center gap-2 p-2">
-    <Input bind:value={column.name} placeholder="nome" class="h-8 w-40 font-mono text-xs" aria-label="Nome da coluna" />
+<div class="rounded-xl border bg-card shadow-card">
+  <div class="flex flex-wrap items-center gap-2.5 p-3">
+    <Input bind:value={column.name} placeholder="nome" class="w-40 font-mono text-xs" aria-label="Nome da coluna" />
     <Input
       bind:value={column.data_type}
       list={`${id}-types`}
       placeholder="tipo"
-      class="h-8 w-40 font-mono text-xs"
+      class="w-40 font-mono text-xs"
       aria-label="Tipo"
     />
     <datalist id={`${id}-types`}>
@@ -79,7 +79,7 @@
       list={`${id}-defaults`}
       placeholder={column.identity ? 'identity' : 'default (SQL)'}
       disabled={column.identity}
-      class="h-8 min-w-32 flex-1 font-mono text-xs"
+      class="min-w-32 flex-1 font-mono text-xs"
       aria-label="Valor padrão"
     />
     <datalist id={`${id}-defaults`}>
@@ -87,11 +87,11 @@
     </datalist>
 
     {#if mode === 'create'}
-      <label class="flex items-center gap-1.5 text-xs text-muted-foreground" title="Chave primária">
+      <label class="flex cursor-pointer items-center gap-1.5 text-xs font-medium text-muted-foreground" title="Chave primária">
         <Checkbox bind:checked={column.primary_key} />PK
       </label>
     {/if}
-    <label class="flex items-center gap-1.5 text-xs text-muted-foreground" title="NOT NULL">
+    <label class="flex cursor-pointer items-center gap-1.5 text-xs font-medium text-muted-foreground" title="NOT NULL">
       <Checkbox
         checked={!column.nullable || column.primary_key}
         disabled={column.primary_key}
@@ -116,7 +116,7 @@
   </div>
 
   {#if expanded}
-    <div class="grid gap-3 border-t bg-muted/20 p-3 text-xs">
+    <div class="grid gap-4 rounded-b-xl border-t bg-muted/30 p-4 text-xs">
       <div class="flex flex-wrap gap-4">
         <label class="flex items-center gap-1.5 text-muted-foreground">
           <Checkbox bind:checked={column.unique} disabled={column.primary_key} />valor único (UNIQUE)
@@ -139,9 +139,9 @@
       </div>
 
       <div class="flex flex-wrap items-center gap-2">
-        <span class="w-24 text-muted-foreground">Referencia</span>
+        <span class="w-24 font-semibold text-muted-foreground">Referencia</span>
         <Select.Root type="single" value={column.references?.table ?? ''} onValueChange={setReference}>
-          <Select.Trigger size="sm" class="h-8 w-40 bg-card font-mono text-xs">
+          <Select.Trigger size="sm" class="w-40 font-mono text-xs">
             {column.references?.table ?? 'nenhuma tabela'}
           </Select.Trigger>
           <Select.Content>
@@ -153,7 +153,7 @@
         </Select.Root>
         {#if column.references}
           <Select.Root type="single" bind:value={column.references.column}>
-            <Select.Trigger size="sm" class="h-8 w-32 bg-card font-mono text-xs">{column.references.column}</Select.Trigger>
+            <Select.Trigger size="sm" class="w-32 font-mono text-xs">{column.references.column}</Select.Trigger>
             <Select.Content>
               {#each tables[column.references.table] ?? [] as name (name)}
                 <Select.Item value={name} class="font-mono text-xs">{name}</Select.Item>
@@ -162,7 +162,7 @@
           </Select.Root>
           <span class="text-muted-foreground">ao apagar:</span>
           <Select.Root type="single" bind:value={column.references.on_delete}>
-            <Select.Trigger size="sm" class="h-8 w-40 bg-card text-xs">{onDeleteLabel(column.references.on_delete)}</Select.Trigger>
+            <Select.Trigger size="sm" class="w-40 text-xs">{onDeleteLabel(column.references.on_delete)}</Select.Trigger>
             <Select.Content>
               {#each ON_DELETE as option (option.value)}
                 <Select.Item value={option.value} class="text-xs">{option.label}</Select.Item>
@@ -173,11 +173,11 @@
       </div>
 
       <div class="flex items-center gap-2">
-        <span class="w-24 text-muted-foreground">Descrição</span>
+        <span class="w-24 font-semibold text-muted-foreground">Descrição</span>
         <Input
           bind:value={() => column.comment ?? '', (v) => (column.comment = v || null)}
           placeholder="opcional (vira COMMENT e aparece na documentação da API)"
-          class="h-8 flex-1 text-xs"
+          class="flex-1 text-xs"
         />
       </div>
     </div>
