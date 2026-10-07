@@ -6,7 +6,7 @@
   // Trilho de ícones que se expande por cima do conteúdo ao passar o mouse.
 </script>
 
-<aside class="relative z-30 hidden w-14 shrink-0 md:block">
+<div class="relative z-30 hidden w-14 shrink-0 md:block">
   <nav
     aria-label="Navegação principal"
     class="group/rail absolute inset-y-0 left-0 flex w-14 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar py-2 transition-[width,box-shadow] duration-200 ease-out hover:w-52 hover:shadow-2xl hover:shadow-black/30 focus-within:w-52 focus-within:shadow-2xl focus-within:shadow-black/30"
@@ -52,4 +52,4 @@
       </p>
     </div>
   </nav>
-</aside>
+</div>

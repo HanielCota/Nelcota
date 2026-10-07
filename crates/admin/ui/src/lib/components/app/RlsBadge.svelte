@@ -25,7 +25,7 @@
     'inline-flex h-5 items-center gap-1.5 rounded-full border px-2 text-2xs font-medium whitespace-nowrap',
     rls.state === 'danger' && 'border-destructive/30 bg-destructive/10 text-destructive',
     rls.state === 'warn' && 'border-warning/30 bg-warning/10 text-warning',
-    rls.state === 'ok' && 'border-brand/25 bg-brand/10 text-brand',
+    rls.state === 'ok' && 'border-brand/25 bg-brand/5 text-brand dark:bg-brand/10',
     (rls.state === 'none' || rls.state === 'view') && 'border-border-strong bg-muted text-muted-foreground',
   ]}
 >

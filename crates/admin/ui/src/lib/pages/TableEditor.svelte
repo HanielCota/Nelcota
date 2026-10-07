@@ -237,7 +237,10 @@
 <div class="flex h-full min-h-0">
   <!-- Lista de tabelas -->
   <!-- No celular, sem tabela escolhida a lista ocupa a tela; com tabela, só a grade. -->
-  <aside class={cn('w-full shrink-0 flex-col border-r bg-sidebar md:flex md:w-64', name ? 'hidden' : 'flex')}>
+  <aside
+    aria-label="Lista de tabelas"
+    class={cn('w-full shrink-0 flex-col border-r bg-sidebar md:flex md:w-64', name ? 'hidden' : 'flex')}
+  >
     <div class="grid gap-3 border-b p-3">
       <div class="flex items-center justify-between">
         <svelte:element this={name ? 'p' : 'h1'} class="px-1 text-sm font-medium">Editor de tabelas</svelte:element>
