@@ -119,7 +119,7 @@ Runs in `spawn_blocking`, with at most `min(cores, 4)` concurrent hashes (peak
 < 80 MiB). Logging in with an unknown email verifies against a dummy hash, so
 the response time does not reveal whether the account exists.
 
-**D26. In-memory rate limit, fixed 1-minute window**, per IP (signup/token)
+**D26. In-memory rate limit, fixed 1-minute window** (the window became a GCRA in D69), per IP (signup/token)
 and per email (login). One binary per install makes Redis unnecessary. The IP
 comes from `X-Forwarded-For` (rightmost entry) only with
 `NELCOTA_TRUST_PROXY=true`.
@@ -409,6 +409,25 @@ chosen language and falls back to the server's English text (raw Postgres
 errors, for instance). Migrations V1–V6 keep their Portuguese file names and
 comments: refinery checksums name and content, and editing them would make
 every existing install refuse to start.
+
+**D69. Libraries instead of four hand-written pieces.** A review of what
+the code reimplemented kept the deliberate ones (the SQL builder of D29, the
+OpenAPI of D30, the PostgREST-style parser, TypeScript generation, CSV,
+secret generation, image sniffing) and replaced four:
+- **Rate limit:** `governor`'s keyed GCRA instead of a fixed window. The budget
+  refills continuously, so a client can no longer spend almost twice the limit
+  across the turn of a minute, and `Retry-After` is the real wait. Still in
+  memory per process; only the `std` and `dashmap` features.
+- **Session cookie:** the `cookie` crate parses the `Cookie` header and builds
+  `Set-Cookie` in one place, instead of `split(';')` and `format!`. No signing
+  or encryption features: the value is an opaque token.
+- **Health probe:** `hyper-util`'s client instead of a hand-written HTTP/1.1
+  request and response split; a chunked body no longer breaks it. hyper was
+  already in the tree through axum.
+- **Identifier quoting:** `postgres_protocol::escape::escape_identifier`, already
+  a dependency. String literals in generated DDL keep the hand-written `''`
+  doubling: `escape_literal` would emit ` E'...'` for backslashes and change the
+  text of panel-generated migrations.
 
 ### Known pending items
 
