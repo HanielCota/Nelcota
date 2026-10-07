@@ -2,7 +2,6 @@
   import { Button } from '$lib/components/ui/button'
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu'
   import RefreshCw from '@lucide/svelte/icons/refresh-cw'
-  import Trash2 from '@lucide/svelte/icons/trash-2'
   import Plus from '@lucide/svelte/icons/plus'
   import ChevronLeft from '@lucide/svelte/icons/chevron-left'
   import Funnel from '@lucide/svelte/icons/funnel'
@@ -20,14 +19,12 @@
     filterCount,
     filterOpen = $bindable(false),
     loading,
-    selectedCount,
     hiddenColumns,
     ontogglecolumn,
     onshowallcolumns,
     exportHref,
     onreload,
     oninsert,
-    ondelete,
   }: {
     name: string
     view: 'data' | 'structure'
@@ -35,14 +32,12 @@
     filterCount: number
     filterOpen?: boolean
     loading: boolean
-    selectedCount: number
     hiddenColumns: string[]
     ontogglecolumn: (column: string) => void
     onshowallcolumns: () => void
     exportHref: (format: 'csv' | 'json') => string
     onreload: () => void
     oninsert: () => void
-    ondelete: () => void
   } = $props()
 
   const tabs = [
@@ -73,11 +68,6 @@
   </nav>
   {#if view === 'data'}
     <div class="ml-auto flex flex-wrap items-center gap-2">
-      {#if selectedCount > 0}
-        <Button variant="destructive" size="sm" onclick={ondelete}>
-          <Trash2 />Apagar {selectedCount}
-        </Button>
-      {/if}
       <Button
         variant={filterOpen || filterCount ? 'secondary' : 'ghost'}
         size="sm"

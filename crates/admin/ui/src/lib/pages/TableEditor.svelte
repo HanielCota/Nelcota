@@ -9,6 +9,7 @@
   import FilterChips from '$lib/components/app/FilterChips.svelte'
   import DataGrid from '$lib/components/app/DataGrid.svelte'
   import GridFooter from '$lib/components/app/GridFooter.svelte'
+  import SelectionBar from '$lib/components/app/SelectionBar.svelte'
   import RowSheet from '$lib/components/app/RowSheet.svelte'
   import ConfirmDialog from '$lib/components/app/ConfirmDialog.svelte'
   import FilterBar from '$lib/components/app/FilterBar.svelte'
@@ -215,14 +216,12 @@
         filterCount={filters.length}
         bind:filterOpen
         {loading}
-        selectedCount={selected.size}
         hiddenColumns={hidden.names}
         ontogglecolumn={(column) => hidden.toggle(column)}
         onshowallcolumns={() => hidden.showAll()}
         {exportHref}
         onreload={load}
         oninsert={() => openSheet(null)}
-        ondelete={() => (confirmOpen = true)}
       />
 
       {#if view === 'structure'}
@@ -245,6 +244,17 @@
           {/key}
         {:else if filters.length || sort}
           <FilterChips {filters} {sort} onchange={setFilters} onclearsort={() => setSort('', null)} />
+        {/if}
+
+        {#if data && selected.size > 0}
+          <SelectionBar
+            table={name}
+            columns={data.table.columns.map((c) => c.name)}
+            rows={[...selected].sort((a, b) => a - b).map((i) => data!.rows[i])}
+            deletable={data.table.editable}
+            onclear={() => (selected = new Set())}
+            ondelete={() => (confirmOpen = true)}
+          />
         {/if}
 
         {#if data?.table.exposed_without_rls}
@@ -303,7 +313,7 @@
   />
   <ConfirmDialog
     bind:open={confirmOpen}
-    title={`Apagar ${selected.size} linha(s)?`}
+    title={selected.size === 1 ? 'Apagar 1 linha?' : `Apagar ${selected.size} linhas?`}
     description="Esta ação não pode ser desfeita. As linhas são apagadas numa transação só."
     confirmLabel="Apagar"
     destructive
