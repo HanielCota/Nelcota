@@ -84,6 +84,29 @@ Same syntax as PostgREST. Inside the parentheses each filter is written
 - `return=representation` runs `RETURNING`, which requires `SELECT`
   permission (GRANT + policy) on the written rows.
 
+### Upsert: create or update in one call
+
+```
+POST /rest/v1/products
+Prefer: resolution=merge-duplicates
+[{ "id": 1, "price": 3.00 }, { "id": 99, "name": "Eraser", "price": 1.00 }]
+```
+
+- `Prefer: resolution=merge-duplicates` updates a row whose key already exists,
+  with the columns the object sent (the others keep their values; the key
+  itself is never changed). `resolution=ignore-duplicates` keeps the existing
+  row; with `return=representation`, only the rows actually written come back.
+- The key is the primary key, or `?on_conflict=col1,col2`, which must match a
+  unique constraint (otherwise 400). `on_conflict` without `resolution` is a
+  400. The response confirms with `Preference-Applied`.
+- A batch that repeats a key gets a 400 from Postgres (a row cannot be updated
+  twice in one statement).
+- A `GENERATED ALWAYS AS IDENTITY` column cannot receive values, so it cannot
+  be the upsert key: use `BY DEFAULT`, or another unique column with
+  `on_conflict`.
+- RLS still decides: on a conflict, the existing row must pass the `UPDATE`
+  policy. A user cannot take over someone else's row through an upsert (403).
+
 ## Functions: `POST /rest/v1/rpc/{function}`
 
 Body: an object with the **named** arguments (`{"a": 1, "b": 2}`); arguments
@@ -135,5 +158,5 @@ NOTIFY nelcota, 'reload schema';
 
 ## Out of the MVP
 
-Relation embedding (`select=*,orders(*)`), upsert (`on_conflict`), `GET` on
-`/rpc`, `Accept: application/vnd.pgrst.object+json`.
+Relation embedding (`select=*,orders(*)`), `GET` on `/rpc`,
+`Accept: application/vnd.pgrst.object+json`.
