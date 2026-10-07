@@ -8,35 +8,14 @@
   import ProjectSwitcher from './ProjectSwitcher.svelte'
   import AccountMenu from './AccountMenu.svelte'
   import { palette } from '$lib/palette.svelte'
-  import { href, match, route } from '$lib/router.svelte'
+  import { href, route } from '$lib/router.svelte'
   import { isActive, navGroups } from '$lib/nav'
+  import { crumbsFor } from '$lib/titles'
 
   // Barra do topo da área de conteúdo: trilha e busca. Projeto, páginas e conta
   // ficam na barra lateral (no celular, no menu que desliza da esquerda).
 
-  const titles: Record<string, string> = {
-    '/': 'Visão geral',
-    '/tables': 'Tabelas',
-    '/sql': 'Editor SQL',
-    '/users': 'Usuários',
-    '/policies': 'Policies',
-    '/projects': 'Projetos',
-    '/connect': 'API',
-  }
-
-  const crumbs = $derived.by((): { label: string; path?: string }[] => {
-    const table = match('/tables/:name', route.path)
-    if (table) return [{ label: 'Tabelas', path: '/tables' }, { label: table.name }]
-    const structure = match('/tables/:name/structure', route.path)
-    if (structure) {
-      return [
-        { label: 'Tabelas', path: '/tables' },
-        { label: structure.name, path: `/tables/${encodeURIComponent(structure.name)}` },
-        { label: 'Estrutura' },
-      ]
-    }
-    return [{ label: titles[route.path.replace(/\/$/, '') || '/'] ?? 'Página' }]
-  })
+  const crumbs = $derived(crumbsFor(route.path))
 
   let mobileOpen = $state(false)
   const isMac = /Mac|iPhone|iPad/.test(navigator.platform)

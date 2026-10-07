@@ -18,6 +18,7 @@
   import { api } from '$lib/api'
   import { session } from '$lib/session.svelte'
   import { match, route } from '$lib/router.svelte'
+  import { crumbsFor, documentTitle } from '$lib/titles'
 
   onMount(async () => {
     // Vindo de outro painel do host (login único): troca o token por sessão.
@@ -44,7 +45,14 @@
   // Trocar de aba (Dados/Estrutura) não remonta o editor; trocar de tabela sim
   // (ordenação, página e seleção são de cada tabela).
   const pageKey = $derived(tableName ? `/tables/${tableName}` : route.path)
+
+  // Título da aba: a página atual (ou o login) seguida do nome do produto.
+  const title = $derived(
+    session.email === null ? 'Entrar · Nelcota' : session.email ? documentTitle(crumbsFor(route.path)) : 'Nelcota',
+  )
 </script>
+
+<svelte:head><title>{title}</title></svelte:head>
 
 <ModeWatcher defaultMode="dark" />
 <Toaster position="bottom-right" />
