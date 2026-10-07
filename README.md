@@ -35,6 +35,9 @@ nelcota up && nelcota projects
 Details in [docs/deploy.md](docs/deploy.md). Backup and restore in
 [docs/backup.md](docs/backup.md), including point-in-time recovery
 (`nelcota -p shop pitr enable`: WAL archived to S3, restore to any second).
+A VPS that holds a single project can skip Docker: `nelcota init <domain>
+--runtime systemd` installs Postgres and Caddy from apt and runs the app as a
+systemd unit.
 
 ## Usage in 1 minute
 

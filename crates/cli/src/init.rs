@@ -6,8 +6,8 @@ use anyhow::bail;
 use crate::{
     InitArgs, caddy, checks,
     envfile::write_private,
-    host::{Host, Manifest, ProjectEntry},
-    machine, naming, panel_login, registry, scaffold,
+    host::{Host, Manifest, ProjectEntry, Runtime},
+    machine, naming, native, panel_login, registry, scaffold,
     util::{self, ask, interactive, ok, step, warn},
 };
 
@@ -30,6 +30,12 @@ pub fn run(host: &Host, args: InitArgs) -> anyhow::Result<()> {
         let manifest = host.manifest()?;
         if args.local && !manifest.local {
             bail!("this host is not local; --local only applies when the host is created");
+        }
+        if manifest.runtime == Runtime::Systemd && !manifest.projects.is_empty() {
+            bail!(
+                "this host runs its project with systemd, which holds one project per machine; \
+                 use a Docker host (nelcota init on another folder or machine) for more"
+            );
         }
         manifest
     };
@@ -73,6 +79,7 @@ pub fn run(host: &Host, args: InitArgs) -> anyhow::Result<()> {
         host,
         &scaffold::NewProject {
             entry: &entry,
+            runtime: manifest.runtime,
             profile,
             image: &manifest.image,
             version: &version,
@@ -80,11 +87,17 @@ pub fn run(host: &Host, args: InitArgs) -> anyhow::Result<()> {
     )?;
     manifest.projects.push(entry.clone());
     host.save(&manifest)?;
-    let project = host.project(&entry);
+    let project = host.project(&manifest, &entry);
     let project_password = panel_login::apply(host, &manifest, &project)?;
+    if manifest.runtime == Runtime::Systemd {
+        let password = project.env().get("POSTGRES_PASSWORD")?.unwrap_or_default();
+        native::configure_postgres(profile, &password)?;
+        native::deploy_binary()?;
+        native::install_unit(&project)?;
+    }
     registry::write(host, &manifest)?;
     caddy::write(host, &manifest)?;
-    caddy::reload(host)?;
+    caddy::reload(host, manifest.runtime)?;
     ok(&format!("files in {}", project.dir.display()));
 
     println!();
@@ -109,10 +122,15 @@ fn create_host(
     args: &InitArgs,
 ) -> anyhow::Result<(Manifest, Option<panel_login::NewPassword>)> {
     step(&format!("Creating the host at {}", host.root().display()));
+    if args.runtime == Runtime::Systemd {
+        native::check_machine()?;
+    }
     if args.skip_checks {
         warn("checks skipped (--skip-checks)");
     } else {
-        checks::docker()?;
+        if args.runtime == Runtime::Docker {
+            checks::docker()?;
+        }
         checks::ports();
         match checks::total_ram_mb() {
             Some(mb) => ok(&format!("RAM: {mb} MB")),
@@ -120,6 +138,9 @@ fn create_host(
         }
     }
 
+    if args.runtime == Runtime::Systemd {
+        native::install_packages()?;
+    }
     let s3 = backup_destination(args);
     std::fs::create_dir_all(host.root())?;
     let mut secrets = format!(
@@ -140,6 +161,7 @@ fn create_host(
         panel_login: args.panel_login,
         base_domain: None,
         local: args.local,
+        runtime: args.runtime,
         image: args.image.clone(),
         projects: Vec::new(),
     };
