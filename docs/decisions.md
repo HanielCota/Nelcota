@@ -512,9 +512,17 @@ variables in the CLI's own process. pgBackRest reads the same settings as on
 Docker, written as `/etc/pgbackrest/pgbackrest.conf` (archive_command runs
 under the Postgres unit, which does not get the `.env`).
 
+**D76. The image is `ghcr.io/hanielcota/nelcota-server`.** The name that
+matches the repository, `ghcr.io/hanielcota/nelcota`, is a package from an
+earlier project (now NelcotaScreenShare) whose production still pulls its
+`latest` tag. Pushing there would overwrite that tag, and deleting it would
+break that deploy, so this project publishes under another name. The release
+image is the released musl binaries copied into `scratch`
+(`deploy/release.Dockerfile`), linked to this repository by the
+`org.opencontainers.image.source` label.
+
 ### Known pending items
 
 - Filtering parent rows by their embeds (`!inner`) and self-referencing embeds.
-- The first release: the repository (HanielCota/Nelcota) is private, so the
-  `v*` tag, the public release URLs `install.sh` downloads from and the
-  `nelcota.com/install` redirect are still to be done.
+- `nelcota.com/install` should redirect to
+  `https://raw.githubusercontent.com/HanielCota/Nelcota/main/scripts/install.sh`.
