@@ -79,6 +79,21 @@ impl Project {
         Ok(String::from_utf8_lossy(&output.stdout).into_owned())
     }
 
+    /// Like [`Project::compose_output`], without echoing errors: for polling
+    /// a state that is expected to fail for a while.
+    pub fn compose_output_quiet(&self, args: &[&str]) -> anyhow::Result<String> {
+        let output = self
+            .compose_command()
+            .args(args)
+            .stderr(Stdio::null())
+            .output()
+            .context("could not run `docker compose`")?;
+        if !output.status.success() {
+            bail!("[{}] `docker compose {}` failed", self.name, args.join(" "));
+        }
+        Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+    }
+
     /// `docker compose` with stdin/stdout tied to files (pg_dump/pg_restore).
     pub fn compose_piped(
         &self,

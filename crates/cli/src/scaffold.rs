@@ -8,6 +8,8 @@ use anyhow::bail;
 use crate::{
     envfile::write_private,
     host::{Host, ProjectEntry},
+    pitr,
+    project::Project,
     util,
 };
 
@@ -138,7 +140,8 @@ pub fn create(host: &Host, new: &NewProject) -> anyhow::Result<()> {
         dir.join("docker-compose.yml"),
         render_compose(&new.entry.name, new.profile),
     )?;
-    fs::write(dir.join(".gitignore"), ".env\nbackups/\n")?;
+    pitr::write_dockerfile(&Project::new(&new.entry.name, &dir))?;
+    fs::write(dir.join(".gitignore"), ".env\npgbackrest.env\nbackups/\n")?;
     fs::write(
         dir.join("migrations/README.md"),
         "Plain SQL migrations, applied in order by `nelcota migrate`.\n\
@@ -172,6 +175,10 @@ mod tests {
         assert!(compose.contains("NELCOTA_PROJECT_NAME: shop"));
         assert!(compose.contains("      - -c\n      - shared_buffers=128MB"));
         assert!(compose.contains("internal: true"));
+        assert!(compose.contains(
+            "    build: ./postgres
+"
+        ));
         assert!(!compose.contains("ports:"), "only Caddy publishes ports");
     }
 }
