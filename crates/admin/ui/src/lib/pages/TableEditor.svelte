@@ -10,6 +10,7 @@
   import DataGrid from '$lib/components/app/DataGrid.svelte'
   import GridFooter from '$lib/components/app/GridFooter.svelte'
   import SelectionBar from '$lib/components/app/SelectionBar.svelte'
+  import GridState from '$lib/components/app/GridState.svelte'
   import RowSheet from '$lib/components/app/RowSheet.svelte'
   import ConfirmDialog from '$lib/components/app/ConfirmDialog.svelte'
   import FilterBar from '$lib/components/app/FilterBar.svelte'
@@ -267,29 +268,40 @@
           </p>
         {/if}
 
-        <div class="min-h-0 flex-1 overflow-auto">
+        <div class="relative min-h-0 flex-1 overflow-auto" aria-busy={loading}>
+          <!-- Recarga (ordem, filtro, página): barra no topo e grade esmaecida,
+               para os dados antigos não parecerem já os novos. -->
+          {#if loading && data}
+            <div class="pointer-events-none sticky top-0 z-20 h-0.5 overflow-hidden bg-brand/15" aria-hidden="true">
+              <div class="animate-progress h-full w-2/5 bg-brand"></div>
+            </div>
+          {/if}
           {#if error}
-            <p class="p-4 text-sm text-destructive">{error}</p>
+            <GridState state="error" message={error} onretry={load} />
           {:else if !data}
-            <p class="p-4 text-sm text-muted-foreground">Carregando…</p>
+            <GridState state="loading" />
           {:else}
-            <DataGrid
-              {data}
-              {sort}
-              hidden={hidden.names}
-              bind:selected
-              onsort={toggleSort}
-              onsortset={setSort}
-              onfilter={filterBy}
-              onhide={(column) => hidden.hide(column)}
-              onexpand={openSheet}
-              oncommit={commitCell}
-              {referenceHref}
-            />
+            <div class={['transition-opacity', loading && 'opacity-60']}>
+              <DataGrid
+                {data}
+                {sort}
+                hidden={hidden.names}
+                bind:selected
+                onsort={toggleSort}
+                onsortset={setSort}
+                onfilter={filterBy}
+                onhide={(column) => hidden.hide(column)}
+                onexpand={openSheet}
+                oncommit={commitCell}
+                {referenceHref}
+              />
+            </div>
             {#if data.rows.length === 0}
-              <p class="py-12 text-center text-sm text-muted-foreground">
-                {filters.length ? 'Nenhuma linha para esses filtros.' : 'Nenhuma linha.'}
-              </p>
+              {#if filters.length}
+                <GridState state="no-match" onclearfilters={() => setFilters([])} />
+              {:else}
+                <GridState state="empty" insertable={data.table.insertable} oninsert={() => openSheet(null)} />
+              {/if}
             {/if}
           {/if}
         </div>

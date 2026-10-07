@@ -193,6 +193,27 @@
 	}
 }
 
+/* Barra de progresso indeterminada (recarga da grade). */
+@keyframes progress-indeterminate {
+	from {
+		transform: translateX(-100%);
+	}
+	to {
+		transform: translateX(250%);
+	}
+}
+.animate-progress {
+	animation: progress-indeterminate 1.1s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+	.animate-progress {
+		animation: none;
+		transform: none;
+		width: 100%;
+		opacity: 0.6;
+	}
+}
+
 /* Barras de rolagem discretas. */
 * {
 	scrollbar-width: thin;
