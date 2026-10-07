@@ -19,5 +19,5 @@
       class="text-white dark:text-[#0b2a1c]"
     />
   </svg>
-  {#if !mark}<span class="text-lg font-bold tracking-tight">nelcota</span>{/if}
+  {#if !mark}<span class="text-lg font-semibold tracking-tight">nelcota</span>{/if}
 </span>

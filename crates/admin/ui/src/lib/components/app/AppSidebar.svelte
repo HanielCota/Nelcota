@@ -33,14 +33,14 @@
           {#if group.label}
             <p
               class={[
-                'mb-1 h-5 px-5 text-3xs font-semibold tracking-[0.08em] whitespace-nowrap text-muted-foreground/80 uppercase transition-opacity duration-150',
+                'mb-1 h-5 px-[23px] text-xs font-medium whitespace-nowrap text-muted-foreground transition-opacity duration-150',
                 reveal,
               ]}
             >
               {group.label}
             </p>
           {/if}
-          <ul class="flex flex-col gap-1 px-3">
+          <ul class="flex flex-col gap-0.5 px-3">
             {#each group.items as item (item.path)}
               {@const active = isActive(item.path)}
               <li>
@@ -49,16 +49,13 @@
                   aria-current={active ? 'page' : undefined}
                   title={item.title}
                   class={[
-                    'relative flex h-10 items-center gap-3 overflow-hidden rounded-lg px-[11px] text-sm font-medium whitespace-nowrap transition-colors',
+                    'flex h-9 items-center gap-3 overflow-hidden rounded-md px-[11px] text-sm whitespace-nowrap transition-colors',
                     active
-                      ? 'bg-sidebar-accent text-sidebar-accent-foreground shadow-card'
+                      ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground'
                       : 'text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground',
                   ]}
                 >
-                  {#if active}
-                    <span class="absolute inset-y-2 left-0 w-[3px] rounded-r-full bg-brand" aria-hidden="true"></span>
-                  {/if}
-                  <item.icon class={['size-[18px] shrink-0', active && 'text-brand']} strokeWidth={1.75} />
+                  <item.icon class={['size-[18px] shrink-0', active && 'text-brand']} strokeWidth={1.6} />
                   <span class={['transition-opacity duration-150', reveal]}>{item.title}</span>
                 </a>
               </li>
@@ -74,9 +71,9 @@
         target="_blank"
         rel="noopener"
         title="Docs (OpenAPI)"
-        class="flex h-10 items-center gap-3 overflow-hidden rounded-lg px-[11px] text-sm font-medium whitespace-nowrap text-sidebar-foreground transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
+        class="flex h-9 items-center gap-3 overflow-hidden rounded-md px-[11px] text-sm whitespace-nowrap text-sidebar-foreground transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
       >
-        <BookOpen class="size-[18px] shrink-0" strokeWidth={1.75} />
+        <BookOpen class="size-[18px] shrink-0" strokeWidth={1.6} />
         <span class={['flex flex-1 items-center justify-between transition-opacity duration-150', reveal]}
           >Docs (OpenAPI)<ArrowUpRight class="size-3.5 text-muted-foreground" /></span
         >
@@ -87,12 +84,12 @@
         title={pinned ? 'Recolher barra lateral' : 'Fixar barra lateral aberta'}
         aria-label={pinned ? 'Recolher barra lateral' : 'Fixar barra lateral aberta'}
         aria-pressed={pinned}
-        class="hidden h-10 cursor-pointer items-center gap-3 overflow-hidden rounded-lg px-[11px] text-sm font-medium whitespace-nowrap text-sidebar-foreground transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground xl:flex"
+        class="hidden h-9 cursor-pointer items-center gap-3 overflow-hidden rounded-md px-[11px] text-sm whitespace-nowrap text-sidebar-foreground transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground xl:flex"
       >
         {#if pinned}
-          <PanelLeftClose class="size-[18px] shrink-0" strokeWidth={1.75} />
+          <PanelLeftClose class="size-[18px] shrink-0" strokeWidth={1.6} />
         {:else}
-          <PanelLeftOpen class="size-[18px] shrink-0" strokeWidth={1.75} />
+          <PanelLeftOpen class="size-[18px] shrink-0" strokeWidth={1.6} />
         {/if}
         <span class={['transition-opacity duration-150', reveal]}>{pinned ? 'Recolher' : 'Fixar aberta'}</span>
       </button>

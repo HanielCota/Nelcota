@@ -54,7 +54,7 @@
 
 <header class="flex h-14 shrink-0 items-center gap-2 border-b border-sidebar-border bg-sidebar pr-3 sm:pr-4">
   <div class="flex w-16 shrink-0 justify-center">
-    <a href={href('/')} class="hidden rounded-lg transition-transform hover:scale-105 md:block" aria-label="Início"
+    <a href={href('/')} class="hidden rounded-md md:block" aria-label="Início"
       ><Logo mark size="lg" /></a
     >
     <Button variant="ghost" size="icon" class="md:hidden" onclick={() => (mobileOpen = true)} aria-label="Menu">
@@ -77,7 +77,7 @@
             >{crumb.label}</a
           >
         {:else}
-          <span class="truncate px-1 font-semibold text-foreground" aria-current="page">{crumb.label}</span>
+          <span class="truncate px-1 text-foreground" aria-current="page">{crumb.label}</span>
         {/if}
       </span>
     {/each}
@@ -87,13 +87,13 @@
     <button
       type="button"
       onclick={() => (palette.open = true)}
-      class="flex size-9 cursor-pointer items-center justify-center gap-2.5 rounded-lg border border-border-strong bg-card text-sm text-muted-foreground shadow-card transition-colors hover:border-ring hover:text-foreground sm:w-64 sm:justify-start sm:px-3 lg:w-80"
+      class="flex size-9 cursor-pointer items-center justify-center gap-2.5 rounded-md border border-border-strong bg-card text-sm text-muted-foreground transition-colors hover:border-ring hover:text-foreground sm:w-64 sm:justify-start sm:px-3 lg:w-80"
       aria-label="Buscar"
     >
       <Search class="size-4 shrink-0" />
-      <span class="hidden flex-1 text-left sm:inline">Buscar páginas, tabelas…</span>
+      <span class="hidden flex-1 text-left sm:inline">Buscar…</span>
       <kbd
-        class="hidden rounded-md border border-border-strong bg-muted px-1.5 py-0.5 font-sans text-2xs font-medium sm:inline"
+        class="hidden rounded border border-border-strong bg-muted px-1.5 font-sans text-2xs sm:inline"
         >{isMac ? '⌘' : 'Ctrl'} K</kbd
       >
     </button>
@@ -108,7 +108,7 @@
         {#snippet child({ props })}
           <button
             {...props}
-            class="ml-0.5 grid size-9 cursor-pointer place-items-center rounded-full bg-brand-soft text-sm font-bold text-brand ring-1 ring-brand/25 transition-shadow hover:ring-2 hover:ring-brand/50 aria-expanded:ring-2 aria-expanded:ring-brand/50"
+            class="ml-0.5 grid size-8 cursor-pointer place-items-center rounded-full border border-border-strong bg-muted text-sm font-medium text-foreground transition-colors hover:border-ring aria-expanded:border-ring"
             aria-label="Conta"
           >
             {initial}
@@ -116,22 +116,15 @@
         {/snippet}
       </DropdownMenu.Trigger>
       <DropdownMenu.Content align="end" class="w-64">
-        <div class="flex items-center gap-3 px-2 py-2">
-          <span
-            class="grid size-9 shrink-0 place-items-center rounded-full bg-brand-soft text-sm font-bold text-brand ring-1 ring-brand/25"
-            >{initial}</span
-          >
-          <div class="min-w-0">
-            <p class="text-xs text-muted-foreground">Conectado como</p>
-            <p class="truncate text-sm font-semibold">{session.email}</p>
-          </div>
+        <div class="px-2 py-1.5">
+          <p class="text-xs text-muted-foreground">Conectado como</p>
+          <p class="truncate text-sm font-medium">{session.email}</p>
         </div>
         <DropdownMenu.Separator />
         <DropdownMenu.Item onclick={toggleMode}>
           {#if mode.current === 'dark'}<Sun />{:else}<Moon />{/if}Alternar tema
         </DropdownMenu.Item>
-        <DropdownMenu.Separator />
-        <DropdownMenu.Item variant="destructive" onclick={logout}><LogOut />Sair</DropdownMenu.Item>
+        <DropdownMenu.Item onclick={logout}><LogOut />Sair</DropdownMenu.Item>
       </DropdownMenu.Content>
     </DropdownMenu.Root>
   </div>
@@ -145,7 +138,7 @@
       {#each navGroups as group, g (g)}
         <div>
           {#if group.label}
-            <p class="mb-1 px-3 text-3xs font-semibold tracking-[0.08em] text-muted-foreground uppercase">
+            <p class="mb-1 px-3 text-xs font-medium text-muted-foreground">
               {group.label}
             </p>
           {/if}
@@ -156,13 +149,13 @@
               onclick={() => (mobileOpen = false)}
               aria-current={active ? 'page' : undefined}
               class={[
-                'flex h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium',
+                'flex h-10 items-center gap-3 rounded-md px-3 text-sm',
                 active
-                  ? 'bg-sidebar-accent text-foreground shadow-card'
+                  ? 'bg-sidebar-accent font-medium text-foreground'
                   : 'text-sidebar-foreground hover:bg-sidebar-accent/60',
               ]}
             >
-              <item.icon class={['size-[18px]', active && 'text-brand']} strokeWidth={1.75} />{item.title}
+              <item.icon class={['size-[18px]', active && 'text-brand']} strokeWidth={1.6} />{item.title}
             </a>
           {/each}
         </div>

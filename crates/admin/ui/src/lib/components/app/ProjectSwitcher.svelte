@@ -39,13 +39,9 @@
       {#snippet child({ props })}
         <button
           {...props}
-          class="flex h-9 min-w-0 cursor-pointer items-center gap-2 rounded-lg px-2.5 text-sm font-semibold transition-colors hover:bg-accent aria-expanded:bg-accent"
+          class="flex h-9 min-w-0 cursor-pointer items-center gap-2 rounded-md px-2.5 text-sm font-medium transition-colors hover:bg-accent aria-expanded:bg-accent"
         >
           <span class="truncate">{data!.current}</span>
-          <span
-            class="hidden rounded-full border border-brand/30 bg-brand/5 px-2 dark:bg-brand/10 py-0.5 text-3xs font-semibold tracking-wide text-brand uppercase sm:inline"
-            >projeto</span
-          >
           <ChevronsUpDown class="size-4 shrink-0 text-muted-foreground" />
         </button>
       {/snippet}
