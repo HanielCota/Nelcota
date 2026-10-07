@@ -5,6 +5,7 @@
   import { Checkbox } from '$lib/components/ui/checkbox'
   import { toast } from 'svelte-sonner'
   import { ddl } from '$lib/ddl'
+  import { errorMessage, t } from '$lib/i18n/index.svelte'
 
   let { open = $bindable(false), table, ondropped }: { open?: boolean; table: string; ondropped: () => void } = $props()
 
@@ -23,47 +24,47 @@
     busy = true
     try {
       const result = await ddl.dropTable(table, cascade)
-      toast.success(result.message ?? 'Tabela apagada')
+      toast.success(t('tables.toast.tableDropped'))
       open = false
       ondropped()
     } catch (e) {
-      toast.error((e as Error).message)
+      toast.error(errorMessage(e))
     } finally {
       busy = false
     }
   }
 </script>
 
-<!-- Confirmação por digitação do nome: apagar tabela não tem volta. -->
+<!-- Confirmed by typing the name: deleting a table cannot be undone. -->
 <AlertDialog.Root bind:open>
   <AlertDialog.Content>
     <AlertDialog.Header>
-      <AlertDialog.Title>Apagar a tabela {table}?</AlertDialog.Title>
+      <AlertDialog.Title>{t('tables.drop.title', { name: table })}</AlertDialog.Title>
       <AlertDialog.Description>
-        Todas as linhas, policies e GRANTs da tabela somem. Não dá para desfazer (só restaurando um backup).
+        {t('tables.drop.description')}
       </AlertDialog.Description>
     </AlertDialog.Header>
     <div class="grid gap-4">
       <label class="grid gap-2 text-sm">
-        <span class="text-muted-foreground">Digite <code class="text-foreground">{table}</code> para confirmar</span>
+        <span class="text-muted-foreground">{t('tables.drop.typeBefore')} <code class="text-foreground">{table}</code> {t('tables.drop.typeAfter')}</span>
         <Input bind:value={typed} autocomplete="off" class="font-mono" />
       </label>
       <label class="flex cursor-pointer items-start gap-3 text-sm">
         <Checkbox bind:checked={cascade} class="mt-0.5" />
         <span>
-          Apagar também o que depende dela (CASCADE)
+          {t('tables.drop.cascade')}
           <span class="mt-0.5 block text-xs text-muted-foreground">
-            Chaves estrangeiras de outras tabelas e views que usam esta tabela.
+            {t('tables.drop.cascadeHint')}
           </span>
         </span>
       </label>
     </div>
     <AlertDialog.Footer>
-      <AlertDialog.Cancel>Cancelar</AlertDialog.Cancel>
+      <AlertDialog.Cancel>{t('common.cancel')}</AlertDialog.Cancel>
       <AlertDialog.Action
         class={buttonVariants({ variant: 'destructive' })}
         disabled={busy || typed !== table}
-        onclick={confirm}>Apagar tabela</AlertDialog.Action
+        onclick={confirm}>{t('tables.drop.submit')}</AlertDialog.Action
       >
     </AlertDialog.Footer>
   </AlertDialog.Content>

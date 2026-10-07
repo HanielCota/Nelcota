@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { HiddenColumns } from './hidden-columns.svelte'
 
-describe('colunas ocultas', () => {
+describe('hidden columns', () => {
   it('ocultar, mostrar, alternar e mostrar todas', () => {
     const hidden = new HiddenColumns()
-    hidden.load('pedidos')
+    hidden.load('orders')
     hidden.hide('criado_em')
     hidden.hide('criado_em')
     expect(hidden.names).toEqual(['criado_em'])
@@ -16,16 +16,16 @@ describe('colunas ocultas', () => {
     expect(hidden.names).toEqual([])
   })
 
-  it('esquece colunas que deixaram de existir', () => {
+  it('forgets columns that no longer exist', () => {
     const hidden = new HiddenColumns()
-    hidden.load('pedidos')
+    hidden.load('orders')
     hidden.hide('antiga')
     hidden.hide('total')
     hidden.prune(['id', 'total'])
     expect(hidden.names).toEqual(['total'])
   })
 
-  it('cada tabela tem as suas (sem localStorage, começa vazio)', () => {
+  it('keeps a list per table (starts empty without localStorage)', () => {
     const hidden = new HiddenColumns()
     hidden.load('clientes')
     expect(hidden.names).toEqual([])

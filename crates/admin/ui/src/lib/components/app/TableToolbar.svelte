@@ -11,6 +11,7 @@
   import { enc } from '$lib/api'
   import { href } from '$lib/router.svelte'
   import type { TableData } from '$lib/types'
+  import { t } from '$lib/i18n/index.svelte'
 
   let {
     name,
@@ -41,8 +42,8 @@
   } = $props()
 
   const tabs = [
-    { view: 'data', label: 'Dados', suffix: '' },
-    { view: 'structure', label: 'Estrutura', suffix: '/structure' },
+    { view: 'data', label: 'tables.toolbar.data', suffix: '' },
+    { view: 'structure', label: 'tables.toolbar.structure', suffix: '/structure' },
   ] as const
 </script>
 
@@ -50,11 +51,11 @@
   <a
     href={href('/tables')}
     class="-ml-1 grid size-9 place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground md:hidden"
-    aria-label="Voltar para a lista de tabelas"><ChevronLeft class="size-4" /></a
+    aria-label={t('tables.toolbar.back')}><ChevronLeft class="size-4" /></a
   >
   <h1 class="min-w-0 truncate text-base font-semibold">{name}</h1>
   {#if data}<RlsBadge rls={data.table.rls} />{/if}
-  <nav class="ml-1 flex h-9 items-center gap-0.5 rounded-md border bg-muted/50 p-0.5 text-sm" aria-label="Visão da tabela">
+  <nav class="ml-1 flex h-9 items-center gap-0.5 rounded-md border bg-muted/50 p-0.5 text-sm" aria-label={t('tables.toolbar.views')}>
     {#each tabs as tab (tab.view)}
       <a
         href={href(`/tables/${enc(name)}${tab.suffix}`)}
@@ -62,7 +63,7 @@
         class={[
           'flex h-full items-center rounded px-3 transition-colors',
           view === tab.view ? 'bg-background font-medium text-foreground ring-1 ring-border' : 'text-muted-foreground hover:text-foreground',
-        ]}>{tab.label}</a
+        ]}>{t(tab.label)}</a
       >
     {/each}
   </nav>
@@ -74,22 +75,22 @@
         onclick={() => (filterOpen = !filterOpen)}
         aria-expanded={filterOpen}
       >
-        <Funnel />Filtrar{#if filterCount}<span class="text-muted-foreground tabular-nums">{filterCount}</span>{/if}
+        <Funnel />{t('tables.toolbar.filter')}{#if filterCount}<span class="text-muted-foreground tabular-nums">{filterCount}</span>{/if}
       </Button>
       {#if data}
         <DropdownMenu.Root>
           <DropdownMenu.Trigger>
             {#snippet child({ props })}
               <Button variant={hiddenColumns.length ? 'secondary' : 'ghost'} size="sm" {...props}>
-                <Columns3 />Colunas{#if hiddenColumns.length}<span
+                <Columns3 />{t('tables.toolbar.columns')}{#if hiddenColumns.length}<span
                     class="text-muted-foreground tabular-nums"
-                    title={`${hiddenColumns.length} oculta(s)`}>{hiddenColumns.length}</span
+                    title={t('tables.toolbar.hidden', { count: hiddenColumns.length })}>{hiddenColumns.length}</span
                   >{/if}
               </Button>
             {/snippet}
           </DropdownMenu.Trigger>
           <DropdownMenu.Content align="end" class="max-h-96 w-64 overflow-y-auto">
-            <DropdownMenu.Label class="text-xs font-normal text-muted-foreground">Colunas visíveis</DropdownMenu.Label>
+            <DropdownMenu.Label class="text-xs font-normal text-muted-foreground">{t('tables.toolbar.visibleColumns')}</DropdownMenu.Label>
             {#each data.table.columns as column (column.name)}
               <DropdownMenu.CheckboxItem
                 checked={!hiddenColumns.includes(column.name)}
@@ -100,7 +101,7 @@
             {/each}
             {#if hiddenColumns.length}
               <DropdownMenu.Separator />
-              <DropdownMenu.Item onclick={onshowallcolumns}>Mostrar todas</DropdownMenu.Item>
+              <DropdownMenu.Item onclick={onshowallcolumns}>{t('tables.toolbar.showAll')}</DropdownMenu.Item>
             {/if}
           </DropdownMenu.Content>
         </DropdownMenu.Root>
@@ -108,12 +109,12 @@
       <DropdownMenu.Root>
         <DropdownMenu.Trigger>
           {#snippet child({ props })}
-            <Button variant="ghost" size="sm" {...props}><Download />Exportar</Button>
+            <Button variant="ghost" size="sm" {...props}><Download />{t('tables.toolbar.export')}</Button>
           {/snippet}
         </DropdownMenu.Trigger>
         <DropdownMenu.Content align="end" class="w-56">
           <DropdownMenu.Label class="text-xs font-normal text-muted-foreground">
-            {filterCount ? 'Linhas filtradas, na ordem atual' : 'Todas as linhas, na ordem atual'}
+            {filterCount ? t('tables.toolbar.exportFiltered') : t('tables.toolbar.exportAll')}
           </DropdownMenu.Label>
           <DropdownMenu.Item>
             {#snippet child({ props })}<a {...props} href={exportHref('csv')} download>CSV</a>{/snippet}
@@ -123,11 +124,11 @@
           </DropdownMenu.Item>
         </DropdownMenu.Content>
       </DropdownMenu.Root>
-      <Button variant="ghost" size="icon-sm" onclick={onreload} aria-label="Recarregar" title="Recarregar">
+      <Button variant="ghost" size="icon-sm" onclick={onreload} aria-label={t('tables.toolbar.reload')} title={t('tables.toolbar.reload')}>
         <RefreshCw class={loading ? 'animate-spin' : ''} />
       </Button>
       {#if data?.table.insertable}
-        <Button size="sm" onclick={oninsert}><Plus />Inserir linha</Button>
+        <Button size="sm" onclick={oninsert}><Plus />{t('tables.toolbar.insertRow')}</Button>
       {/if}
     </div>
   {/if}

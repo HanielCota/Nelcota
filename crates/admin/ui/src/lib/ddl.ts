@@ -1,7 +1,8 @@
-// Estrutura de tabelas e policies: tipos espelhando a API do painel, cliente
-// e as regras puras (diferença entre colunas, campos de cada policy).
+// Table and policy structure: types mirroring the panel API, the client and
+// the pure rules (difference between columns, fields of each policy).
 
 import { api, enc } from './api'
+import type { MessageKey } from './i18n/index.svelte'
 
 export type ApiRole = 'anon' | 'authenticated' | 'service_role'
 export type Privilege = 'select' | 'insert' | 'update' | 'delete'
@@ -10,12 +11,13 @@ export type OnDelete = 'no_action' | 'restrict' | 'cascade' | 'set_null' | 'set_
 export const API_ROLES: readonly ApiRole[] = ['anon', 'authenticated', 'service_role']
 export const PRIVILEGES: readonly Privilege[] = ['select', 'insert', 'update', 'delete']
 
-export const ON_DELETE: readonly { value: OnDelete; label: string }[] = [
-  { value: 'no_action', label: 'impedir (padrão)' },
-  { value: 'cascade', label: 'apagar junto' },
-  { value: 'set_null', label: 'deixar NULL' },
-  { value: 'restrict', label: 'impedir (imediato)' },
-  { value: 'set_default', label: 'voltar ao DEFAULT' },
+/** `label` is a translation key: render it with `t(option.label)`. */
+export const ON_DELETE: readonly { value: OnDelete; label: MessageKey }[] = [
+  { value: 'no_action', label: 'tables.columns.onDelete.no_action' },
+  { value: 'cascade', label: 'tables.columns.onDelete.cascade' },
+  { value: 'set_null', label: 'tables.columns.onDelete.set_null' },
+  { value: 'restrict', label: 'tables.columns.onDelete.restrict' },
+  { value: 'set_default', label: 'tables.columns.onDelete.set_default' },
 ]
 
 export interface ReferenceDef {
@@ -64,7 +66,7 @@ export type AlterAction =
   | { action: 'set_column_comment'; column: string; comment: string | null }
   | { action: 'set_grants'; grant: GrantDef }
 
-// Estrutura lida do pg_catalog (GET /tables/:nome/structure).
+// Structure read from pg_catalog (GET /tables/:name/structure).
 export interface ColumnInfo {
   name: string
   data_type: string
@@ -99,7 +101,7 @@ export interface PolicyDef {
   check: string | null
 }
 
-/** Resposta de toda mudança: o SQL executado (ou a prévia dele). */
+/** Response of every change: the SQL that ran (or its preview). */
 export interface DdlResult {
   sql: string[]
   message?: string
@@ -119,10 +121,10 @@ export const blankColumn = (): ColumnDef => ({
 
 const blank = (text: string | null | undefined) => (text?.trim() ? text.trim() : null)
 
-/** O `on_delete` como o pg_catalog descreve (`set null`) no formato da API. */
+/** `on_delete` as pg_catalog describes it (`set null`) in the API format. */
 const onDeleteValue = (text: string): OnDelete => text.replace(' ', '_') as OnDelete
 
-/** Coluna existente no formato do formulário. */
+/** An existing column in the form's format. */
 export function toColumnDef(info: ColumnInfo): ColumnDef {
   return {
     name: info.name,
@@ -143,9 +145,9 @@ const sameReference = (a: ReferenceDef | null, b: ReferenceDef | null) =>
   a === b || (a !== null && b !== null && a.table === b.table && a.column === b.column && a.on_delete === b.on_delete)
 
 /**
- * Ações para levar a coluna `original` ao estado `edited`. O rename vai por
- * último: as ações anteriores usam o nome antigo (o servidor também acompanha
- * renomeações, mas assim a prévia fica na ordem natural de leitura).
+ * Actions that take column `original` to the `edited` state. The rename goes
+ * last: the earlier actions use the old name (the server also follows renames,
+ * but this way the preview reads in natural order).
  */
 export function columnChanges(original: ColumnInfo, edited: ColumnDef): AlterAction[] {
   const column = original.name
@@ -169,7 +171,7 @@ export function columnChanges(original: ColumnInfo, edited: ColumnDef): AlterAct
   return actions
 }
 
-/** GRANTs que mudaram, como ações `set_grants` (uma por role alterada). */
+/** GRANTs that changed, as `set_grants` actions (one per changed role). */
 export function grantChanges(before: Structure['grants'], after: GrantDef[]): AlterAction[] {
   return after
     .filter((grant) => {
@@ -179,7 +181,7 @@ export function grantChanges(before: Structure['grants'], after: GrantDef[]): Al
     .map((grant) => ({ action: 'set_grants', grant }))
 }
 
-/** Quais expressões cada comando aceita (mesma regra do servidor). */
+/** Which expressions each command accepts (same rule as the server). */
 export function policyFields(command: PolicyCommand): { using: boolean; check: boolean } {
   return {
     using: command !== 'insert',
@@ -187,7 +189,7 @@ export function policyFields(command: PolicyCommand): { using: boolean; check: b
   }
 }
 
-/** Policy como vem de GET /policies, no formato do formulário. */
+/** A policy as GET /policies returns it, in the form's format. */
 export function toPolicyDef(policy: {
   name: string
   command: string

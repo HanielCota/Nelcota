@@ -7,6 +7,7 @@
   import { blankColumn, columnChanges, ddl, toColumnDef, type AlterAction, type ColumnDef, type ColumnInfo } from '$lib/ddl'
   import { loadSchemaColumns, loadTypes } from '$lib/pg-types.svelte'
   import { SqlPreview as Preview } from '$lib/preview.svelte'
+  import { errorMessage, t } from '$lib/i18n/index.svelte'
 
   let {
     open = $bindable(false),
@@ -16,7 +17,7 @@
   }: {
     open?: boolean
     table: string
-    /** Coluna sendo editada; `null` = adicionar coluna nova. */
+    /** Column being edited; `null` = add a new column. */
     original?: ColumnInfo | null
     onsaved: () => void
   } = $props()
@@ -51,11 +52,11 @@
     saving = true
     try {
       const result = await ddl.alterTable(table, $state.snapshot(actions))
-      toast.success(result.message ?? 'Coluna salva')
+      toast.success(t('tables.toast.columnSaved'))
       open = false
       onsaved()
     } catch (e) {
-      toast.error((e as Error).message)
+      toast.error(errorMessage(e))
     } finally {
       saving = false
     }
@@ -65,10 +66,10 @@
 <Sheet.Root bind:open>
   <Sheet.Content class="flex w-full flex-col gap-0 p-0 data-[side=right]:sm:max-w-2xl">
     <Sheet.Header class="border-b px-6 pt-6 pb-5">
-      <Sheet.Title>{original ? `Editar coluna ${original.name}` : 'Nova coluna'}</Sheet.Title>
+      <Sheet.Title>{original ? t('tables.columnSheet.editTitle', { name: original.name }) : t('tables.columnSheet.newTitle')}</Sheet.Title>
       <Sheet.Description>
-        em <code class="font-mono text-foreground">{table}</code>
-        {#if original?.primary_key}· faz parte da chave primária{/if}
+        {t('tables.columnSheet.in')} <code class="font-mono text-foreground">{table}</code>
+        {#if original?.primary_key}· {t('tables.columnSheet.partOfPrimaryKey')}{/if}
       </Sheet.Description>
     </Sheet.Header>
 
@@ -76,17 +77,16 @@
       <ColumnFields bind:column {tables} mode={original ? 'edit' : 'add'} />
       {#if original && column.data_type.trim() !== original.data_type}
         <p class="rounded-lg border bg-muted/40 px-4 py-3 text-xs text-muted-foreground">
-          Os valores atuais são convertidos com <code>{original.name}::{column.data_type}</code>. Se algum não converter, nada é
-          alterado.
+          {t('tables.columnSheet.conversionBefore')} <code>{original.name}::{column.data_type}</code>. {t('tables.columnSheet.conversionAfter')}
         </p>
       {/if}
-      <SqlPreview {preview} placeholder={original ? 'Nenhuma alteração ainda.' : 'Dê nome e tipo à coluna.'} />
+      <SqlPreview {preview} placeholder={original ? t('tables.columnSheet.previewEdit') : t('tables.columnSheet.previewAdd')} />
     </form>
 
     <Sheet.Footer class="flex-row justify-end gap-2 border-t bg-muted/40 px-6 py-4">
-      <Button variant="outline" onclick={() => (open = false)}>Cancelar</Button>
+      <Button variant="outline" onclick={() => (open = false)}>{t('common.cancel')}</Button>
       <Button type="submit" form="column-form" disabled={saving || actions.length === 0}>
-        {saving ? 'Salvando…' : original ? 'Salvar alterações' : 'Adicionar coluna'}
+        {saving ? t('common.saving') : original ? t('tables.columnSheet.saveChanges') : t('tables.columnSheet.addColumn')}
       </Button>
     </Sheet.Footer>
   </Sheet.Content>

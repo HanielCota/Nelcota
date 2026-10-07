@@ -4,9 +4,10 @@
   import Plus from '@lucide/svelte/icons/plus'
   import RotateCw from '@lucide/svelte/icons/rotate-cw'
   import EmptyState from './EmptyState.svelte'
+  import { t } from '$lib/i18n/index.svelte'
 
-  // Estados da grade sem linhas para mostrar: carregando pela primeira vez,
-  // erro, filtro sem resultado e tabela vazia.
+  // Grid states without rows to show: first load, error, a filter without
+  // results and an empty table.
   let {
     state,
     message = '',
@@ -25,7 +26,7 @@
 </script>
 
 {#if state === 'loading'}
-  <div class="grid gap-px p-0" aria-busy="true" aria-label="Carregando linhas">
+  <div class="grid gap-px p-0" aria-busy="true" aria-label={t('tables.state.loading')}>
     <div class="flex gap-3 border-b px-4 py-3.5">
       {#each [1, 2, 3, 4, 5] as i (i)}<Skeleton class="h-6 w-32" />{/each}
     </div>
@@ -37,19 +38,19 @@
   </div>
 {:else if state === 'error'}
   <div class="grid justify-items-start gap-3 p-6 text-sm">
-    <p class="break-words text-destructive">Não deu para carregar as linhas: {message}</p>
-    {#if onretry}<Button variant="outline" size="sm" onclick={onretry}><RotateCw />Tentar de novo</Button>{/if}
+    <p class="break-words text-destructive">{t('tables.state.loadError', { message })}</p>
+    {#if onretry}<Button variant="outline" size="sm" onclick={onretry}><RotateCw />{t('common.retry')}</Button>{/if}
   </div>
 {:else if state === 'no-match'}
-  <EmptyState title="Nenhuma linha para esses filtros">
+  <EmptyState title={t('tables.state.noMatch')}>
     {#snippet actions()}
-      {#if onclearfilters}<Button variant="outline" onclick={onclearfilters}>Limpar filtros</Button>{/if}
+      {#if onclearfilters}<Button variant="outline" onclick={onclearfilters}>{t('tables.state.clearFilters')}</Button>{/if}
     {/snippet}
   </EmptyState>
 {:else}
-  <EmptyState title="Tabela vazia">
+  <EmptyState title={t('tables.state.empty')}>
     {#snippet actions()}
-      {#if insertable && oninsert}<Button variant="outline" onclick={oninsert}><Plus />Inserir linha</Button>{/if}
+      {#if insertable && oninsert}<Button variant="outline" onclick={oninsert}><Plus />{t('tables.state.insertRow')}</Button>{/if}
     {/snippet}
   </EmptyState>
 {/if}

@@ -13,18 +13,19 @@
   import { blankColumn, ddl, type CreateTable } from '$lib/ddl'
   import { loadSchemaColumns, loadTypes } from '$lib/pg-types.svelte'
   import { SqlPreview as Preview } from '$lib/preview.svelte'
+  import { errorMessage, t } from '$lib/i18n/index.svelte'
 
   let { open = $bindable(false), oncreated }: { open?: boolean; oncreated: (name: string) => void } = $props()
 
-  // Padrões no estilo Supabase: id identity, criado_em, RLS ligado e
-  // service_role com acesso total (o resto se concede depois, com policies).
+  // Supabase-style defaults: identity id, created_at, RLS on and full access
+  // for service_role (everything else is granted later, with policies).
   const initial = (): CreateTable => ({
     name: '',
     comment: null,
     rls: true,
     columns: [
       { ...blankColumn(), name: 'id', data_type: 'bigint', primary_key: true, identity: true, nullable: false },
-      { ...blankColumn(), name: 'criado_em', data_type: 'timestamptz', default: 'now()', nullable: false },
+      { ...blankColumn(), name: 'created_at', data_type: 'timestamptz', default: 'now()', nullable: false },
     ],
     grants: [
       { role: 'anon', privileges: [] },
@@ -52,7 +53,7 @@
 
   const ready = $derived(spec.name.trim() !== '' && spec.columns.length > 0 && spec.columns.every((c) => c.name.trim()))
 
-  // Prévia a cada mudança do formulário (o snapshot também registra a dependência).
+  // Preview on every form change (the snapshot also registers the dependency).
   $effect(() => {
     const snapshot = $state.snapshot(spec)
     if (!open || !ready) return preview.clear()
@@ -74,11 +75,11 @@
     saving = true
     try {
       const result = await ddl.createTable($state.snapshot(spec))
-      toast.success(result.message ?? 'Tabela criada')
+      toast.success(t('tables.toast.tableCreated'))
       open = false
       oncreated(spec.name.trim())
     } catch (e) {
-      toast.error((e as Error).message)
+      toast.error(errorMessage(e))
     } finally {
       saving = false
     }
@@ -88,22 +89,22 @@
 <Sheet.Root bind:open>
   <Sheet.Content class="flex w-full flex-col gap-0 p-0 data-[side=right]:sm:max-w-3xl">
     <Sheet.Header class="border-b px-6 pt-6 pb-5">
-      <Sheet.Title>Nova tabela</Sheet.Title>
-      <Sheet.Description>Criada no schema exposto pela API, numa transação só.</Sheet.Description>
+      <Sheet.Title>{t('tables.create.title')}</Sheet.Title>
+      <Sheet.Description>{t('tables.create.description')}</Sheet.Description>
     </Sheet.Header>
 
     <form id="create-table" class="flex-1 space-y-8 overflow-y-auto px-6 py-6" onsubmit={submit}>
       <div class="grid gap-4 sm:grid-cols-2">
         <div class="grid gap-2">
-          <Label for="table-name">Nome</Label>
-          <Input id="table-name" bind:value={spec.name} placeholder="ex.: pedidos" class="font-mono" required />
+          <Label for="table-name">{t('tables.create.name')}</Label>
+          <Input id="table-name" bind:value={spec.name} placeholder={t('tables.create.namePlaceholder')} class="font-mono" required />
         </div>
         <div class="grid gap-2">
-          <Label for="table-comment">Descrição</Label>
+          <Label for="table-comment">{t('tables.create.comment')}</Label>
           <Input
             id="table-comment"
             bind:value={() => spec.comment ?? '', (v) => (spec.comment = v || null)}
-            placeholder="opcional"
+            placeholder={t('tables.create.optional')}
           />
         </div>
       </div>
@@ -111,21 +112,21 @@
       <label class="flex cursor-pointer items-start gap-3">
         <Checkbox bind:checked={spec.rls} class="mt-0.5" />
         <span class="text-sm font-medium">
-          Ativar Row Level Security (recomendado)
+          {t('tables.create.rls')}
           <span class="mt-0.5 block text-sm font-normal text-muted-foreground">
-            Sem policies, só o <code>service_role</code> acessa as linhas. Crie policies depois, na página Policies.
+            {t('tables.create.rlsHintBefore')} <code>service_role</code> {t('tables.create.rlsHintAfter')}
           </span>
         </span>
       </label>
       {#if !spec.rls}
         <p class="flex gap-2 text-sm text-destructive">
           <ShieldAlert class="mt-0.5 size-4 shrink-0" />
-          Sem RLS, quem tiver GRANT na tabela lê e altera todas as linhas.
+          {t('tables.create.noRlsWarning')}
         </p>
       {/if}
 
       <section class="grid gap-3">
-        <h3 class="text-sm font-semibold">Colunas</h3>
+        <h3 class="text-sm font-semibold">{t('tables.create.columns')}</h3>
         {#each spec.columns as _, i (keys[i])}
           <ColumnFields
             bind:column={spec.columns[i]}
@@ -134,21 +135,21 @@
             onremove={spec.columns.length > 1 ? () => removeColumn(i) : undefined}
           />
         {/each}
-        <Button variant="outline" size="sm" class="justify-self-start" onclick={addColumn}><Plus />Adicionar coluna</Button>
+        <Button variant="outline" size="sm" class="justify-self-start" onclick={addColumn}><Plus />{t('tables.create.addColumn')}</Button>
       </section>
 
       <section class="grid gap-3">
-        <h3 class="text-sm font-semibold">Acesso pela API (GRANT)</h3>
+        <h3 class="text-sm font-semibold">{t('tables.create.grants')}</h3>
         <GrantsEditor bind:grants={spec.grants} />
       </section>
 
-      <SqlPreview {preview} placeholder="Dê um nome à tabela e às colunas para ver o SQL." />
+      <SqlPreview {preview} placeholder={t('tables.create.previewPlaceholder')} />
     </form>
 
     <Sheet.Footer class="flex-row justify-end gap-2 border-t bg-muted/40 px-6 py-4">
-      <Button variant="outline" onclick={() => (open = false)}>Cancelar</Button>
+      <Button variant="outline" onclick={() => (open = false)}>{t('common.cancel')}</Button>
       <Button type="submit" form="create-table" disabled={saving || !ready}>
-        {saving ? 'Criando…' : 'Criar tabela'}
+        {saving ? t('common.creating') : t('tables.create.submit')}
       </Button>
     </Sheet.Footer>
   </Sheet.Content>

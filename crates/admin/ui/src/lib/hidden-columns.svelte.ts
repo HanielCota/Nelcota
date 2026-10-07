@@ -1,4 +1,4 @@
-// Colunas ocultas da grade, lembradas por tabela neste navegador.
+// Hidden grid columns, remembered per table in this browser.
 
 import { readJson, write } from './storage'
 
@@ -10,7 +10,7 @@ export class HiddenColumns {
   names = $state<string[]>([])
   #table = ''
 
-  /** Troca para as preferências de outra tabela. */
+  /** Switches to another table's preferences. */
   load(table: string) {
     this.#table = table
     this.names = readJson(key(table), parse, [])
@@ -37,7 +37,7 @@ export class HiddenColumns {
     this.set([])
   }
 
-  /** Esquece colunas que não existem mais (renomeadas ou apagadas). */
+  /** Forgets columns that no longer exist (renamed or dropped). */
   prune(existing: readonly string[]) {
     const kept = this.names.filter((c) => existing.includes(c))
     if (kept.length !== this.names.length) this.set(kept)

@@ -1,5 +1,5 @@
-// Apresentação das colunas na grade conforme o tipo do Postgres: categoria,
-// largura e alinhamento. Puro, para testar sem montar componente.
+// How grid columns are presented by Postgres type: category, width and
+// alignment. Pure, so it can be tested without mounting a component.
 
 import type { Column } from './types'
 
@@ -20,15 +20,15 @@ export function columnKind(column: Pick<Column, 'type' | 'enum_values'>): Column
 }
 
 /**
- * Largura inicial (px). Fixa por coluna: com `table-layout: fixed`, editar
- * uma célula não faz as outras colunas mudarem de tamanho.
+ * Initial width (px). Fixed per column: with `table-layout: fixed`, editing a
+ * cell does not resize the other columns.
  */
 export function columnWidth(
   column: Pick<Column, 'name' | 'type' | 'enum_values' | 'is_pk' | 'full_type' | 'references'>,
 ): number {
   const kind = columnKind(column)
-  // O cabeçalho precisa caber: nome (fonte normal) e linha do tipo (mono
-  // pequena, com a tabela da chave estrangeira). Larguras médias por caractere.
+  // The header has to fit: the name (regular font) and the type line (small
+  // mono, with the foreign key's table). Average widths per character.
   const typeLabel = column.full_type + (column.references ? ` → ${column.references.table}` : '')
   const header = Math.max(column.name.length * 7.5 + (column.is_pk ? 88 : 72), typeLabel.length * 6.8 + 72, 96)
   const base: Record<ColumnKind, number> = {
@@ -43,22 +43,22 @@ export function columnWidth(
   return Math.ceil(Math.min(Math.max(base[kind], header), 420))
 }
 
-/** Números à direita (comparar grandezas); o resto à esquerda. */
+/** Numbers on the right (to compare magnitudes); everything else on the left. */
 export const alignRight = (kind: ColumnKind) => kind === 'number'
 
-/** Fonte mono só onde ajuda a ler (números, ids, JSON); texto em fonte normal. */
+/** Mono font only where it helps reading (numbers, ids, JSON); text in the regular font. */
 export const monospace = (kind: ColumnKind) => kind === 'number' || kind === 'uuid' || kind === 'json'
 
 export interface PageInfo {
-  /** Primeira e última linha mostradas (1-based); 0 e 0 sem linhas. */
+  /** First and last row shown (1-based); 0 and 0 without rows. */
   from: number
   to: number
-  /** Última página (0-based), só com total exato; `null` se desconhecida. */
+  /** Last page (0-based), only with an exact total; `null` when unknown. */
   lastPage: number | null
   pageCount: number | null
 }
 
-/** Faixa de linhas e total de páginas para o rodapé da grade. */
+/** Row range and page count for the grid footer. */
 export function pageInfo(page: number, size: number, rowsOnPage: number, total: number | null, exact: boolean): PageInfo {
   const from = rowsOnPage ? page * size + 1 : 0
   const to = rowsOnPage ? page * size + rowsOnPage : 0
@@ -75,9 +75,9 @@ export interface CellPos {
 const PAGE_ROWS = 10
 
 /**
- * Navegação por teclado na grade (padrão "grid" do WAI-ARIA): setas, Home/End
- * (com Ctrl, primeira/última célula) e PageUp/PageDown. `null` para teclas que
- * não movem. Sempre dentro dos limites.
+ * Keyboard navigation in the grid (WAI-ARIA "grid" pattern): arrows, Home/End
+ * (with Ctrl, first/last cell) and PageUp/PageDown. `null` for keys that do
+ * not move. Always within bounds.
  */
 export function nextCell(key: string, pos: CellPos, rows: number, cols: number, ctrl = false): CellPos | null {
   if (rows === 0 || cols === 0) return null
