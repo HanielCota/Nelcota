@@ -171,10 +171,6 @@ pub fn router(state: AdminState) -> Router {
         .merge(protected)
         .route("/admin/api/{*rest}", get(api_not_found).post(api_not_found))
         .route("/admin/assets/{*file}", get(asset))
-        .route(
-            "/admin/favicon.svg",
-            get(|| async { ui_file("favicon.svg") }),
-        )
         .route("/admin", get(|| async { Redirect::to("/admin/") }))
         .route("/admin/", get(spa))
         .route("/admin/{*route}", get(spa))
