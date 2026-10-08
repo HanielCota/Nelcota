@@ -321,8 +321,11 @@ mod tests {
         project.compose_ok(&["up", "-d"]).unwrap();
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(40);
         loop {
+            // Over TCP: the image's init runs a temporary server on the socket
+            // only and then restarts it, so a socket check can pass just before
+            // that restart.
             if project
-                .as_postgres(&["pg_isready", "-q"])
+                .as_postgres(&["pg_isready", "-q", "-h", "127.0.0.1"])
                 .stdout(Stdio::null())
                 .stderr(Stdio::null())
                 .status()
