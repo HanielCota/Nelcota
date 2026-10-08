@@ -536,7 +536,8 @@ bundled object server: Garage on a single node keeps the files on the same
 disk as a plain directory would, for one more service to run, and MinIO's
 community edition went into maintenance mode in 2025. The routes follow the
 shape of Supabase Storage (`/storage/v1/object/{bucket}/{path}`), without
-promising compatibility with its client.
+promising compatibility with its client; the route words (`public`, `sign`,
+`list`) cannot be bucket names.
 
 **D78. Uploads stream through the server; keys are versioned.** The client
 sends the file to Nelcota, which streams it to the store: one endpoint, the
@@ -548,11 +549,14 @@ object's name; only after the upload completes does a short transaction
 insert or update the row under RLS. Holding no connection while bytes flow
 keeps slow clients from draining the pool; versioned keys make an overwrite
 atomic (readers see the old file or the new one, never half) and keep a
-failed upload from clobbering anything. A delete removes the row first and
-the bytes after. A periodic collector removes bytes no row points to once
-they are older than a grace period (7 days by default), so a database
-restore or a point-in-time recovery inside that window still finds its
-files. Storage routes run outside the request timeout and the gzip layer.
+failed upload from clobbering anything. Deleting or replacing a file removes
+the old bytes right after the commit: a delete means the file is gone, which
+also means a database restore does not bring deleted files back. A periodic
+collector removes bytes no row points to (left by a crash mid-upload) once
+they are a day old, so it never races an upload in flight. A plain upload
+needs only an `INSERT` policy; overwriting and deleting also need `SELECT`,
+as `UPDATE`/`DELETE` with a `WHERE` do in Postgres. Storage routes run
+outside the request timeout and the gzip layer.
 
 **D79. User files are served as inert content.** Every object response
 carries `X-Content-Type-Options: nosniff` and `Content-Security-Policy:
