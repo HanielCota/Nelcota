@@ -48,7 +48,7 @@ pub fn render(manifest: &Manifest) -> String {
 /// Writes the Caddyfile (and, on Docker, Caddy's compose if it does not exist yet).
 pub fn write(host: &Host, manifest: &Manifest) -> anyhow::Result<()> {
     if manifest.runtime == Runtime::Systemd {
-        return native::write_caddyfile(&render(manifest));
+        return write_native(&render(manifest));
     }
     let dir = host.caddy_dir();
     fs::create_dir_all(dir.join("config"))?;
@@ -149,6 +149,15 @@ pub fn down(host: &Host, runtime: Runtime, volumes: bool) -> anyhow::Result<()> 
         args.push("--volumes");
     }
     compose_command(&host.caddy_dir()).args(&args).status()?;
+    Ok(())
+}
+
+/// Writes the Caddyfile atomically.
+fn write_native(content: &str) -> anyhow::Result<()> {
+    let path = std::path::Path::new("/etc/caddy/Caddyfile");
+    let tmp = path.with_extension("nelcota-tmp");
+    fs::write(&tmp, content)?;
+    fs::rename(&tmp, path)?;
     Ok(())
 }
 
