@@ -808,3 +808,42 @@ async fn the_collector_removes_only_old_orphans() {
         .await;
     assert_eq!(bytes, b"kept");
 }
+
+#[tokio::test]
+async fn a_per_user_quota_is_a_policy() {
+    let app = TestApp::spawn().await;
+    with_buckets(&app).await;
+    // The policy from docs/storage.md, with a 10-byte quota.
+    app.admin_client
+        .batch_execute(
+            "CREATE POLICY quota ON storage.objects AS RESTRICTIVE FOR INSERT TO authenticated
+                 WITH CHECK ((SELECT coalesce(sum(size), 0) FROM storage.objects
+                               WHERE owner = auth.uid()) + size <= 10)",
+        )
+        .await
+        .unwrap();
+    let a = user_token(app.user_a);
+    let url = |name: &str| format!("/storage/v1/object/docs/{}/{name}", app.user_a);
+    let (status, _) = app
+        .upload(
+            Method::POST,
+            &url("one.txt"),
+            Some(&a),
+            "text/plain",
+            b"12345678",
+        )
+        .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let (status, _) = app
+        .upload(
+            Method::POST,
+            &url("two.txt"),
+            Some(&a),
+            "text/plain",
+            b"12345",
+        )
+        .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    // The refused upload left no bytes behind.
+    assert_eq!(stored_files(&app.storage_dir), 1);
+}
