@@ -102,6 +102,7 @@ pub fn render_unit(project: &str, env_file: &Path) -> String {
          Restart=on-failure\n\
          RestartSec=2\n\
          DynamicUser=yes\n\
+         StateDirectory=nelcota-{project}\n\
          CapabilityBoundingSet=\n\
          NoNewPrivileges=yes\n\
          ProtectSystem=strict\n\
@@ -300,6 +301,7 @@ mod tests {
             "Environment=NELCOTA_PROJECT_NAME=shop",
             "Requires=postgresql@17-main.service",
             "DynamicUser=yes",
+            "StateDirectory=nelcota-shop",
             "ProtectSystem=strict",
             "WantedBy=multi-user.target",
         ] {

@@ -117,6 +117,7 @@ pub fn backup(
 
     if upload {
         upload_s3(host, &project.name, &path, &name)?;
+        sync_files_up(host, project)?;
     }
     if let Some(keep) = keep {
         prune(&dir, keep)?;
@@ -124,48 +125,152 @@ pub fn backup(
     Ok(path)
 }
 
+/// The host's backup bucket (credentials from `host.env`).
+struct BackupS3 {
+    endpoint: String,
+    bucket: String,
+    access_key: String,
+    secret_key: String,
+    region: String,
+}
+
+impl BackupS3 {
+    fn from_host(host: &Host) -> anyhow::Result<Self> {
+        let secrets = host.secrets();
+        let get = |key: &str| -> anyhow::Result<String> {
+            secrets
+                .get(key)?
+                .with_context(|| format!("{key} is not set in host.env (see docs/backup.md)"))
+        };
+        Ok(BackupS3 {
+            endpoint: get("NELCOTA_BACKUP_S3_ENDPOINT")?,
+            bucket: get("NELCOTA_BACKUP_S3_BUCKET")?,
+            access_key: get("NELCOTA_BACKUP_S3_ACCESS_KEY")?,
+            secret_key: get("NELCOTA_BACKUP_S3_SECRET_KEY")?,
+            region: secrets
+                .get("NELCOTA_BACKUP_S3_REGION")?
+                .unwrap_or_else(|| "us-east-1".into()),
+        })
+    }
+
+    /// Runs `aws s3 <args>` in the `amazon/aws-cli` image with `dir` mounted
+    /// at `/data` (as `user`, when given).
+    fn run(
+        &self,
+        dir: &Path,
+        read_only: bool,
+        user: Option<&str>,
+        args: &[&str],
+    ) -> anyhow::Result<()> {
+        let dir = fs::canonicalize(dir)?.display().to_string();
+        // Windows marks canonical paths as verbatim (`\\?\C:\...`), which
+        // `docker -v` reads as extra colons.
+        let dir = dir.strip_prefix(r"\\?\").unwrap_or(&dir);
+        let mut command = Command::new("docker");
+        command
+            .args(["run", "--rm", "-v"])
+            .arg(format!("{dir}:/data{}", if read_only { ":ro" } else { "" }));
+        if let Some(user) = user {
+            command.args(["--user", user]);
+        }
+        let status = command
+            .args([
+                "-e",
+                "AWS_ACCESS_KEY_ID",
+                "-e",
+                "AWS_SECRET_ACCESS_KEY",
+                "-e",
+                "AWS_DEFAULT_REGION",
+            ])
+            .env("AWS_ACCESS_KEY_ID", &self.access_key)
+            .env("AWS_SECRET_ACCESS_KEY", &self.secret_key)
+            .env("AWS_DEFAULT_REGION", &self.region)
+            .args(["amazon/aws-cli", "s3"])
+            .args(args)
+            .args(["--endpoint-url", &self.endpoint])
+            .status()
+            .context("could not run aws-cli")?;
+        if !status.success() {
+            bail!("aws s3 {} failed ({status})", args.first().unwrap_or(&""));
+        }
+        Ok(())
+    }
+
+    fn files_url(&self, project: &str) -> String {
+        format!("s3://{}/{project}/storage/", self.bucket)
+    }
+}
+
 /// Uploads to S3-compatible storage (credentials from `host.env`), under `<bucket>/<project>/`.
 fn upload_s3(host: &Host, project: &str, path: &Path, name: &str) -> anyhow::Result<()> {
-    let secrets = host.secrets();
-    let get = |key: &str| -> anyhow::Result<String> {
-        secrets
-            .get(key)?
-            .with_context(|| format!("{key} is not set in host.env (see docs/backup.md)"))
-    };
-    let endpoint = get("NELCOTA_BACKUP_S3_ENDPOINT")?;
-    let bucket = get("NELCOTA_BACKUP_S3_BUCKET")?;
-    let access_key = get("NELCOTA_BACKUP_S3_ACCESS_KEY")?;
-    let secret_key = get("NELCOTA_BACKUP_S3_SECRET_KEY")?;
-    let region = secrets
-        .get("NELCOTA_BACKUP_S3_REGION")?
-        .unwrap_or_else(|| "us-east-1".into());
-    let dir = fs::canonicalize(path.parent().unwrap_or(Path::new(".")))?;
-
-    step(&format!("Uploading to s3://{bucket}/{project}/{name}"));
-    let status = Command::new("docker")
-        .args(["run", "--rm", "-v"])
-        .arg(format!("{}:/backups:ro", dir.display()))
-        .args([
-            "-e",
-            "AWS_ACCESS_KEY_ID",
-            "-e",
-            "AWS_SECRET_ACCESS_KEY",
-            "-e",
-            "AWS_DEFAULT_REGION",
-        ])
-        .env("AWS_ACCESS_KEY_ID", access_key)
-        .env("AWS_SECRET_ACCESS_KEY", secret_key)
-        .env("AWS_DEFAULT_REGION", region)
-        .args(["amazon/aws-cli", "s3", "cp"])
-        .arg(format!("/backups/{name}"))
-        .arg(format!("s3://{bucket}/{project}/{name}"))
-        .args(["--endpoint-url", &endpoint])
-        .status()
-        .context("could not run aws-cli")?;
-    if !status.success() {
-        bail!("upload to S3 failed ({status})");
-    }
+    let s3 = BackupS3::from_host(host)?;
+    let dir = path.parent().unwrap_or(Path::new("."));
+    step(&format!("Uploading to s3://{}/{project}/{name}", s3.bucket));
+    s3.run(
+        dir,
+        true,
+        None,
+        &[
+            "cp",
+            &format!("/data/{name}"),
+            &format!("s3://{}/{project}/{name}", s3.bucket),
+        ],
+    )?;
     ok("uploaded");
+    Ok(())
+}
+
+/// Mirrors the project's files to `<bucket>/<project>/storage/`. Keys are
+/// immutable versions (D78), so each run only sends what is new, and files
+/// deleted in the app are deleted there too.
+fn sync_files_up(host: &Host, project: &Project) -> anyhow::Result<()> {
+    let dir = project.storage_dir();
+    if !project.stores_files_on_disk() || !dir.is_dir() {
+        return Ok(());
+    }
+    let s3 = BackupS3::from_host(host)?;
+    step(&format!("Syncing files to {}", s3.files_url(&project.name)));
+    s3.run(
+        &dir,
+        true,
+        None,
+        &[
+            "sync",
+            "/data",
+            &s3.files_url(&project.name),
+            "--delete",
+            "--only-show-errors",
+        ],
+    )?;
+    ok("files synced");
+    Ok(())
+}
+
+/// Brings the files back from the backup bucket, replacing the local ones.
+fn sync_files_down(host: &Host, project: &Project) -> anyhow::Result<()> {
+    let dir = project.storage_dir();
+    fs::create_dir_all(&dir)?;
+    let s3 = BackupS3::from_host(host)?;
+    step(&format!(
+        "Restoring files from {}",
+        s3.files_url(&project.name)
+    ));
+    // On Docker, as the image's user so the app can still replace and delete
+    // them; systemd hands its state directory to the unit's dynamic user.
+    let user = (project.runtime == Runtime::Docker).then_some("65532:65532");
+    s3.run(
+        &dir,
+        false,
+        user,
+        &[
+            "sync",
+            &s3.files_url(&project.name),
+            "/data",
+            "--delete",
+            "--only-show-errors",
+        ],
+    )?;
+    ok("files restored");
     Ok(())
 }
 
@@ -185,7 +290,15 @@ fn prune(dir: &Path, keep: usize) -> anyhow::Result<()> {
 
 /// Restores a dump: stops the app, recreates the objects in a single
 /// transaction and starts the app again.
-pub fn restore(project: &Project, file: &Path, yes: bool) -> anyhow::Result<()> {
+/// With `files`, also brings the files back from the backup bucket (what
+/// `backup --upload` mirrored), replacing the local ones.
+pub fn restore(
+    host: &Host,
+    project: &Project,
+    file: &Path,
+    files: bool,
+    yes: bool,
+) -> anyhow::Result<()> {
     if !file.is_file() {
         bail!("file not found: {}", file.display());
     }
@@ -202,7 +315,10 @@ pub fn restore(project: &Project, file: &Path, yes: bool) -> anyhow::Result<()> 
     step(&format!("Stopping the {} app", project.name));
     project.stop(&[Service::App])?;
     step(&format!("Restoring {}", file.display()));
-    let result = restore_dump(project, file);
+    let mut result = restore_dump(project, file);
+    if files && result.is_ok() {
+        result = sync_files_down(host, project);
+    }
     step("Starting the app");
     project.start(&[Service::App])?;
     result?;

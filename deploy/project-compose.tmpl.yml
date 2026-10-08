@@ -41,6 +41,8 @@ services:
     volumes:
       - ./migrations:/migrations:ro
       - ../../shared:/etc/nelcota/shared:ro
+      # Uploaded files (NELCOTA_STORAGE_DIR), owned by the image's user 65532.
+      - ./storage:/storage
     depends_on:
       postgres:
         condition: service_healthy

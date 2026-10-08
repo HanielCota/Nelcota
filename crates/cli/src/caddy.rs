@@ -34,7 +34,9 @@ pub fn render(manifest: &Manifest) -> String {
             ""
         };
         out.push_str(&format!(
-            "\n{domain} {{\n{tls}\tencode zstd gzip\n\treverse_proxy {upstream}\n\theader {{\n\
+            // Files under /storage go byte for byte (ranges, ETags): not compressed.
+            "\n{domain} {{\n{tls}\t@compressible not path /storage/*\n\
+             \tencode @compressible zstd gzip\n\treverse_proxy {upstream}\n\theader {{\n\
              \t\t-Server\n\t\tStrict-Transport-Security \"max-age=31536000\"\n\
              \t\tX-Content-Type-Options \"nosniff\"\n\t}}\n}}\n",
             domain = project.domain,
@@ -179,9 +181,10 @@ mod tests {
     #[test]
     fn one_site_per_project() {
         let caddyfile = render(&manifest(false));
-        assert!(
-            caddyfile.contains("api.shop.com {\n\tencode zstd gzip\n\treverse_proxy app-shop:8000")
-        );
+        assert!(caddyfile.contains(
+            "api.shop.com {\n\t@compressible not path /storage/*\n\
+             \tencode @compressible zstd gzip\n\treverse_proxy app-shop:8000"
+        ));
         assert!(caddyfile.contains("blog.example.com {"));
         assert!(caddyfile.contains("reverse_proxy app-blog:8000"));
         assert!(!caddyfile.contains("tls internal"));
