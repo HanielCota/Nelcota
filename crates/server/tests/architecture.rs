@@ -1,39 +1,12 @@
 //! Regression tests for resource limits, catalog reconciliation and wire DTOs.
 mod common;
-use axum::http::{Method, StatusCode, header};
+use axum::http::{Method, StatusCode};
+use common::panel::{login, sql_response as sql};
 use common::*;
 use nelcota_admin::contracts::*;
 use serde_json::{Value, json};
 use std::{sync::Arc, time::Duration};
 use tower::ServiceExt;
-
-async fn login(app: &TestApp) -> String {
-    let reply = app
-        .raw(
-            Method::POST,
-            "/admin/api/login",
-            &[("content-type", "application/json")],
-            json!({ "email": ADMIN_EMAIL, "password": ADMIN_PASSWORD }).to_string(),
-        )
-        .await;
-    assert_eq!(reply.status, StatusCode::OK);
-    reply.headers[header::SET_COOKIE]
-        .to_str()
-        .unwrap()
-        .split(';')
-        .next()
-        .unwrap()
-        .to_owned()
-}
-async fn sql(app: &TestApp, cookie: &str, query: &str) -> Reply {
-    app.raw(
-        Method::POST,
-        "/admin/api/sql",
-        &[("cookie", cookie), ("content-type", "application/json")],
-        json!({"sql":query}).to_string(),
-    )
-    .await
-}
 
 #[tokio::test]
 async fn cancelled_http_execution_interrupts_postgres_and_releases_the_slot() {

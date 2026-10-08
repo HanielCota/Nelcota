@@ -4,6 +4,8 @@
 //! Requires Docker to be running.
 #![allow(dead_code)]
 
+pub mod panel;
+
 use std::{sync::Arc, time::Duration};
 
 use axum::{
