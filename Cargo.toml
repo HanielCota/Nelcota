@@ -41,6 +41,10 @@ jsonwebtoken = { version = "11.1.0", default-features = false, features = ["rust
 # system certificates). No native-tls/OpenSSL: the musl build stays static.
 lettre = { version = "0.11.23", default-features = false, features = ["builder", "hostname", "smtp-transport", "tokio1-rustls-tls"] }
 postgres-protocol = "0.6.12"
+# HTTPS client (S3, OAuth providers) without a bundled TLS provider: rustls
+# runs on `ring`, installed at startup, never `aws-lc-rs` (D16).
+reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
 refinery = { version = "0.10.0", default-features = false, features = ["tokio-postgres"] }
 rust-embed = { version = "8.12.0", features = ["debug-embed"] }
 serde = { version = "1.0.229", features = ["derive"] }
@@ -54,6 +58,7 @@ tower = { version = "0.5.3", default-features = false, features = ["util"] }
 tower-http = { version = "0.7.1", default-features = false, features = ["cors", "timeout", "trace", "compression-gzip"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", default-features = false, features = ["fmt", "env-filter", "ansi", "json"] }
+url = "2.5.8"
 uuid = { version = "1.27.0", features = ["serde"] }
 
 [workspace.lints.rust]
