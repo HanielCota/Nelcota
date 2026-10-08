@@ -78,6 +78,36 @@ Links sent by email: password recovery, signup confirmation and magic link.
 | `created_at`, `expires_at` | `timestamptz` | validity: recovery 1 hour, signup 24 hours, magic link 15 minutes |
 | `used_at` | `timestamptz` | set on use; the link does not work again |
 
+## `auth.identities`
+
+Accounts at sign-in providers linked to a user (see
+[Sign-in with Google or GitHub](#sign-in-with-google-or-github)).
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `uuid` PK | |
+| `user_id` | `uuid` → `auth.users` | `ON DELETE CASCADE` |
+| `provider` | `text` | `google` or `github` |
+| `provider_id` | `text` | the provider's account id (`sub`); unique per provider |
+| `email` | `text` | the email the provider reported at the last sign-in |
+| `identity_data` | `jsonb` | the provider's profile as received |
+| `created_at`, `updated_at`, `last_sign_in_at` | `timestamptz` | |
+
+## `auth.flow_states`
+
+Provider sign-ins in progress; each row lives minutes.
+
+| Column | Type | Notes |
+|---|---|---|
+| `state_hash` | `bytea` unique | **SHA-256** of the `state` sent to the provider |
+| `provider` | `text` | |
+| `provider_verifier` | `text` | PKCE verifier toward the provider; cleared once used |
+| `code_challenge` | `text` | the app's S256 challenge |
+| `redirect_to` | `text` | the app page to return to |
+| `auth_code_hash` | `bytea` unique | **SHA-256** of the code handed to the app |
+| `user_id` | `uuid` → `auth.users` | set when the provider answers |
+| `created_at`, `expires_at` | `timestamptz` | 10 minutes at the provider, then 5 to redeem the code |
+
 ## Endpoints
 
 | Method and route | Body | Response |
@@ -85,6 +115,9 @@ Links sent by email: password recovery, signup confirmation and magic link.
 | `POST /auth/v1/signup` | `{email, password, data?}` | 201 + session (201 `{user}` with email confirmation on) |
 | `POST /auth/v1/token?grant_type=password` | `{email, password}` | 200 + session |
 | `POST /auth/v1/token?grant_type=refresh_token` | `{refresh_token}` | 200 + session |
+| `POST /auth/v1/token?grant_type=pkce` | `{auth_code, code_verifier}` | 200 + session |
+| `GET /auth/v1/authorize` | `?provider&redirect_to&code_challenge&code_challenge_method=S256` | 303 to the provider |
+| `GET /auth/v1/callback` | (the provider's redirect) | 303 to `redirect_to?code=...` or `?error=...` |
 | `POST /auth/v1/logout` | Bearer | 204 (revokes the session) |
 | `GET /auth/v1/user` | Bearer | user data |
 | `GET /auth/v1/.well-known/jwks.json` | - | public JWKS |
@@ -201,3 +234,55 @@ It does not create accounts: an email request would otherwise let anyone
 reserve addresses before their owners sign up. Same guarantees as recovery:
 token only in the fragment, one use, one email per minute per account,
 sending in the background.
+
+## Sign-in with Google or GitHub
+
+Off until a provider is configured. Register an OAuth app at the provider with
+the callback `https://<api domain>/auth/v1/callback`, then:
+
+```sh
+NELCOTA_API_URL=https://api.shop.com
+NELCOTA_OAUTH_REDIRECT_URLS=https://shop.com/auth,http://localhost:5173/auth
+NELCOTA_OAUTH_GOOGLE_CLIENT_ID=...
+NELCOTA_OAUTH_GOOGLE_CLIENT_SECRET=...
+NELCOTA_OAUTH_GITHUB_CLIENT_ID=...
+NELCOTA_OAUTH_GITHUB_CLIENT_SECRET=...
+```
+
+A half-configured provider, or a provider without the two URLs, stops the
+server from starting.
+
+1. The app creates a PKCE pair: a random `code_verifier` (43 to 128
+   characters) kept in the browser and `code_challenge =
+   base64url(SHA-256(code_verifier))`. It sends the person to
+   `GET /auth/v1/authorize?provider=github&redirect_to=https://shop.com/auth&code_challenge=...&code_challenge_method=S256`.
+2. After the provider, the person lands on
+   `https://shop.com/auth?code=...` (or `?error=...`).
+3. The page calls `POST /auth/v1/token?grant_type=pkce {auth_code,
+   code_verifier}` and gets a session (same format as login).
+
+Errors on `redirect_to`: `access_denied` (the person declined),
+`provider_error`, `email_conflict` (the provider did not verify an email that
+belongs to an account), `email_required` (the provider gave no email),
+`signup_disabled`. `/authorize` answers `400 redirect_not_allowed`, `400
+invalid_code_challenge` or `403 provider_disabled`; `/callback` answers `400
+invalid_state` for an unknown, expired or already answered sign-in.
+
+Which account opens:
+
+- a provider account already linked: its user, even if the email changed at
+  the provider;
+- an email the provider **verified** that matches a confirmed account: that
+  account, which gains the identity (its password keeps working);
+- a verified email that matches an **unconfirmed** account: the verified owner
+  takes it over; the password, sessions and links set before are removed,
+  since whoever created it may not own the address;
+- an unverified email that matches an account: refused (`email_conflict`);
+- no account: a new one without password, confirmed when the provider verified
+  the email, with `user_metadata` `name` and `avatar_url` from the provider.
+
+Guarantees: `redirect_to` must sit under one of `NELCOTA_OAUTH_REDIRECT_URLS`
+(same origin, path below), so the endpoint cannot redirect elsewhere. The
+code in the app's URL works once, for 5 minutes, and only with the verifier
+the app kept. Nelcota uses its own PKCE and `state` toward the provider and
+talks to it only server to server.

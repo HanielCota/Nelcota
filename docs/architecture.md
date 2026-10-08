@@ -12,7 +12,7 @@ client ──HTTPS──▶ Caddy ──▶ nelcota (single binary) ──▶ Po
 | Crate | Responsibility |
 |---|---|
 | `nelcota-core` | config (`figment`), HTTP errors, `Claims`/`Role`, pool, migrations, `begin_request` |
-| `nelcota-auth` | `JwtVerifier` trait, EdDSA/HS256 keys and JWKS, `Auth` extractor, signup/login/refresh/logout, email links (recovery, confirmation, magic link), argon2id, rate limit |
+| `nelcota-auth` | `JwtVerifier` trait, EdDSA/HS256 keys and JWKS, `Auth` extractor, signup/login/refresh/logout, email links (recovery, confirmation, magic link), OAuth/OIDC providers, argon2id, rate limit |
 | `nelcota-api`  | catalog introspection, SQL builder, CRUD/RPC, OpenAPI, TS types |
 | `nelcota-storage` | files: buckets and objects under RLS (`storage` schema), bytes on disk or S3 (`object_store`), signed URLs, orphan collector |
 | `nelcota-admin` | panel at `/admin`: JSON API (`/admin/api`) + embedded Svelte SPA (`ui/dist`) |
@@ -35,7 +35,10 @@ Authentication's HTTP handlers adapt requests to `accounts` and `sessions`.
 `db` owns auth-role transactions and `request` owns HTTP metadata. `links`
 owns single-use email links (token storage, email text, sending and sign-in
 by link); `recovery` adds the password change, `confirmation` the signup
-policy and `verify` routes a link by its `type`. The panel's root assembles routes;
+policy and `verify` routes a link by its `type`. `oauth` owns provider
+sign-in: `provider` (with one module per provider) talks to the provider,
+`flow` stores sign-ins in progress, `identities` decides which account opens
+and `redirects` holds the allowlist. The panel's root assembles routes;
 `auth`, `middleware`, `error`, `assets` and `state` own their respective behavior.
 
 Storage's `upload` module owns streamed writes and their metadata commit,
@@ -177,7 +180,7 @@ assertions and request helpers shared with storage and architecture suites.
 |---|---|---|
 | `/health` | server | public |
 | `/rest/v1/*` | api | JWT → role → GRANTs + RLS |
-| `/auth/v1/*` | auth | public (signup/login/email links) or the user's JWT |
+| `/auth/v1/*` | auth | public (signup/login/email links/provider sign-in) or the user's JWT |
 | `/storage/v1/*` | storage | JWT → role → RLS on `storage.objects`; public buckets and signed URLs without a token |
 | `/admin/*` | admin | panel login (session), admin connection |
 
