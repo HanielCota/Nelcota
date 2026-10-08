@@ -12,6 +12,7 @@
   import Copy from '@lucide/svelte/icons/copy'
   import KeyRound from '@lucide/svelte/icons/key-round'
   import LogOut from '@lucide/svelte/icons/log-out'
+  import MailCheck from '@lucide/svelte/icons/mail-check'
   import Trash2 from '@lucide/svelte/icons/trash-2'
   import { Badge } from '$lib/components/ui/badge'
   import { toast } from 'svelte-sonner'
@@ -79,6 +80,16 @@
     confirmOpen = true
   }
 
+  async function confirmEmail(user: User) {
+    try {
+      await api.post(`/users/${enc(user.id)}/confirm`)
+      toast.success(t('users.emailConfirmed', { email: user.email }))
+      await load()
+    } catch (e) {
+      toast.error(errorMessage(e))
+    }
+  }
+
   async function confirm() {
     if (!target) return
     const { user, action } = target
@@ -101,6 +112,12 @@
   const when = (value: string | null) => (value ? date.format(new Date(value)) : '—')
 </script>
 
+{#snippet unconfirmed(user: User)}
+  {#if !user.email_confirmed_at}
+    <Badge variant="outline" class="ml-2 align-middle font-normal text-muted-foreground" title={t('users.unconfirmedHint')}>{t('users.unconfirmed')}</Badge>
+  {/if}
+{/snippet}
+
 {#snippet userActions(user: User)}
   <DropdownMenu.Root>
     <DropdownMenu.Trigger>
@@ -112,6 +129,9 @@
       <DropdownMenu.Group>
         <DropdownMenu.Item onclick={() => copyText(user.id, t('users.idCopied'))}><Copy aria-hidden="true" />{t('users.copyId')}</DropdownMenu.Item>
         <DropdownMenu.Item onclick={() => { passwordUser = user; passwordOpen = true }}><KeyRound aria-hidden="true" />{t('users.resetPassword')}</DropdownMenu.Item>
+        {#if !user.email_confirmed_at}
+          <DropdownMenu.Item onclick={() => confirmEmail(user)}><MailCheck aria-hidden="true" />{t('users.confirmEmail')}</DropdownMenu.Item>
+        {/if}
         <DropdownMenu.Item onclick={() => ask(user, 'revoke')}><LogOut aria-hidden="true" />{t('users.revokeSessions')}</DropdownMenu.Item>
       </DropdownMenu.Group>
       <DropdownMenu.Separator />
@@ -171,7 +191,7 @@
       {#each users as user (user.id)}
         <article class="min-w-0 rounded-lg border bg-card p-4">
           <div class="flex min-w-0 items-start justify-between gap-2">
-            <div class="min-w-0"><p class="break-all font-medium">{user.email}</p><p class="mt-1 truncate font-mono text-xs text-muted-foreground" title={user.id}>{user.id}</p></div>
+            <div class="min-w-0"><p class="break-all font-medium">{user.email}{@render unconfirmed(user)}</p><p class="mt-1 truncate font-mono text-xs text-muted-foreground" title={user.id}>{user.id}</p></div>
             {@render userActions(user)}
           </div>
           <dl class="mt-4 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2 text-xs">
@@ -203,7 +223,7 @@
                     aria-hidden="true">{user.email.charAt(0).toUpperCase()}</span
                   >
                   <div class="min-w-0">
-                    <p class="font-medium">{user.email}</p>
+                    <p class="font-medium">{user.email}{@render unconfirmed(user)}</p>
                     <p class="max-w-60 truncate font-mono text-xs text-muted-foreground" title={user.id}>{user.id}</p>
                   </div>
                 </div>

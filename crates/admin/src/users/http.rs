@@ -1,5 +1,5 @@
 //! HTTP adaptation for end-user account and session administration.
-//! Account creation does not confirm email or send invitations.
+//! Accounts created here count as confirmed; no invitation is sent.
 use super::operations;
 use crate::{AdminState, ApiError, contracts::UsersResponse};
 use axum::{
@@ -38,6 +38,11 @@ pub async fn revoke_sessions(State(state): State<AdminState>, Path(id): Path<Str
     Ok(Json(
         json!({ "message": format!("{count} session(s) ended"), "count": count }),
     ))
+}
+
+pub async fn confirm_email(State(state): State<AdminState>, Path(id): Path<String>) -> ApiResult {
+    operations::confirm_email(&state.db, &id).await?;
+    Ok(Json(json!({ "message": "email confirmed" })))
 }
 
 pub async fn delete_user(State(state): State<AdminState>, Path(id): Path<String>) -> ApiResult {

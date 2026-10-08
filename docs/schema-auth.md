@@ -178,8 +178,9 @@ NELCOTA_EMAIL_CONFIRMATION_URL=https://app.shop.com/welcome
 
 Opening a magic or recovery link also confirms the email. Accounts that were
 already unconfirmed when the flow was turned on are held as well; mark them
-with `UPDATE auth.users SET email_confirmed_at = now()` if they should keep
-signing in.
+with "Confirm email" on the panel's Users page (or `UPDATE auth.users SET
+email_confirmed_at = now()`) if they should keep signing in. Accounts created
+in the panel are confirmed from the start.
 
 ## Magic link
 
