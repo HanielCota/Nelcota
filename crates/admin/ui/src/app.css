@@ -55,6 +55,13 @@
 	--sidebar-ring: #a3a3a3;
 	--warning: #9a4708;
 	--success: #137a4b;
+	/* Code syntax (SQL editor), after GitHub's light palette. */
+	--syntax-keyword: #cf222e;
+	--syntax-function: #8250df;
+	--syntax-type: #953800;
+	--syntax-string: #0a3069;
+	--syntax-number: #0550ae;
+	--syntax-comment: #6e7781;
 	/* Layered shadows: a crisp edge plus a soft spread. */
 	--elev-card: 0 1px 2px rgb(0 0 0 / 0.04), 0 1px 3px rgb(0 0 0 / 0.03);
 	--elev-raised: 0 4px 12px -2px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.04);
@@ -101,6 +108,13 @@
 	--sidebar-ring: #5c5c5c;
 	--warning: #f5a524;
 	--success: #3ecf8e;
+	/* Code syntax (SQL editor), after GitHub's dark palette. */
+	--syntax-keyword: #ff7b72;
+	--syntax-function: #d2a8ff;
+	--syntax-type: #ffa657;
+	--syntax-string: #a5d6ff;
+	--syntax-number: #79c0ff;
+	--syntax-comment: #8b949e;
 	--elev-card: 0 1px 2px rgb(0 0 0 / 0.3);
 	--elev-raised: 0 6px 16px -4px rgb(0 0 0 / 0.5), 0 2px 4px -2px rgb(0 0 0 / 0.3);
 	--elev-overlay: 0 24px 64px -12px rgb(0 0 0 / 0.7), 0 8px 20px -8px rgb(0 0 0 / 0.5);

@@ -7,6 +7,7 @@
   import { sql, PostgreSQL } from '@codemirror/lang-sql'
   import { HighlightStyle, syntaxHighlighting } from '@codemirror/language'
   import { tags as t } from '@lezer/highlight'
+  import { functionCalls } from './function-calls'
 
   let {
     value = $bindable(''),
@@ -56,19 +57,24 @@
       color: 'var(--foreground)',
     },
     '.cm-completionDetail': { color: 'var(--muted-foreground)', fontStyle: 'normal', marginLeft: '8px' },
+    // Also over the keyword colour of built-ins such as `count(`.
+    '.cm-sql-call, .cm-sql-call *': { color: 'var(--syntax-function)' },
     '.cm-foldPlaceholder': { backgroundColor: 'var(--muted)', border: 'none', color: 'var(--muted-foreground)' },
   })
 
+  // Syntax colours come from the --syntax-* tokens (light and dark, D92);
+  // table and column names keep the text colour.
   const highlight = HighlightStyle.define([
-    // Restrained palette: keywords stand out, literals and comments are muted.
-    { tag: [t.keyword, t.operatorKeyword, t.modifier], color: 'var(--foreground)', fontWeight: '500' },
-    { tag: [t.string, t.special(t.string)], color: 'oklch(0.72 0.09 150)' },
-    { tag: [t.number, t.bool, t.null], color: 'oklch(0.72 0.08 60)' },
-    { tag: [t.comment, t.lineComment, t.blockComment], color: 'var(--muted-foreground)' },
-    { tag: [t.typeName, t.standard(t.name)], color: 'var(--foreground)' },
-    { tag: [t.function(t.variableName), t.function(t.name)], color: 'var(--foreground)' },
+    { tag: [t.keyword, t.operatorKeyword, t.modifier], color: 'var(--syntax-keyword)' },
+    { tag: [t.standard(t.name), t.function(t.variableName), t.function(t.name)], color: 'var(--syntax-function)' },
+    { tag: t.typeName, color: 'var(--syntax-type)' },
+    { tag: [t.string, t.special(t.string)], color: 'var(--syntax-string)' },
+    { tag: [t.number, t.bool, t.null], color: 'var(--syntax-number)' },
+    { tag: [t.comment, t.lineComment, t.blockComment], color: 'var(--syntax-comment)', fontStyle: 'italic' },
     { tag: [t.operator, t.punctuation, t.bracket], color: 'var(--muted-foreground)' },
-    { tag: [t.special(t.name)], color: 'var(--foreground)' },
+    // Plain identifiers carry no colour of their own, so function calls
+    // (`functionCalls`) can tint them.
+    { tag: t.special(t.name), color: 'var(--foreground)' },
   ])
 
   const sqlExtension = () =>
@@ -95,6 +101,7 @@
           keymap.of([indentWithTab]),
           language.of(sqlExtension()),
           syntaxHighlighting(highlight),
+          functionCalls,
           theme,
           EditorView.lineWrapping,
           EditorView.contentAttributes.of({ 'aria-label': 'Editor SQL' }),
