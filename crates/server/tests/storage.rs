@@ -87,7 +87,15 @@ async fn path_helpers() {
 #[tokio::test]
 async fn bucket_names_and_owner_default() {
     let app = TestApp::spawn().await;
-    for bad in ["", "Upper", "-dash", "has space", "a/b", "sign", &"x".repeat(64)] {
+    for bad in [
+        "",
+        "Upper",
+        "-dash",
+        "has space",
+        "a/b",
+        "sign",
+        &"x".repeat(64),
+    ] {
         assert!(
             app.admin_client
                 .execute("INSERT INTO storage.buckets (id) VALUES ($1)", &[&bad])

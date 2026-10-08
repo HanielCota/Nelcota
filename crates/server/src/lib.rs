@@ -48,6 +48,7 @@ pub fn app(
     state: AppState,
     auth: AuthState,
     admin: Option<nelcota_admin::AdminState>,
+    storage: Option<nelcota_storage::StorageState>,
     request_timeout: Duration,
 ) -> Router {
     // The API is called straight from the browser, from any origin; the
@@ -56,7 +57,9 @@ pub fn app(
         .allow_origin(Any)
         .allow_methods([
             Method::GET,
+            Method::HEAD,
             Method::POST,
+            Method::PUT,
             Method::PATCH,
             Method::DELETE,
             Method::OPTIONS,
@@ -64,7 +67,15 @@ pub fn app(
         .allow_headers([
             header::AUTHORIZATION,
             header::CONTENT_TYPE,
+            header::RANGE,
+            header::IF_NONE_MATCH,
+            header::IF_RANGE,
             HeaderName::from_static("prefer"),
+        ])
+        .expose_headers([
+            header::CONTENT_RANGE,
+            header::CONTENT_DISPOSITION,
+            header::ETAG,
         ]);
 
     let mut router = Router::new()
@@ -75,13 +86,19 @@ pub fn app(
     if let Some(admin) = admin {
         router = router.merge(nelcota_admin::router(admin));
     }
-    router
+    router = router
         .layer(TimeoutLayer::with_status_code(
             StatusCode::GATEWAY_TIMEOUT,
             request_timeout,
         ))
+        .layer(CompressionLayer::new());
+    // Storage stays outside the timeout (uploads take as long as they take,
+    // with their own cap) and gzip (files are served byte for byte, by range).
+    if let Some(storage) = storage {
+        router = router.merge(nelcota_storage::router(storage));
+    }
+    router
         .layer(cors)
-        .layer(CompressionLayer::new())
         // The default span records method and URI, never headers (Authorization).
         .layer(TraceLayer::new_for_http())
 }
