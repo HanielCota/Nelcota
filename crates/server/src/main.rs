@@ -75,8 +75,31 @@ async fn serve(config: Config) -> anyhow::Result<()> {
         }
         None => None,
     };
+    let oauth = match config.oauth()? {
+        Some(settings) => {
+            let mut providers = Vec::new();
+            if let Some((id, secret)) = settings.google {
+                providers.push(nelcota_auth::Provider::google(id, secret));
+            }
+            if let Some((id, secret)) = settings.github {
+                providers.push(nelcota_auth::Provider::github(id, secret));
+            }
+            let names: Vec<_> = providers.iter().map(|p| p.kind().as_str()).collect();
+            let oauth = nelcota_auth::OAuth::new(
+                settings.api_url,
+                settings.redirect_urls.iter().copied(),
+                providers,
+            )
+            .map_err(anyhow::Error::msg)
+            .context("invalid sign-in provider settings")?;
+            tracing::info!(providers = ?names, "sign-in providers enabled");
+            Some(Arc::new(oauth))
+        }
+        None => None,
+    };
     let auth = AuthState {
         mailer,
+        oauth,
         pool: pool.clone(),
         keys: keys.clone(),
         passwords: Arc::new(Passwords::new(hash_concurrency())),

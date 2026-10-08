@@ -114,6 +114,9 @@ pub struct Options {
     pub mail: bool,
     /// Signup waits for the email to be confirmed (needs `mail`).
     pub confirm_email: bool,
+    /// Sign-in providers (pointed at a local fake).
+    pub oauth: Option<Arc<nelcota_auth::OAuth>>,
+    pub signup_enabled: bool,
     /// `migrations/` folder the panel sees.
     pub migrations_dir: Option<std::path::PathBuf>,
     pub rate_limit_per_minute: u32,
@@ -131,6 +134,8 @@ impl Default for Options {
             pool_size: 4,
             mail: true,
             confirm_email: false,
+            oauth: None,
+            signup_enabled: true,
             migrations_dir: None,
             rate_limit_per_minute: 10_000,
             access_ttl_secs: 900,
@@ -271,6 +276,7 @@ impl TestApp {
         let outbox = Arc::new(Outbox::default());
         let auth = AuthState {
             mailer: options.mail.then(|| outbox.clone() as Arc<dyn Mailer>),
+            oauth: options.oauth.clone(),
             pool: pool.clone(),
             keys: keys.clone(),
             passwords: Arc::new(Passwords::new(2)),
@@ -279,7 +285,7 @@ impl TestApp {
                 issuer: "nelcota-test".into(),
                 access_ttl_secs: options.access_ttl_secs,
                 refresh_ttl_days: 30,
-                signup_enabled: true,
+                signup_enabled: options.signup_enabled,
                 trust_proxy: false,
                 links: nelcota_auth::EmailLinks {
                     recovery: options.mail.then(|| RECOVERY_URL.to_owned()),

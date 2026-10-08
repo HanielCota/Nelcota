@@ -31,8 +31,8 @@ infer = { version = "0.22.0", default-features = false, features = ["alloc"] }
 object_store = { version = "0.14.2", default-features = false, features = ["fs", "aws-base", "reqwest", "ring"] }
 percent-encoding = "2.3.2"
 # Only to pick reqwest's TLS without a bundled provider: rustls uses `ring`, installed at startup.
-reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider"] }
-rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
+reqwest.workspace = true
+rustls.workspace = true
 unicode-normalization = "0.1.25"
 
 [lints]

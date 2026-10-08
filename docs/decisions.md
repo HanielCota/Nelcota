@@ -696,6 +696,33 @@ which replaces the SQL `UPDATE` of D89 for projects that turn confirmation
 on with older accounts. It sends no email: the panel has no mailer and an
 invitation flow is a separate decision.
 
+## Sign-in providers
+
+**D91. OAuth/OIDC sign-in with PKCE on both legs, and verified-email
+linking.** Google (OpenID Connect userinfo) and GitHub (REST profile plus its
+email list, the only place that says an address is verified) sit behind one
+`Provider` type, each in its own module; another provider is another module.
+The app starts at `GET /auth/v1/authorize` with its own S256 challenge;
+Nelcota keeps the sign-in in `auth.flow_states` (V10) with a separate PKCE
+verifier toward the provider, redeems the provider's code server to server,
+and sends the person to `redirect_to?code=...`. The app trades that code and
+its verifier for a session at `POST /auth/v1/token?grant_type=pkce`, so a code
+read from a URL, a log or a `Referer` is useless alone; a code is tried once.
+`redirect_to` must sit under one of `NELCOTA_OAUTH_REDIRECT_URLS` (same origin,
+path below), so `/authorize` is no open redirect; the callback is
+`NELCOTA_API_URL/auth/v1/callback`. A provider account is identified by its
+own id (`auth.identities`, unique per provider), never by email. A first
+sign-in links an existing account only when the provider verified the email:
+a confirmed account is linked as is; an unconfirmed one is taken over by the
+verified owner, losing the password, sessions and links someone else may have
+set up with the address (the pre-registration takeover); an unverified email
+that matches an account is refused (`email_conflict`). New accounts get no
+password and are confirmed when the provider verified the email. Refusals and
+provider errors go back to the app as `?error=<code>`, and an unknown `state`
+is an error page, since there is no trusted place to return to. The HTTPS
+client is the `reqwest` already in the tree for S3, on rustls with `ring`
+(D16), with a 10 s timeout, no redirects and bounded response bodies.
+
 ### Known pending items
 
 - Filtering parent rows by their embeds (`!inner`) and self-referencing embeds.
