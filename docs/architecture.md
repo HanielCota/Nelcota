@@ -16,7 +16,7 @@ client ──HTTPS──▶ Caddy ──▶ nelcota (single binary) ──▶ Po
 | `nelcota-api`  | catalog introspection, SQL builder, CRUD/RPC, OpenAPI, TS types |
 | `nelcota-storage` | files: buckets and objects under RLS (`storage` schema), bytes on disk or S3 (`object_store`), signed URLs, orphan collector |
 | `nelcota-admin` | panel at `/admin`: JSON API (`/admin/api`) + embedded Svelte SPA (`ui/dist`) |
-| `nelcota-cli`  | host with N projects (`init`, `up`, `projects`, `remove`, `migrate`, `backup`, `upgrade`, `panel-login`...). Modules: `host` (registry), `naming`, `scaffold`, `caddy`, `registry`, `panel_login`, `ops` |
+| `nelcota-cli`  | host with N projects (`init`, `up`, `projects`, `remove`, `migrate`, `backup`, `upgrade`, `panel-login`...). Modules: `host` (registry), `naming`, `scaffold`, `caddy`, `registry`, `panel_login`, `lifecycle`, `backup`, `upgrade` |
 | `nelcota-server` | the `nelcota` binary: dispatches the CLI or starts the server (trace, timeout, CORS, gzip) |
 
 Everything compiles into a single binary (~19 MB, static with musl in the
@@ -26,6 +26,23 @@ The query compiler separates the validated request representation (`query/mod.rs
 URL parsing (`query/parse.rs`) and SQL generation (`query/sql.rs`), behind the
 existing public interface. Panel read/write handlers are organized by feature in
 `admin/src/api/`; DDL validation and execution remain separate modules.
+
+Authentication's HTTP handlers adapt requests to `accounts` and `sessions`.
+`db` owns auth-role transactions, `request` owns HTTP metadata, and recovery
+uses the shared session interface directly. The panel's root assembles routes;
+`auth`, `middleware`, `error`, `assets` and `state` own their respective behavior.
+
+Storage's `upload` module owns streamed writes and their metadata commit,
+`operations` owns reads/listing/deletion, and `signing` owns signed-file grants.
+Their interface takes upload options and a byte stream and returns typed data.
+The `http` adapter handles headers, response status, URLs and file serving for
+both public routes and the panel. Policy checks still happen before bytes are
+consumed, and failed writes still clean up their unpublished versions.
+
+The CLI separates project lifecycle and version upgrades from backup workflows.
+`backup/workflow` coordinates capture, retention and restore; `backup/remote`
+owns S3 transport. Database and immutable file capture retain one owner so
+their snapshot consistency remains intact.
 
 Panel wire DTOs live in `admin/src/contracts.rs` and the existing structure/DDL
 types. Their generated TypeScript and JSON Schemas are versioned with the UI;
@@ -48,6 +65,9 @@ the client refreshes its view without replaying the change.
 user and storage pages. Storage's upload queue owns progress, partial failures
 and conflict retries, capturing the bucket and folder before navigation changes.
 These modules have unit tests; browser flows and real-Postgres regressions run in CI.
+`TableRows` owns row selection, loading and mutation reconciliation, including
+captured primary keys and navigation during writes. The table page owns its
+navigation, dialogs and presentation; its HTTP adapter supplies row operations.
 
 ## A request's flow
 

@@ -620,6 +620,17 @@ cancellation and closes its connection. DDL reports `applied` separately from
 `catalog_pending`: a failed refresh after COMMIT retries with backoff instead
 of asking the user to replay an already committed mutation.
 
+**D85. Modules follow independent reasons for change.** Authentication shares
+session/token operations and auth-role transactions independently of its HTTP
+handlers. Panel route composition does not own cookies, response headers or
+asset serving. Storage operations accept a byte stream and explicit options
+and return typed results; the public routes and panel share the HTTP adapter.
+CLI lifecycle, backup sequencing, remote transport and version upgrades have
+separate owners. The table editor's row module owns loading and write
+reconciliation while the page owns navigation and presentation. Existing
+transaction, RLS and snapshot guarantees remain coordinated inside their
+operation modules (docs/architecture.md).
+
 ### Known pending items
 
 - Filtering parent rows by their embeds (`!inner`) and self-referencing embeds.
