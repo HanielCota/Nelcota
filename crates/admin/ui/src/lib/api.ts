@@ -1,5 +1,5 @@
 // Panel API client (/admin/api). The session lives in an HttpOnly cookie.
-import { session } from './session.svelte'
+import { session } from './features/auth/session.svelte'
 import { responseContract } from './contracts'
 import { t } from './i18n/index.svelte'
 

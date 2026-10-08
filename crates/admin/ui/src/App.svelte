@@ -3,25 +3,25 @@
   import { ModeWatcher } from 'mode-watcher'
   import { Toaster } from '$lib/components/ui/sonner'
   import * as Tooltip from '$lib/components/ui/tooltip'
-  import AppSidebar from '$lib/components/app/AppSidebar.svelte'
-  import Topbar from '$lib/components/app/Topbar.svelte'
-  import CommandPalette from '$lib/components/app/CommandPalette.svelte'
-  import Login from '$lib/pages/Login.svelte'
-  import Overview from '$lib/pages/Overview.svelte'
-  import TableEditor from '$lib/pages/TableEditor.svelte'
-  import Users from '$lib/pages/Users.svelte'
-  import Storage from '$lib/pages/Storage.svelte'
-  import StorageBucket from '$lib/pages/StorageBucket.svelte'
-  import Policies from '$lib/pages/Policies.svelte'
-  import Migrations from '$lib/pages/Migrations.svelte'
-  import NotFound from '$lib/pages/NotFound.svelte'
-  import Projects from '$lib/pages/Projects.svelte'
-  import ApiPage from '$lib/pages/ApiPage.svelte'
-  import { takeHandoffToken } from '$lib/projects'
+  import AppSidebar from '$lib/shell/components/AppSidebar.svelte'
+  import Topbar from '$lib/shell/components/Topbar.svelte'
+  import CommandPalette from '$lib/shell/components/CommandPalette.svelte'
+  import Login from '$lib/features/auth/Login.svelte'
+  import Overview from '$lib/features/overview/Overview.svelte'
+  import TableEditor from '$lib/features/tables/TableEditor.svelte'
+  import Users from '$lib/features/users/Users.svelte'
+  import Storage from '$lib/features/storage/Storage.svelte'
+  import StorageBucket from '$lib/features/storage/StorageBucket.svelte'
+  import Policies from '$lib/features/policies/Policies.svelte'
+  import Migrations from '$lib/features/migrations/Migrations.svelte'
+  import NotFound from '$lib/shell/NotFound.svelte'
+  import Projects from '$lib/features/projects/Projects.svelte'
+  import ApiPage from '$lib/features/api/ApiPage.svelte'
+  import { takeHandoffToken } from '$lib/features/projects/projects'
   import { api } from '$lib/api'
-  import { session } from '$lib/session.svelte'
+  import { session } from '$lib/features/auth/session.svelte'
   import { match, route } from '$lib/router.svelte'
-  import { crumbsFor, documentTitle } from '$lib/titles'
+  import { crumbsFor, documentTitle } from '$lib/shell/titles'
   import { t } from '$lib/i18n/index.svelte'
 
   onMount(async () => {
@@ -92,7 +92,7 @@
               <TableEditor name={tableName} view={structureName ? 'structure' : 'data'} />
             {:else if path === '/sql'}
               <!-- CodeMirror is only downloaded when the SQL editor opens. -->
-              {#await import('$lib/pages/SqlEditor.svelte') then m}
+              {#await import('$lib/features/sql/SqlEditor.svelte') then m}
                 <m.default />
               {/await}
             {:else if path === '/migrations'}

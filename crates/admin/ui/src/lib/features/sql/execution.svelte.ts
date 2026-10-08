@@ -1,15 +1,14 @@
 import { RemoteResource } from '$lib/remote-resource.svelte'
-import type { SqlResponse } from '$lib/types'
+import type { SchemaResponse, SqlResponse } from '$lib/types'
 
-export type SqlSchema = { schema: string; tables: Record<string, string[]> }
 export interface SqlAdapter {
-  schema(signal: AbortSignal): Promise<SqlSchema>
+  schema(signal: AbortSignal): Promise<SchemaResponse>
   execute(sql: string, signal: AbortSignal): Promise<SqlResponse>
 }
 
 /** Owns SQL request lifetime, timing and results independently of the page. */
 export class SqlExecution {
-  readonly schema = new RemoteResource<SqlSchema>()
+  readonly schema = new RemoteResource<SchemaResponse>()
   running = $state(false)
   response = $state<SqlResponse | null>(null)
   error = $state<unknown>(null)

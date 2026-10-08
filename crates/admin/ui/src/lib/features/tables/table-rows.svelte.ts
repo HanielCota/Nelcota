@@ -1,5 +1,5 @@
 import { RemoteResource } from '$lib/remote-resource.svelte'
-import { rowKey, rowPk } from '$lib/grid'
+import { rowKey, rowPk } from '$lib/features/tables/grid'
 import type { RowData, TableData } from '$lib/types'
 
 export interface TableRowsAdapter {

@@ -1,0 +1,53 @@
+// Display of values in the grid. Display only: editing, export and the
+// tooltip keep the exact text Postgres returned.
+
+import { intlLocale } from '$lib/i18n/index.svelte'
+
+export interface CellDisplay {
+  text: string
+  /** Original value, for the tooltip (`null` when it equals the displayed one). */
+  raw: string | null
+}
+
+/** `2026-10-06T22:26:15.177028` → parts, without any time zone conversion. */
+const WALL_CLOCK = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?/
+
+/**
+ * Dates in the viewer's language. `timestamptz` goes to the viewer's time
+ * zone (it is an instant); `timestamp` and `date` stay as stored (they have
+ * no time zone). A value that is not recognised is shown as it came.
+ */
+export function formatCell(
+  value: string,
+  type: string,
+  options: { timeZone?: string; locale?: string } = {},
+): CellDisplay {
+  const locale = options.locale ?? intlLocale()
+  if (type === 'timestamp with time zone') {
+    const instant = new Date(value)
+    if (Number.isNaN(instant.getTime())) return { text: value, raw: null }
+    const text = new Intl.DateTimeFormat(locale, {
+      dateStyle: 'short',
+      timeStyle: 'medium',
+      timeZone: options.timeZone,
+    }).format(instant)
+    return { text, raw: value }
+  }
+  if (type === 'timestamp without time zone' || type === 'date') {
+    const m = WALL_CLOCK.exec(value)
+    if (!m) return { text: value, raw: null }
+    const [, year, month, day, hour, minute, second] = m
+    // Formatted in UTC from the stored parts, so no conversion happens.
+    const wallClock = new Date(
+      Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour ?? 0), Number(minute ?? 0), Number(second ?? 0)),
+    )
+    const dateOnly = type === 'date' || hour === undefined
+    const text = new Intl.DateTimeFormat(locale, {
+      dateStyle: 'short',
+      ...(dateOnly ? {} : { timeStyle: 'medium' }),
+      timeZone: 'UTC',
+    }).format(wallClock)
+    return { text, raw: value }
+  }
+  return { text: value, raw: null }
+}
