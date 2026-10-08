@@ -22,8 +22,8 @@ pub fn router(state: AuthState) -> Router {
         .route("/auth/v1/token", post(token))
         .route("/auth/v1/logout", post(logout))
         .route("/auth/v1/user", get(user))
-        .route("/auth/v1/recover", post(recovery::recover))
-        .route("/auth/v1/verify", post(recovery::verify))
+        .route("/auth/v1/recover", post(recover))
+        .route("/auth/v1/verify", post(verify))
         .route("/auth/v1/.well-known/jwks.json", get(jwks))
         .with_state(state)
 }
@@ -100,4 +100,35 @@ async fn jwks(State(state): State<AuthState>) -> impl IntoResponse {
         ],
         state.keys.jwks_json().to_owned(),
     )
+}
+
+#[derive(Deserialize)]
+struct RecoverBody {
+    email: String,
+}
+
+async fn recover(
+    State(state): State<AuthState>,
+    PeerAddr(peer): PeerAddr,
+    headers: HeaderMap,
+    Json(body): Json<RecoverBody>,
+) -> Result<Json<Value>, ApiError> {
+    recovery::ensure_enabled(&state)?;
+    let ip = client_ip(&state.settings, &headers, peer);
+    limit(&state, &format!("recover:{}", ip_key(ip)))?;
+    recovery::request(&state, &body.email).await?;
+    Ok(Json(serde_json::json!({})))
+}
+
+async fn verify(
+    State(state): State<AuthState>,
+    PeerAddr(peer): PeerAddr,
+    headers: HeaderMap,
+    Json(body): Json<recovery::VerifyBody>,
+) -> Result<Json<Value>, ApiError> {
+    let ip = client_ip(&state.settings, &headers, peer);
+    limit(&state, &format!("verify:{}", ip_key(ip)))?;
+    Ok(Json(
+        recovery::complete(&state, body, ip, user_agent(&headers)).await?,
+    ))
 }

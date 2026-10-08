@@ -399,6 +399,31 @@ async fn password_recovery_changes_the_password_and_ends_sessions() {
 }
 
 #[tokio::test]
+async fn concurrent_recovery_submissions_consume_the_link_once() {
+    let app = TestApp::spawn().await;
+    signup(&app, "concurrent@example.com", "old-password-123").await;
+    recover(&app, "concurrent@example.com").await;
+    let sent = app.outbox.wait_for(1).await;
+    let token = link_token(&sent[0]);
+    let (first, second) = tokio::join!(
+        verify(&app, &token, "first-password-123"),
+        verify(&app, &token, "second-password-123")
+    );
+    let (winner, loser, password) = if first.status == StatusCode::OK {
+        (first, second, "first-password-123")
+    } else {
+        (second, first, "second-password-123")
+    };
+    assert_eq!(winner.status, StatusCode::OK);
+    assert_eq!(loser.status, StatusCode::BAD_REQUEST);
+    assert_eq!(loser.body["code"], "invalid_grant");
+    assert_eq!(
+        login(&app, "concurrent@example.com", password).await.status,
+        StatusCode::OK
+    );
+}
+
+#[tokio::test]
 async fn recovery_does_not_reveal_whether_the_account_exists() {
     let app = TestApp::spawn().await;
     signup(&app, "bia@example.com", "strong-pass-123").await;
