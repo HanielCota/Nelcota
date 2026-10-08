@@ -4,6 +4,12 @@ use crate::project::Project;
 use anyhow::{Context, bail};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+mod remote;
+mod workflow;
+#[cfg(test)]
+pub(crate) use workflow::prune;
+pub(crate) use workflow::{backup as run, restore, restore_dump};
+
 use std::{
     fs,
     io::{BufRead, BufReader, Read, Write},
@@ -368,7 +374,7 @@ mod tests {
         let archived = archive_dir.join("a.dump");
         archive(&a, &archived).unwrap();
         let manifest = validate(&a).unwrap();
-        crate::ops::restore_dump(project, &a).unwrap();
+        crate::backup::restore_dump(project, &a).unwrap();
         restore_files(project, &a, &manifest).unwrap();
         assert_eq!(run("SELECT version FROM storage.objects"), old.to_string());
         assert_eq!(fs::read(source.join(old.to_string())).unwrap(), b"old");
@@ -394,7 +400,7 @@ mod tests {
         manifest.dump = "another.dump".into();
         fs::write(&manifest_path, serde_json::to_vec(&manifest).unwrap()).unwrap();
         assert!(validate(&a).is_err());
-        crate::ops::prune(&backups, 1).unwrap();
+        crate::backup::prune(&backups, 1).unwrap();
         assert!(!a.exists());
         assert!(!bundle_path(&a).unwrap().exists());
         assert!(validate(&b).is_ok());
