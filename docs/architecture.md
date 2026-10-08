@@ -102,12 +102,30 @@ waiting for promotion, taking a backup on the new timeline and starting the app.
 
 ## Source organization
 
+Nelcota is a modular monolith: capability modules ship in one binary. Use a
+small facade to expose a complete operation, keeping its validation, transaction
+and cleanup together. HTTP adapters translate requests, results and errors.
+Introduce interchangeable adapters where implementations actually vary, such
+as disk/S3 storage and SMTP/test mail delivery. Concrete functions and existing
+types are enough elsewhere; a generic repository or another layer is not needed
+to wrap PostgreSQL.
+
 Keep the existing crate boundaries: each crate owns a product capability,
 and `server` assembles them. Add an internal module when behavior needs an
 independent owner; file length alone does not require a new crate or layer.
 Rust module facades use explicit exports. Types returned by a public method
 must be reachable through its public interface, including errors such as
 `SqlBusy` alongside `SqlExecutor`.
+
+Bucket mutations belong to storage's operation interface on `StorageState`.
+Both the public routes and panel call it; bucket privileges, RLS and foreign
+keys remain PostgreSQL's responsibility. Operations return typed records and
+bucket errors, while each HTTP adapter preserves its response/error vocabulary.
+Only the panel adapter trims empty MIME inputs from forms. A failed deletion
+rolls back before reading the optional file count for its error response.
+Panel user operations accept the admin pool and return data; their HTTP adapter
+owns messages and status codes. Password changes and session revocation remain
+one transaction inside the operation.
 
 The panel's `ui/src/lib/features/<feature>/` owns its page, state, HTTP
 adapter, pure helpers, components and adjacent unit tests. `shell/` owns
