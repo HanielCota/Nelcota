@@ -22,6 +22,12 @@ updates:
     groups:
       panel:
         patterns: ["*"]
+    ignore:
+      # TypeScript 7 (the native port) drops the compiler API that
+      # svelte-check needs; its peer range stops at 6. Lift this once
+      # svelte-check supports 7.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
