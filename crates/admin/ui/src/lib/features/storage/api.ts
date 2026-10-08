@@ -1,0 +1,20 @@
+import { api, ApiError, enc, uploadFile } from '$lib/api'
+import type { StorageListing, StorageOverview } from '$lib/types'
+import type { StorageBrowserAdapter } from './browser.svelte'
+
+export const storageBrowserAdapter: StorageBrowserAdapter = {
+  async info(bucket, signal) {
+    const data = await api.get<StorageOverview>('/storage', { signal })
+    const found = data.enabled ? data.buckets.find(item => item.id === bucket) : undefined
+    return data.enabled && found ? { bucket: found, publicOrigin: data.public_url ?? location.origin } : null
+  },
+  list: (target, offset, signal) => api.get<StorageListing>(
+    `/storage/buckets/${enc(target.bucket)}/objects?${new URLSearchParams({ prefix: target.prefix, offset: String(offset) })}`, { signal }),
+  remove: (bucket, name) => api.delete(`/storage/buckets/${enc(bucket)}/file?${new URLSearchParams({ name })}`),
+  upload(file, target, replace, progress) {
+    const params = new URLSearchParams({ name: target.prefix + file.name })
+    if (replace) params.set('replace', 'true')
+    return uploadFile(`/storage/buckets/${enc(target.bucket)}/upload?${params}`, file, progress)
+  },
+  isConflict: error => error instanceof ApiError && error.code === 'object_exists',
+}

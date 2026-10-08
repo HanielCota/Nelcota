@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { untrack } from 'svelte'
+  import { untrack, onDestroy } from 'svelte'
   import * as Table from '$lib/components/ui/table'
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu'
   import { Button } from '$lib/components/ui/button'
@@ -24,28 +24,27 @@
   import ConfirmDialog from '$lib/components/app/ConfirmDialog.svelte'
   import LoadError from '$lib/components/app/LoadError.svelte'
   import FilePreviewDialog from '$lib/components/app/FilePreviewDialog.svelte'
-  import { RemoteResource } from '$lib/remote-resource.svelte'
-  import { UploadQueue, type UploadTarget } from '$lib/features/storage/upload-queue.svelte'
+  import { StorageBrowser } from '$lib/features/storage/browser.svelte'
+  import { storageBrowserAdapter } from '$lib/features/storage/api'
+  import { type UploadTarget } from '$lib/features/storage/upload-queue.svelte'
   import { copyText } from '$lib/clipboard'
-  import { ApiError, api, enc, uploadFile } from '$lib/api'
+  import { enc } from '$lib/api'
   import { href, route } from '$lib/router.svelte'
   import { baseName, folderTrail, formatBytes, publicUrl } from '$lib/files'
-  import type { Bucket, StorageListing, StorageOverview, StoredFile } from '$lib/types'
+  import type { StoredFile } from '$lib/types'
   import { errorMessage, intlLocale, t } from '$lib/i18n/index.svelte'
 
   let { bucket }: { bucket: string } = $props()
 
-  const infoResource = new RemoteResource<{ bucket: Bucket; publicOrigin: string } | null>()
-  const filesResource = new RemoteResource<StorageListing>()
+  const browser = new StorageBrowser(storageBrowserAdapter)
+  const infoResource = browser.infoResource
+  const filesResource = browser.filesResource
+  const uploads = browser.uploads
   const info = $derived(infoResource.loaded && !infoResource.error ? infoResource.data : undefined)
   const files = $derived(filesResource.data?.objects ?? null)
   const folders = $derived(filesResource.data?.folders ?? [])
   const hasNext = $derived(filesResource.data?.has_next ?? false)
-  const uploads = new UploadQueue((file, target, replace, progress) => {
-    const params = new URLSearchParams({ name: target.prefix + file.name })
-    if (replace) params.set('replace', 'true')
-    return uploadFile(`/storage/buckets/${enc(target.bucket)}/upload?${params}`, file, progress)
-  }, error => error instanceof ApiError && error.code === 'object_exists')
+  onDestroy(() => browser.cancel())
   const uploading = $derived(uploads.progress)
   const queue = $derived(uploads.items)
   let conflicts = $state<File[]>([])
@@ -69,39 +68,16 @@
   const fileIcon = (file: StoredFile) => file.mime_type.startsWith('image/') ? Image : file.mime_type.startsWith('text/') || ['application/pdf', 'application/json'].includes(file.mime_type) ? FileText : FileIcon
   function showPreview(file: StoredFile) { preview = file; previewOpen = true }
 
-  async function loadInfo() {
-    const target = bucket
-    await infoResource.load(async signal => {
-      const data = await api.get<StorageOverview>('/storage', { signal })
-      const found = data.enabled ? data.buckets.find(b => b.id === target) : undefined
-      return data.enabled && found ? { bucket: found, publicOrigin: data.public_url ?? location.origin } : null
-    })
-  }
-
-  async function load(more = false) {
-    const previous = more ? [...(files ?? [])] : []
-    const params = new URLSearchParams({ prefix, offset: String(previous.length) })
-    await filesResource.load(async signal => {
-      const page = await api.get<StorageListing>(`${base}/objects?${params}`, { signal })
-      return { ...page, objects: [...previous, ...page.objects] }
-    })
-  }
-
+  const loadInfo = async () => { await browser.loadInfo() }
+  const load = async (more = false) => { await browser.load(more) }
   $effect(() => {
-    void bucket
-    untrack(() => { infoResource.clear(); loadInfo() })
-    return () => infoResource.cancel()
-  })
-
-  $effect(() => {
-    void [bucket, prefix]
-    untrack(() => { filesResource.clear(); load() })
-    return () => filesResource.cancel()
+    const target = { bucket, prefix }
+    untrack(() => { void browser.open(target) })
   })
 
   async function send(list: File[], replace: boolean, target?: UploadTarget) {
     if (!info && !target) return
-    const result = await uploads.send(list, target ?? { bucket, prefix }, replace)
+    const result = await browser.send(list, replace, target)
     if (!result) return
     for (const { file, error } of result.errors) toast.error(`${file.name}: ${errorMessage(error)}`)
     if (result.sent) toast.success(t('storage.browser.uploaded', { count: result.sent }))
@@ -110,7 +86,6 @@
       conflictTarget = result.target
       replaceOpen = true
     }
-    if (bucket === result.target.bucket && prefix === result.target.prefix) await Promise.all([load(), loadInfo()])
   }
 
   function picked() {
@@ -124,9 +99,8 @@
     if (!removing) return
     const name = removing.name
     try {
-      await api.delete(`${base}/file?${new URLSearchParams({ name })}`)
+      await browser.remove(name)
       toast.success(t('storage.browser.deleted', { name: baseName(name) }))
-      await Promise.all([load(), loadInfo()])
     } catch (e) {
       toast.error(errorMessage(e))
       throw e
