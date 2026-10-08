@@ -1,10 +1,12 @@
 //! HTTP routes and response adaptation for authentication.
 use crate::{
     Auth, AuthState, accounts,
+    error::unsupported_type,
+    links::{self, LinkKind},
     rate_limit::limit,
-    recovery,
     request::{PeerAddr, client_ip, ip_key, user_agent},
     sessions,
+    verify::{self, VerifyBody},
 };
 use axum::{
     Json, Router,
@@ -23,6 +25,8 @@ pub fn router(state: AuthState) -> Router {
         .route("/auth/v1/logout", post(logout))
         .route("/auth/v1/user", get(user))
         .route("/auth/v1/recover", post(recover))
+        .route("/auth/v1/magiclink", post(magic_link))
+        .route("/auth/v1/resend", post(resend))
         .route("/auth/v1/verify", post(verify))
         .route("/auth/v1/.well-known/jwks.json", get(jwks))
         .with_state(state)
@@ -103,32 +107,72 @@ async fn jwks(State(state): State<AuthState>) -> impl IntoResponse {
 }
 
 #[derive(Deserialize)]
-struct RecoverBody {
+struct EmailBody {
     email: String,
+}
+
+/// Emails a link of `kind`; always `200 {}`, whether or not the account exists.
+async fn send_link(
+    state: &AuthState,
+    kind: LinkKind,
+    peer: PeerAddr,
+    headers: &HeaderMap,
+    email: &str,
+) -> Result<Json<Value>, ApiError> {
+    links::ensure_enabled(state, kind)?;
+    let ip = client_ip(&state.settings, headers, peer.0);
+    limit(state, &format!("{}:{}", kind.as_str(), ip_key(ip)))?;
+    links::send(state, kind, email).await?;
+    Ok(Json(serde_json::json!({})))
 }
 
 async fn recover(
     State(state): State<AuthState>,
-    PeerAddr(peer): PeerAddr,
+    peer: PeerAddr,
     headers: HeaderMap,
-    Json(body): Json<RecoverBody>,
+    Json(body): Json<EmailBody>,
 ) -> Result<Json<Value>, ApiError> {
-    recovery::ensure_enabled(&state)?;
-    let ip = client_ip(&state.settings, &headers, peer);
-    limit(&state, &format!("recover:{}", ip_key(ip)))?;
-    recovery::request(&state, &body.email).await?;
-    Ok(Json(serde_json::json!({})))
+    send_link(&state, LinkKind::Recovery, peer, &headers, &body.email).await
+}
+
+async fn magic_link(
+    State(state): State<AuthState>,
+    peer: PeerAddr,
+    headers: HeaderMap,
+    Json(body): Json<EmailBody>,
+) -> Result<Json<Value>, ApiError> {
+    send_link(&state, LinkKind::MagicLink, peer, &headers, &body.email).await
+}
+
+#[derive(Deserialize)]
+struct ResendBody {
+    #[serde(rename = "type")]
+    kind: String,
+    email: String,
+}
+
+/// `POST /auth/v1/resend {type: "signup", email}`: a new confirmation link.
+async fn resend(
+    State(state): State<AuthState>,
+    peer: PeerAddr,
+    headers: HeaderMap,
+    Json(body): Json<ResendBody>,
+) -> Result<Json<Value>, ApiError> {
+    if LinkKind::parse(&body.kind) != Some(LinkKind::Signup) {
+        return Err(unsupported_type("type must be signup"));
+    }
+    send_link(&state, LinkKind::Signup, peer, &headers, &body.email).await
 }
 
 async fn verify(
     State(state): State<AuthState>,
     PeerAddr(peer): PeerAddr,
     headers: HeaderMap,
-    Json(body): Json<recovery::VerifyBody>,
+    Json(body): Json<VerifyBody>,
 ) -> Result<Json<Value>, ApiError> {
     let ip = client_ip(&state.settings, &headers, peer);
     limit(&state, &format!("verify:{}", ip_key(ip)))?;
     Ok(Json(
-        recovery::complete(&state, body, ip, user_agent(&headers)).await?,
+        verify::verify(&state, body, ip, user_agent(&headers)).await?,
     ))
 }

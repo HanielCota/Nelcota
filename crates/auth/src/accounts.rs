@@ -1,9 +1,10 @@
 //! Signup, password authentication and account lookup.
 use crate::{
-    AuthState,
+    AuthState, confirmation,
     credentials::{normalize_email, validate_password},
     db::{USER_JSON, begin_auth, db_error},
     error::{invalid, invalid_grant, validation},
+    links::{self, LinkKind},
     rate_limit::limit,
     sessions::{session_of, start_session},
 };
@@ -22,7 +23,8 @@ pub(crate) struct Signup {
     data: Option<Value>,
 }
 
-/// `POST /auth/v1/signup` `{email, password, data?}` → 201 + session.
+/// `POST /auth/v1/signup` `{email, password, data?}` → 201 + session, or 201 +
+/// `{user}` when the email must be confirmed first.
 pub(crate) async fn signup(
     state: &AuthState,
     body: Signup,
@@ -71,9 +73,17 @@ pub(crate) async fn signup(
         }
         Err(err) => return Err(db_error(err)),
     };
-    let session = start_session(state, &tx, user_id, ip, user_agent).await?;
+    if !confirmation::required(state) {
+        let session = start_session(state, &tx, user_id, ip, user_agent).await?;
+        tx.commit().await.map_err(db_error)?;
+        return Ok(session);
+    }
+    let (pending, token) = confirmation::pending_signup(&tx, user_id).await?;
     tx.commit().await.map_err(db_error)?;
-    Ok(session)
+    if let Some(token) = token {
+        links::deliver(state, LinkKind::Signup, &email, &token);
+    }
+    Ok(pending)
 }
 
 pub(crate) async fn password_grant(
@@ -93,29 +103,32 @@ pub(crate) async fn password_grant(
     limit(state, &format!("login:{email}"))?;
 
     let mut client = state.pool.get().await.map_err(ApiError::from_pool)?;
-    let found: Option<(Uuid, Option<String>)> = {
+    let found: Option<(Uuid, Option<String>, bool)> = {
         let tx = begin_auth(&mut client).await?;
         let row = tx
             .query_opt(
-                "SELECT id, encrypted_password FROM auth.users WHERE email = $1",
+                "SELECT id, encrypted_password, email_confirmed_at IS NOT NULL
+                 FROM auth.users WHERE email = $1",
                 &[&email],
             )
             .await
             .map_err(db_error)?;
         tx.commit().await.map_err(db_error)?;
-        row.map(|r| (r.get(0), r.get(1)))
+        row.map(|r| (r.get(0), r.get(1), r.get(2)))
     };
     // The connection is released while argon2 runs.
     drop(client);
 
-    let (user_id, phc) = match found {
-        Some((id, phc)) => (Some(id), phc),
-        None => (None, None),
+    let (user_id, phc, confirmed) = match found {
+        Some((id, phc, confirmed)) => (Some(id), phc, confirmed),
+        None => (None, None, false),
     };
     if !state.passwords.verify(password, phc).await {
         return Err(invalid_grant("invalid email or password"));
     }
     let user_id = user_id.expect("verify only succeeds for an existing user");
+    // Only after the password: the answer reveals nothing to someone without it.
+    confirmation::ensure_confirmed(state, confirmed)?;
 
     let mut client = state.pool.get().await.map_err(ApiError::from_pool)?;
     let tx = begin_auth(&mut client).await?;

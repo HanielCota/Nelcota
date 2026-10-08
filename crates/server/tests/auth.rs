@@ -1,6 +1,6 @@
 //! Authentication flow tests against a real Postgres: signup, login, refresh
-//! with rotation and reuse detection, logout, JWKS, rate limit and password
-//! recovery by email.
+//! with rotation and reuse detection, logout, JWKS, rate limit and the email
+//! links (password recovery, signup confirmation and magic link).
 
 mod common;
 
@@ -333,16 +333,8 @@ async fn verify(app: &TestApp, token: &str, password: &str) -> Reply {
     .await
 }
 
-/// Token of the email link (`...#type=recovery&token=<token>`).
-fn link_token(email: &nelcota_auth::Email) -> String {
-    let link = email
-        .text
-        .split_whitespace()
-        .find(|word| word.starts_with(RECOVERY_URL))
-        .unwrap_or_else(|| panic!("sem link em: {}", email.text));
-    link.strip_prefix(&format!("{RECOVERY_URL}#type=recovery&token="))
-        .unwrap_or_else(|| panic!("link fora do formato: {link}"))
-        .to_owned()
+fn recovery_token(email: &nelcota_auth::Email) -> String {
+    link_token(email, RECOVERY_URL, "recovery")
 }
 
 #[tokio::test]
@@ -357,7 +349,7 @@ async fn password_recovery_changes_the_password_and_ends_sessions() {
     assert_eq!(reply.body, json!({}));
     let sent = app.outbox.wait_for(1).await;
     assert_eq!(sent[0].to, "ana@example.com");
-    let token = link_token(&sent[0]);
+    let token = recovery_token(&sent[0]);
 
     // Only the token's SHA-256 is stored in the database.
     let row = app
@@ -404,7 +396,7 @@ async fn concurrent_recovery_submissions_consume_the_link_once() {
     signup(&app, "concurrent@example.com", "old-password-123").await;
     recover(&app, "concurrent@example.com").await;
     let sent = app.outbox.wait_for(1).await;
-    let token = link_token(&sent[0]);
+    let token = recovery_token(&sent[0]);
     let (first, second) = tokio::join!(
         verify(&app, &token, "first-password-123"),
         verify(&app, &token, "second-password-123")
@@ -452,7 +444,7 @@ async fn recovery_sends_one_email_per_minute_and_only_the_last_link_works() {
     signup(&app, "caio@example.com", "strong-pass-123").await;
 
     recover(&app, "caio@example.com").await;
-    let first = link_token(&app.outbox.wait_for(1).await[0]);
+    let first = recovery_token(&app.outbox.wait_for(1).await[0]);
     // A repeated request right away: same response, no new email.
     assert_eq!(
         recover(&app, "caio@example.com").await.status,
@@ -470,7 +462,7 @@ async fn recovery_sends_one_email_per_minute_and_only_the_last_link_works() {
         .await
         .unwrap();
     recover(&app, "caio@example.com").await;
-    let second = link_token(&app.outbox.wait_for(2).await[1]);
+    let second = recovery_token(&app.outbox.wait_for(2).await[1]);
     assert_ne!(first, second);
     assert_eq!(
         verify(&app, &first, "new-pass-456").await.status,
@@ -487,7 +479,7 @@ async fn expired_or_invalid_link_or_weak_password() {
     let app = TestApp::spawn().await;
     signup(&app, "davi@example.com", "strong-pass-123").await;
     recover(&app, "davi@example.com").await;
-    let token = link_token(&app.outbox.wait_for(1).await[0]);
+    let token = recovery_token(&app.outbox.wait_for(1).await[0]);
 
     // A password breaking the rules does not consume the link.
     let reply = verify(&app, &token, "short").await;
@@ -501,10 +493,19 @@ async fn expired_or_invalid_link_or_weak_password() {
         .post(
             "/auth/v1/verify",
             None,
-            json!({ "type": "signup", "token": token, "password": "new-pass-456" }),
+            json!({ "type": "email", "token": token, "password": "new-pass-456" }),
         )
         .await;
     assert_eq!(reply.body["code"], "unsupported_type");
+    // A recovery link does not work as another kind of link.
+    let reply = app
+        .post(
+            "/auth/v1/verify",
+            None,
+            json!({ "type": "magiclink", "token": token }),
+        )
+        .await;
+    assert_eq!(reply.body["code"], "invalid_grant");
 
     app.admin_client
         .execute(
@@ -535,4 +536,230 @@ async fn recovery_disabled_without_smtp() {
     let reply = recover(&app, "eva@example.com").await;
     assert_eq!(reply.status, StatusCode::FORBIDDEN);
     assert_eq!(reply.body["code"], "recovery_disabled");
+}
+
+// ---------------------------------------------------------------- signup confirmation
+
+async fn spawn_confirming() -> TestApp {
+    TestApp::spawn_with(Options {
+        confirm_email: true,
+        ..Options::default()
+    })
+    .await
+}
+
+async fn verify_link(app: &TestApp, kind: &str, token: &str) -> Reply {
+    app.post(
+        "/auth/v1/verify",
+        None,
+        json!({ "type": kind, "token": token }),
+    )
+    .await
+}
+
+async fn resend(app: &TestApp, email: &str) -> Reply {
+    app.post(
+        "/auth/v1/resend",
+        None,
+        json!({ "type": "signup", "email": email }),
+    )
+    .await
+}
+
+/// Lets the next link of any kind go out (past the per-account cooldown).
+async fn age_links(app: &TestApp) {
+    app.admin_client
+        .execute(
+            "UPDATE auth.one_time_tokens SET created_at = now() - interval '2 minutes'",
+            &[],
+        )
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn signup_with_confirmation_waits_for_the_link_before_password_login() {
+    let app = spawn_confirming().await;
+    let reply = signup(&app, "fabi@example.com", "strong-pass-123").await;
+    assert_eq!(reply.status, StatusCode::CREATED, "{}", reply.body);
+    assert!(reply.body.get("access_token").is_none(), "no session yet");
+    assert_eq!(reply.body["user"]["email"], "fabi@example.com");
+    assert!(reply.body["user"]["email_confirmed_at"].is_null());
+
+    let sent = app.outbox.wait_for(1).await;
+    assert_eq!(sent[0].to, "fabi@example.com");
+    assert_eq!(sent[0].subject, "Confirm your email");
+    let token = link_token(&sent[0], CONFIRMATION_URL, "signup");
+
+    let reply = login(&app, "fabi@example.com", "strong-pass-123").await;
+    assert_eq!(reply.status, StatusCode::BAD_REQUEST);
+    assert_eq!(reply.body["code"], "email_not_confirmed");
+    // A wrong password still gets the generic answer: nothing is revealed.
+    let reply = login(&app, "fabi@example.com", "wrong-pass-123").await;
+    assert_eq!(reply.body["code"], "invalid_grant");
+
+    let reply = verify_link(&app, "signup", &token).await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+    assert!(reply.body["access_token"].is_string());
+    assert!(reply.body["user"]["email_confirmed_at"].is_string());
+    assert_eq!(
+        login(&app, "fabi@example.com", "strong-pass-123")
+            .await
+            .status,
+        StatusCode::OK
+    );
+    // The link works only once.
+    let reply = verify_link(&app, "signup", &token).await;
+    assert_eq!(reply.body["code"], "invalid_grant");
+}
+
+#[tokio::test]
+async fn confirmation_can_be_resent_only_to_unconfirmed_accounts() {
+    let app = spawn_confirming().await;
+    signup(&app, "gil@example.com", "strong-pass-123").await;
+    let first = link_token(&app.outbox.wait_for(1).await[0], CONFIRMATION_URL, "signup");
+
+    // Within the cooldown, and for unknown accounts: same answer, no email.
+    assert_eq!(resend(&app, "gil@example.com").await.status, StatusCode::OK);
+    let missing = resend(&app, "nobody@example.com").await;
+    assert_eq!(
+        (missing.status, &missing.body),
+        (StatusCode::OK, &json!({}))
+    );
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+    assert_eq!(app.outbox.sent().len(), 1);
+
+    age_links(&app).await;
+    resend(&app, "Gil@Example.com").await;
+    let second = link_token(&app.outbox.wait_for(2).await[1], CONFIRMATION_URL, "signup");
+    assert_eq!(
+        verify_link(&app, "signup", &first).await.body["code"],
+        "invalid_grant",
+        "a new link voids the previous one"
+    );
+    assert_eq!(
+        verify_link(&app, "signup", &second).await.status,
+        StatusCode::OK
+    );
+
+    // Confirmed accounts get nothing more.
+    age_links(&app).await;
+    resend(&app, "gil@example.com").await;
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+    assert_eq!(app.outbox.sent().len(), 2);
+
+    let reply = app
+        .post(
+            "/auth/v1/resend",
+            None,
+            json!({ "type": "recovery", "email": "gil@example.com" }),
+        )
+        .await;
+    assert_eq!(reply.body["code"], "unsupported_type");
+}
+
+#[tokio::test]
+async fn without_a_confirmation_page_signup_signs_in_and_resend_is_off() {
+    let app = TestApp::spawn().await;
+    let reply = signup(&app, "hana@example.com", "strong-pass-123").await;
+    assert!(reply.body["access_token"].is_string());
+    let reply = resend(&app, "hana@example.com").await;
+    assert_eq!(reply.status, StatusCode::FORBIDDEN);
+    assert_eq!(reply.body["code"], "confirmation_disabled");
+}
+
+// ---------------------------------------------------------------- magic link
+
+async fn magic_link(app: &TestApp, email: &str) -> Reply {
+    app.post("/auth/v1/magiclink", None, json!({ "email": email }))
+        .await
+}
+
+#[tokio::test]
+async fn magic_link_signs_in_existing_accounts_and_confirms_the_email() {
+    let app = spawn_confirming().await;
+    signup(&app, "ivo@example.com", "strong-pass-123").await;
+    app.outbox.wait_for(1).await;
+
+    let existing = magic_link(&app, "IVO@example.com").await;
+    let missing = magic_link(&app, "nobody@example.com").await;
+    assert_eq!(existing.status, StatusCode::OK, "{}", existing.body);
+    assert_eq!(
+        (existing.status, &existing.body),
+        (missing.status, &missing.body)
+    );
+    let sent = app.outbox.wait_for(2).await;
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+    assert_eq!(
+        app.outbox.sent().len(),
+        2,
+        "only the existing account receives it"
+    );
+    assert_eq!(sent[1].subject, "Your sign-in link");
+    let token = link_token(&sent[1], MAGIC_LINK_URL, "magiclink");
+
+    // Each kind is its own link: a magic link does not confirm a signup nor
+    // reset a password.
+    assert_eq!(
+        verify_link(&app, "signup", &token).await.body["code"],
+        "invalid_grant"
+    );
+    let reply = app
+        .post(
+            "/auth/v1/verify",
+            None,
+            json!({ "type": "recovery", "token": token, "password": "new-pass-456" }),
+        )
+        .await;
+    assert_eq!(reply.body["code"], "invalid_grant");
+
+    // Opening it signs in and, as it proves the inbox, confirms the email.
+    let reply = verify_link(&app, "magiclink", &token).await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+    assert_eq!(reply.body["user"]["email"], "ivo@example.com");
+    assert!(reply.body["user"]["email_confirmed_at"].is_string());
+    assert!(reply.body["access_token"].is_string());
+    assert_eq!(
+        login(&app, "ivo@example.com", "strong-pass-123")
+            .await
+            .status,
+        StatusCode::OK
+    );
+    assert_eq!(
+        verify_link(&app, "magiclink", &token).await.body["code"],
+        "invalid_grant",
+        "the link works only once"
+    );
+}
+
+#[tokio::test]
+async fn magic_link_expires_and_is_off_without_smtp() {
+    let app = TestApp::spawn().await;
+    signup(&app, "jade@example.com", "strong-pass-123").await;
+    magic_link(&app, "jade@example.com").await;
+    let token = link_token(
+        &app.outbox.wait_for(1).await[0],
+        MAGIC_LINK_URL,
+        "magiclink",
+    );
+    app.admin_client
+        .execute(
+            "UPDATE auth.one_time_tokens SET expires_at = now() - interval '1 second'",
+            &[],
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        verify_link(&app, "magiclink", &token).await.body["code"],
+        "invalid_grant"
+    );
+
+    let app = TestApp::spawn_with(Options {
+        mail: false,
+        ..Options::default()
+    })
+    .await;
+    let reply = magic_link(&app, "jade@example.com").await;
+    assert_eq!(reply.status, StatusCode::FORBIDDEN);
+    assert_eq!(reply.body["code"], "magiclink_disabled");
 }
