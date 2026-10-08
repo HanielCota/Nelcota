@@ -110,7 +110,13 @@ fn checksum(path: &Path) -> anyhow::Result<(u64, String)> {
         size += read as u64;
         digest.update(&buffer[..read]);
     }
-    Ok((size, format!("{:x}", digest.finalize())))
+    // sha2 0.11's digest array has no hex formatting of its own.
+    let hex = digest
+        .finalize()
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    Ok((size, hex))
 }
 
 fn dump(project: &Project, path: &Path, snapshot: Option<&str>) -> anyhow::Result<()> {
