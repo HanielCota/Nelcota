@@ -1,19 +1,18 @@
-//! Panel SQL editor. Each run uses a NEW admin connection, dropped at the
-//! end: a `BEGIN` without `COMMIT` or a `SET ROLE` left by the admin never
-//! contaminates the pool. The SQL text does not go to the log.
+//! HTTP adaptation for the SQL editor.
+mod executor;
+pub use executor::{SqlBusy, SqlExecutor};
 
+use crate::{AdminState, ApiError};
 use axum::{
     Json,
     extract::State,
+    http::StatusCode,
     response::{IntoResponse, Response},
 };
 use serde::Deserialize;
-use serde_json::{Value, json};
-use tokio_postgres::{NoTls, SimpleQueryMessage};
+use serde_json::{Map, json};
 
-use crate::AdminState;
-
-const MAX_ROWS: usize = 1000;
+type ApiResult<T> = Result<Json<T>, ApiError>;
 
 #[derive(Deserialize)]
 pub struct SqlRequest {
@@ -21,77 +20,37 @@ pub struct SqlRequest {
 }
 
 pub async fn run(State(state): State<AdminState>, Json(request): Json<SqlRequest>) -> Response {
-    tracing::info!(bytes = request.sql.len(), "panel SQL editor run");
-    let mut config = state.db_config.clone();
-    config
-        .application_name("nelcota-admin-sql")
-        .options("-c statement_timeout=30s");
-    let client = match config.connect(NoTls).await {
-        Ok((client, connection)) => {
-            tokio::spawn(connection);
-            client
-        }
-        Err(err) => {
-            return Json(json!({ "error": { "message": err.to_string() } })).into_response();
-        }
-    };
-
-    match client.simple_query(&request.sql).await {
-        Ok(messages) => {
-            let mut results = Vec::new();
-            let mut columns: Vec<String> = Vec::new();
-            let mut rows: Vec<Vec<Value>> = Vec::new();
-            let mut truncated = false;
-            for message in messages {
-                match message {
-                    SimpleQueryMessage::RowDescription(desc) => {
-                        columns = desc.iter().map(|c| c.name().to_owned()).collect();
-                    }
-                    SimpleQueryMessage::Row(row) => {
-                        if columns.is_empty() {
-                            columns = row.columns().iter().map(|c| c.name().to_owned()).collect();
-                        }
-                        if rows.len() < MAX_ROWS {
-                            rows.push(
-                                (0..row.len())
-                                    .map(|i| {
-                                        row.get(i)
-                                            .map_or(Value::Null, |v| Value::String(v.to_owned()))
-                                    })
-                                    .collect(),
-                            );
-                        } else {
-                            truncated = true;
-                        }
-                    }
-                    SimpleQueryMessage::CommandComplete(count) => {
-                        results.push(json!({
-                            "columns": std::mem::take(&mut columns),
-                            "rows": std::mem::take(&mut rows),
-                            "count": count,
-                            "truncated": std::mem::replace(&mut truncated, false),
-                        }));
-                    }
-                    _ => {}
-                }
-            }
-            Json(json!({ "results": results })).into_response()
-        }
-        Err(err) => {
-            let error = match err.as_db_error() {
-                Some(db) => json!({
-                    "message": db.message(),
-                    "code": db.code().code(),
-                    "detail": db.detail(),
-                    "hint": db.hint(),
-                    "position": match db.position() {
-                        Some(tokio_postgres::error::ErrorPosition::Original(p)) => Some(*p),
-                        _ => None,
-                    },
-                }),
-                None => json!({ "message": err.to_string() }),
-            };
-            Json(json!({ "error": error })).into_response()
-        }
+    match state.sql.execute(&state.db_config, &request.sql).await {
+        Ok(result) => Json(result).into_response(),
+        Err(_) => (StatusCode::SERVICE_UNAVAILABLE, Json(serde_json::json!({
+            "error": "SQL execution is busy; wait for a running query to finish", "code": "sql_busy"
+        }))).into_response(),
     }
+}
+
+/// Tables and columns for CodeMirror's autocomplete (`schema.table`).
+pub async fn schema(
+    State(state): State<AdminState>,
+) -> ApiResult<crate::contracts::SchemaResponse> {
+    let catalog = state.catalog.get();
+    let mut tables = Map::new();
+    for table in catalog.tables.values() {
+        let columns: Vec<&str> = table.columns.iter().map(|c| c.name.as_str()).collect();
+        tables.insert(table.name.clone(), json!(columns));
+    }
+    let client = state.db.get().await?;
+    let rows = client
+        .query(
+            "SELECT table_schema || '.' || table_name, array_agg(column_name::text ORDER BY ordinal_position)
+             FROM information_schema.columns WHERE table_schema = 'auth'
+             GROUP BY 1",
+            &[],
+        )
+        .await?;
+    for row in rows {
+        tables.insert(row.get(0), json!(row.get::<_, Vec<String>>(1)));
+    }
+    crate::contracts::response::<crate::contracts::SchemaResponse>(
+        json!({ "schema": catalog.schema, "tables": tables }),
+    )
 }

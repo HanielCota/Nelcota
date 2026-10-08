@@ -8,7 +8,7 @@ use super::{
     DataType, GrantDef, Result, error, expression, grant, invalid, literal, qualified,
     validate_name,
 };
-use crate::structure::{ColumnInfo, Structure};
+use crate::tables::structure::{ColumnInfo, Structure};
 
 /// Context for validating types: the exposed schema and its enums.
 pub struct Context<'a> {
@@ -16,7 +16,9 @@ pub struct Context<'a> {
     pub enums: &'a [String],
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, ts_rs::TS, schemars::JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum OnDelete {
     #[default]
@@ -39,7 +41,7 @@ impl OnDelete {
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, ts_rs::TS, schemars::JsonSchema)]
 pub struct ReferenceDef {
     pub table: String,
     pub column: String,
@@ -51,7 +53,7 @@ const fn yes() -> bool {
     true
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, ts_rs::TS, schemars::JsonSchema)]
 pub struct ColumnDef {
     pub name: String,
     pub data_type: String,
@@ -135,7 +137,7 @@ fn comment_on_column(table: &str, column: &str, comment: Option<&str>) -> String
     )
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, ts_rs::TS, schemars::JsonSchema)]
 pub struct CreateTable {
     pub name: String,
     pub comment: Option<String>,
@@ -197,7 +199,7 @@ pub fn create(ctx: &Context, spec: &CreateTable) -> Result<Vec<String>> {
 }
 
 /// One change. The whole list runs in one transaction, in the order sent.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, ts_rs::TS, schemars::JsonSchema)]
 #[serde(tag = "action", rename_all = "snake_case")]
 pub enum AlterAction {
     RenameTable {
@@ -223,6 +225,7 @@ pub enum AlterAction {
     SetType {
         column: String,
         data_type: String,
+        #[ts(optional = nullable)]
         using: Option<String>,
     },
     SetNullable {
@@ -271,7 +274,7 @@ fn added_column(col: &ColumnDef) -> ColumnInfo {
 fn column_exists<'a>(
     current: &'a Structure,
     name: &str,
-) -> Result<&'a crate::structure::ColumnInfo> {
+) -> Result<&'a crate::tables::structure::ColumnInfo> {
     current.column(name).ok_or_else(|| {
         error(
             "column_not_found",
@@ -452,7 +455,7 @@ pub fn drop(schema: &str, name: &str, cascade: bool) -> Vec<String> {
 mod tests {
     use super::*;
     use crate::ddl::{ApiRole, Privilege};
-    use crate::structure::ForeignKeyRef;
+    use crate::tables::structure::ForeignKeyRef;
 
     const ENUMS: &[String] = &[];
 

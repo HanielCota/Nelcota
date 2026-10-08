@@ -7,6 +7,7 @@
 //! in the environment (inside the container or in a dev shell) and, on a host,
 //! run with the project's app configuration.
 
+mod backup;
 mod caddy;
 mod checks;
 mod db;
@@ -14,16 +15,17 @@ mod dev;
 mod envfile;
 mod host;
 mod init;
+mod lifecycle;
 mod machine;
 mod naming;
 mod native;
-mod ops;
 mod panel_login;
 mod pitr;
 mod project;
 mod projects;
 mod registry;
 mod scaffold;
+mod upgrade;
 mod util;
 
 use std::path::PathBuf;
@@ -286,17 +288,20 @@ pub fn run(cli: Cli) -> anyhow::Result<Outcome> {
                 Some(_) => vec![host.select(&manifest, selection)?],
                 None => host.projects(&manifest),
             };
-            done(ops::up(&host, &manifest, &targets))
+            done(lifecycle::up(&host, &manifest, &targets))
         }
         Command::Down { volumes, all } => {
             let manifest = host.require()?;
             if all {
                 for project in host.projects(&manifest) {
-                    ops::down(&project, volumes)?;
+                    lifecycle::down(&project, volumes)?;
                 }
                 done(caddy::down(&host, manifest.runtime, volumes))
             } else {
-                done(ops::down(&host.select(&manifest, selection)?, volumes))
+                done(lifecycle::down(
+                    &host.select(&manifest, selection)?,
+                    volumes,
+                ))
             }
         }
         Command::Status => {
@@ -305,11 +310,11 @@ pub fn run(cli: Cli) -> anyhow::Result<Outcome> {
                 Some(_) => vec![host.select(&manifest, selection)?],
                 None => host.projects(&manifest),
             };
-            done(ops::status(&manifest, &targets))
+            done(lifecycle::status(&manifest, &targets))
         }
         Command::Logs { follow, service } => {
             let manifest = host.require()?;
-            done(ops::logs(
+            done(lifecycle::logs(
                 &host.select(&manifest, selection)?,
                 follow,
                 service.as_deref(),
@@ -328,11 +333,11 @@ pub fn run(cli: Cli) -> anyhow::Result<Outcome> {
             let manifest = host.require()?;
             if all {
                 for project in host.projects(&manifest) {
-                    ops::upgrade(&host, &project, version.as_deref())?;
+                    upgrade::run(&host, &project, version.as_deref())?;
                 }
                 Ok(Outcome::Done)
             } else {
-                done(ops::upgrade(
+                done(upgrade::run(
                     &host,
                     &host.select(&manifest, selection)?,
                     version.as_deref(),
@@ -349,7 +354,7 @@ pub fn run(cli: Cli) -> anyhow::Result<Outcome> {
             let mut failed = Vec::new();
             for project in &targets {
                 // A project with a problem does not stop the others from being backed up.
-                let result = ops::backup(&host, project, upload, keep).and_then(|_| {
+                let result = backup::run(&host, project, upload, keep).and_then(|_| {
                     if pitr::enabled(project) {
                         pitr::backup(project)?;
                     }
@@ -367,7 +372,7 @@ pub fn run(cli: Cli) -> anyhow::Result<Outcome> {
         }
         Command::Restore { file, files, yes } => {
             let manifest = host.require()?;
-            done(ops::restore(
+            done(backup::restore(
                 &host,
                 &host.select(&manifest, selection)?,
                 &file,
@@ -405,7 +410,7 @@ pub fn run(cli: Cli) -> anyhow::Result<Outcome> {
                 Some(project) => vec![project],
                 None => host.projects(&manifest),
             };
-            ops::recreate_apps(&affected)?;
+            lifecycle::recreate_apps(&affected)?;
             panel_login::print(&[new]);
             Ok(Outcome::Done)
         }

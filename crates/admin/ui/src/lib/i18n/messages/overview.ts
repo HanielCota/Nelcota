@@ -7,13 +7,14 @@ const ptBR = {
   stats: {
     tables: 'Tabelas',
     users: 'Usuários',
-    policies: 'Policies',
+    policies: 'Políticas',
     functions: 'Funções',
+    inSql: 'Abrir no editor SQL',
   },
   exposed: {
     title: 'Expostas sem RLS: {tables}',
     before: 'Quem tem GRANT nessas tabelas lê e altera todas as linhas. Ative com',
-    after: 'e crie policies, ou revogue os grants.',
+    after: 'e crie políticas, ou revogue os grants.',
   },
   tables: {
     heading: 'Tabelas',
@@ -40,6 +41,7 @@ const en: Messages<typeof ptBR> = {
     users: 'Users',
     policies: 'Policies',
     functions: 'Functions',
+    inSql: 'Open in the SQL editor',
   },
   exposed: {
     title: 'Exposed without RLS: {tables}',

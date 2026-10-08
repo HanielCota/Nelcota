@@ -1,0 +1,250 @@
+//! Wire contracts are defined here, then exported to TypeScript and JSON Schema.
+//! Keep nullable values explicit: SQL NULL and a missing field are different.
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
+use ts_rs::TS;
+
+macro_rules! dto {
+    ($name:ident { $($field:ident : $ty:ty),* $(,)? }) => {
+        #[derive(Serialize, Deserialize, JsonSchema, TS)]
+        pub struct $name { $(pub $field: $ty),* }
+    };
+}
+#[derive(Serialize, Deserialize, JsonSchema, TS)]
+#[serde(rename_all = "lowercase")]
+pub enum RlsState {
+    Ok,
+    Warn,
+    Danger,
+    None,
+    View,
+}
+dto!(Rls {
+    state: RlsState,
+    label: String,
+    enabled: bool,
+    forced: bool,
+    policies: usize
+});
+dto!(TableSummary {
+    name: String,
+    kind: String,
+    has_pk: bool,
+    rls: Rls
+});
+dto!(TablesResponse { schema: String, tables: Vec<TableSummary> });
+dto!(Counts {
+    tables: usize,
+    users: i64,
+    policies: usize,
+    functions: usize
+});
+dto!(Grants { anon: Vec<String>, authenticated: Vec<String> });
+dto!(OverviewTable { name: String, kind: String, comment: Option<String>, rows: Option<i64>, rows_exact: bool, rls: Rls, grants: Grants });
+dto!(Overview { schema: String, counts: Counts, exposed_without_rls: Vec<String>, tables: Vec<OverviewTable> });
+dto!(ColumnReference {
+    table: String,
+    column: String
+});
+dto!(Column { name: String, r#type: String, full_type: String, category: String, nullable: bool, has_default: bool, generated: bool, enum_values: Vec<String>, is_pk: bool, comment: Option<String>, references: Option<ColumnReference> });
+pub type RowData = BTreeMap<String, Option<String>>;
+dto!(TableInfo { name: String, kind: String, comment: Option<String>, primary_key: Vec<String>, editable: bool, insertable: bool, exposed_without_rls: bool, rls: Rls, columns: Vec<Column> });
+dto!(TableData { table: TableInfo, rows: Vec<RowData>, page: i64, size: i64, has_next: bool, total: Option<i64>, total_exact: bool });
+dto!(User { id: String, email: String, created_at: String, last_sign_in_at: Option<String>, email_confirmed_at: Option<String>, sessions: i64 });
+dto!(UsersResponse { users: Vec<User>, total: i64, page: i64, has_next: bool });
+dto!(Policy { name: String, permissive: bool, roles: Vec<String>, command: String, using: Option<String>, check: Option<String> });
+dto!(PolicyTable { name: String, rls: Rls, exposed_without_rls: bool, policies: Vec<Policy> });
+dto!(PoliciesData { schema: String, exposed_without_rls: Vec<String>, tables: Vec<PolicyTable>, anon_functions: Vec<String> });
+dto!(ProjectLink { name: String, url: Option<String>, current: bool });
+dto!(ProjectsData { current: String, sso: bool, projects: Vec<ProjectLink> });
+dto!(ProjectStatus { name: String, url: Option<String>, current: bool, healthy: bool, version: Option<String>, latency_ms: Option<u64> });
+dto!(ProjectsStatusData { current: String, projects: Vec<ProjectStatus> });
+dto!(Migration { version: i64, name: String, applied_on: Option<String>, in_folder: Option<bool>, from_panel: bool });
+dto!(PendingChange { id: i64, applied_at: String, summary: String, statements: Vec<String>, kind: Option<String>, target: Option<String> });
+dto!(MigrationsData { migrations: Vec<Migration>, pending: Vec<PendingChange>, next_version: i64, folder: Option<String> });
+dto!(ExportedMigration {
+    version: i64,
+    filename: String,
+    sql: String,
+    message: String
+});
+dto!(Bucket { id: String, public: bool, file_size_limit: Option<i64>, allowed_mime_types: Option<Vec<String>>, created_at: String, files: i64, bytes: i64 });
+#[derive(Serialize, Deserialize, JsonSchema, TS)]
+pub struct StorageEnabled {
+    #[ts(type = "true")]
+    #[schemars(transform = enabled)]
+    pub enabled: bool,
+    pub backend: StorageBackend,
+    pub max_file_size: u64,
+    pub max_total_size: Option<u64>,
+    pub public_url: Option<String>,
+    pub buckets: Vec<Bucket>,
+}
+#[derive(Serialize, Deserialize, JsonSchema, TS)]
+#[serde(rename_all = "lowercase")]
+pub enum StorageBackend {
+    Disk,
+    S3,
+}
+#[derive(Serialize, Deserialize, JsonSchema, TS)]
+#[serde(untagged)]
+pub enum StorageOverview {
+    Enabled(StorageEnabled),
+    Disabled {
+        #[ts(type = "false")]
+        #[schemars(transform = disabled)]
+        enabled: bool,
+    },
+}
+fn enabled(schema: &mut schemars::Schema) {
+    schema.insert("const".into(), serde_json::json!(true));
+}
+fn disabled(schema: &mut schemars::Schema) {
+    schema.insert("const".into(), serde_json::json!(false));
+}
+dto!(StoredFile { id: String, name: String, size: u64, mime_type: String, owner: Option<String>, updated_at: String });
+dto!(StorageListing { folders: Vec<String>, objects: Vec<StoredFile>, has_next: bool });
+dto!(SchemaResponse { schema: String, tables: BTreeMap<String, Vec<String>> });
+dto!(TypesResponse { base: Vec<String>, enums: Vec<String> });
+
+#[derive(Default, Serialize, Deserialize, JsonSchema, TS)]
+pub struct DdlResult {
+    pub sql: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub message: Option<String>,
+    pub applied: bool,
+    pub catalog_pending: bool,
+}
+#[derive(Default, Serialize, Deserialize, JsonSchema, TS)]
+pub struct SqlResult {
+    pub columns: Vec<String>,
+    pub rows: Vec<Vec<Option<String>>>,
+    pub count: u64,
+    pub truncated: bool,
+}
+dto!(SqlError { message: String, code: Option<String>, detail: Option<String>, hint: Option<String>, position: Option<u32> });
+#[derive(Serialize, Deserialize, JsonSchema, TS)]
+#[serde(untagged)]
+pub enum SqlResponse {
+    Success {
+        results: Vec<SqlResult>,
+        results_truncated: bool,
+    },
+    Failure {
+        error: SqlError,
+    },
+}
+
+/// Transitional database JSON aggregation is checked at the module boundary.
+pub(crate) fn response<T: serde::de::DeserializeOwned>(
+    value: serde_json::Value,
+) -> Result<axum::Json<T>, crate::ApiError> {
+    serde_json::from_value(value)
+        .map(axum::Json)
+        .map_err(|error| {
+            tracing::error!(%error, "invalid panel response contract");
+            crate::ApiError::from("invalid panel response contract")
+        })
+}
+
+/// Deterministic output; tests fail when a Rust change was not regenerated.
+pub fn exports() -> (String, String) {
+    let config = ts_rs::Config::default().with_large_int("number");
+    let mut types = String::from(
+        "// Generated by cargo run -p nelcota-admin --example export_contracts. Do not edit.\n",
+    );
+    let mut schemas = serde_json::Map::new();
+    macro_rules! export {
+        ($($ty:ty),* $(,)?) => { $(
+            types.push_str("export "); types.push_str(&<$ty>::decl(&config)); types.push('\n');
+            let schema = schemars::generate::SchemaSettings::draft2020_12().for_serialize().into_generator().into_root_schema_for::<$ty>();
+            schemas.insert(<$ty>::ident(&config), serde_json::to_value(schema).expect("schema serializes"));
+        )* };
+    }
+    export!(
+        RlsState,
+        Rls,
+        TableSummary,
+        TablesResponse,
+        Counts,
+        Grants,
+        OverviewTable,
+        Overview,
+        ColumnReference,
+        Column,
+        TableInfo,
+        TableData,
+        User,
+        UsersResponse,
+        Policy,
+        PolicyTable,
+        PoliciesData,
+        ProjectLink,
+        ProjectsData,
+        ProjectStatus,
+        ProjectsStatusData,
+        Migration,
+        PendingChange,
+        MigrationsData,
+        ExportedMigration,
+        Bucket,
+        StorageBackend,
+        StorageEnabled,
+        StorageOverview,
+        StoredFile,
+        StorageListing,
+        SchemaResponse,
+        TypesResponse,
+        DdlResult,
+        SqlResult,
+        SqlError,
+        SqlResponse
+    );
+    export!(
+        crate::tables::structure::ForeignKeyRef,
+        crate::tables::structure::ColumnInfo,
+        crate::tables::structure::Grant,
+        crate::tables::structure::Structure,
+        crate::ddl::ApiRole,
+        crate::ddl::Privilege,
+        crate::ddl::GrantDef,
+        crate::ddl::table::OnDelete,
+        crate::ddl::table::ReferenceDef,
+        crate::ddl::table::ColumnDef,
+        crate::ddl::table::CreateTable,
+        crate::ddl::table::AlterAction,
+        crate::ddl::policy::Command,
+        crate::ddl::policy::PolicyRole,
+        crate::ddl::policy::PolicyDef
+    );
+    types.push_str("export type RowData = Record<string, string | null>;\n");
+    let types = types
+        .lines()
+        .map(str::trim_end)
+        .collect::<Vec<_>>()
+        .join("\n")
+        + "\n";
+    (
+        types,
+        serde_json::to_string_pretty(&schemas).expect("schemas serialize") + "\n",
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn generated_contracts_are_current() {
+        let (types, schemas) = super::exports();
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("ui/src/lib/generated");
+        assert_eq!(
+            types,
+            std::fs::read_to_string(root.join("contracts.ts")).expect("run npm run contracts")
+        );
+        assert_eq!(
+            schemas,
+            std::fs::read_to_string(root.join("schemas.json")).expect("run npm run contracts")
+        );
+    }
+}

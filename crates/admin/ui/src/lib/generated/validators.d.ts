@@ -1,0 +1,17 @@
+// Generated. Do not edit.
+export function Overview(value: unknown): boolean;
+export function TablesResponse(value: unknown): boolean;
+export function SchemaResponse(value: unknown): boolean;
+export function UsersResponse(value: unknown): boolean;
+export function PoliciesData(value: unknown): boolean;
+export function ProjectsData(value: unknown): boolean;
+export function ProjectsStatusData(value: unknown): boolean;
+export function MigrationsData(value: unknown): boolean;
+export function StorageOverview(value: unknown): boolean;
+export function TypesResponse(value: unknown): boolean;
+export function Structure(value: unknown): boolean;
+export function TableData(value: unknown): boolean;
+export function StorageListing(value: unknown): boolean;
+export function SqlResponse(value: unknown): boolean;
+export function ExportedMigration(value: unknown): boolean;
+export function DdlResult(value: unknown): boolean;

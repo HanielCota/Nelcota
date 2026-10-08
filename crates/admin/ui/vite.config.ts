@@ -20,6 +20,6 @@ export default defineConfig({
   },
   server: {
     // `npm run dev`: the panel API comes from nelcota running locally.
-    proxy: { '/admin/api': { target: 'https://localhost', secure: false, changeOrigin: true } },
+    proxy: { '/admin/api': { target: process.env.NELCOTA_API_URL ?? 'http://127.0.0.1:8000', changeOrigin: true } },
   },
 })

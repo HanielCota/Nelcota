@@ -12,9 +12,15 @@ The first `init` (as root) installs a daily cron job at 03:00
 (`/etc/cron.d/nelcota-backup`) running `backup --all`, plus `--upload` when S3
 is configured. A broken project does not stop the others from being backed up.
 
-With disk storage, `--upload` also mirrors the project's files to
-`s3://<bucket>/<project>/storage/`; `restore --files` brings them back
-([storage.md](storage.md#backups)).
+With disk storage, every dump has a sibling `<dump>.files/` directory containing
+the immutable object versions and a SHA-256 manifest. The dump and file list
+share one exported Postgres snapshot. A SHARE lock on `storage.objects` prevents
+metadata changes during capture; reads continue, but file writes may wait.
+
+`--upload` publishes that directory to `s3://<bucket>/<project>/<dump>.files/`
+before uploading the dump. Later replacements and deletions cannot change an
+older snapshot. Keep each dump together with its file directory; `--keep` prunes
+both locally. Configure remote lifecycle rules for both members of the pair.
 
 The dump uses `pg_dump`'s custom format: it includes schema, data, RLS
 policies, functions and the `auth` schema (users with their argon2id hashes).
@@ -52,6 +58,14 @@ The restore stops the app, runs `pg_restore --clean --if-exists` in **a single
 transaction** (if anything fails, the database stays as it was) and starts the
 app again.
 
+Use `--files` to restore the matching disk snapshot. It uses the local sibling
+directory when present, otherwise fetches that dump's snapshot from the backup
+bucket. The manifest, file sizes and hashes are checked before stopping the app.
+The immutable versions are copied before restoring the database, so a file-copy
+failure leaves the database untouched. Existing unrelated versions remain for
+the normal orphan collector. Backups made with the former shared storage mirror
+have no historical file manifest; they remain usable for database-only restores.
+
 ### Restore on a new VPS
 
 ```sh
@@ -69,6 +83,7 @@ more data, restores and checks that the state went back to the backup's.
 
 When a project is removed (`nelcota -p <name> remove`), a final backup is kept
 in `archive/`, in the host folder.
+Disk snapshots are archived alongside the final dump.
 
 ## PITR (point-in-time recovery)
 

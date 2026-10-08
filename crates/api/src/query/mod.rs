@@ -1,0 +1,880 @@
+//! Translation of the URL (PostgREST style) into parameterized SQL.
+//!
+//! Security rules, checked by the injection tests:
+//! - identifiers (table, column, function) only reach SQL if they exist in the
+//!   catalog, and always double-quoted ([`ident`]);
+//! - types used in casts come from the catalog (`format_type`), never the URL;
+//! - every user-supplied value is a parameter (`$n`), never SQL text.
+//!
+//! Values arrive as text and Postgres converts them to the column type
+//! (`$1::text::integer`): type validation is its job, as with a literal.
+
+use std::error::Error;
+
+use bytes::BytesMut;
+use serde_json::{Map, Value};
+use tokio_postgres::types::{IsNull, ToSql, Type, to_sql_checked};
+
+use crate::catalog::{Catalog, Column, ForeignKey, Function, Table};
+
+#[derive(Debug, thiserror::Error)]
+pub enum QueryError {
+    #[error("{0}")]
+    Invalid(String),
+}
+
+fn invalid(message: impl Into<String>) -> QueryError {
+    QueryError::Invalid(message.into())
+}
+
+/// Quoted identifier, with inner quotes doubled (libpq's rules).
+pub fn ident(name: &str) -> String {
+    postgres_protocol::escape::escape_identifier(name)
+}
+
+// ------------------------------------------------------------------ parameters
+
+#[derive(Debug)]
+pub enum Param {
+    Text(String),
+    Int(i64),
+    Json(Value),
+}
+
+impl ToSql for Param {
+    fn to_sql(
+        &self,
+        ty: &Type,
+        out: &mut BytesMut,
+    ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
+        match self {
+            Param::Text(v) => v.to_sql_checked(ty, out),
+            Param::Int(v) => v.to_sql_checked(ty, out),
+            Param::Json(v) => v.to_sql_checked(ty, out),
+        }
+    }
+
+    fn accepts(_: &Type) -> bool {
+        // The real check happens in the inner value's `to_sql_checked`.
+        true
+    }
+
+    to_sql_checked!();
+}
+
+/// SQL under construction + its parameters.
+#[derive(Debug, Default)]
+pub struct Sql {
+    pub text: String,
+    pub params: Vec<Param>,
+}
+
+impl Sql {
+    fn param(&mut self, param: Param) -> String {
+        self.params.push(param);
+        format!("${}", self.params.len())
+    }
+
+    pub fn param_refs(&self) -> Vec<&(dyn ToSql + Sync)> {
+        self.params
+            .iter()
+            .map(|p| p as &(dyn ToSql + Sync))
+            .collect()
+    }
+}
+
+// ------------------------------------------------------------------ request
+
+/// What `select=` asks for: `*` and/or columns, plus embedded relations.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Select {
+    pub star: bool,
+    pub columns: Vec<String>,
+    pub embeds: Vec<Embed>,
+}
+
+impl Select {
+    /// No `select=`: every column, no relations.
+    pub fn all() -> Self {
+        Select {
+            star: true,
+            columns: Vec::new(),
+            embeds: Vec::new(),
+        }
+    }
+}
+
+/// `(related column, this table's column)` pairs of a foreign key, ANDed.
+pub type JoinPairs = Vec<(String, String)>;
+
+/// A related table embedded through a foreign key (`customers(name)`), with
+/// its own columns, nested embeds and, through `items.qty=gt.1`-style
+/// parameters, its own filters, ordering and paging.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Embed {
+    /// Key of the embedded value in the JSON (the table name or `alias:`).
+    pub alias: String,
+    /// The related table.
+    pub table: String,
+    /// `true` when the related table points here (one-to-many, an array);
+    /// `false` when this table points there (many-to-one, an object or null).
+    pub many: bool,
+    pub join: JoinPairs,
+    pub select: Select,
+    /// Narrow the embedded rows only; the parent rows stay.
+    pub filters: Vec<Condition>,
+    pub order: Vec<OrderTerm>,
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
+}
+
+/// Longest identifier Postgres keeps (longer aliases would be cut silently).
+const MAX_IDENTIFIER_BYTES: usize = 63;
+/// Deepest embedding accepted (`a(b(c(d(*))))`): bounds the recursion and
+/// the correlated subqueries a single request can stack.
+const MAX_EMBED_DEPTH: usize = 4;
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum CmpOp {
+    Eq,
+    Neq,
+    Gt,
+    Gte,
+    Lt,
+    Lte,
+}
+
+impl CmpOp {
+    fn sql(self) -> &'static str {
+        match self {
+            CmpOp::Eq => "=",
+            CmpOp::Neq => "<>",
+            CmpOp::Gt => ">",
+            CmpOp::Gte => ">=",
+            CmpOp::Lt => "<",
+            CmpOp::Lte => "<=",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum IsValue {
+    Null,
+    True,
+    False,
+    Unknown,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+enum Op {
+    Cmp(CmpOp, String),
+    Like { insensitive: bool, pattern: String },
+    In(Vec<String>),
+    Is(IsValue),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Filter {
+    column: String,
+    /// The column's type, for the parameter cast.
+    type_name: String,
+    negate: bool,
+    op: Op,
+}
+
+/// One filter, or a parenthesized group joined by OR/AND (`or=(...)`,
+/// `and=(...)`, optionally negated), nested as a tree.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Condition {
+    Filter(Filter),
+    Group {
+        /// `true` joins the items with OR, `false` with AND.
+        any: bool,
+        negate: bool,
+        items: Vec<Condition>,
+    },
+}
+
+/// Deepest nesting accepted in `or=`/`and=`: bounds the recursion on hostile input.
+const MAX_DEPTH: usize = 8;
+/// Most conditions accepted in one logic tree.
+const MAX_CONDITIONS: usize = 100;
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct OrderTerm {
+    column: String,
+    desc: bool,
+    nulls_first: Option<bool>,
+}
+
+/// What the query string asks for: columns, filters, ordering and paging.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Request {
+    pub select: Select,
+    /// Joined with AND, like separate query parameters.
+    pub filters: Vec<Condition>,
+    pub order: Vec<OrderTerm>,
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
+    /// `on_conflict=col1,col2`: the unique key an upsert resolves on.
+    pub on_conflict: Option<Vec<String>>,
+}
+
+/// What `Prefer: resolution=...` asks a POST to do with a row whose key
+/// already exists.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Resolution {
+    /// `merge-duplicates`: update the existing row with the sent columns.
+    Merge,
+    /// `ignore-duplicates`: keep the existing row.
+    Ignore,
+}
+
+/// `INSERT ... ON CONFLICT (columns)` and what to do on a conflict.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Upsert {
+    pub columns: Vec<String>,
+    pub resolution: Resolution,
+}
+
+impl Upsert {
+    /// Conflict target: `on_conflict` when given, else the primary key.
+    pub fn new(
+        table: &Table,
+        on_conflict: Option<&[String]>,
+        resolution: Resolution,
+    ) -> Result<Self, QueryError> {
+        let columns = match on_conflict {
+            Some(columns) => columns.to_vec(),
+            None if !table.primary_key.is_empty() => table.primary_key.clone(),
+            None => {
+                return Err(invalid(
+                    "upsert needs a primary key or on_conflict=col1,col2",
+                ));
+            }
+        };
+        Ok(Upsert {
+            columns,
+            resolution,
+        })
+    }
+
+    /// Merge updates only the columns the row sent, never the key itself;
+    /// with nothing left to update, a merge behaves like ignore.
+    fn clause(&self, columns: &[String]) -> String {
+        let target = self
+            .columns
+            .iter()
+            .map(|c| ident(c))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let updates: Vec<String> = columns
+            .iter()
+            .filter(|c| !self.columns.contains(c))
+            .map(|c| format!("{0} = EXCLUDED.{0}", ident(c)))
+            .collect();
+        match self.resolution {
+            Resolution::Merge if !updates.is_empty() => {
+                format!(
+                    " ON CONFLICT ({target}) DO UPDATE SET {}",
+                    updates.join(", ")
+                )
+            }
+            _ => format!(" ON CONFLICT ({target}) DO NOTHING"),
+        }
+    }
+}
+
+mod parse;
+mod sql;
+#[cfg(test)]
+use parse::*;
+pub use parse::{parse_request, parse_request_with_relations};
+#[cfg(test)]
+use sql::*;
+pub use sql::{count, delete, insert, resolve_function, rpc, select, select_rows, update};
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::catalog::{Privileges, TableKind};
+
+    fn col(name: &str, type_name: &str) -> Column {
+        Column {
+            name: name.into(),
+            type_name: type_name.into(),
+            full_type: type_name.into(),
+            category: 'S',
+            element_type: None,
+            enum_values: vec![],
+            nullable: true,
+            has_default: false,
+            generated: false,
+            comment: None,
+        }
+    }
+
+    fn table() -> Table {
+        Table {
+            name: "todos".into(),
+            kind: TableKind::Table,
+            columns: vec![
+                col("id", "bigint"),
+                col("title", "text"),
+                col("done", "boolean"),
+            ],
+            primary_key: vec!["id".into()],
+            foreign_keys: vec![],
+            rls_enabled: true,
+            rls_forced: false,
+            comment: None,
+            privileges: [Privileges::default(); 3],
+        }
+    }
+
+    fn pairs(q: &[(&str, &str)]) -> Vec<(String, String)> {
+        q.iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
+    }
+
+    #[test]
+    fn select_with_filters_order_and_paging() {
+        let t = table();
+        let req = parse_request(
+            &pairs(&[
+                ("select", "id,title"),
+                ("done", "is.false"),
+                ("id", "gte.10"),
+                ("title", "not.ilike.*compr*"),
+                ("order", "id.desc.nullslast"),
+                ("limit", "5"),
+                ("offset", "10"),
+            ]),
+            &t,
+        )
+        .unwrap();
+        let sql = select("public", &t, &req, Some(1000));
+        assert_eq!(
+            sql.text,
+            "SELECT coalesce(json_agg(_r), '[]')::text, count(*) FROM (SELECT _t.\"id\", _t.\"title\" \
+             FROM \"public\".\"todos\" AS _t WHERE _t.\"done\" IS FALSE AND _t.\"id\" >= $1::text::bigint \
+             AND NOT (_t.\"title\"::text ILIKE $2::text) ORDER BY _t.\"id\" DESC NULLS LAST LIMIT $3 OFFSET $4) _r"
+        );
+        assert_eq!(sql.params.len(), 4);
+        assert!(matches!(&sql.params[1], Param::Text(p) if p == "%compr%"));
+    }
+
+    #[test]
+    fn select_rows_returns_one_json_record_per_row() {
+        let t = table();
+        let req = parse_request(&pairs(&[("done", "eq.true"), ("order", "id")]), &t).unwrap();
+        let sql = select_rows("public", &t, &req);
+        assert_eq!(
+            sql.text,
+            "SELECT row_to_json(_r)::text FROM (SELECT _t.* FROM \"public\".\"todos\" AS _t \
+             WHERE _t.\"done\" = $1::text::boolean ORDER BY _t.\"id\" ASC) _r"
+        );
+        assert_eq!(sql.params.len(), 1);
+    }
+
+    #[test]
+    fn max_rows_caps_the_limit() {
+        let t = table();
+        let req = parse_request(&pairs(&[("limit", "5000")]), &t).unwrap();
+        let sql = select("public", &t, &req, Some(100));
+        assert!(matches!(sql.params[0], Param::Int(100)));
+    }
+
+    #[test]
+    fn unknown_identifiers_are_rejected() {
+        let t = table();
+        for q in [
+            ("select", "id,\"title\""),
+            ("select", "id;drop table todos"),
+            ("select", "todos(*)"),
+            ("order", "title;drop table todos"),
+            ("order", "id.sideways"),
+            ("x\"; drop table todos; --", "eq.1"),
+            ("title", "eq"),
+            ("title", "foo.1"),
+            ("limit", "-1"),
+            ("limit", "1;drop"),
+            ("title", "is.nothing"),
+            ("title", "in.(a,\"b)"),
+        ] {
+            assert!(parse_request(&pairs(&[q]), &t).is_err(), "{q:?}");
+        }
+    }
+
+    #[test]
+    fn values_become_parameters() {
+        let t = table();
+        let malicious = "'; DROP TABLE todos; --";
+        let req = parse_request(&pairs(&[("title", &format!("eq.{malicious}"))]), &t).unwrap();
+        let sql = select("public", &t, &req, None);
+        assert!(!sql.text.contains("DROP"));
+        assert!(matches!(&sql.params[0], Param::Text(p) if p == malicious));
+    }
+
+    #[test]
+    fn in_list_with_quotes_and_escapes() {
+        assert_eq!(
+            parse_in_list(r#"(1, 2,"a,b","x\"y",)"#).unwrap(),
+            vec!["1", "2", "a,b", "x\"y", ""]
+        );
+        assert_eq!(parse_in_list("()").unwrap(), Vec::<String>::new());
+        assert_eq!(
+            array_literal(&["a\"b".into(), "c\\d".into()]),
+            r#"{"a\"b","c\\d"}"#
+        );
+    }
+
+    #[test]
+    fn ident_doubles_quotes() {
+        assert_eq!(ident("a\"b"), "\"a\"\"b\"");
+        // Backslashes and non-ASCII pass through untouched (no E'' form for identifiers).
+        assert_eq!(ident("a\\b"), "\"a\\b\"");
+        assert_eq!(ident("café"), "\"café\"");
+        assert_eq!(ident(""), "\"\"");
+        assert_eq!(
+            ident("x\"; drop table t; --"),
+            "\"x\"\"; drop table t; --\""
+        );
+    }
+
+    #[test]
+    fn insert_rejects_unknown_columns() {
+        let t = table();
+        let body = serde_json::json!({"title": "x", "\"; drop table todos; --": 1});
+        assert!(insert("public", &t, body, None, None).is_err());
+        let sql = insert(
+            "public",
+            &t,
+            serde_json::json!([{"title": "a"}, {"title": "b"}]),
+            None,
+            None,
+        )
+        .unwrap();
+        assert!(
+            sql.text
+                .starts_with("INSERT INTO \"public\".\"todos\" AS _t (\"title\")")
+        );
+        // Different keys: one INSERT per group, so the DEFAULT applies.
+        let sql = insert(
+            "public",
+            &t,
+            serde_json::json!([{"title": "a"}, {"done": true}, {}]),
+            None,
+            None,
+        )
+        .unwrap();
+        assert!(sql.text.starts_with("WITH _w0 AS (INSERT"), "{}", sql.text);
+        assert!(sql.text.contains("DEFAULT VALUES"));
+        assert_eq!(sql.params.len(), 2);
+    }
+
+    // ------------------------------------------------------------- or / and
+
+    fn where_of(q: &[(&str, &str)]) -> (String, Vec<String>) {
+        let t = table();
+        let req = parse_request(&pairs(q), &t).unwrap();
+        let sql = count("public", &t, &req);
+        let params = sql
+            .params
+            .iter()
+            .map(|p| match p {
+                Param::Text(v) => v.clone(),
+                other => format!("{other:?}"),
+            })
+            .collect();
+        let text = sql
+            .text
+            .split(" WHERE ")
+            .nth(1)
+            .unwrap_or_default()
+            .to_owned();
+        (text, params)
+    }
+
+    #[test]
+    fn or_joins_its_items_and_ands_with_other_filters() {
+        let (text, params) = where_of(&[("or", "(title.eq.a,title.eq.b)"), ("done", "is.false")]);
+        assert_eq!(
+            text,
+            "(_t.\"title\" = $1::text::text OR _t.\"title\" = $2::text::text) AND _t.\"done\" IS FALSE"
+        );
+        assert_eq!(params, ["a", "b"]);
+    }
+
+    #[test]
+    fn groups_nest_and_negate() {
+        let (text, params) = where_of(&[("or", "(id.eq.1,and(done.is.true,title.not.like.*x*))")]);
+        assert_eq!(
+            text,
+            "(_t.\"id\" = $1::text::bigint OR (_t.\"done\" IS TRUE AND NOT (_t.\"title\"::text LIKE $2::text)))"
+        );
+        assert_eq!(params, ["1", "%x%"]);
+
+        let (text, _) = where_of(&[("not.and", "(id.gt.1,not.or(done.is.true,id.lt.0))")]);
+        assert_eq!(
+            text,
+            "NOT (_t.\"id\" > $1::text::bigint AND NOT (_t.\"done\" IS TRUE OR _t.\"id\" < $2::text::bigint))"
+        );
+    }
+
+    #[test]
+    fn quoted_values_may_hold_commas_and_parentheses() {
+        let (_, params) = where_of(&[(
+            "or",
+            r#"(title.eq."a,b",title.eq."f(x)",title.eq."say \"hi\"",title.in.("x,y",z))"#,
+        )]);
+        assert_eq!(params, ["a,b", "f(x)", "say \"hi\"", r#"{"x,y","z"}"#]);
+    }
+
+    #[test]
+    fn logic_values_stay_parameters() {
+        let malicious = "x') OR true; DROP TABLE todos; --";
+        let (text, params) = where_of(&[("or", &format!("(title.eq.\"{malicious}\",id.eq.1)"))]);
+        assert!(!text.contains("DROP"), "{text}");
+        assert_eq!(params[0], malicious);
+    }
+
+    #[test]
+    fn malformed_or_hostile_trees_are_rejected() {
+        let t = table();
+        let deep = format!(
+            "({}id.eq.1{})",
+            "or(".repeat(MAX_DEPTH),
+            ")".repeat(MAX_DEPTH)
+        );
+        let wide = format!("({})", vec!["id.eq.1"; MAX_CONDITIONS + 1].join(","));
+        for (key, value) in [
+            ("or", "title.eq.a"),                // no parentheses
+            ("or", "()"),                        // empty
+            ("or", "(title.eq.a,)"),             // empty item
+            ("or", "(title.eq.a"),               // unbalanced
+            ("or", "(title.eq.\"a)"),            // unclosed quote
+            ("or", "(nope.eq.1)"),               // unknown column
+            ("or", "(title)"),                   // no operator
+            ("or", "(title.eq.a,xor(id.eq.1))"), // not a group keyword
+            ("and", "(\"x\"\"; drop table todos; --\".eq.1)"),
+            ("or", deep.as_str()),
+            ("or", wide.as_str()),
+        ] {
+            assert!(
+                parse_request(&pairs(&[(key, value)]), &t).is_err(),
+                "{key}={value}"
+            );
+        }
+        // The deepest accepted tree still parses.
+        let ok = format!(
+            "({}id.eq.1{})",
+            "or(".repeat(MAX_DEPTH - 1),
+            ")".repeat(MAX_DEPTH - 1)
+        );
+        assert!(parse_request(&pairs(&[("or", &ok)]), &t).is_ok());
+    }
+
+    // ------------------------------------------------------------- upsert
+
+    fn upsert_sql(body: serde_json::Value, upsert: &Upsert) -> String {
+        insert("public", &table(), body, None, Some(upsert))
+            .unwrap()
+            .text
+    }
+
+    #[test]
+    fn merge_updates_only_the_sent_columns_never_the_key() {
+        let t = table();
+        let merge = Upsert::new(&t, None, Resolution::Merge).unwrap();
+        assert_eq!(merge.columns, ["id"]);
+        let text = upsert_sql(serde_json::json!({"id": 1, "title": "a"}), &merge);
+        assert!(
+            text.ends_with(" ON CONFLICT (\"id\") DO UPDATE SET \"title\" = EXCLUDED.\"title\""),
+            "{text}"
+        );
+        // Only the key sent: nothing to update, so the row is kept.
+        let text = upsert_sql(serde_json::json!({"id": 1}), &merge);
+        assert!(text.ends_with(" ON CONFLICT (\"id\") DO NOTHING"), "{text}");
+    }
+
+    #[test]
+    fn ignore_keeps_the_existing_row_and_groups_each_get_the_clause() {
+        let t = table();
+        let ignore = Upsert::new(&t, None, Resolution::Ignore).unwrap();
+        let text = upsert_sql(
+            serde_json::json!([{"id": 1, "title": "a"}, {"id": 2, "done": true}]),
+            &ignore,
+        );
+        assert_eq!(
+            text.matches(" ON CONFLICT (\"id\") DO NOTHING").count(),
+            2,
+            "{text}"
+        );
+    }
+
+    #[test]
+    fn on_conflict_picks_the_key() {
+        let t = table();
+        let req = parse_request(&pairs(&[("on_conflict", "title, done")]), &t).unwrap();
+        let cols = req.on_conflict.unwrap();
+        assert_eq!(cols, ["title", "done"]);
+        let merge = Upsert::new(&t, Some(&cols), Resolution::Merge).unwrap();
+        let text = upsert_sql(
+            serde_json::json!({"title": "a", "done": true, "id": 3}),
+            &merge,
+        );
+        assert!(
+            text.ends_with(
+                " ON CONFLICT (\"title\", \"done\") DO UPDATE SET \"id\" = EXCLUDED.\"id\""
+            ),
+            "{text}"
+        );
+    }
+
+    #[test]
+    fn bad_upsert_requests_are_rejected() {
+        let t = table();
+        for value in [
+            "",
+            "title,",
+            "nope",
+            "title,title",
+            "\"id\"; drop table todos",
+        ] {
+            assert!(
+                parse_request(&pairs(&[("on_conflict", value)]), &t).is_err(),
+                "{value}"
+            );
+        }
+        let mut no_pk = table();
+        no_pk.primary_key.clear();
+        assert!(Upsert::new(&no_pk, None, Resolution::Merge).is_err());
+        assert!(Upsert::new(&no_pk, Some(&["title".to_owned()]), Resolution::Merge).is_ok());
+    }
+
+    // ------------------------------------------------------------- embedding
+
+    fn fk(name: &str, columns: &[&str], table: &str, foreign: &[&str]) -> ForeignKey {
+        ForeignKey {
+            name: name.into(),
+            columns: columns.iter().map(|c| (*c).into()).collect(),
+            foreign_schema: "public".into(),
+            foreign_table: table.into(),
+            foreign_columns: foreign.iter().map(|c| (*c).into()).collect(),
+        }
+    }
+
+    fn shop() -> Catalog {
+        let mut customers = table();
+        customers.name = "customers".into();
+        customers.columns = vec![col("id", "bigint"), col("name", "text")];
+        let mut orders = table();
+        orders.name = "orders".into();
+        orders.columns = vec![
+            col("id", "bigint"),
+            col("buyer_id", "bigint"),
+            col("seller_id", "bigint"),
+            col("customer_id", "bigint"),
+            col("total", "numeric"),
+        ];
+        orders.foreign_keys = vec![
+            fk(
+                "orders_customer_id_fkey",
+                &["customer_id"],
+                "customers",
+                &["id"],
+            ),
+            fk("orders_buyer_id_fkey", &["buyer_id"], "users", &["id"]),
+            fk("orders_seller_id_fkey", &["seller_id"], "users", &["id"]),
+        ];
+        let mut items = table();
+        items.name = "items".into();
+        items.columns = vec![
+            col("id", "bigint"),
+            col("order_id", "bigint"),
+            col("qty", "integer"),
+        ];
+        items.foreign_keys = vec![fk("items_order_id_fkey", &["order_id"], "orders", &["id"])];
+        let mut users = table();
+        users.name = "users".into();
+        users.columns = vec![col("id", "bigint"), col("email", "text")];
+        Catalog {
+            schema: "public".into(),
+            tables: [customers, orders, items, users]
+                .into_iter()
+                .map(|t| (t.name.clone(), t))
+                .collect(),
+            functions: Default::default(),
+        }
+    }
+
+    fn select_of(table: &str, select: &str) -> Result<(Select, String), QueryError> {
+        let catalog = shop();
+        let t = catalog.table(table).unwrap();
+        let req = parse_request_with_relations(&pairs(&[("select", select)]), t, &catalog)?;
+        let sql = super::select("public", t, &req, None);
+        Ok((req.select, sql.text))
+    }
+
+    #[test]
+    fn embeds_follow_foreign_keys_in_both_directions() {
+        let (select, text) = select_of("orders", "id,customers(name),items(*)").unwrap();
+        assert_eq!(select.columns, ["id"]);
+        let customer = &select.embeds[0];
+        assert_eq!(
+            (customer.many, &customer.join),
+            (false, &vec![("id".to_owned(), "customer_id".to_owned())])
+        );
+        let items = &select.embeds[1];
+        assert_eq!(
+            (items.many, &items.join),
+            (true, &vec![("order_id".to_owned(), "id".to_owned())])
+        );
+        assert!(text.contains(
+            "(SELECT to_json(_j0) FROM (SELECT _e0.\"name\" FROM \"public\".\"customers\" AS _e0 WHERE _e0.\"id\" = _t.\"customer_id\") AS _j0) AS \"customers\""
+        ), "{text}");
+        assert!(text.contains(
+            "(SELECT coalesce(json_agg(_j1), '[]') FROM (SELECT _e1.* FROM \"public\".\"items\" AS _e1 WHERE _e1.\"order_id\" = _t.\"id\") AS _j1) AS \"items\""
+        ), "{text}");
+    }
+
+    #[test]
+    fn several_keys_need_a_hint_and_aliases_name_the_result() {
+        let err = select_of("orders", "users(email)").unwrap_err().to_string();
+        assert!(err.contains("users!buyer_id or users!seller_id"), "{err}");
+        let (select, _) = select_of(
+            "orders",
+            "buyer:users!buyer_id(email),seller:users!orders_seller_id_fkey(email)",
+        )
+        .unwrap();
+        let picked: Vec<(&str, &str)> = select
+            .embeds
+            .iter()
+            .map(|e| (e.alias.as_str(), e.join[0].1.as_str()))
+            .collect();
+        assert_eq!(picked, [("buyer", "buyer_id"), ("seller", "seller_id")]);
+    }
+
+    #[test]
+    fn bad_embeds_are_rejected() {
+        let long = format!("{}:customers(name)", "a".repeat(64));
+        for (table, select) in [
+            ("orders", "nope(id)"),        // unknown table
+            ("customers", "users(email)"), // no foreign key
+            ("orders", "customers(nope)"), // unknown column
+            (
+                "customers",
+                "orders(customers(orders(customers(orders(id)))))",
+            ), // too deep
+            ("orders", "customers(name"),  // unbalanced
+            ("orders", "customers()"),     // empty list
+            ("orders", "users!nope(email)"), // hint matches nothing
+            ("orders", "total,total:customers(name)"), // alias collides with a column
+            ("orders", "*,id:customers(name)"),
+            ("orders", "customers(name),customers(id)"), // same key twice
+            ("orders", "x:customers(n:name)"),           // column alias
+            ("orders", long.as_str()),
+            ("orders", "orders(id)"), // self-reference
+            ("orders", "\"customers\"; drop table x(id)"),
+        ] {
+            assert!(select_of(table, select).is_err(), "{table}?select={select}");
+        }
+    }
+
+    fn request_of(table: &str, q: &[(&str, &str)]) -> Result<(Request, Sql), QueryError> {
+        let catalog = shop();
+        let t = catalog.table(table).unwrap();
+        let req = parse_request_with_relations(&pairs(q), t, &catalog)?;
+        let sql = super::select("public", t, &req, None);
+        Ok((req, sql))
+    }
+
+    #[test]
+    fn embeds_nest_with_their_own_aliases() {
+        let (select, text) = select_of(
+            "customers",
+            "name,orders(id,items(qty),buyer:users!buyer_id(email))",
+        )
+        .unwrap();
+        let orders = &select.embeds[0];
+        assert_eq!(orders.select.columns, ["id"]);
+        assert_eq!(orders.select.embeds[0].alias, "items");
+        assert!(text.contains(
+            "(SELECT coalesce(json_agg(_j0_0), '[]') FROM (SELECT _e0_0.\"qty\" FROM \"public\".\"items\" AS _e0_0 WHERE _e0_0.\"order_id\" = _e0.\"id\") AS _j0_0) AS \"items\""
+        ), "{text}");
+        assert!(
+            text.contains("WHERE _e0_1.\"id\" = _e0.\"buyer_id\") AS _j0_1) AS \"buyer\""),
+            "{text}"
+        );
+        assert!(
+            text.contains("WHERE _e0.\"customer_id\" = _t.\"id\""),
+            "{text}"
+        );
+    }
+
+    #[test]
+    fn dotted_parameters_filter_order_and_page_the_embed() {
+        let (req, sql) = request_of(
+            "customers",
+            &[
+                ("orders.total", "gt.10"),
+                ("select", "id,orders(id,items(*))"),
+                ("orders.items.or", "(qty.eq.1,qty.gt.5)"),
+                ("orders.order", "total.desc"),
+                ("orders.limit", "2"),
+                ("id", "eq.7"),
+            ],
+        )
+        .unwrap();
+        let orders = &req.select.embeds[0];
+        assert_eq!((orders.filters.len(), orders.limit), (1, Some(2)));
+        assert_eq!(orders.select.embeds[0].filters.len(), 1);
+        assert_eq!(req.filters.len(), 1, "the parent keeps only its own filter");
+        let text = &sql.text;
+        assert!(
+            text.contains("WHERE _e0.\"customer_id\" = _t.\"id\" AND _e0.\"total\" > $"),
+            "{text}"
+        );
+        assert!(
+            text.contains("::text::numeric ORDER BY _e0.\"total\" DESC LIMIT $"),
+            "{text}"
+        );
+        assert!(
+            text.contains("WHERE _e0_0.\"order_id\" = _e0.\"id\" AND (_e0_0.\"qty\" = $"),
+            "{text}"
+        );
+        assert!(text.contains(" WHERE _t.\"id\" = $"), "{text}");
+        // Every value is a parameter: 10, 1, 5, 2 and 7.
+        assert_eq!(sql.params.len(), 5);
+    }
+
+    #[test]
+    fn bad_embedded_parameters_are_rejected() {
+        for q in [
+            [("select", "id,orders(id)"), ("orders.nope", "eq.1")], // unknown column
+            [("select", "id,orders(id)"), ("orders.select", "id")], // select belongs inside
+            [("select", "id,customers(id)"), ("customers.order", "id")], // single row
+            [("select", "id,customers(id)"), ("customers.limit", "1")],
+            [("select", "id,orders(id)"), ("orders.limit", "-1")],
+            [("select", "id,orders(id)"), ("orders.or", "(total.zz.1)")],
+        ] {
+            let table = if q[0].1.contains("customers") {
+                "orders"
+            } else {
+                "customers"
+            };
+            assert!(request_of(table, &q).is_err(), "{q:?}");
+        }
+        // Without the embed in select, the dotted key is not a column either.
+        assert!(request_of("customers", &[("orders.total", "gt.1")]).is_err());
+    }
+
+    #[test]
+    fn the_panel_parser_refuses_embeds() {
+        let catalog = shop();
+        let t = catalog.table("orders").unwrap();
+        assert!(parse_request(&pairs(&[("select", "customers(name)")]), t).is_err());
+    }
+}

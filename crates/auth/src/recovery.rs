@@ -6,24 +6,20 @@
 //! 2. `POST /auth/v1/verify {type: "recovery", token, password}`: changes the
 //!    password, ends the other sessions and returns a new session.
 
-use axum::{
-    Json,
-    extract::State,
-    http::{HeaderMap, StatusCode},
-};
+use axum::http::StatusCode;
 use nelcota_core::ApiError;
 use serde::Deserialize;
-use serde_json::{Value, json};
+use serde_json::Value;
 use sha2::{Digest, Sha256};
+use std::net::IpAddr;
 use uuid::Uuid;
 
 use crate::{
-    Email,
+    AuthState, Email,
     credentials::{normalize_email, validate_password},
-    handlers::{
-        AuthState, PeerAddr, begin_auth, client_ip, db_error, invalid, invalid_grant, ip_key,
-        limit, new_opaque_token, start_session, user_agent,
-    },
+    db::{begin_auth, db_error},
+    error::{invalid, invalid_grant},
+    sessions::{new_opaque_token, start_session},
 };
 
 /// Lifetime of the link.
@@ -60,26 +56,23 @@ pub(crate) fn recovery_email(to: &str, recovery_url: &str, token: &str) -> Email
     }
 }
 
-#[derive(Deserialize)]
-pub(crate) struct RecoverBody {
-    email: String,
+pub(crate) fn ensure_enabled(state: &AuthState) -> Result<(), ApiError> {
+    if state.mailer.is_none() || state.settings.recovery_url.is_none() {
+        return Err(disabled());
+    }
+    Ok(())
 }
 
-/// `POST /auth/v1/recover` `{email}` → 200 `{}`.
-pub(crate) async fn recover(
-    State(state): State<AuthState>,
-    PeerAddr(peer): PeerAddr,
-    headers: HeaderMap,
-    Json(body): Json<RecoverBody>,
-) -> Result<Json<Value>, ApiError> {
-    let (Some(mailer), Some(recovery_url)) =
-        (state.mailer.clone(), state.settings.recovery_url.clone())
-    else {
-        return Err(disabled());
-    };
-    let ip = client_ip(&state.settings, &headers, peer);
-    limit(&state, &format!("recover:{}", ip_key(ip)))?;
-    let email = normalize_email(&body.email).map_err(invalid)?;
+/// Issues a link after committing its token; delivery does not reveal accounts.
+pub(crate) async fn request(state: &AuthState, email: &str) -> Result<(), ApiError> {
+    ensure_enabled(state)?;
+    let mailer = state.mailer.clone().ok_or_else(disabled)?;
+    let recovery_url = state
+        .settings
+        .recovery_url
+        .as_deref()
+        .ok_or_else(disabled)?;
+    let email = normalize_email(email).map_err(invalid)?;
 
     let mut client = state.pool.get().await.map_err(ApiError::from_pool)?;
     let tx = begin_auth(&mut client).await?;
@@ -117,7 +110,7 @@ pub(crate) async fn recover(
             )
             .await
             .map_err(db_error)?;
-            outgoing = Some(recovery_email(&email, &recovery_url, &token));
+            outgoing = Some(recovery_email(&email, recovery_url, &token));
         }
     }
     tx.commit().await.map_err(db_error)?;
@@ -132,7 +125,7 @@ pub(crate) async fn recover(
             }
         });
     }
-    Ok(Json(json!({})))
+    Ok(())
 }
 
 #[derive(Deserialize)]
@@ -143,15 +136,13 @@ pub(crate) struct VerifyBody {
     password: String,
 }
 
-/// `POST /auth/v1/verify` `{type: "recovery", token, password}` → 200 + session.
-pub(crate) async fn verify(
-    State(state): State<AuthState>,
-    PeerAddr(peer): PeerAddr,
-    headers: HeaderMap,
-    Json(body): Json<VerifyBody>,
-) -> Result<Json<Value>, ApiError> {
-    let ip = client_ip(&state.settings, &headers, peer);
-    limit(&state, &format!("verify:{}", ip_key(ip)))?;
+/// Consumes a link and replaces the password and session atomically.
+pub(crate) async fn complete(
+    state: &AuthState,
+    body: VerifyBody,
+    ip: Option<IpAddr>,
+    agent: Option<&str>,
+) -> Result<Value, ApiError> {
     if body.kind != "recovery" {
         return Err(ApiError::new(
             StatusCode::BAD_REQUEST,
@@ -226,10 +217,10 @@ pub(crate) async fn verify(
     )
     .await
     .map_err(db_error)?;
-    let session = start_session(&state, &tx, user_id, ip, user_agent(&headers)).await?;
+    let session = start_session(state, &tx, user_id, ip, agent).await?;
     tx.commit().await.map_err(db_error)?;
     tracing::info!(user_id = %user_id, "password reset through the recovery link");
-    Ok(Json(session))
+    Ok(session)
 }
 
 #[cfg(test)]

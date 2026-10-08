@@ -5,12 +5,16 @@
 
 mod buckets;
 mod db;
+mod error;
 mod gc;
+pub mod http;
 mod mime;
-mod objects;
+mod operations;
 mod path;
 mod serve;
+mod signing;
 mod store;
+mod upload;
 
 use std::{sync::Arc, time::Duration};
 
@@ -25,8 +29,11 @@ use nelcota_core::Config;
 use tokio::sync::Semaphore;
 
 pub use buckets::mime_entry_ok;
+pub use db::Object as StoredObject;
 pub use gc::{collect as collect_orphans, spawn_collector};
+pub use operations::{ListedObject, ObjectListing};
 pub use store::{Store, StoreError};
+pub use upload::{UploadOptions, UploadOutcome, UploadStream, UploadedObject};
 
 /// Uploads streaming at once; more wait for a slot. Bounds the memory held
 /// in upload parts.
@@ -105,10 +112,10 @@ pub fn router(state: StorageState) -> Router {
     let uploads = Router::new()
         .route(
             "/storage/v1/object/{bucket}/{*name}",
-            get(objects::download)
-                .post(objects::create)
-                .put(objects::upsert)
-                .delete(objects::remove),
+            get(http::private_download)
+                .post(http::create)
+                .put(http::upsert)
+                .delete(http::remove),
         )
         .layer(DefaultBodyLimit::disable());
     Router::new()
@@ -122,14 +129,14 @@ pub fn router(state: StorageState) -> Router {
                 .put(buckets::update)
                 .delete(buckets::remove),
         )
-        .route("/storage/v1/object/list/{bucket}", post(objects::list))
+        .route("/storage/v1/object/list/{bucket}", post(http::list))
         .route(
             "/storage/v1/object/public/{bucket}/{*name}",
-            get(objects::public),
+            get(http::public),
         )
         .route(
             "/storage/v1/object/sign/{bucket}/{*name}",
-            get(objects::signed).post(objects::sign),
+            get(http::signed).post(http::sign),
         )
         .merge(uploads)
         .with_state(state)

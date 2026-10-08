@@ -9,6 +9,9 @@ const ptBR = {
   current: 'este painel',
   up: 'No ar',
   down: 'Fora do ar',
+  empty: 'Nenhum projeto encontrado',
+  emptyDescription: 'Crie um projeto com nelcota init e atualize esta lista.',
+  copyUrl: 'Copiar endereço de {name}',
   open: 'Abrir painel',
   newProject: {
     before: 'Novo projeto:',
@@ -26,6 +29,9 @@ const en: Messages<typeof ptBR> = {
   current: 'this panel',
   up: 'Up',
   down: 'Down',
+  empty: 'No projects found',
+  emptyDescription: 'Create a project with nelcota init and refresh this list.',
+  copyUrl: 'Copy address for {name}',
   open: 'Open panel',
   newProject: {
     before: 'New project:',

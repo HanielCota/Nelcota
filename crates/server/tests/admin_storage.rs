@@ -3,30 +3,10 @@
 
 mod common;
 
-use axum::http::{Method, StatusCode, header};
+use axum::http::{Method, StatusCode};
+use common::panel::{login, send};
 use common::*;
-use serde_json::{Value, json};
-
-const JSON: (&str, &str) = ("content-type", "application/json");
-
-async fn login(app: &TestApp) -> String {
-    let reply = app
-        .raw(
-            Method::POST,
-            "/admin/api/login",
-            &[JSON],
-            json!({ "email": ADMIN_EMAIL, "password": ADMIN_PASSWORD }).to_string(),
-        )
-        .await;
-    assert_eq!(reply.status, StatusCode::OK, "{}", reply.text);
-    let cookie = reply.headers[header::SET_COOKIE].to_str().unwrap();
-    cookie.split(';').next().unwrap().to_owned()
-}
-
-async fn send(app: &TestApp, method: Method, path: &str, cookie: &str, body: Value) -> Reply {
-    app.raw(method, path, &[("cookie", cookie), JSON], body.to_string())
-        .await
-}
+use serde_json::json;
 
 async fn upload(app: &TestApp, cookie: &str, bucket: &str, name: &str, body: &[u8]) -> Reply {
     app.raw(

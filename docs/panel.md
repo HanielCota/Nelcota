@@ -54,20 +54,22 @@ without policies) and red (table exposed without RLS).
 | Feature | How to use it |
 |---|---|
 | Edit a cell | double click; Enter saves, Esc cancels, NULL button for nulls |
-| Edit or insert a full row | pencil at the end of the row / "Insert row" (side panel) |
+| Edit or insert a full row | expand button next to the row's checkbox / "Insert row" (side panel). Closing an altered form asks whether to keep editing or discard |
 | Delete several rows | tick the boxes and "Delete N" (a single transaction) |
 | Sort | click the column header (asc → desc → unsorted) |
-| Filter | "Filter" in the grid: equals, not equal, contains, greater/less, is/is not NULL. Filters live in the URL in the REST API format (`/admin/tables/orders?status=eq.paid`): you can share the link and go back with the browser |
+| Filter | "Filter" in the grid: equals, not equal, contains, greater/less, is/is not NULL. Filters live in the URL in the REST API format (`/admin/tables/orders?status=eq.paid`). Page, page size and sort use `_page`, `_size`, `_sort` and `_desc`; the complete view survives switching between Data and Structure, refresh and browser navigation |
 | Export a table | "Export" → CSV or JSON, with the grid's order and filters. The server streams the read (no row limit, nothing loaded fully into memory); the CSV has a BOM so Excel recognizes accents |
 | Follow a foreign key | the arrow in an FK cell opens the referenced row in the other table; the header shows `→ table` |
 | Run SQL | Ctrl+Enter; table and column autocomplete; templates and history |
-| Save queries | Ctrl+S or "Save"; they show in the editor's sidebar and in the palette. Stored in the browser, per project |
+| Save queries | Ctrl+S or "Save"; they show in the editor's sidebar and in the palette. Each query has its own draft; opening another query, template or new query keeps previous work. Saved queries and drafts are stored in this browser, per project |
+| Read long values | "View full content" in long grid and SQL result cells; copy from the detail dialog |
+| Resize SQL results | drag the separator between the editor and results, or focus it and use the arrow keys. The split is remembered in the browser |
 | Export a SQL result | "Export" above each result → CSV or JSON |
 | Command palette | Ctrl+K (⌘K on Mac) or "Search…" in the top bar: pages, tables, saved queries, templates and actions |
 | Create a table | "New table" in the table list: columns (type, default, PK, identity, UNIQUE, foreign key), RLS on by default and a GRANTs matrix. Shows the SQL before creating |
 | Edit the structure | the table's **Structure** tab (`/admin/tables/<name>/structure`): add, edit and delete columns; rename the table; description; turn RLS on/off; GRANTs per role; delete the table (by typing its name) |
-| Policies | "New policy" on each table, with templates (public read, signed-in users read, owner reads/creates/updates/deletes); edit and delete; "Enable RLS" on tables without it |
-| service_role token | **API** page: issues a token with the chosen validity; shown once and never stored |
+| Policies | search tables and filter their RLS status; "New policy" on each table, with templates (public read, signed-in users read, owner reads/creates/updates/deletes); edit and delete; "Enable RLS" on tables without it. Long expressions expand on demand |
+| service_role token | **API** page, expandable token section after the examples: issues a token with the chosen validity; shown once and never stored |
 | Create a user / reset a password | **Users** page: "New user" and "Reset password…" in each user's menu, with a password generator. Same rules as public signup. The panel sends no invitations and login does not require email confirmation; end users can recover their own password by email when the project has SMTP configured ([schema-auth.md](schema-auth.md#password-recovery)) |
 | Generate migration | **Migrations** page: schema changes made in the panel (tables, columns, policies) that are not in any file yet, and the project's migrations (applied or only in the folder). "Generate migration" downloads `V<n>__<name>.sql` and registers it as applied in this database; the file goes into `migrations/` (see [deploy](deploy.md#changes-made-in-the-panel)) |
 | Profile photo | account menu, at the bottom of the sidebar: "Add photo…". The image is center-cropped and scaled to 256px in the browser; the server accepts PNG, JPEG or WebP up to 256 KB. It lives in the project's database (`nelcota.admin_avatar`, out of reach of the API roles), so it works in any browser, but it is per project |
@@ -79,10 +81,10 @@ without policies) and red (table exposed without RLS).
 | **Tables** | every table in the exposed schema, estimated rows, `anon`/`authenticated` GRANTs and RLS status. List, insert, edit and delete rows (tables with a primary key); create tables and edit the structure |
 | **SQL editor** | runs as the database owner (bypasses RLS); Ctrl+Enter runs; errors with code and position |
 | **Migrations** | panel changes not yet in a migration and the project's migrations, with "Generate migration" |
-| **Storage** | buckets with file count, size, limit and accepted types (create, edit, delete when empty); a file browser by folder: upload (asks before replacing), download, copy the public URL, delete. Files go through the same checks as the API ([storage.md](storage.md)) |
+| **Storage** | buckets with file count, size, limit and accepted types (create, edit, delete when empty); a file browser by folder: upload by selection or drop, per-file progress (asks before replacing), preview, download, copy the public URL, delete. Passive image formats and PDFs up to 20 MB can be previewed; plain text, CSV and JSON up to 1 MB. PDFs open in the browser viewer. Files go through the same checks as the API ([storage.md](storage.md)) |
 | **Users** | search by email, last sign-in, active sessions; create a user, reset a password (ends their sessions), end sessions or delete a user |
 | **Policies** | each table's policies (`USING`/`WITH CHECK`): create, edit and delete; tables without RLS; functions `anon` can execute |
-| **API** | project address, how each role calls the API, curl and JavaScript examples generated from each table's columns, service_role token |
+| **API** | section navigation, project address, how each role calls the API, curl and JavaScript examples generated from each table's columns, service_role token. Topic, language and table are shareable through the URL |
 
 ## RLS warnings
 

@@ -7,7 +7,7 @@
 // Portuguese one, so a missing or extra key is a type error.
 
 import { ApiError } from '../api'
-import { readText, write } from '../storage'
+import { readText, write } from '../local-storage'
 import common from './messages/common'
 import shell from './messages/shell'
 import login from './messages/login'

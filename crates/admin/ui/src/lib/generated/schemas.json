@@ -1,0 +1,3661 @@
+{
+  "AlterAction": {
+    "$defs": {
+      "ApiRole": {
+        "description": "API roles the panel lets you configure in GRANTs and policies.",
+        "enum": [
+          "anon",
+          "authenticated",
+          "service_role"
+        ],
+        "type": "string"
+      },
+      "ColumnDef": {
+        "properties": {
+          "comment": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data_type": {
+            "type": "string"
+          },
+          "default": {
+            "description": "SQL expression (`now()`, `0`, `'draft'`).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "identity": {
+            "default": false,
+            "description": "`GENERATED ALWAYS AS IDENTITY` (integer types only).",
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "nullable": {
+            "default": true,
+            "type": "boolean"
+          },
+          "primary_key": {
+            "default": false,
+            "type": "boolean"
+          },
+          "references": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/ReferenceDef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "unique": {
+            "default": false,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "data_type",
+          "nullable",
+          "default",
+          "primary_key",
+          "identity",
+          "unique",
+          "references",
+          "comment"
+        ],
+        "type": "object"
+      },
+      "GrantDef": {
+        "properties": {
+          "privileges": {
+            "items": {
+              "$ref": "#/$defs/Privilege"
+            },
+            "type": "array"
+          },
+          "role": {
+            "$ref": "#/$defs/ApiRole"
+          }
+        },
+        "required": [
+          "role",
+          "privileges"
+        ],
+        "type": "object"
+      },
+      "OnDelete": {
+        "enum": [
+          "no_action",
+          "restrict",
+          "cascade",
+          "set_null",
+          "set_default"
+        ],
+        "type": "string"
+      },
+      "Privilege": {
+        "enum": [
+          "select",
+          "insert",
+          "update",
+          "delete"
+        ],
+        "type": "string"
+      },
+      "ReferenceDef": {
+        "properties": {
+          "column": {
+            "type": "string"
+          },
+          "on_delete": {
+            "$ref": "#/$defs/OnDelete"
+          },
+          "table": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "table",
+          "column",
+          "on_delete"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "One change. The whole list runs in one transaction, in the order sent.",
+    "oneOf": [
+      {
+        "properties": {
+          "action": {
+            "const": "rename_table",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "action",
+          "name"
+        ],
+        "type": "object"
+      },
+      {
+        "properties": {
+          "action": {
+            "const": "set_comment",
+            "type": "string"
+          },
+          "comment": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "action",
+          "comment"
+        ],
+        "type": "object"
+      },
+      {
+        "properties": {
+          "action": {
+            "const": "set_rls",
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "action",
+          "enabled"
+        ],
+        "type": "object"
+      },
+      {
+        "properties": {
+          "action": {
+            "const": "add_column",
+            "type": "string"
+          },
+          "column": {
+            "$ref": "#/$defs/ColumnDef"
+          }
+        },
+        "required": [
+          "action",
+          "column"
+        ],
+        "type": "object"
+      },
+      {
+        "properties": {
+          "action": {
+            "const": "drop_column",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "action",
+          "name"
+        ],
+        "type": "object"
+      },
+      {
+        "properties": {
+          "action": {
+            "const": "rename_column",
+            "type": "string"
+          },
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "action",
+          "from",
+          "to"
+        ],
+        "type": "object"
+      },
+      {
+        "description": "`using`: conversion expression; default `\"column\"::new_type`.",
+        "properties": {
+          "action": {
+            "const": "set_type",
+            "type": "string"
+          },
+          "column": {
+            "type": "string"
+          },
+          "data_type": {
+            "type": "string"
+          },
+          "using": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "action",
+          "column",
+          "data_type",
+          "using"
+        ],
+        "type": "object"
+      },
+      {
+        "properties": {
+          "action": {
+            "const": "set_nullable",
+            "type": "string"
+          },
+          "column": {
+            "type": "string"
+          },
+          "nullable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "action",
+          "column",
+          "nullable"
+        ],
+        "type": "object"
+      },
+      {
+        "properties": {
+          "action": {
+            "const": "set_default",
+            "type": "string"
+          },
+          "column": {
+            "type": "string"
+          },
+          "default": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "action",
+          "column",
+          "default"
+        ],
+        "type": "object"
+      },
+      {
+        "properties": {
+          "action": {
+            "const": "set_unique",
+            "type": "string"
+          },
+          "column": {
+            "type": "string"
+          },
+          "unique": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "action",
+          "column",
+          "unique"
+        ],
+        "type": "object"
+      },
+      {
+        "properties": {
+          "action": {
+            "const": "set_reference",
+            "type": "string"
+          },
+          "column": {
+            "type": "string"
+          },
+          "reference": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/ReferenceDef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "action",
+          "column",
+          "reference"
+        ],
+        "type": "object"
+      },
+      {
+        "properties": {
+          "action": {
+            "const": "set_column_comment",
+            "type": "string"
+          },
+          "column": {
+            "type": "string"
+          },
+          "comment": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "action",
+          "column",
+          "comment"
+        ],
+        "type": "object"
+      },
+      {
+        "description": "Replaces the role's privileges on the table.",
+        "properties": {
+          "action": {
+            "const": "set_grants",
+            "type": "string"
+          },
+          "grant": {
+            "$ref": "#/$defs/GrantDef"
+          }
+        },
+        "required": [
+          "action",
+          "grant"
+        ],
+        "type": "object"
+      }
+    ],
+    "title": "AlterAction"
+  },
+  "ApiRole": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "API roles the panel lets you configure in GRANTs and policies.",
+    "enum": [
+      "anon",
+      "authenticated",
+      "service_role"
+    ],
+    "title": "ApiRole",
+    "type": "string"
+  },
+  "Bucket": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "allowed_mime_types": {
+        "items": {
+          "type": "string"
+        },
+        "type": [
+          "array",
+          "null"
+        ]
+      },
+      "bytes": {
+        "format": "int64",
+        "type": "integer"
+      },
+      "created_at": {
+        "type": "string"
+      },
+      "file_size_limit": {
+        "format": "int64",
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "files": {
+        "format": "int64",
+        "type": "integer"
+      },
+      "id": {
+        "type": "string"
+      },
+      "public": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "id",
+      "public",
+      "file_size_limit",
+      "allowed_mime_types",
+      "created_at",
+      "files",
+      "bytes"
+    ],
+    "title": "Bucket",
+    "type": "object"
+  },
+  "Column": {
+    "$defs": {
+      "ColumnReference": {
+        "properties": {
+          "column": {
+            "type": "string"
+          },
+          "table": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "table",
+          "column"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "category": {
+        "type": "string"
+      },
+      "comment": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "enum_values": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "full_type": {
+        "type": "string"
+      },
+      "generated": {
+        "type": "boolean"
+      },
+      "has_default": {
+        "type": "boolean"
+      },
+      "is_pk": {
+        "type": "boolean"
+      },
+      "name": {
+        "type": "string"
+      },
+      "nullable": {
+        "type": "boolean"
+      },
+      "references": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/ColumnReference"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "type": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "name",
+      "type",
+      "full_type",
+      "category",
+      "nullable",
+      "has_default",
+      "generated",
+      "enum_values",
+      "is_pk",
+      "comment",
+      "references"
+    ],
+    "title": "Column",
+    "type": "object"
+  },
+  "ColumnDef": {
+    "$defs": {
+      "OnDelete": {
+        "enum": [
+          "no_action",
+          "restrict",
+          "cascade",
+          "set_null",
+          "set_default"
+        ],
+        "type": "string"
+      },
+      "ReferenceDef": {
+        "properties": {
+          "column": {
+            "type": "string"
+          },
+          "on_delete": {
+            "$ref": "#/$defs/OnDelete"
+          },
+          "table": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "table",
+          "column",
+          "on_delete"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "comment": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "data_type": {
+        "type": "string"
+      },
+      "default": {
+        "description": "SQL expression (`now()`, `0`, `'draft'`).",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "identity": {
+        "default": false,
+        "description": "`GENERATED ALWAYS AS IDENTITY` (integer types only).",
+        "type": "boolean"
+      },
+      "name": {
+        "type": "string"
+      },
+      "nullable": {
+        "default": true,
+        "type": "boolean"
+      },
+      "primary_key": {
+        "default": false,
+        "type": "boolean"
+      },
+      "references": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/ReferenceDef"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "unique": {
+        "default": false,
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "name",
+      "data_type",
+      "nullable",
+      "default",
+      "primary_key",
+      "identity",
+      "unique",
+      "references",
+      "comment"
+    ],
+    "title": "ColumnDef",
+    "type": "object"
+  },
+  "ColumnInfo": {
+    "$defs": {
+      "ForeignKeyRef": {
+        "properties": {
+          "column": {
+            "type": "string"
+          },
+          "constraint": {
+            "type": "string"
+          },
+          "on_delete": {
+            "description": "`no action`, `restrict`, `cascade`, `set null` or `set default`.",
+            "type": "string"
+          },
+          "table": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "table",
+          "column",
+          "on_delete",
+          "constraint"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "comment": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "data_type": {
+        "description": "Type as Postgres writes it (`character varying(80)`, `integer[]`).",
+        "type": "string"
+      },
+      "default": {
+        "description": "DEFAULT (or generated column) expression, as in `pg_get_expr`.",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "generated": {
+        "type": "boolean"
+      },
+      "identity": {
+        "description": "`always`, `by default` or `None` (not an identity column).",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "name": {
+        "type": "string"
+      },
+      "nullable": {
+        "type": "boolean"
+      },
+      "primary_key": {
+        "type": "boolean"
+      },
+      "references": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/ForeignKeyRef"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "unique": {
+        "description": "Name of the single-column UNIQUE constraint, if any.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "required": [
+      "name",
+      "data_type",
+      "nullable",
+      "default",
+      "identity",
+      "generated",
+      "primary_key",
+      "unique",
+      "references",
+      "comment"
+    ],
+    "title": "ColumnInfo",
+    "type": "object"
+  },
+  "ColumnReference": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "column": {
+        "type": "string"
+      },
+      "table": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "table",
+      "column"
+    ],
+    "title": "ColumnReference",
+    "type": "object"
+  },
+  "Command": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "enum": [
+      "all",
+      "select",
+      "insert",
+      "update",
+      "delete"
+    ],
+    "title": "Command",
+    "type": "string"
+  },
+  "Counts": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "functions": {
+        "format": "uint",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "policies": {
+        "format": "uint",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "tables": {
+        "format": "uint",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "users": {
+        "format": "int64",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "tables",
+      "users",
+      "policies",
+      "functions"
+    ],
+    "title": "Counts",
+    "type": "object"
+  },
+  "CreateTable": {
+    "$defs": {
+      "ApiRole": {
+        "description": "API roles the panel lets you configure in GRANTs and policies.",
+        "enum": [
+          "anon",
+          "authenticated",
+          "service_role"
+        ],
+        "type": "string"
+      },
+      "ColumnDef": {
+        "properties": {
+          "comment": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data_type": {
+            "type": "string"
+          },
+          "default": {
+            "description": "SQL expression (`now()`, `0`, `'draft'`).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "identity": {
+            "default": false,
+            "description": "`GENERATED ALWAYS AS IDENTITY` (integer types only).",
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "nullable": {
+            "default": true,
+            "type": "boolean"
+          },
+          "primary_key": {
+            "default": false,
+            "type": "boolean"
+          },
+          "references": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/ReferenceDef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "unique": {
+            "default": false,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "data_type",
+          "nullable",
+          "default",
+          "primary_key",
+          "identity",
+          "unique",
+          "references",
+          "comment"
+        ],
+        "type": "object"
+      },
+      "GrantDef": {
+        "properties": {
+          "privileges": {
+            "items": {
+              "$ref": "#/$defs/Privilege"
+            },
+            "type": "array"
+          },
+          "role": {
+            "$ref": "#/$defs/ApiRole"
+          }
+        },
+        "required": [
+          "role",
+          "privileges"
+        ],
+        "type": "object"
+      },
+      "OnDelete": {
+        "enum": [
+          "no_action",
+          "restrict",
+          "cascade",
+          "set_null",
+          "set_default"
+        ],
+        "type": "string"
+      },
+      "Privilege": {
+        "enum": [
+          "select",
+          "insert",
+          "update",
+          "delete"
+        ],
+        "type": "string"
+      },
+      "ReferenceDef": {
+        "properties": {
+          "column": {
+            "type": "string"
+          },
+          "on_delete": {
+            "$ref": "#/$defs/OnDelete"
+          },
+          "table": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "table",
+          "column",
+          "on_delete"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "columns": {
+        "items": {
+          "$ref": "#/$defs/ColumnDef"
+        },
+        "type": "array"
+      },
+      "comment": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "grants": {
+        "items": {
+          "$ref": "#/$defs/GrantDef"
+        },
+        "type": "array"
+      },
+      "name": {
+        "type": "string"
+      },
+      "rls": {
+        "default": true,
+        "description": "RLS on from creation (the default): without policies, only service_role gets in.",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "name",
+      "comment",
+      "columns",
+      "rls",
+      "grants"
+    ],
+    "title": "CreateTable",
+    "type": "object"
+  },
+  "DdlResult": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "applied": {
+        "type": "boolean"
+      },
+      "catalog_pending": {
+        "type": "boolean"
+      },
+      "message": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "sql": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "sql",
+      "applied",
+      "catalog_pending"
+    ],
+    "title": "DdlResult",
+    "type": "object"
+  },
+  "ExportedMigration": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "filename": {
+        "type": "string"
+      },
+      "message": {
+        "type": "string"
+      },
+      "sql": {
+        "type": "string"
+      },
+      "version": {
+        "format": "int64",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "version",
+      "filename",
+      "sql",
+      "message"
+    ],
+    "title": "ExportedMigration",
+    "type": "object"
+  },
+  "ForeignKeyRef": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "column": {
+        "type": "string"
+      },
+      "constraint": {
+        "type": "string"
+      },
+      "on_delete": {
+        "description": "`no action`, `restrict`, `cascade`, `set null` or `set default`.",
+        "type": "string"
+      },
+      "table": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "table",
+      "column",
+      "on_delete",
+      "constraint"
+    ],
+    "title": "ForeignKeyRef",
+    "type": "object"
+  },
+  "Grant": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "privileges": {
+        "description": "Subset of `select`, `insert`, `update`, `delete`.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "role": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "role",
+      "privileges"
+    ],
+    "title": "Grant",
+    "type": "object"
+  },
+  "GrantDef": {
+    "$defs": {
+      "ApiRole": {
+        "description": "API roles the panel lets you configure in GRANTs and policies.",
+        "enum": [
+          "anon",
+          "authenticated",
+          "service_role"
+        ],
+        "type": "string"
+      },
+      "Privilege": {
+        "enum": [
+          "select",
+          "insert",
+          "update",
+          "delete"
+        ],
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "privileges": {
+        "items": {
+          "$ref": "#/$defs/Privilege"
+        },
+        "type": "array"
+      },
+      "role": {
+        "$ref": "#/$defs/ApiRole"
+      }
+    },
+    "required": [
+      "role",
+      "privileges"
+    ],
+    "title": "GrantDef",
+    "type": "object"
+  },
+  "Grants": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "anon": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "authenticated": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "anon",
+      "authenticated"
+    ],
+    "title": "Grants",
+    "type": "object"
+  },
+  "Migration": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "applied_on": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "from_panel": {
+        "type": "boolean"
+      },
+      "in_folder": {
+        "type": [
+          "boolean",
+          "null"
+        ]
+      },
+      "name": {
+        "type": "string"
+      },
+      "version": {
+        "format": "int64",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "version",
+      "name",
+      "applied_on",
+      "in_folder",
+      "from_panel"
+    ],
+    "title": "Migration",
+    "type": "object"
+  },
+  "MigrationsData": {
+    "$defs": {
+      "Migration": {
+        "properties": {
+          "applied_on": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "from_panel": {
+            "type": "boolean"
+          },
+          "in_folder": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "version": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "name",
+          "applied_on",
+          "in_folder",
+          "from_panel"
+        ],
+        "type": "object"
+      },
+      "PendingChange": {
+        "properties": {
+          "applied_at": {
+            "type": "string"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "kind": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "statements": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "target": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "applied_at",
+          "summary",
+          "statements",
+          "kind",
+          "target"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "folder": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "migrations": {
+        "items": {
+          "$ref": "#/$defs/Migration"
+        },
+        "type": "array"
+      },
+      "next_version": {
+        "format": "int64",
+        "type": "integer"
+      },
+      "pending": {
+        "items": {
+          "$ref": "#/$defs/PendingChange"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "migrations",
+      "pending",
+      "next_version",
+      "folder"
+    ],
+    "title": "MigrationsData",
+    "type": "object"
+  },
+  "OnDelete": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "enum": [
+      "no_action",
+      "restrict",
+      "cascade",
+      "set_null",
+      "set_default"
+    ],
+    "title": "OnDelete",
+    "type": "string"
+  },
+  "Overview": {
+    "$defs": {
+      "Counts": {
+        "properties": {
+          "functions": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "policies": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "tables": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "users": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "tables",
+          "users",
+          "policies",
+          "functions"
+        ],
+        "type": "object"
+      },
+      "Grants": {
+        "properties": {
+          "anon": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "authenticated": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "anon",
+          "authenticated"
+        ],
+        "type": "object"
+      },
+      "OverviewTable": {
+        "properties": {
+          "comment": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "grants": {
+            "$ref": "#/$defs/Grants"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "rls": {
+            "$ref": "#/$defs/Rls"
+          },
+          "rows": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "rows_exact": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "kind",
+          "comment",
+          "rows",
+          "rows_exact",
+          "rls",
+          "grants"
+        ],
+        "type": "object"
+      },
+      "Rls": {
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "forced": {
+            "type": "boolean"
+          },
+          "label": {
+            "type": "string"
+          },
+          "policies": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "state": {
+            "$ref": "#/$defs/RlsState"
+          }
+        },
+        "required": [
+          "state",
+          "label",
+          "enabled",
+          "forced",
+          "policies"
+        ],
+        "type": "object"
+      },
+      "RlsState": {
+        "enum": [
+          "ok",
+          "warn",
+          "danger",
+          "none",
+          "view"
+        ],
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "counts": {
+        "$ref": "#/$defs/Counts"
+      },
+      "exposed_without_rls": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "schema": {
+        "type": "string"
+      },
+      "tables": {
+        "items": {
+          "$ref": "#/$defs/OverviewTable"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "schema",
+      "counts",
+      "exposed_without_rls",
+      "tables"
+    ],
+    "title": "Overview",
+    "type": "object"
+  },
+  "OverviewTable": {
+    "$defs": {
+      "Grants": {
+        "properties": {
+          "anon": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "authenticated": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "anon",
+          "authenticated"
+        ],
+        "type": "object"
+      },
+      "Rls": {
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "forced": {
+            "type": "boolean"
+          },
+          "label": {
+            "type": "string"
+          },
+          "policies": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "state": {
+            "$ref": "#/$defs/RlsState"
+          }
+        },
+        "required": [
+          "state",
+          "label",
+          "enabled",
+          "forced",
+          "policies"
+        ],
+        "type": "object"
+      },
+      "RlsState": {
+        "enum": [
+          "ok",
+          "warn",
+          "danger",
+          "none",
+          "view"
+        ],
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "comment": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "grants": {
+        "$ref": "#/$defs/Grants"
+      },
+      "kind": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "rls": {
+        "$ref": "#/$defs/Rls"
+      },
+      "rows": {
+        "format": "int64",
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "rows_exact": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "name",
+      "kind",
+      "comment",
+      "rows",
+      "rows_exact",
+      "rls",
+      "grants"
+    ],
+    "title": "OverviewTable",
+    "type": "object"
+  },
+  "PendingChange": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "applied_at": {
+        "type": "string"
+      },
+      "id": {
+        "format": "int64",
+        "type": "integer"
+      },
+      "kind": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "statements": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "summary": {
+        "type": "string"
+      },
+      "target": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "required": [
+      "id",
+      "applied_at",
+      "summary",
+      "statements",
+      "kind",
+      "target"
+    ],
+    "title": "PendingChange",
+    "type": "object"
+  },
+  "PoliciesData": {
+    "$defs": {
+      "Policy": {
+        "properties": {
+          "check": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "command": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "permissive": {
+            "type": "boolean"
+          },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "using": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "permissive",
+          "roles",
+          "command",
+          "using",
+          "check"
+        ],
+        "type": "object"
+      },
+      "PolicyTable": {
+        "properties": {
+          "exposed_without_rls": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "policies": {
+            "items": {
+              "$ref": "#/$defs/Policy"
+            },
+            "type": "array"
+          },
+          "rls": {
+            "$ref": "#/$defs/Rls"
+          }
+        },
+        "required": [
+          "name",
+          "rls",
+          "exposed_without_rls",
+          "policies"
+        ],
+        "type": "object"
+      },
+      "Rls": {
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "forced": {
+            "type": "boolean"
+          },
+          "label": {
+            "type": "string"
+          },
+          "policies": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "state": {
+            "$ref": "#/$defs/RlsState"
+          }
+        },
+        "required": [
+          "state",
+          "label",
+          "enabled",
+          "forced",
+          "policies"
+        ],
+        "type": "object"
+      },
+      "RlsState": {
+        "enum": [
+          "ok",
+          "warn",
+          "danger",
+          "none",
+          "view"
+        ],
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "anon_functions": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "exposed_without_rls": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "schema": {
+        "type": "string"
+      },
+      "tables": {
+        "items": {
+          "$ref": "#/$defs/PolicyTable"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "schema",
+      "exposed_without_rls",
+      "tables",
+      "anon_functions"
+    ],
+    "title": "PoliciesData",
+    "type": "object"
+  },
+  "Policy": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "check": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "command": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "permissive": {
+        "type": "boolean"
+      },
+      "roles": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "using": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "required": [
+      "name",
+      "permissive",
+      "roles",
+      "command",
+      "using",
+      "check"
+    ],
+    "title": "Policy",
+    "type": "object"
+  },
+  "PolicyDef": {
+    "$defs": {
+      "Command": {
+        "enum": [
+          "all",
+          "select",
+          "insert",
+          "update",
+          "delete"
+        ],
+        "type": "string"
+      },
+      "PolicyRole": {
+        "description": "`public` = every role.",
+        "enum": [
+          "public",
+          "anon",
+          "authenticated",
+          "service_role"
+        ],
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "check": {
+        "description": "Which new/changed rows are accepted.",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "command": {
+        "$ref": "#/$defs/Command"
+      },
+      "name": {
+        "type": "string"
+      },
+      "permissive": {
+        "default": true,
+        "type": "boolean"
+      },
+      "roles": {
+        "description": "Empty = `PUBLIC`.",
+        "items": {
+          "$ref": "#/$defs/PolicyRole"
+        },
+        "type": "array"
+      },
+      "using": {
+        "description": "Which existing rows the role sees/changes.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "required": [
+      "name",
+      "command",
+      "roles",
+      "permissive",
+      "using",
+      "check"
+    ],
+    "title": "PolicyDef",
+    "type": "object"
+  },
+  "PolicyRole": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "`public` = every role.",
+    "enum": [
+      "public",
+      "anon",
+      "authenticated",
+      "service_role"
+    ],
+    "title": "PolicyRole",
+    "type": "string"
+  },
+  "PolicyTable": {
+    "$defs": {
+      "Policy": {
+        "properties": {
+          "check": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "command": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "permissive": {
+            "type": "boolean"
+          },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "using": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "permissive",
+          "roles",
+          "command",
+          "using",
+          "check"
+        ],
+        "type": "object"
+      },
+      "Rls": {
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "forced": {
+            "type": "boolean"
+          },
+          "label": {
+            "type": "string"
+          },
+          "policies": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "state": {
+            "$ref": "#/$defs/RlsState"
+          }
+        },
+        "required": [
+          "state",
+          "label",
+          "enabled",
+          "forced",
+          "policies"
+        ],
+        "type": "object"
+      },
+      "RlsState": {
+        "enum": [
+          "ok",
+          "warn",
+          "danger",
+          "none",
+          "view"
+        ],
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "exposed_without_rls": {
+        "type": "boolean"
+      },
+      "name": {
+        "type": "string"
+      },
+      "policies": {
+        "items": {
+          "$ref": "#/$defs/Policy"
+        },
+        "type": "array"
+      },
+      "rls": {
+        "$ref": "#/$defs/Rls"
+      }
+    },
+    "required": [
+      "name",
+      "rls",
+      "exposed_without_rls",
+      "policies"
+    ],
+    "title": "PolicyTable",
+    "type": "object"
+  },
+  "Privilege": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "enum": [
+      "select",
+      "insert",
+      "update",
+      "delete"
+    ],
+    "title": "Privilege",
+    "type": "string"
+  },
+  "ProjectLink": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "current": {
+        "type": "boolean"
+      },
+      "name": {
+        "type": "string"
+      },
+      "url": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "required": [
+      "name",
+      "url",
+      "current"
+    ],
+    "title": "ProjectLink",
+    "type": "object"
+  },
+  "ProjectStatus": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "current": {
+        "type": "boolean"
+      },
+      "healthy": {
+        "type": "boolean"
+      },
+      "latency_ms": {
+        "format": "uint64",
+        "minimum": 0,
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "name": {
+        "type": "string"
+      },
+      "url": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "version": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "required": [
+      "name",
+      "url",
+      "current",
+      "healthy",
+      "version",
+      "latency_ms"
+    ],
+    "title": "ProjectStatus",
+    "type": "object"
+  },
+  "ProjectsData": {
+    "$defs": {
+      "ProjectLink": {
+        "properties": {
+          "current": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "url",
+          "current"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "current": {
+        "type": "string"
+      },
+      "projects": {
+        "items": {
+          "$ref": "#/$defs/ProjectLink"
+        },
+        "type": "array"
+      },
+      "sso": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "current",
+      "sso",
+      "projects"
+    ],
+    "title": "ProjectsData",
+    "type": "object"
+  },
+  "ProjectsStatusData": {
+    "$defs": {
+      "ProjectStatus": {
+        "properties": {
+          "current": {
+            "type": "boolean"
+          },
+          "healthy": {
+            "type": "boolean"
+          },
+          "latency_ms": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "version": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "url",
+          "current",
+          "healthy",
+          "version",
+          "latency_ms"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "current": {
+        "type": "string"
+      },
+      "projects": {
+        "items": {
+          "$ref": "#/$defs/ProjectStatus"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "current",
+      "projects"
+    ],
+    "title": "ProjectsStatusData",
+    "type": "object"
+  },
+  "ReferenceDef": {
+    "$defs": {
+      "OnDelete": {
+        "enum": [
+          "no_action",
+          "restrict",
+          "cascade",
+          "set_null",
+          "set_default"
+        ],
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "column": {
+        "type": "string"
+      },
+      "on_delete": {
+        "$ref": "#/$defs/OnDelete"
+      },
+      "table": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "table",
+      "column",
+      "on_delete"
+    ],
+    "title": "ReferenceDef",
+    "type": "object"
+  },
+  "Rls": {
+    "$defs": {
+      "RlsState": {
+        "enum": [
+          "ok",
+          "warn",
+          "danger",
+          "none",
+          "view"
+        ],
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "enabled": {
+        "type": "boolean"
+      },
+      "forced": {
+        "type": "boolean"
+      },
+      "label": {
+        "type": "string"
+      },
+      "policies": {
+        "format": "uint",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "state": {
+        "$ref": "#/$defs/RlsState"
+      }
+    },
+    "required": [
+      "state",
+      "label",
+      "enabled",
+      "forced",
+      "policies"
+    ],
+    "title": "Rls",
+    "type": "object"
+  },
+  "RlsState": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "enum": [
+      "ok",
+      "warn",
+      "danger",
+      "none",
+      "view"
+    ],
+    "title": "RlsState",
+    "type": "string"
+  },
+  "SchemaResponse": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "schema": {
+        "type": "string"
+      },
+      "tables": {
+        "additionalProperties": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "type": "object"
+      }
+    },
+    "required": [
+      "schema",
+      "tables"
+    ],
+    "title": "SchemaResponse",
+    "type": "object"
+  },
+  "SqlError": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "code": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "detail": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "hint": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "message": {
+        "type": "string"
+      },
+      "position": {
+        "format": "uint32",
+        "minimum": 0,
+        "type": [
+          "integer",
+          "null"
+        ]
+      }
+    },
+    "required": [
+      "message",
+      "code",
+      "detail",
+      "hint",
+      "position"
+    ],
+    "title": "SqlError",
+    "type": "object"
+  },
+  "SqlResponse": {
+    "$defs": {
+      "SqlError": {
+        "properties": {
+          "code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hint": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "position": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "message",
+          "code",
+          "detail",
+          "hint",
+          "position"
+        ],
+        "type": "object"
+      },
+      "SqlResult": {
+        "properties": {
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "count": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "rows": {
+            "items": {
+              "items": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "type": "array"
+            },
+            "type": "array"
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "columns",
+          "rows",
+          "count",
+          "truncated"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "anyOf": [
+      {
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/$defs/SqlResult"
+            },
+            "type": "array"
+          },
+          "results_truncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "results",
+          "results_truncated"
+        ],
+        "type": "object"
+      },
+      {
+        "properties": {
+          "error": {
+            "$ref": "#/$defs/SqlError"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "type": "object"
+      }
+    ],
+    "title": "SqlResponse"
+  },
+  "SqlResult": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "columns": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "count": {
+        "format": "uint64",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "rows": {
+        "items": {
+          "items": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "type": "array"
+        },
+        "type": "array"
+      },
+      "truncated": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "columns",
+      "rows",
+      "count",
+      "truncated"
+    ],
+    "title": "SqlResult",
+    "type": "object"
+  },
+  "StorageBackend": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "enum": [
+      "disk",
+      "s3"
+    ],
+    "title": "StorageBackend",
+    "type": "string"
+  },
+  "StorageEnabled": {
+    "$defs": {
+      "Bucket": {
+        "properties": {
+          "allowed_mime_types": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "bytes": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "file_size_limit": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "files": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          },
+          "public": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "public",
+          "file_size_limit",
+          "allowed_mime_types",
+          "created_at",
+          "files",
+          "bytes"
+        ],
+        "type": "object"
+      },
+      "StorageBackend": {
+        "enum": [
+          "disk",
+          "s3"
+        ],
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "backend": {
+        "$ref": "#/$defs/StorageBackend"
+      },
+      "buckets": {
+        "items": {
+          "$ref": "#/$defs/Bucket"
+        },
+        "type": "array"
+      },
+      "enabled": {
+        "const": true,
+        "type": "boolean"
+      },
+      "max_file_size": {
+        "format": "uint64",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "max_total_size": {
+        "format": "uint64",
+        "minimum": 0,
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "public_url": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "required": [
+      "enabled",
+      "backend",
+      "max_file_size",
+      "max_total_size",
+      "public_url",
+      "buckets"
+    ],
+    "title": "StorageEnabled",
+    "type": "object"
+  },
+  "StorageListing": {
+    "$defs": {
+      "StoredFile": {
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "mime_type": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "owner": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "size": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "size",
+          "mime_type",
+          "owner",
+          "updated_at"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "folders": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "has_next": {
+        "type": "boolean"
+      },
+      "objects": {
+        "items": {
+          "$ref": "#/$defs/StoredFile"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "folders",
+      "objects",
+      "has_next"
+    ],
+    "title": "StorageListing",
+    "type": "object"
+  },
+  "StorageOverview": {
+    "$defs": {
+      "Bucket": {
+        "properties": {
+          "allowed_mime_types": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "bytes": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "file_size_limit": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "files": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          },
+          "public": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "public",
+          "file_size_limit",
+          "allowed_mime_types",
+          "created_at",
+          "files",
+          "bytes"
+        ],
+        "type": "object"
+      },
+      "StorageBackend": {
+        "enum": [
+          "disk",
+          "s3"
+        ],
+        "type": "string"
+      },
+      "StorageEnabled": {
+        "properties": {
+          "backend": {
+            "$ref": "#/$defs/StorageBackend"
+          },
+          "buckets": {
+            "items": {
+              "$ref": "#/$defs/Bucket"
+            },
+            "type": "array"
+          },
+          "enabled": {
+            "const": true,
+            "type": "boolean"
+          },
+          "max_file_size": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "max_total_size": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "public_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "enabled",
+          "backend",
+          "max_file_size",
+          "max_total_size",
+          "public_url",
+          "buckets"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "anyOf": [
+      {
+        "$ref": "#/$defs/StorageEnabled"
+      },
+      {
+        "properties": {
+          "enabled": {
+            "const": false,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "type": "object"
+      }
+    ],
+    "title": "StorageOverview"
+  },
+  "StoredFile": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "mime_type": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "owner": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "size": {
+        "format": "uint64",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "updated_at": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "name",
+      "size",
+      "mime_type",
+      "owner",
+      "updated_at"
+    ],
+    "title": "StoredFile",
+    "type": "object"
+  },
+  "Structure": {
+    "$defs": {
+      "ColumnInfo": {
+        "properties": {
+          "comment": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data_type": {
+            "description": "Type as Postgres writes it (`character varying(80)`, `integer[]`).",
+            "type": "string"
+          },
+          "default": {
+            "description": "DEFAULT (or generated column) expression, as in `pg_get_expr`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "generated": {
+            "type": "boolean"
+          },
+          "identity": {
+            "description": "`always`, `by default` or `None` (not an identity column).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "nullable": {
+            "type": "boolean"
+          },
+          "primary_key": {
+            "type": "boolean"
+          },
+          "references": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/ForeignKeyRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "unique": {
+            "description": "Name of the single-column UNIQUE constraint, if any.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "data_type",
+          "nullable",
+          "default",
+          "identity",
+          "generated",
+          "primary_key",
+          "unique",
+          "references",
+          "comment"
+        ],
+        "type": "object"
+      },
+      "ForeignKeyRef": {
+        "properties": {
+          "column": {
+            "type": "string"
+          },
+          "constraint": {
+            "type": "string"
+          },
+          "on_delete": {
+            "description": "`no action`, `restrict`, `cascade`, `set null` or `set default`.",
+            "type": "string"
+          },
+          "table": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "table",
+          "column",
+          "on_delete",
+          "constraint"
+        ],
+        "type": "object"
+      },
+      "Grant": {
+        "properties": {
+          "privileges": {
+            "description": "Subset of `select`, `insert`, `update`, `delete`.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "role": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "role",
+          "privileges"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "columns": {
+        "items": {
+          "$ref": "#/$defs/ColumnInfo"
+        },
+        "type": "array"
+      },
+      "comment": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "grants": {
+        "items": {
+          "$ref": "#/$defs/Grant"
+        },
+        "type": "array"
+      },
+      "name": {
+        "type": "string"
+      },
+      "primary_key": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "primary_key_constraint": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "rls_enabled": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "name",
+      "comment",
+      "rls_enabled",
+      "primary_key",
+      "primary_key_constraint",
+      "columns",
+      "grants"
+    ],
+    "title": "Structure",
+    "type": "object"
+  },
+  "TableData": {
+    "$defs": {
+      "Column": {
+        "properties": {
+          "category": {
+            "type": "string"
+          },
+          "comment": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "enum_values": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "full_type": {
+            "type": "string"
+          },
+          "generated": {
+            "type": "boolean"
+          },
+          "has_default": {
+            "type": "boolean"
+          },
+          "is_pk": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "nullable": {
+            "type": "boolean"
+          },
+          "references": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/ColumnReference"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "type",
+          "full_type",
+          "category",
+          "nullable",
+          "has_default",
+          "generated",
+          "enum_values",
+          "is_pk",
+          "comment",
+          "references"
+        ],
+        "type": "object"
+      },
+      "ColumnReference": {
+        "properties": {
+          "column": {
+            "type": "string"
+          },
+          "table": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "table",
+          "column"
+        ],
+        "type": "object"
+      },
+      "Rls": {
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "forced": {
+            "type": "boolean"
+          },
+          "label": {
+            "type": "string"
+          },
+          "policies": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "state": {
+            "$ref": "#/$defs/RlsState"
+          }
+        },
+        "required": [
+          "state",
+          "label",
+          "enabled",
+          "forced",
+          "policies"
+        ],
+        "type": "object"
+      },
+      "RlsState": {
+        "enum": [
+          "ok",
+          "warn",
+          "danger",
+          "none",
+          "view"
+        ],
+        "type": "string"
+      },
+      "TableInfo": {
+        "properties": {
+          "columns": {
+            "items": {
+              "$ref": "#/$defs/Column"
+            },
+            "type": "array"
+          },
+          "comment": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "editable": {
+            "type": "boolean"
+          },
+          "exposed_without_rls": {
+            "type": "boolean"
+          },
+          "insertable": {
+            "type": "boolean"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "primary_key": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "rls": {
+            "$ref": "#/$defs/Rls"
+          }
+        },
+        "required": [
+          "name",
+          "kind",
+          "comment",
+          "primary_key",
+          "editable",
+          "insertable",
+          "exposed_without_rls",
+          "rls",
+          "columns"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "has_next": {
+        "type": "boolean"
+      },
+      "page": {
+        "format": "int64",
+        "type": "integer"
+      },
+      "rows": {
+        "items": {
+          "additionalProperties": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "size": {
+        "format": "int64",
+        "type": "integer"
+      },
+      "table": {
+        "$ref": "#/$defs/TableInfo"
+      },
+      "total": {
+        "format": "int64",
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "total_exact": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "table",
+      "rows",
+      "page",
+      "size",
+      "has_next",
+      "total",
+      "total_exact"
+    ],
+    "title": "TableData",
+    "type": "object"
+  },
+  "TableInfo": {
+    "$defs": {
+      "Column": {
+        "properties": {
+          "category": {
+            "type": "string"
+          },
+          "comment": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "enum_values": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "full_type": {
+            "type": "string"
+          },
+          "generated": {
+            "type": "boolean"
+          },
+          "has_default": {
+            "type": "boolean"
+          },
+          "is_pk": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "nullable": {
+            "type": "boolean"
+          },
+          "references": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/ColumnReference"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "type",
+          "full_type",
+          "category",
+          "nullable",
+          "has_default",
+          "generated",
+          "enum_values",
+          "is_pk",
+          "comment",
+          "references"
+        ],
+        "type": "object"
+      },
+      "ColumnReference": {
+        "properties": {
+          "column": {
+            "type": "string"
+          },
+          "table": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "table",
+          "column"
+        ],
+        "type": "object"
+      },
+      "Rls": {
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "forced": {
+            "type": "boolean"
+          },
+          "label": {
+            "type": "string"
+          },
+          "policies": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "state": {
+            "$ref": "#/$defs/RlsState"
+          }
+        },
+        "required": [
+          "state",
+          "label",
+          "enabled",
+          "forced",
+          "policies"
+        ],
+        "type": "object"
+      },
+      "RlsState": {
+        "enum": [
+          "ok",
+          "warn",
+          "danger",
+          "none",
+          "view"
+        ],
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "columns": {
+        "items": {
+          "$ref": "#/$defs/Column"
+        },
+        "type": "array"
+      },
+      "comment": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "editable": {
+        "type": "boolean"
+      },
+      "exposed_without_rls": {
+        "type": "boolean"
+      },
+      "insertable": {
+        "type": "boolean"
+      },
+      "kind": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "primary_key": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "rls": {
+        "$ref": "#/$defs/Rls"
+      }
+    },
+    "required": [
+      "name",
+      "kind",
+      "comment",
+      "primary_key",
+      "editable",
+      "insertable",
+      "exposed_without_rls",
+      "rls",
+      "columns"
+    ],
+    "title": "TableInfo",
+    "type": "object"
+  },
+  "TableSummary": {
+    "$defs": {
+      "Rls": {
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "forced": {
+            "type": "boolean"
+          },
+          "label": {
+            "type": "string"
+          },
+          "policies": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "state": {
+            "$ref": "#/$defs/RlsState"
+          }
+        },
+        "required": [
+          "state",
+          "label",
+          "enabled",
+          "forced",
+          "policies"
+        ],
+        "type": "object"
+      },
+      "RlsState": {
+        "enum": [
+          "ok",
+          "warn",
+          "danger",
+          "none",
+          "view"
+        ],
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "has_pk": {
+        "type": "boolean"
+      },
+      "kind": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "rls": {
+        "$ref": "#/$defs/Rls"
+      }
+    },
+    "required": [
+      "name",
+      "kind",
+      "has_pk",
+      "rls"
+    ],
+    "title": "TableSummary",
+    "type": "object"
+  },
+  "TablesResponse": {
+    "$defs": {
+      "Rls": {
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "forced": {
+            "type": "boolean"
+          },
+          "label": {
+            "type": "string"
+          },
+          "policies": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "state": {
+            "$ref": "#/$defs/RlsState"
+          }
+        },
+        "required": [
+          "state",
+          "label",
+          "enabled",
+          "forced",
+          "policies"
+        ],
+        "type": "object"
+      },
+      "RlsState": {
+        "enum": [
+          "ok",
+          "warn",
+          "danger",
+          "none",
+          "view"
+        ],
+        "type": "string"
+      },
+      "TableSummary": {
+        "properties": {
+          "has_pk": {
+            "type": "boolean"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "rls": {
+            "$ref": "#/$defs/Rls"
+          }
+        },
+        "required": [
+          "name",
+          "kind",
+          "has_pk",
+          "rls"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "schema": {
+        "type": "string"
+      },
+      "tables": {
+        "items": {
+          "$ref": "#/$defs/TableSummary"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "schema",
+      "tables"
+    ],
+    "title": "TablesResponse",
+    "type": "object"
+  },
+  "TypesResponse": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "base": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "enums": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "base",
+      "enums"
+    ],
+    "title": "TypesResponse",
+    "type": "object"
+  },
+  "User": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "created_at": {
+        "type": "string"
+      },
+      "email": {
+        "type": "string"
+      },
+      "email_confirmed_at": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "id": {
+        "type": "string"
+      },
+      "last_sign_in_at": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "sessions": {
+        "format": "int64",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "id",
+      "email",
+      "created_at",
+      "last_sign_in_at",
+      "email_confirmed_at",
+      "sessions"
+    ],
+    "title": "User",
+    "type": "object"
+  },
+  "UsersResponse": {
+    "$defs": {
+      "User": {
+        "properties": {
+          "created_at": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "email_confirmed_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "last_sign_in_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sessions": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "created_at",
+          "last_sign_in_at",
+          "email_confirmed_at",
+          "sessions"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "has_next": {
+        "type": "boolean"
+      },
+      "page": {
+        "format": "int64",
+        "type": "integer"
+      },
+      "total": {
+        "format": "int64",
+        "type": "integer"
+      },
+      "users": {
+        "items": {
+          "$ref": "#/$defs/User"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "users",
+      "total",
+      "page",
+      "has_next"
+    ],
+    "title": "UsersResponse",
+    "type": "object"
+  }
+}

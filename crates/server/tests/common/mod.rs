@@ -4,6 +4,8 @@
 //! Requires Docker to be running.
 #![allow(dead_code)]
 
+pub mod panel;
+
 use std::{sync::Arc, time::Duration};
 
 use axum::{
@@ -226,6 +228,7 @@ impl TestApp {
             }),
         };
         let panel = nelcota_admin::AdminState {
+            sql: Arc::default(),
             db: db::admin_pool(&admin, 2),
             db_config: admin.clone(),
             catalog: catalog.clone(),

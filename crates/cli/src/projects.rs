@@ -6,9 +6,9 @@ use std::fs;
 use anyhow::bail;
 
 use crate::{
-    caddy,
+    backup, caddy,
     host::{Host, PanelLogin, Runtime},
-    naming, native, ops, panel_login,
+    lifecycle, naming, native, panel_login,
     project::Service,
     registry,
     util::{self, ok, step, warn},
@@ -31,7 +31,7 @@ pub fn list(host: &Host) -> anyhow::Result<()> {
         println!("No projects. Create one with `nelcota init`.");
         return Ok(());
     }
-    ops::status(&manifest, &host.projects(&manifest))
+    lifecycle::status(&manifest, &host.projects(&manifest))
 }
 
 /// `nelcota remove -p <name>`: final backup in `archive/`, containers and data
@@ -54,18 +54,18 @@ pub fn remove(host: &Host, name: &str, yes: bool, keep_files: bool) -> anyhow::R
 
     let project = host.project(&manifest, &entry);
     if project.health(Service::Postgres).is_some() {
-        let dump = ops::backup(host, &project, false, None)?;
+        let dump = backup::run(host, &project, false, None)?;
         fs::create_dir_all(host.archive_dir())?;
         let archived = host
             .archive_dir()
             .join(dump.file_name().unwrap_or_default());
-        fs::copy(&dump, &archived)?;
+        crate::backup::archive(&dump, &archived)?;
         ok(&format!("final backup at {}", archived.display()));
     } else {
         warn("Postgres stopped: removing without a final backup");
     }
     match manifest.runtime {
-        Runtime::Docker if project.exists() => ops::down(&project, true)?,
+        Runtime::Docker if project.exists() => lifecycle::down(&project, true)?,
         Runtime::Docker => {}
         Runtime::Systemd => native::remove(&project)?,
     }
@@ -100,7 +100,7 @@ pub fn set_panel_login(host: &Host, mode: PanelLogin) -> anyhow::Result<()> {
     ));
     let generated = panel_login::switch(host, &mut manifest, mode)?;
     registry::write(host, &manifest)?;
-    ops::recreate_apps(&host.projects(&manifest))?;
+    lifecycle::recreate_apps(&host.projects(&manifest))?;
     if mode == PanelLogin::Shared {
         println!();
         println!("Single sign-on on: use the host email and password on any panel.");

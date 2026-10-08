@@ -2,16 +2,16 @@
 import type { Messages } from '../index.svelte'
 
 const ptBR = {
-  title: 'Storage',
+  title: 'Armazenamento',
   diskSummary: {
     one: '{count} bucket, {size} no disco do servidor.',
     other: '{count} buckets, {size} no disco do servidor.',
   },
   s3Summary: { one: '{count} bucket, {size} no S3.', other: '{count} buckets, {size} no S3.' },
-  disabled: 'Storage desligado',
+  disabled: 'Armazenamento desligado',
   disabledDescription:
     'Defina NELCOTA_STORAGE_BACKEND no .env do projeto (disk para o disco do servidor, s3 para um bucket compatível) e reinicie o app.',
-  policiesNote: 'Sem policy em storage.objects, só o service_role acessa os arquivos.',
+  policiesNote: 'Sem política em storage.objects, só o service_role acessa os arquivos.',
   diskNote: 'Os arquivos estão no disco deste servidor. Em produção, prefira um bucket S3 (veja docs/storage.md).',
   newBucket: 'Novo bucket',
   empty: 'Nenhum bucket',
@@ -30,6 +30,7 @@ const ptBR = {
   serverLimit: '{size} (servidor)',
   edit: 'Editar…',
   deleteBucket: 'Apagar bucket',
+  emptyBeforeDelete: 'Esvazie o bucket antes de apagá-lo.',
   confirmDeleteBucket: {
     title: 'Apagar o bucket?',
     description: "O bucket '{bucket}' está vazio e será apagado.",
@@ -41,7 +42,7 @@ const ptBR = {
     name: 'Nome',
     nameHint: 'Letras minúsculas, números, - e _. Faz parte da URL dos arquivos.',
     public: 'Público',
-    publicHint: 'Qualquer pessoa lê os arquivos pela URL pública. Escrever continua dependendo das policies.',
+    publicHint: 'Qualquer pessoa lê os arquivos pela URL pública. Escrever continua dependendo das políticas.',
     limit: 'Limite por arquivo (MB)',
     limitHint: 'Vazio usa o limite do servidor ({size}).',
     types: 'Tipos aceitos',
@@ -52,6 +53,13 @@ const ptBR = {
     saved: "Bucket '{bucket}' salvo",
   },
   browser: {
+    dropHint: 'Arraste arquivos para cá ou clique para selecionar',
+    uploadProgress: 'Progresso dos envios',
+    uploadStatus: { queued: 'Na fila', sending: 'Enviando…', done: 'Enviado', error: 'Falhou', conflict: 'Já existe' },
+    preview: 'Ver arquivo',
+    previewUnavailable: 'A prévia não está disponível para este formato ou tamanho. Baixe o arquivo para abri-lo.',
+    pdfHint: 'Abra o PDF no visualizador do navegador em uma nova aba.',
+    openPdf: 'Abrir PDF',
     upload: 'Enviar arquivos',
     uploading: 'Enviando {done} de {total}…',
     uploaded: { one: '{count} arquivo enviado', other: '{count} arquivos enviados' },
@@ -73,8 +81,8 @@ const ptBR = {
     replace: {
       title: 'Substituir arquivos?',
       description: {
-        one: "'{names}' já existe nesta pasta.",
-        other: '{count} arquivos já existem nesta pasta: {names}.',
+        one: "'{names}' já existe em {destination}.",
+        other: '{count} arquivos já existem em {destination}: {names}.',
       },
       confirm: 'Substituir',
     },
@@ -114,6 +122,7 @@ const en: Messages<typeof ptBR> = {
   serverLimit: '{size} (server)',
   edit: 'Edit…',
   deleteBucket: 'Delete bucket',
+  emptyBeforeDelete: 'Empty the bucket before deleting it.',
   confirmDeleteBucket: {
     title: 'Delete the bucket?',
     description: "Bucket '{bucket}' is empty and will be deleted.",
@@ -136,6 +145,13 @@ const en: Messages<typeof ptBR> = {
     saved: "Bucket '{bucket}' saved",
   },
   browser: {
+    dropHint: 'Drop files here or click to select',
+    uploadProgress: 'Upload progress',
+    uploadStatus: { queued: 'Queued', sending: 'Uploading…', done: 'Uploaded', error: 'Failed', conflict: 'Already exists' },
+    preview: 'View file',
+    previewUnavailable: 'Preview is unavailable for this format or size. Download the file to open it.',
+    pdfHint: 'Open the PDF in the browser viewer in a new tab.',
+    openPdf: 'Open PDF',
     upload: 'Upload files',
     uploading: 'Uploading {done} of {total}…',
     uploaded: { one: '{count} file uploaded', other: '{count} files uploaded' },
@@ -157,8 +173,8 @@ const en: Messages<typeof ptBR> = {
     replace: {
       title: 'Replace files?',
       description: {
-        one: "'{names}' already exists in this folder.",
-        other: '{count} files already exist in this folder: {names}.',
+        one: "'{names}' already exists in {destination}.",
+        other: '{count} files already exist in {destination}: {names}.',
       },
       confirm: 'Replace',
     },

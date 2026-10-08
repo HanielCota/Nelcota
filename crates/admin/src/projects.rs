@@ -73,21 +73,29 @@ fn valid_name(name: &str) -> bool {
 }
 
 /// `GET /admin/api/projects`
-pub async fn list(State(state): State<AdminState>) -> Json<Value> {
+pub async fn list(State(state): State<AdminState>) -> Json<crate::contracts::ProjectsData> {
     let registry = read_registry(&state.host);
-    let mut projects: Vec<Value> = registry
+    let mut projects: Vec<crate::contracts::ProjectLink> = registry
         .projects
         .iter()
-        .map(|p| json!({ "name": p.name, "url": p.url, "current": p.name == state.host.project }))
+        .map(|p| crate::contracts::ProjectLink {
+            name: p.name.clone(),
+            url: Some(p.url.clone()),
+            current: p.name == state.host.project,
+        })
         .collect();
     if projects.is_empty() {
-        projects.push(json!({ "name": state.host.project, "url": null, "current": true }));
+        projects.push(crate::contracts::ProjectLink {
+            name: state.host.project.clone(),
+            url: None,
+            current: true,
+        });
     }
-    Json(json!({
-        "current": state.host.project,
-        "sso": state.host.sso.is_some(),
-        "projects": projects,
-    }))
+    Json(crate::contracts::ProjectsData {
+        current: state.host.project.clone(),
+        sso: state.host.sso.is_some(),
+        projects,
+    })
 }
 
 /// Calls `GET /health` on a project's app over the host's internal network.
@@ -126,7 +134,9 @@ async fn probe_url(url: &str) -> Value {
 }
 
 /// `GET /admin/api/projects/status`: each project's status (in parallel).
-pub async fn status(State(state): State<AdminState>) -> Result<Json<Value>, ApiError> {
+pub async fn status(
+    State(state): State<AdminState>,
+) -> Result<Json<crate::contracts::ProjectsStatusData>, ApiError> {
     let registry = read_registry(&state.host);
     let probes = registry.projects.iter().map(|p| {
         let name = p.name.clone();
@@ -150,9 +160,7 @@ pub async fn status(State(state): State<AdminState>) -> Result<Json<Value>, ApiE
             status
         })
         .collect();
-    Ok(Json(
-        json!({ "current": state.host.project, "projects": projects }),
-    ))
+    crate::contracts::response(json!({ "current": state.host.project, "projects": projects }))
 }
 
 #[cfg(test)]

@@ -579,7 +579,8 @@ Per-user quotas are left to policies, which see the final row (with its
 size) on insert. Image transformations and resumable (TUS) uploads stay out:
 decoding untrusted images is a steady source of CVEs.
 
-**D81. New projects store files on their disk; backups mirror them.**
+**D81. New projects store files on their disk; backups mirror them**
+(the shared backup mirror is superseded by D82).
 `nelcota init` writes `NELCOTA_STORAGE_BACKEND=disk`: on Docker the app
 mounts `projects/<name>/storage` (owned by the image's user 65532), on
 systemd the unit's `StateDirectory`. Storage works right after `nelcota up`,
@@ -590,6 +591,66 @@ change once written (D78), so each run only sends new files, and
 `restore --files` brings them back. Caddy stops compressing `/storage/*`,
 which would break byte ranges. Projects created before storage keep it off
 until they add the two lines and the volume (docs/storage.md).
+
+## Panel and backup reliability
+
+**D82. Disk backups capture immutable files beside each dump.** A shared
+mirror loses old versions when later uploads replace or delete them, so it
+cannot restore the files referenced by a historical database dump. Each dump
+now has its own `.files/` directory and SHA-256 manifest. An exported Postgres
+snapshot and a SHARE lock on `storage.objects` keep the copied versions and
+dump metadata consistent. Upload files before publishing the dump; retain and
+archive the pair together. Restore validates the manifest before stopping the
+app and copies immutable versions before restoring the database. Older dumps
+remain usable for database-only restores (docs/backup.md).
+
+**D83. The panel validates wire contracts generated from Rust.** `ts-rs` and
+`schemars` export TypeScript and JSON Schema from the server DTOs; Ajv emits
+standalone browser validators so the existing CSP needs no runtime code
+generation. Drift checks run in CI. Database cell values stay text or NULL
+(D48). Resource state and upload queues own cancellation, result ordering and
+the captured upload destination, with unit and browser regression tests.
+
+**D84. SQL display limits bound memory without changing batch semantics.**
+Dedicated editor connections (D47) allow at most four runs with a 30-second
+statement timeout. The client retains up to 1000 rows per result, 8 MiB of
+values and 32 displayed results, while the server drains the remaining batch
+so later statements still execute. Dropping a request sends Postgres
+cancellation and closes its connection. DDL reports `applied` separately from
+`catalog_pending`: a failed refresh after COMMIT retries with backoff instead
+of asking the user to replay an already committed mutation.
+
+**D85. Modules follow independent reasons for change.** Authentication shares
+session/token operations and auth-role transactions independently of its HTTP
+handlers. Panel route composition does not own cookies, response headers or
+asset serving. Storage operations accept a byte stream and explicit options
+and return typed results; the public routes and panel share the HTTP adapter.
+CLI lifecycle, backup sequencing, remote transport and version upgrades have
+separate owners. The table editor's row module owns loading and write
+reconciliation while the page owns navigation and presentation. Existing
+transaction, RLS and snapshot guarantees remain coordinated inside their
+operation modules (docs/architecture.md).
+
+**D86. Operation interfaces own complete lifetimes.** Recovery and migration
+workflows return data without HTTP extraction or response construction. Their
+atomic database changes stay under one transaction owner. The SQL executor
+owns its connection, cancellation and display budgets behind one execution
+method; the route chooses the HTTP response. REST execution returns the JSON
+already built by PostgreSQL and response metadata, preserving RLS and error
+ordering. Catalog model, introspection and refresh workers remain internal to
+the existing facade. Panel SQL and storage modules accept transport adapters
+and own cancellation, captured destinations and mutation refreshes. Native
+provisioning and PITR configuration/process adapters are separate from restore
+sequencing, with no new deployment runtime or command contract.
+
+**D87. Feature ownership determines source location.** Panel pages, state,
+adapters, components and unit tests live with their feature. The shell and
+shared schema/presentation helpers have named locations; generated wire
+contracts remain authoritative. Admin backend facades group table, policy and
+account handlers and explicitly export their interface. Integration tests
+share panel request helpers and keep feature scenarios under one admin suite.
+This changes source navigation without introducing another runtime, crate
+layer, HTTP contract or transaction owner (docs/architecture.md).
 
 ### Known pending items
 

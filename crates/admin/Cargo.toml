@@ -30,6 +30,8 @@ sha2.workspace = true
 tokio = { workspace = true, features = ["rt", "net", "time", "io-util"] }
 tokio-postgres.workspace = true
 tracing.workspace = true
+ts-rs = "12.0"
+schemars = "1.0"
 
 [lints]
 workspace = true

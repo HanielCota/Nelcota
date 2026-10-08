@@ -5,13 +5,19 @@
 //! be swapped (local keys today; an external OIDC provider later). This crate
 //! only AUTHENTICATES: authorization belongs exclusively to RLS.
 
+mod accounts;
 mod credentials;
+mod db;
+mod error;
 mod handlers;
 mod keys;
 mod mail;
 mod password;
 mod rate_limit;
 mod recovery;
+mod request;
+mod sessions;
+mod state;
 
 use std::sync::Arc;
 
@@ -22,11 +28,12 @@ use axum::{
 use nelcota_core::{ApiError, Claims};
 
 pub use credentials::{InvalidCredential, normalize_email, validate_password};
-pub use handlers::{AuthSettings, AuthState, router};
+pub use handlers::router;
 pub use keys::{KeyError, Keys, generate_ed25519_private_key};
 pub use mail::{Email, MailError, Mailer, SmtpMailer};
 pub use password::{Passwords, hash_password, verify_password};
 pub use rate_limit::RateLimiter;
+pub use state::{AuthSettings, AuthState};
 
 #[derive(Debug, thiserror::Error)]
 pub enum VerifyError {

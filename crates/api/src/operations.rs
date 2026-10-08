@@ -1,0 +1,279 @@
+//! CRUD/RPC execution under the caller's role and row-level policies.
+use crate::{
+    Catalog,
+    query::{self, QueryError, Resolution, Sql},
+};
+use axum::http::StatusCode;
+use deadpool_postgres::{Pool, Transaction};
+use nelcota_core::{ApiError, Claims, db};
+use serde_json::{Map, Value};
+
+pub(crate) struct ReadResult {
+    pub body: String,
+    pub rows: i64,
+    pub offset: i64,
+    pub total: Option<i64>,
+}
+pub(crate) struct WriteResult {
+    pub body: Option<String>,
+    pub resolution: Option<Resolution>,
+}
+#[derive(Default)]
+pub(crate) struct WriteOptions {
+    pub representation: bool,
+    pub resolution: Option<Resolution>,
+}
+
+fn bad_query(err: QueryError) -> ApiError {
+    ApiError::new(StatusCode::BAD_REQUEST, "invalid_query", err.to_string())
+}
+
+fn not_found(kind: &str, name: &str) -> ApiError {
+    ApiError::new(
+        StatusCode::NOT_FOUND,
+        "not_found",
+        format!("{kind} '{name}' does not exist in the exposed schema"),
+    )
+}
+
+fn parse_body(bytes: &[u8]) -> Result<Value, ApiError> {
+    if bytes.is_empty() {
+        return Ok(Value::Object(Map::new()));
+    }
+    serde_json::from_slice(bytes).map_err(|e| {
+        ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "invalid_body",
+            format!("invalid JSON: {e}"),
+        )
+    })
+}
+
+async fn fetch_json(
+    tx: &Transaction<'_>,
+    sql: &Sql,
+) -> Result<(String, i64), tokio_postgres::Error> {
+    let statement = tx.prepare_cached(&sql.text).await?;
+    let row = tx.query_one(&statement, &sql.param_refs()).await?;
+    Ok((row.get(0), row.get(1)))
+}
+
+async fn execute(tx: &Transaction<'_>, sql: &Sql) -> Result<u64, tokio_postgres::Error> {
+    let statement = tx.prepare_cached(&sql.text).await?;
+    tx.execute(&statement, &sql.param_refs()).await
+}
+
+/// Runs the body in a transaction with the request role/claims.
+macro_rules! in_request_tx {
+    ($pool:expr, $claims:expr, |$tx:ident| $body:block) => {{
+        let role = $claims.role();
+        let db_err = |e| ApiError::from_db(e, role);
+        let mut client = $pool.get().await.map_err(ApiError::from_pool)?;
+        let $tx = db::begin_request(&mut client, &$claims)
+            .await
+            .map_err(db_err)?;
+        let result = async { $body }.await.map_err(db_err)?;
+        $tx.commit().await.map_err(db_err)?;
+        result
+    }};
+}
+
+/// `on_conflict` only means something to an upsert (POST).
+fn reject_on_conflict(request: &query::Request) -> Result<(), ApiError> {
+    if request.on_conflict.is_some() {
+        return Err(bad_query(QueryError::Invalid(
+            "on_conflict only applies to POST with Prefer: resolution=...".into(),
+        )));
+    }
+    Ok(())
+}
+
+/// PATCH/DELETE require at least one filter: prevents deleting/changing the
+/// whole table by mistake (for that, use an explicit filter such as
+/// `id=not.is.null`).
+fn require_filters(request: &query::Request) -> Result<(), ApiError> {
+    if request.filters.is_empty() {
+        return Err(bad_query(QueryError::Invalid(
+            "provide at least one filter (e.g. ?id=eq.1)".into(),
+        )));
+    }
+    Ok(())
+}
+
+pub(crate) async fn read(
+    pool: &Pool,
+    claims: &Claims,
+    catalog: &Catalog,
+    name: &str,
+    pairs: &[(String, String)],
+    max_rows: Option<i64>,
+    count_exact: bool,
+) -> Result<ReadResult, ApiError> {
+    let table = catalog
+        .table(name)
+        .ok_or_else(|| not_found("table", name))?;
+    let request = query::parse_request_with_relations(pairs, table, catalog).map_err(bad_query)?;
+    reject_on_conflict(&request)?;
+    let sql = query::select(&catalog.schema, table, &request, max_rows);
+    let count_sql = count_exact.then(|| query::count(&catalog.schema, table, &request));
+    let (body, rows, total) = in_request_tx!(pool, claims, |tx| {
+        let (body, rows) = fetch_json(&tx, &sql).await?;
+        let total = match &count_sql {
+            Some(sql) => {
+                let statement = tx.prepare_cached(&sql.text).await?;
+                Some(
+                    tx.query_one(&statement, &sql.param_refs())
+                        .await?
+                        .get::<_, i64>(0),
+                )
+            }
+            None => None,
+        };
+        Ok::<_, tokio_postgres::Error>((body, rows, total))
+    });
+    Ok(ReadResult {
+        body,
+        rows,
+        total,
+        offset: request.offset.unwrap_or(0),
+    })
+}
+
+async fn write(
+    pool: &Pool,
+    claims: &Claims,
+    sql: Sql,
+    representation: bool,
+) -> Result<Option<String>, ApiError> {
+    if representation {
+        let (body, _) = in_request_tx!(pool, claims, |tx| { fetch_json(&tx, &sql).await });
+        Ok(Some(body))
+    } else {
+        in_request_tx!(pool, claims, |tx| { execute(&tx, &sql).await });
+        Ok(None)
+    }
+}
+
+pub(crate) async fn create(
+    pool: &Pool,
+    claims: &Claims,
+    catalog: &Catalog,
+    name: &str,
+    pairs: &[(String, String)],
+    bytes: &[u8],
+    options: WriteOptions,
+) -> Result<WriteResult, ApiError> {
+    let table = catalog
+        .table(name)
+        .ok_or_else(|| not_found("table", name))?;
+    let request = query::parse_request_with_relations(pairs, table, catalog).map_err(bad_query)?;
+    if !request.filters.is_empty() {
+        return Err(bad_query(QueryError::Invalid(
+            "POST does not accept filters".into(),
+        )));
+    }
+    let upsert = match (options.resolution, &request.on_conflict) {
+        (Some(resolution), on_conflict) => {
+            Some(query::Upsert::new(table, on_conflict.as_deref(), resolution).map_err(bad_query)?)
+        }
+        (None, Some(_)) => {
+            return Err(bad_query(QueryError::Invalid(
+                "on_conflict needs Prefer: resolution=merge-duplicates or ignore-duplicates".into(),
+            )));
+        }
+        (None, None) => None,
+    };
+    let sql = query::insert(
+        &catalog.schema,
+        table,
+        parse_body(bytes)?,
+        options.representation.then_some(&request.select),
+        upsert.as_ref(),
+    )
+    .map_err(bad_query)?;
+    Ok(WriteResult {
+        body: write(pool, claims, sql, options.representation).await?,
+        resolution: options.resolution,
+    })
+}
+
+pub(crate) async fn update(
+    pool: &Pool,
+    claims: &Claims,
+    catalog: &Catalog,
+    name: &str,
+    pairs: &[(String, String)],
+    bytes: &[u8],
+    representation: bool,
+) -> Result<Option<String>, ApiError> {
+    let table = catalog
+        .table(name)
+        .ok_or_else(|| not_found("table", name))?;
+    let request = query::parse_request_with_relations(pairs, table, catalog).map_err(bad_query)?;
+    require_filters(&request)?;
+    reject_on_conflict(&request)?;
+    let sql = query::update(
+        &catalog.schema,
+        table,
+        parse_body(bytes)?,
+        &request.filters,
+        representation.then_some(&request.select),
+    )
+    .map_err(bad_query)?;
+    write(pool, claims, sql, representation).await
+}
+
+pub(crate) async fn remove(
+    pool: &Pool,
+    claims: &Claims,
+    catalog: &Catalog,
+    name: &str,
+    pairs: &[(String, String)],
+    representation: bool,
+) -> Result<Option<String>, ApiError> {
+    let table = catalog
+        .table(name)
+        .ok_or_else(|| not_found("table", name))?;
+    let request = query::parse_request_with_relations(pairs, table, catalog).map_err(bad_query)?;
+    require_filters(&request)?;
+    reject_on_conflict(&request)?;
+    let sql = query::delete(
+        &catalog.schema,
+        table,
+        &request.filters,
+        representation.then_some(&request.select),
+    );
+    write(pool, claims, sql, representation).await
+}
+
+pub(crate) async fn rpc(
+    pool: &Pool,
+    claims: &Claims,
+    catalog: &Catalog,
+    name: &str,
+    bytes: &[u8],
+) -> Result<Option<String>, ApiError> {
+    let candidates = catalog
+        .functions
+        .get(name)
+        .ok_or_else(|| not_found("function", name))?;
+    let Value::Object(args) = parse_body(bytes)? else {
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "invalid_body",
+            "the arguments must be a JSON object",
+        ));
+    };
+    let function = query::resolve_function(candidates, &args).map_err(bad_query)?;
+    let sql = query::rpc(&catalog.schema, function, args);
+    if function.returns_void {
+        in_request_tx!(pool, claims, |tx| { execute(&tx, &sql).await });
+        return Ok(None);
+    }
+    let body = in_request_tx!(pool, claims, |tx| {
+        let statement = tx.prepare_cached(&sql.text).await?;
+        let row = tx.query_one(&statement, &sql.param_refs()).await?;
+        Ok::<_, tokio_postgres::Error>(row.get::<_, Option<String>>(0))
+    });
+    Ok(Some(body.unwrap_or_else(|| "null".into())))
+}

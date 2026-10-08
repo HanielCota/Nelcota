@@ -29,6 +29,9 @@ struct DevState {
     authenticator_password: String,
     jwt_private_key: String,
     db_port: u16,
+    admin_email: String,
+    admin_password: String,
+    admin_password_hash: String,
 }
 
 fn load_state(root: &Path) -> anyhow::Result<Option<DevState>> {
@@ -42,12 +45,40 @@ fn load_state(root: &Path) -> anyhow::Result<Option<DevState>> {
             .map(|(_, v)| v.clone())
             .with_context(|| format!("{key} missing from {STATE_FILE}"))
     };
-    Ok(Some(DevState {
+    let mut state = DevState {
         postgres_password: get("POSTGRES_PASSWORD")?,
         authenticator_password: get("AUTHENTICATOR_PASSWORD")?,
         jwt_private_key: get("JWT_PRIVATE_KEY")?,
         db_port: get("DB_PORT")?.parse()?,
-    }))
+        admin_email: get("ADMIN_EMAIL").unwrap_or_else(|_| "admin@localhost".into()),
+        admin_password: get("ADMIN_PASSWORD").unwrap_or_else(|_| util::secret(18)),
+        admin_password_hash: get("ADMIN_PASSWORD_HASH").unwrap_or_default(),
+    };
+    if state.admin_password_hash.is_empty() || get("ADMIN_PASSWORD").is_err() {
+        state.admin_password_hash = nelcota_auth::hash_password(&state.admin_password)
+            .context("could not hash the development admin password")?;
+        save_state(root, &state)?;
+    }
+    Ok(Some(state))
+}
+
+fn save_state(root: &Path, state: &DevState) -> anyhow::Result<()> {
+    fs::create_dir_all(root.join(".nelcota"))?;
+    write_private(
+        &root.join(STATE_FILE),
+        &format!(
+            "# Development secrets (do not use in production).\nPOSTGRES_PASSWORD={}\nAUTHENTICATOR_PASSWORD={}\nJWT_PRIVATE_KEY={}\nDB_PORT={}\nADMIN_EMAIL={}\nADMIN_PASSWORD={}\nADMIN_PASSWORD_HASH={}\n",
+            state.postgres_password,
+            state.authenticator_password,
+            state.jwt_private_key,
+            state.db_port,
+            state.admin_email,
+            state.admin_password,
+            state.admin_password_hash
+        ),
+    )?;
+    fs::write(root.join(".nelcota/.gitignore"), "*\n")?;
+    Ok(())
 }
 
 fn config_for(root: &Path, state: &DevState, listen: std::net::SocketAddr) -> Config {
@@ -63,6 +94,9 @@ fn config_for(root: &Path, state: &DevState, listen: std::net::SocketAddr) -> Co
         log_format: LogFormat::Text,
         storage_backend: StorageBackend::Disk,
         storage_dir: Some(root.join(".nelcota/storage")),
+        admin_email: Some(state.admin_email.clone()),
+        admin_password_hash: Some(Secret::new(state.admin_password_hash.clone())),
+        project_name: Some("nelcota-dev".into()),
         ..Config::default()
     }
 }
@@ -76,25 +110,19 @@ pub fn run(root: &Path, args: DevArgs) -> anyhow::Result<Outcome> {
     let state = match load_state(root)? {
         Some(state) => state,
         None => {
+            let admin_password = util::secret(18);
+            let admin_password_hash = nelcota_auth::hash_password(&admin_password)
+                .context("could not hash the development admin password")?;
             let state = DevState {
                 postgres_password: util::secret(24),
                 authenticator_password: util::secret(24),
                 jwt_private_key: nelcota_auth::generate_ed25519_private_key(),
                 db_port: args.db_port,
+                admin_email: "admin@localhost".into(),
+                admin_password,
+                admin_password_hash,
             };
-            fs::create_dir_all(root.join(".nelcota"))?;
-            write_private(
-                &root.join(STATE_FILE),
-                &format!(
-                    "# Development environment secrets (do not use in production).\n\
-                     POSTGRES_PASSWORD={}\nAUTHENTICATOR_PASSWORD={}\nJWT_PRIVATE_KEY={}\nDB_PORT={}\n",
-                    state.postgres_password,
-                    state.authenticator_password,
-                    state.jwt_private_key,
-                    state.db_port
-                ),
-            )?;
-            fs::write(root.join(".nelcota/.gitignore"), "*\n")?;
+            save_state(root, &state)?;
             state
         }
     };
@@ -138,6 +166,11 @@ pub fn run(root: &Path, args: DevArgs) -> anyhow::Result<Outcome> {
     println!();
     println!("  API:      http://{}/rest/v1/", args.listen);
     println!("  Auth:     http://{}/auth/v1/", args.listen);
+    println!("  Panel:    http://{}/admin/", args.listen);
+    println!(
+        "  Login:    {}  /  {}",
+        state.admin_email, state.admin_password
+    );
     println!("  Postgres: {}", config.database_url.expose());
     println!("  service_role (30 days, bypasses RLS): {service}");
     println!();
@@ -163,4 +196,39 @@ fn wait_for_postgres(config: &Config) -> anyhow::Result<()> {
             }
         }
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn upgrades_legacy_dev_state_and_keeps_the_same_credentials_on_reload() {
+        let root = tempfile::tempdir().unwrap();
+        fs::create_dir_all(root.path().join(".nelcota")).unwrap();
+        fs::write(root.path().join(STATE_FILE), "POSTGRES_PASSWORD=existing-db\nAUTHENTICATOR_PASSWORD=existing-api\nJWT_PRIVATE_KEY=existing-key\nDB_PORT=54322\n").unwrap();
+        let first = load_state(root.path()).unwrap().unwrap();
+        assert_eq!(first.postgres_password, "existing-db");
+        assert!(nelcota_auth::verify_password(
+            &first.admin_password,
+            &first.admin_password_hash
+        ));
+        let second = load_state(root.path()).unwrap().unwrap();
+        assert_eq!(first.admin_password, second.admin_password);
+        assert_eq!(first.admin_password_hash, second.admin_password_hash);
+        let config = config_for(root.path(), &second, ([127, 0, 0, 1], 8000).into());
+        assert_eq!(config.admin_email.as_deref(), Some("admin@localhost"));
+        assert!(config.admin_password_hash.is_some());
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(
+                fs::metadata(root.path().join(STATE_FILE))
+                    .unwrap()
+                    .permissions()
+                    .mode()
+                    & 0o777,
+                0o600
+            );
+        }
+    }
 }
