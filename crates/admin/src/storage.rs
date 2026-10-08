@@ -252,7 +252,7 @@ pub async fn list(
         .await
         .map_err(from_storage)?;
     // One extra row tells whether there is a next page.
-    let mut page: Value = serde_json::from_str(&body)?;
+    let mut page: Value = serde_json::to_value(body)?;
     let objects = page["objects"]
         .as_array_mut()
         .map(std::mem::take)
@@ -278,8 +278,7 @@ pub async fn download(
     headers: HeaderMap,
 ) -> Result<Response, ApiError> {
     let storage = enabled(&state)?;
-    storage
-        .download(&service_role(), &id, &query.name, &headers, true)
+    nelcota_storage::http::download(storage, &service_role(), &id, &query.name, &headers, true)
         .await
         .map_err(from_storage)
 }
@@ -313,15 +312,15 @@ pub async fn upload(
     body: Body,
 ) -> Result<Response, ApiError> {
     let storage = enabled(&state)?;
-    storage
+    let outcome = storage
         .upload(
             service_role(),
             &id,
             &query.name,
-            &headers,
-            body,
-            query.replace,
+            nelcota_storage::http::upload_options(&headers, query.replace),
+            nelcota_storage::http::upload_stream(body),
         )
         .await
-        .map_err(from_storage)
+        .map_err(from_storage)?;
+    Ok(nelcota_storage::http::upload_response(storage, outcome))
 }

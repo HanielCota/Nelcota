@@ -12,7 +12,7 @@ use nelcota_core::ApiError;
 use object_store::GetRange;
 use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
 
-use crate::{StorageState, db::Object, mime, store::Store};
+use crate::{StorageState, db::Object, error::object_not_found as not_found, mime, store::Store};
 
 /// Applied to every file: no scripts, no plugins, no forms, nothing loaded
 /// from elsewhere, even if a browser were convinced to render it as a page.
@@ -225,10 +225,6 @@ pub async fn respond(
     headers.insert(header::CONTENT_DISPOSITION, header_value(&disposition));
     let body = Body::from_stream(result.into_stream());
     Ok((status, headers, body).into_response())
-}
-
-pub fn not_found() -> ApiError {
-    ApiError::new(StatusCode::NOT_FOUND, "object_not_found", "file not found")
 }
 
 #[cfg(test)]
