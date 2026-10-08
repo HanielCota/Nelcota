@@ -15,7 +15,7 @@ that).
 | `id` | `uuid` PK | `gen_random_uuid()`; it is the JWT `sub` and `auth.uid()` |
 | `email` | `text` unique | always lowercase, ≤ 254 characters |
 | `encrypted_password` | `text` | **argon2id PHC string** (see below); `NULL` = no password |
-| `email_confirmed_at` | `timestamptz` | set when the person uses a recovery link (proves they receive the email); confirmation at signup is still out of the MVP |
+| `email_confirmed_at` | `timestamptz` | set when the person opens a signup confirmation, magic or recovery link (proves they receive the email) |
 | `raw_user_meta_data` | `jsonb` | the signup `data` field; returned as `user_metadata` |
 | `created_at`, `updated_at` | `timestamptz` | |
 | `last_sign_in_at` | `timestamptz` | updated on every login |
@@ -67,29 +67,31 @@ later, if needed.
 
 ## `auth.one_time_tokens`
 
-Links sent by email (today, only password recovery).
+Links sent by email: password recovery, signup confirmation and magic link.
 
 | Column | Type | Notes |
 |---|---|---|
 | `id` | `bigint` PK | |
 | `user_id` | `uuid` → `auth.users` | `ON DELETE CASCADE` |
-| `kind` | `text` | `recovery` |
+| `kind` | `text` | `recovery`, `signup` or `magiclink`; a token only works as its kind |
 | `token_hash` | `bytea` unique | **SHA-256** of the token; the token itself is never stored |
-| `created_at`, `expires_at` | `timestamptz` | validity: 1 hour |
+| `created_at`, `expires_at` | `timestamptz` | validity: recovery 1 hour, signup 24 hours, magic link 15 minutes |
 | `used_at` | `timestamptz` | set on use; the link does not work again |
 
 ## Endpoints
 
 | Method and route | Body | Response |
 |---|---|---|
-| `POST /auth/v1/signup` | `{email, password, data?}` | 201 + session |
+| `POST /auth/v1/signup` | `{email, password, data?}` | 201 + session (201 `{user}` with email confirmation on) |
 | `POST /auth/v1/token?grant_type=password` | `{email, password}` | 200 + session |
 | `POST /auth/v1/token?grant_type=refresh_token` | `{refresh_token}` | 200 + session |
 | `POST /auth/v1/logout` | Bearer | 204 (revokes the session) |
 | `GET /auth/v1/user` | Bearer | user data |
 | `GET /auth/v1/.well-known/jwks.json` | - | public JWKS |
 | `POST /auth/v1/recover` | `{email}` | 200 `{}` (whether or not the account exists) |
-| `POST /auth/v1/verify` | `{type: "recovery", token, password}` | 200 + session |
+| `POST /auth/v1/magiclink` | `{email}` | 200 `{}` (whether or not the account exists) |
+| `POST /auth/v1/resend` | `{type: "signup", email}` | 200 `{}` (whether or not the account exists) |
+| `POST /auth/v1/verify` | `{type: "recovery", token, password}` or `{type: "signup" \| "magiclink", token}` | 200 + session |
 
 Session:
 
@@ -107,10 +109,12 @@ Session:
 Errors: `422 validation_failed` (email or password outside the rules), `409
 user_already_exists`, `400 invalid_grant` (invalid credentials or refresh, with
 the same message for an unknown email and a wrong password), `429
-rate_limited` with `Retry-After`, `403 signup_disabled`.
+rate_limited` with `Retry-After`, `403 signup_disabled`, `400
+email_not_confirmed` (correct password, email confirmation pending).
 
-Recovery: `403 recovery_disabled` (project without SMTP), `400 invalid_grant`
-(invalid, expired or already used link), `400 unsupported_type`.
+Links: `403 recovery_disabled`, `confirmation_disabled` or `magiclink_disabled`
+(the project has not configured that flow), `400 invalid_grant` (invalid,
+expired, already used or other-kind link), `400 unsupported_type`.
 
 Password: 8 to 256 characters. Rate limit:
 `NELCOTA_AUTH_RATE_LIMIT_PER_MINUTE` per IP (default 30) and the same limit
@@ -153,3 +157,46 @@ Guarantees:
 - Changing the password ends every session of the account (refresh tokens stop
   working immediately; access JWTs already issued stay valid until they
   expire).
+
+## Signup confirmation
+
+Off by default. With SMTP configured, setting the page that receives the link
+turns it on:
+
+```sh
+NELCOTA_EMAIL_CONFIRMATION_URL=https://app.shop.com/welcome
+```
+
+1. `POST /auth/v1/signup` creates the account and answers `201 {"user": {...}}`
+   **without** a session; an email ("Confirm your email") carries
+   `https://app.shop.com/welcome#type=signup&token=...`, valid for 24 hours.
+2. The page reads the token from the fragment and calls `POST /auth/v1/verify
+   {type: "signup", token}`: the email is confirmed and the answer is a session.
+3. Until then, password sign-in answers `400 email_not_confirmed`, only after a
+   correct password. `POST /auth/v1/resend {type: "signup", email}` sends a new
+   link to an unconfirmed account (same cooldown and `200 {}` as recovery).
+
+Opening a magic or recovery link also confirms the email. Accounts that were
+already unconfirmed when the flow was turned on are held as well; mark them
+with `UPDATE auth.users SET email_confirmed_at = now()` if they should keep
+signing in.
+
+## Magic link
+
+Passwordless sign-in for existing accounts, on when its page is configured:
+
+```sh
+NELCOTA_MAGIC_LINK_URL=https://app.shop.com/signed-in
+```
+
+1. `POST /auth/v1/magiclink {email}` always answers `200 {}`. If the account
+   exists, an email ("Your sign-in link") carries
+   `https://app.shop.com/signed-in#type=magiclink&token=...`, valid for 15
+   minutes.
+2. The page calls `POST /auth/v1/verify {type: "magiclink", token}` and gets a
+   session; the email counts as confirmed.
+
+It does not create accounts: an email request would otherwise let anyone
+reserve addresses before their owners sign up. Same guarantees as recovery:
+token only in the fragment, one use, one email per minute per account,
+sending in the background.

@@ -652,7 +652,33 @@ share panel request helpers and keep feature scenarios under one admin suite.
 This changes source navigation without introducing another runtime, crate
 layer, HTTP contract or transaction owner (docs/architecture.md).
 
+## Email links
+
+**D89. Signup confirmation and magic links reuse the recovery link.** Two
+optional pages, `NELCOTA_EMAIL_CONFIRMATION_URL` and `NELCOTA_MAGIC_LINK_URL`,
+need the D66 SMTP and turn on one flow each; without them nothing changes.
+Their tokens share `auth.one_time_tokens` (V9 widens the `kind` CHECK to
+`signup` and `magiclink`), the token in the URL fragment, the one email per
+minute per account and kind, and background sending. A token only works as
+the kind it was issued for. With confirmation on, signup answers `201 {user}`
+without a session, and password sign-in answers `400 email_not_confirmed`
+(only after a correct password, so it reveals nothing) until a signup, magic
+or recovery link is opened; `POST /auth/v1/resend {type: "signup"}` sends a
+new link to unconfirmed accounts only. Turning confirmation on in a project
+with unconfirmed accounts holds them too: they confirm through `resend` or a
+magic link, or the operator runs `UPDATE auth.users SET email_confirmed_at =
+now()`. A magic link only signs in existing accounts: creating accounts from
+an unauthenticated email request would let anyone fill `auth.users` and
+squat addresses before their owners sign up. Lifetimes: recovery 1 hour,
+confirmation 24 hours, magic link 15 minutes (it signs in by itself). The
+`links` module owns the link lifecycle (token storage, email text, sending,
+sign-in by link); `recovery` keeps only the password change, `confirmation`
+the signup policy and `verify` the routing by `type`.
+
 ### Known pending items
+
+- Accounts created in the panel stay unconfirmed: with email confirmation on
+  they need a magic link or `resend` before password sign-in.
 
 - Filtering parent rows by their embeds (`!inner`) and self-referencing embeds.
 - `nelcota.com/install` should redirect to
