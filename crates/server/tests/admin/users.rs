@@ -78,6 +78,90 @@ async fn password_login(app: &TestApp, email: &str, password: &str) -> Reply {
 }
 
 #[tokio::test]
+async fn failed_session_revocation_rolls_back_the_password_change() {
+    let app = TestApp::spawn().await;
+    let cookie = login(&app).await;
+    let session = app
+        .post(
+            "/auth/v1/signup",
+            None,
+            json!({
+                "email": "atomic@example.com", "password": "original-password-123",
+            }),
+        )
+        .await;
+    assert_eq!(session.status, StatusCode::CREATED);
+    let id = session.body["user"]["id"].as_str().unwrap();
+    let original_hash: String = app
+        .admin_client
+        .query_one(
+            "SELECT encrypted_password FROM auth.users WHERE id = $1::text::uuid",
+            &[&id],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    app.admin_client
+        .batch_execute(
+            "CREATE FUNCTION public.reject_revocation() RETURNS trigger LANGUAGE plpgsql AS $$
+         BEGIN RAISE EXCEPTION 'test revocation failure'; END $$;
+         CREATE TRIGGER reject_revocation BEFORE UPDATE OF revoked_at ON auth.sessions
+             FOR EACH ROW EXECUTE FUNCTION public.reject_revocation();",
+        )
+        .await
+        .unwrap();
+
+    let reset = send(
+        &app,
+        Method::PUT,
+        &format!("/admin/api/users/{id}/password"),
+        &cookie,
+        json!({ "password": "replacement-password-456" }),
+    )
+    .await;
+    assert_eq!(reset.status, StatusCode::INTERNAL_SERVER_ERROR);
+    let unchanged_hash: String = app
+        .admin_client
+        .query_one(
+            "SELECT encrypted_password FROM auth.users WHERE id = $1::text::uuid",
+            &[&id],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    assert_eq!(unchanged_hash, original_hash);
+    let active: i64 = app.admin_client.query_one(
+        "SELECT count(*) FROM auth.sessions WHERE user_id = $1::text::uuid AND revoked_at IS NULL",
+        &[&id],
+    ).await.unwrap().get(0);
+    assert_eq!(active, 1);
+    app.admin_client
+        .batch_execute("DROP TRIGGER reject_revocation ON auth.sessions")
+        .await
+        .unwrap();
+    let refreshed = app
+        .post(
+            "/auth/v1/token?grant_type=refresh_token",
+            None,
+            json!({ "refresh_token": session.body["refresh_token"] }),
+        )
+        .await;
+    assert_eq!(refreshed.status, StatusCode::OK);
+    assert_eq!(
+        password_login(&app, "atomic@example.com", "original-password-123")
+            .await
+            .status,
+        StatusCode::OK
+    );
+    assert_eq!(
+        password_login(&app, "atomic@example.com", "replacement-password-456")
+            .await
+            .status,
+        StatusCode::BAD_REQUEST
+    );
+}
+
+#[tokio::test]
 async fn create_user_and_reset_password_from_the_panel() {
     let app = TestApp::spawn().await;
     let cookie = login(&app).await;
