@@ -3,6 +3,7 @@ use crate::{
     Auth, AuthState, accounts,
     error::unsupported_type,
     links::{self, LinkKind},
+    oauth,
     rate_limit::limit,
     request::{PeerAddr, client_ip, ip_key, user_agent},
     sessions,
@@ -13,6 +14,7 @@ use axum::{
     extract::{Query, State},
     http::{HeaderMap, StatusCode, header},
     response::IntoResponse,
+    response::Redirect,
     routing::{get, post},
 };
 use nelcota_core::ApiError;
@@ -28,6 +30,8 @@ pub fn router(state: AuthState) -> Router {
         .route("/auth/v1/magiclink", post(magic_link))
         .route("/auth/v1/resend", post(resend))
         .route("/auth/v1/verify", post(verify))
+        .route("/auth/v1/authorize", get(authorize))
+        .route("/auth/v1/callback", get(callback))
         .route("/auth/v1/.well-known/jwks.json", get(jwks))
         .with_state(state)
 }
@@ -65,9 +69,11 @@ struct TokenBody {
     email: Option<String>,
     password: Option<String>,
     refresh_token: Option<String>,
+    auth_code: Option<String>,
+    code_verifier: Option<String>,
 }
 
-/// `POST /auth/v1/token?grant_type=password|refresh_token`.
+/// `POST /auth/v1/token?grant_type=password|refresh_token|pkce`.
 async fn token(
     State(state): State<AuthState>,
     PeerAddr(peer): PeerAddr,
@@ -84,11 +90,21 @@ async fn token(
                 .await?
         }
         "refresh_token" => sessions::refresh(&state, body.refresh_token).await?,
+        "pkce" => {
+            oauth::redeem(
+                &state,
+                body.auth_code,
+                body.code_verifier,
+                ip,
+                user_agent(&headers),
+            )
+            .await?
+        }
         _ => {
             return Err(ApiError::new(
                 StatusCode::BAD_REQUEST,
                 "unsupported_grant_type",
-                "grant_type must be password or refresh_token",
+                "grant_type must be password, refresh_token or pkce",
             ));
         }
     };
@@ -175,4 +191,57 @@ async fn verify(
     Ok(Json(
         verify::verify(&state, body, ip, user_agent(&headers)).await?,
     ))
+}
+
+#[derive(Deserialize)]
+struct AuthorizeQuery {
+    provider: String,
+    redirect_to: String,
+    code_challenge: String,
+    code_challenge_method: Option<String>,
+}
+
+/// `GET /auth/v1/authorize`: redirects to the provider (see `oauth`).
+async fn authorize(
+    State(state): State<AuthState>,
+    PeerAddr(peer): PeerAddr,
+    headers: HeaderMap,
+    Query(query): Query<AuthorizeQuery>,
+) -> Result<Redirect, ApiError> {
+    let ip = client_ip(&state.settings, &headers, peer);
+    limit(&state, &format!("authorize:{}", ip_key(ip)))?;
+    let url = oauth::authorize(
+        &state,
+        &query.provider,
+        &query.redirect_to,
+        &query.code_challenge,
+        query.code_challenge_method.as_deref(),
+    )
+    .await?;
+    Ok(Redirect::to(&url))
+}
+
+#[derive(Deserialize)]
+struct CallbackQuery {
+    #[serde(default)]
+    state: String,
+    code: Option<String>,
+    error: Option<String>,
+}
+
+/// `GET /auth/v1/callback`: the provider's answer, then back to the app.
+async fn callback(
+    State(state): State<AuthState>,
+    Query(query): Query<CallbackQuery>,
+) -> Result<Redirect, ApiError> {
+    let url = oauth::callback(
+        &state,
+        oauth::Callback {
+            state: query.state,
+            code: query.code,
+            error: query.error,
+        },
+    )
+    .await?;
+    Ok(Redirect::to(&url))
 }

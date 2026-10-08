@@ -7,5 +7,5 @@ pub mod db;
 pub mod error;
 
 pub use claims::{Claims, InvalidClaims, Role};
-pub use config::{Config, MailConfig, Secret};
+pub use config::{Config, MailConfig, OAuthConfig, Secret};
 pub use error::ApiError;

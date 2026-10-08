@@ -162,7 +162,13 @@ pub fn create(host: &Host, new: &NewProject) -> anyhow::Result<()> {
          # NELCOTA_PASSWORD_RECOVERY_URL=https://app.example.com/new-password\n\
          # Optional: confirm emails at signup and passwordless sign-in links.\n\
          # NELCOTA_EMAIL_CONFIRMATION_URL=https://app.example.com/welcome\n\
-         # NELCOTA_MAGIC_LINK_URL=https://app.example.com/signed-in\n",
+         # NELCOTA_MAGIC_LINK_URL=https://app.example.com/signed-in\n\n\
+         # Sign-in with Google or GitHub (optional). Provider callback:\n\
+         # https://{domain}/auth/v1/callback\n\
+         # NELCOTA_API_URL=https://{domain}\n\
+         # NELCOTA_OAUTH_REDIRECT_URLS=https://app.example.com/auth\n\
+         # NELCOTA_OAUTH_GITHUB_CLIENT_ID=...\n\
+         # NELCOTA_OAUTH_GITHUB_CLIENT_SECRET=...\n",
         name = new.entry.name,
         now = util::timestamp(),
         domain = new.entry.domain,
