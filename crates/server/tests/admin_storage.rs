@@ -80,6 +80,7 @@ async fn buckets_and_files_from_the_panel() {
     .await;
     assert_eq!(reply.status, StatusCode::CONFLICT);
     assert_eq!(reply.body["code"], "bucket_exists");
+    assert_eq!(reply.body["params"]["bucket"], "docs");
 
     // Uploads get the API's checks: the bucket only takes text.
     let reply = upload(&app, &cookie, "docs", "notes/a.txt", b"hello").await;
@@ -174,6 +175,7 @@ async fn buckets_and_files_from_the_panel() {
     .await;
     assert_eq!(reply.status, StatusCode::CONFLICT);
     assert_eq!(reply.body["code"], "bucket_not_empty");
+    assert_eq!(reply.body["params"]["count"], 1);
     let reply = send(
         &app,
         Method::DELETE,

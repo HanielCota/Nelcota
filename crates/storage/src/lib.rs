@@ -28,7 +28,7 @@ use nelcota_auth::{Keys, SharedVerifier};
 use nelcota_core::Config;
 use tokio::sync::Semaphore;
 
-pub use buckets::mime_entry_ok;
+pub use buckets::{Bucket, BucketError, BucketSettings, mime_entry_ok};
 pub use db::Object as StoredObject;
 pub use gc::{collect as collect_orphans, spawn_collector};
 pub use operations::{ListedObject, ObjectListing};

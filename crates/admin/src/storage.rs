@@ -11,7 +11,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use nelcota_core::Claims;
-use nelcota_storage::StorageState;
+use nelcota_storage::{BucketError, BucketSettings, StorageState};
 use serde::Deserialize;
 use serde_json::{Value, json};
 
@@ -79,48 +79,49 @@ pub async fn overview(
     }))
 }
 
-#[derive(Deserialize)]
-pub struct BucketSettings {
-    #[serde(default)]
-    public: bool,
-    file_size_limit: Option<i64>,
-    allowed_mime_types: Option<Vec<String>>,
+/// The panel accepts whitespace and empty MIME inputs from its forms.
+/// Validation and writes belong to the shared storage operations.
+fn form_settings(mut settings: BucketSettings) -> BucketSettings {
+    settings.allowed_mime_types = settings
+        .allowed_mime_types
+        .map(|list| {
+            list.into_iter()
+                .map(|entry| entry.trim().to_ascii_lowercase())
+                .filter(|entry| !entry.is_empty())
+                .collect::<Vec<_>>()
+        })
+        .filter(|list| !list.is_empty());
+    settings
 }
 
-impl BucketSettings {
-    /// Validated and normalized; an empty type list means "any type".
-    fn checked(self) -> Result<Self, ApiError> {
-        if self.file_size_limit.is_some_and(|l| l <= 0) {
-            return Err(ApiError::bad_request(
-                "invalid_size_limit",
-                "the size limit must be greater than zero",
-            ));
+fn from_bucket(error: BucketError, id: &str) -> ApiError {
+    match error {
+        BucketError::InvalidSizeLimit => ApiError::bad_request(
+            "invalid_size_limit",
+            "the size limit must be greater than zero",
+        ),
+        BucketError::InvalidMimeType(entry) => ApiError::bad_request(
+            "invalid_mime_type",
+            format!("invalid type: {entry} (use image/png or image/*)"),
+        )
+        .params(json!({ "type": entry })),
+        BucketError::Exists => {
+            ApiError::conflict("bucket_exists", "a bucket with this name already exists")
+                .params(json!({ "bucket": id }))
         }
-        let types: Option<Vec<String>> = self
-            .allowed_mime_types
-            .as_ref()
-            .map(|list| {
-                list.iter()
-                    .map(|t| t.trim().to_ascii_lowercase())
-                    .filter(|t| !t.is_empty())
-                    .collect::<Vec<_>>()
-            })
-            .filter(|list| !list.is_empty());
-        if let Some(bad) = types
-            .iter()
-            .flatten()
-            .find(|t| !nelcota_storage::mime_entry_ok(t))
-        {
-            return Err(ApiError::bad_request(
-                "invalid_mime_type",
-                format!("invalid type: {bad} (use image/png or image/*)"),
-            )
-            .params(json!({ "type": bad })));
+        BucketError::NotFound => ApiError::not_found("bucket_not_found", "bucket not found")
+            .params(json!({ "bucket": id })),
+        BucketError::NotEmpty { count } => {
+            let error = ApiError::conflict(
+                "bucket_not_empty",
+                "the bucket still has files; delete them first",
+            );
+            match count {
+                Some(count) => error.params(json!({ "count": count })),
+                None => error,
+            }
         }
-        Ok(BucketSettings {
-            allowed_mime_types: types,
-            ..self
-        })
+        BucketError::Request(error) => from_storage(error),
     }
 }
 
@@ -136,27 +137,12 @@ pub async fn create_bucket(
     State(state): State<AdminState>,
     Json(new): Json<NewBucket>,
 ) -> Result<StatusCode, ApiError> {
-    enabled(&state)?;
+    let storage = enabled(&state)?;
     let id = bucket_id(&new.id)?;
-    let BucketSettings {
-        public,
-        file_size_limit: limit,
-        allowed_mime_types: types,
-    } = new.settings.checked()?;
-    let client = state.db.get().await?;
-    let inserted = client
-        .execute(
-            "INSERT INTO storage.buckets (id, public, file_size_limit, allowed_mime_types)
-             VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO NOTHING",
-            &[&id, &public, &limit, &types],
-        )
-        .await?;
-    if inserted == 0 {
-        return Err(
-            ApiError::conflict("bucket_exists", "a bucket with this name already exists")
-                .params(json!({ "bucket": id })),
-        );
-    }
+    storage
+        .create_bucket(&service_role(), id, form_settings(new.settings))
+        .await
+        .map_err(|error| from_bucket(error, id))?;
     Ok(StatusCode::CREATED)
 }
 
@@ -166,30 +152,13 @@ pub async fn update_bucket(
     Path(id): Path<String>,
     Json(settings): Json<BucketSettings>,
 ) -> Result<StatusCode, ApiError> {
-    enabled(&state)?;
+    let storage = enabled(&state)?;
     let id = bucket_id(&id)?;
-    let BucketSettings {
-        public,
-        file_size_limit: limit,
-        allowed_mime_types: types,
-    } = settings.checked()?;
-    let client = state.db.get().await?;
-    let updated = client
-        .execute(
-            "UPDATE storage.buckets
-                SET public = $2, file_size_limit = $3, allowed_mime_types = $4, updated_at = now()
-              WHERE id = $1",
-            &[&id, &public, &limit, &types],
-        )
-        .await?;
-    if updated == 0 {
-        return Err(bucket_not_found(id));
-    }
+    storage
+        .update_bucket(&service_role(), id, form_settings(settings))
+        .await
+        .map_err(|error| from_bucket(error, id))?;
     Ok(StatusCode::NO_CONTENT)
-}
-
-fn bucket_not_found(id: &str) -> ApiError {
-    ApiError::not_found("bucket_not_found", "bucket not found").params(json!({ "bucket": id }))
 }
 
 /// `DELETE /admin/api/storage/buckets/{id}`: only an empty bucket.
@@ -197,29 +166,12 @@ pub async fn delete_bucket(
     State(state): State<AdminState>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, ApiError> {
-    enabled(&state)?;
+    let storage = enabled(&state)?;
     let id = bucket_id(&id)?;
-    let client = state.db.get().await?;
-    let files: i64 = client
-        .query_one(
-            "SELECT count(*) FROM storage.objects WHERE bucket_id = $1",
-            &[&id],
-        )
-        .await?
-        .get(0);
-    if files > 0 {
-        return Err(ApiError::conflict(
-            "bucket_not_empty",
-            "the bucket still has files; delete them first",
-        )
-        .params(json!({ "count": files })));
-    }
-    let deleted = client
-        .execute("DELETE FROM storage.buckets WHERE id = $1", &[&id])
-        .await?;
-    if deleted == 0 {
-        return Err(bucket_not_found(id));
-    }
+    storage
+        .delete_bucket(&service_role(), id)
+        .await
+        .map_err(|error| from_bucket(error, id))?;
     Ok(StatusCode::NO_CONTENT)
 }
 
