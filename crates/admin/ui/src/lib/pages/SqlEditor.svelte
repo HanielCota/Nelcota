@@ -20,20 +20,24 @@
   import SaveQueryDialog from '$lib/components/app/SaveQueryDialog.svelte'
   import SqlSidebar from '$lib/components/app/SqlSidebar.svelte'
   import CellDetailDialog from '$lib/components/app/CellDetailDialog.svelte'
-  import { api } from '$lib/api'
+  import { SqlExecution } from '$lib/features/sql/execution.svelte'
+  import { sqlAdapter } from '$lib/features/sql/api'
   import { downloadText, toCsv, toJson } from '$lib/download'
   import { errorMessage, t } from '$lib/i18n/index.svelte'
   import { SQL_SNIPPETS } from '$lib/sql-snippets'
   import { sqlStore, type SavedQuery, type SqlDraft } from '$lib/sql-store.svelte'
-  import type { SqlResponse, SqlResult } from '$lib/types'
+  import type { SqlResult } from '$lib/types'
 
-  let schema = $state<Record<string, string[]>>({})
-  let defaultSchema = $state('public')
-  let running = $state(false)
-  let response = $state<SqlResponse | null>(null)
-  let elapsed = $state(0)
-  let execution: AbortController | undefined
-  onDestroy(() => execution?.abort())
+  const execution = new SqlExecution(sqlAdapter)
+  const schema = $derived(execution.schema.data?.tables ?? {})
+  const defaultSchema = $derived(execution.schema.data?.schema ?? 'public')
+  const running = $derived(execution.running)
+  const response = $derived(execution.error
+    ? { error: { message: errorMessage(execution.error), code: null, detail: null, hint: null, position: null } }
+    : execution.response)
+  const elapsed = $derived(execution.elapsed)
+  onMount(() => { void execution.loadSchema() })
+  onDestroy(() => execution.cancel())
 
   // Name dialog: save as a new query, or rename an existing one.
   let dialog = $state<{ mode: 'save' | 'rename'; query?: SavedQuery } | null>(null)
@@ -45,31 +49,9 @@
   let detail = $state<{ title: string; value: string | null } | null>(null)
   let detailOpen = $state(false)
 
-  onMount(async () => {
-    try {
-      const s = await api.get<{ schema: string; tables: Record<string, string[]> }>('/schema')
-      schema = s.tables
-      defaultSchema = s.schema
-    } catch {
-      // No table autocomplete; the editor keeps working.
-    }
-  })
-
   async function run() {
     const code = sqlStore.draft
-    if (running || !code.trim()) return
-    running = true
-    const started = performance.now()
-    const controller = execution = new AbortController()
-    try {
-      response = await api.post<SqlResponse>('/sql', { sql: code }, { signal: controller.signal })
-      sqlStore.remember(code)
-    } catch (e) {
-      response = { error: { message: errorMessage(e), code: null, detail: null, hint: null, position: null } }
-    } finally {
-      elapsed = Math.round(performance.now() - started)
-      running = false
-    }
+    if (await execution.run(code)) sqlStore.remember(code)
   }
 
   /** Saves the open query; with none open, asks for a name. */
