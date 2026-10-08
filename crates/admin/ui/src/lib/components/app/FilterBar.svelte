@@ -55,7 +55,7 @@
     <div class="flex flex-wrap items-center gap-2">
       <span class="w-12 text-right text-xs text-muted-foreground">{i === 0 ? t('tables.filters.where') : t('tables.filters.and')}</span>
       <Select.Root type="single" bind:value={row.column}>
-        <Select.Trigger class="w-48 font-mono text-xs">{row.column || t('tables.filters.column')}</Select.Trigger>
+        <Select.Trigger aria-label={t('tables.filters.column')} class="w-48 font-mono text-xs">{row.column || t('tables.filters.column')}</Select.Trigger>
         <Select.Content>
           {#each columns as column (column.name)}
             <Select.Item value={column.name} class="font-mono text-xs">{column.name}</Select.Item>
@@ -63,7 +63,7 @@
         </Select.Content>
       </Select.Root>
       <Select.Root type="single" bind:value={row.op}>
-        <Select.Trigger class="w-44 text-sm">{opLabel(row.op)}</Select.Trigger>
+        <Select.Trigger aria-label={t('tables.filters.operator')} class="w-44 text-sm">{opLabel(row.op)}</Select.Trigger>
         <Select.Content>
           {#each UI_OPERATORS as op (op.value)}
             <Select.Item value={op.value}>{t(op.label)}</Select.Item>
@@ -71,7 +71,7 @@
         </Select.Content>
       </Select.Root>
       {#if needsValue(row.op)}
-        <Input bind:value={row.value} placeholder={t('tables.filters.value')} class="w-56 font-mono text-xs" />
+        <Input bind:value={row.value} aria-label={t('tables.filters.value')} placeholder={t('tables.filters.value')} class="w-56 font-mono text-xs" />
       {/if}
       <Button
         variant="ghost"

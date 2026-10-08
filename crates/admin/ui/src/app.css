@@ -109,7 +109,7 @@
 @theme inline {
 	/* Panel type scale (one step above Tailwind's default).
 	   Size tweaks happen here, not with text-[Npx] in components. */
-	--text-3xs: 0.6875rem;
+	--text-3xs: 0.75rem;
 	--text-3xs--line-height: 1rem;
 	--text-2xs: 0.75rem;
 	--text-2xs--line-height: 1rem;
@@ -236,6 +236,12 @@
 	animation: progress-indeterminate 1.1s ease-in-out infinite;
 }
 @media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0s !important;
+    scroll-behavior: auto !important;
+  }
 	.animate-progress {
 		animation: none;
 		transform: none;

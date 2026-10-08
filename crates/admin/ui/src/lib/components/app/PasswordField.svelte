@@ -4,7 +4,7 @@
   import Eye from '@lucide/svelte/icons/eye'
   import EyeOff from '@lucide/svelte/icons/eye-off'
   import Copy from '@lucide/svelte/icons/copy'
-  import { toast } from 'svelte-sonner'
+  import { copyText } from '$lib/clipboard'
   import { generatePassword, passwordProblem } from '$lib/password'
   import { t } from '$lib/i18n/index.svelte'
 
@@ -20,8 +20,7 @@
   }
 
   async function copy() {
-    await navigator.clipboard.writeText(value)
-    toast.success(t('users.password.copied'))
+    await copyText(value, t('users.password.copied'))
   }
 </script>
 

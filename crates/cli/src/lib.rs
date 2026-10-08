@@ -7,6 +7,7 @@
 //! in the environment (inside the container or in a dev shell) and, on a host,
 //! run with the project's app configuration.
 
+mod backup;
 mod caddy;
 mod checks;
 mod db;

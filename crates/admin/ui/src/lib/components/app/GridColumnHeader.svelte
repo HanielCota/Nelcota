@@ -9,7 +9,7 @@
   import Copy from '@lucide/svelte/icons/copy'
   import EyeOff from '@lucide/svelte/icons/eye-off'
   import X from '@lucide/svelte/icons/x'
-  import { toast } from 'svelte-sonner'
+  import { copyText } from '$lib/clipboard'
   import { alignRight, type ColumnKind } from '$lib/grid'
   import type { Column } from '$lib/types'
   import { t } from '$lib/i18n/index.svelte'
@@ -52,8 +52,7 @@
   }
 
   async function copyName() {
-    await navigator.clipboard.writeText(column.name)
-    toast.success(t('tables.toast.nameCopied', { name: column.name }))
+    await copyText(column.name, t('tables.toast.nameCopied', { name: column.name }))
   }
 </script>
 

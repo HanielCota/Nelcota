@@ -5,6 +5,9 @@
   import Plus from '@lucide/svelte/icons/plus'
   import Table2 from '@lucide/svelte/icons/table-2'
   import RlsDot from './RlsDot.svelte'
+  import LoadError from './LoadError.svelte'
+  import EmptyState from './EmptyState.svelte'
+  import { Skeleton } from '$lib/components/ui/skeleton'
   import { href } from '$lib/router.svelte'
   import { cn } from '$lib/utils'
   import type { TableSummary } from '$lib/types'
@@ -14,11 +17,17 @@
     tables,
     current,
     oncreate,
+    loading = false,
+    error = '',
+    onretry,
   }: {
     tables: TableSummary[]
     /** Open table (`undefined` = none: on phones the list fills the screen). */
     current?: string
     oncreate: () => void
+    loading?: boolean
+    error?: string
+    onretry: () => void
   } = $props()
 
   let search = $state('')
@@ -33,7 +42,7 @@
 
 <aside
   aria-label={t('tables.sidebar.label')}
-  class={cn('w-full shrink-0 flex-col border-r bg-sidebar md:flex md:w-72', current ? 'hidden' : 'flex')}
+  class={cn('w-full shrink-0 flex-col border-r bg-sidebar lg:flex lg:w-64 xl:w-72', current ? 'hidden' : 'flex lg:w-64 xl:w-72')}
 >
   <div class="grid gap-3 border-b p-4">
     <div class="flex items-center justify-between gap-2">
@@ -44,13 +53,17 @@
     </div>
     <div class="relative">
       <Search class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-      <Input bind:value={search} placeholder={t('tables.sidebar.search')} class="pl-9 text-sm" />
+      <Input bind:value={search} aria-label={t('tables.sidebar.search')} placeholder={t('tables.sidebar.search')} class="pl-9 text-sm" />
     </div>
   </div>
   <p class="flex items-center justify-between px-5 pt-4 pb-2 text-xs font-medium text-muted-foreground">
     {t('tables.sidebar.heading')}<span class="tabular-nums">{visible.length}</span>
   </p>
   <nav class="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 pb-3" aria-label={t('tables.sidebar.heading')}>
+    {#if error}<LoadError message={error} onretry={onretry} busy={loading} />{/if}
+    {#if loading && !tables.length}
+      {#each Array(4) as _}<Skeleton class="mb-1 h-9 w-full" />{/each}
+    {:else}
     {#each visible as table (table.name)}
       <a
         href={href(`/tables/${encodeURIComponent(table.name)}`)}
@@ -67,7 +80,12 @@
         {#if table.kind !== 'table'}<span class="text-2xs text-muted-foreground">{t('tables.sidebar.view')}</span>{/if}
       </a>
     {:else}
-      <p class="px-3 py-6 text-center text-sm text-muted-foreground">{t('tables.sidebar.empty')}</p>
+      {#if !error}
+        <EmptyState icon={Table2} title={t('tables.sidebar.empty')} class="px-3 py-6">
+          {#snippet actions()}{#if !tables.length}<Button variant="outline" size="sm" onclick={oncreate}><Plus aria-hidden="true" />{t('tables.sidebar.newTable')}</Button>{/if}{/snippet}
+        </EmptyState>
+      {/if}
     {/each}
+    {/if}
   </nav>
 </aside>

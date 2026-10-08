@@ -1,7 +1,16 @@
 // How grid columns are presented by Postgres type: category, width and
 // alignment. Pure, so it can be tested without mounting a component.
 
-import type { Column } from './types'
+import type { Column, RowData } from './types'
+
+/** Stable identity, including composite keys; never use a row's position for writes. */
+export function rowKey(row: RowData, primaryKey: readonly string[], fallback = 0): string {
+  return primaryKey.length ? JSON.stringify(primaryKey.map((key) => row[key])) : String(fallback)
+}
+
+export function rowPk(row: RowData, primaryKey: readonly string[]): RowData {
+  return Object.fromEntries(primaryKey.map((key) => [key, row[key]]))
+}
 
 export type ColumnKind = 'number' | 'boolean' | 'temporal' | 'json' | 'uuid' | 'enum' | 'text'
 

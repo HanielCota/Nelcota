@@ -4,6 +4,8 @@
 import type { Messages } from '../index.svelte'
 
 const ptBR = {
+  sql_busy: "Todas as conexões do editor estão ocupadas. Aguarde uma consulta terminar.",
+
   // Session and access
   route_not_found: 'Rota não encontrada.',
   session_expired: 'Sessão expirada: entre de novo.',
@@ -62,13 +64,13 @@ const ptBR = {
   column_already_exists: "A coluna '{column}' já existe.",
   column_not_found: "A coluna '{column}' não existe.",
   column_rejects_default: "A coluna '{column}' é identity/gerada: não aceita DEFAULT.",
-  policy_insert_no_using: 'Policy de INSERT não usa USING: a linha ainda não existe (use WITH CHECK).',
-  policy_check_not_allowed: 'Policy de {command} não usa WITH CHECK: nenhuma linha é gravada (use USING).',
-  policy_insert_needs_check: 'Policy de INSERT precisa de WITH CHECK.',
-  policy_needs_using: 'A policy precisa da expressão USING.',
+  policy_insert_no_using: 'Política de INSERT não usa USING: a linha ainda não existe (use WITH CHECK).',
+  policy_check_not_allowed: 'Política de {command} não usa WITH CHECK: nenhuma linha é gravada (use USING).',
+  policy_insert_needs_check: 'Política de INSERT precisa de WITH CHECK.',
+  policy_needs_using: 'A política precisa da expressão USING.',
 
   // Storage
-  storage_disabled: 'Storage desligado: defina NELCOTA_STORAGE_BACKEND.',
+  storage_disabled: 'Armazenamento desligado: defina NELCOTA_STORAGE_BACKEND.',
   invalid_bucket_name: 'Nome de bucket com letras minúsculas, números, - e _ (até 63). public, sign e list são reservados.',
   invalid_mime_type: "Tipo inválido: '{type}'. Use image/png ou image/*.",
   invalid_size_limit: 'O limite precisa ser maior que zero.',
@@ -86,6 +88,7 @@ const ptBR = {
 }
 
 const en: Messages<typeof ptBR> = {
+  sql_busy: 'All SQL editor connections are busy. Wait for a query to finish.',
   route_not_found: 'Route not found.',
   session_expired: 'Session expired: sign in again.',
   origin_not_allowed: 'Origin not allowed.',

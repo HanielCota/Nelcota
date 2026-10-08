@@ -1,5 +1,7 @@
 // Panel API client (/admin/api). The session lives in an HttpOnly cookie.
 import { session } from './session.svelte'
+import { responseContract } from './contracts'
+import { t } from './i18n/index.svelte'
 
 /**
  * Failed request. `message` is the server's English text; `code` and `params`
@@ -24,21 +26,36 @@ async function request<T>(method: string, path: string, body?: unknown, signal?:
     headers: body === undefined ? {} : { 'content-type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),
   })
-  return parse<T>(res, path)
+  return parse<T>(res, path, method)
 }
 
 /** Sends a file as the raw request body (storage uploads). */
-export async function uploadFile<T>(path: string, file: File): Promise<T> {
+export async function uploadFile<T>(path: string, file: File, onprogress?: (loaded: number, total: number) => void): Promise<T> {
+  if (onprogress) {
+    return new Promise<T>((resolve, reject) => {
+      const request = new XMLHttpRequest()
+      request.open('POST', `/admin/api${path}`)
+      request.withCredentials = true
+      request.setRequestHeader('content-type', file.type || 'application/octet-stream')
+      request.upload.onprogress = (event) => onprogress(event.loaded, event.lengthComputable ? event.total : file.size)
+      request.onerror = () => reject(new Error(t('common.requestFailed')))
+      request.onabort = () => reject(new DOMException('Aborted', 'AbortError'))
+      request.onload = () => {
+        Promise.resolve().then(() => parse<T>(new Response([204, 205, 304].includes(request.status) ? null : request.responseText, { status: request.status }), path, 'POST')).then(resolve, reject)
+      }
+      request.send(file)
+    })
+  }
   const res = await fetch(`/admin/api${path}`, {
     method: 'POST',
     credentials: 'same-origin',
     headers: { 'content-type': file.type || 'application/octet-stream' },
     body: file,
   })
-  return parse<T>(res, path)
+  return parse<T>(res, path, 'POST')
 }
 
-async function parse<T>(res: Response, path: string): Promise<T> {
+async function parse<T>(res: Response, path: string, method: string): Promise<T> {
   const text = await res.text()
   let data: unknown = null
   try {
@@ -51,6 +68,8 @@ async function parse<T>(res: Response, path: string): Promise<T> {
     const body = data as { error?: string; code?: string; params?: Record<string, string | number> } | null
     throw new ApiError(body?.error ?? `HTTP ${res.status}`, res.status, body?.code, body?.params)
   }
+  const validate = responseContract(method, path)
+  if (validate && !validate(data)) throw new ApiError(t('common.invalidResponse'), 502, 'invalid_response')
   return data as T
 }
 

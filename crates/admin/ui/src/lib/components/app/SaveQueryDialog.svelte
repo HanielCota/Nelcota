@@ -1,4 +1,8 @@
 <script lang="ts">
+  import { untrack } from 'svelte'
+  import { CloseGuard } from '$lib/close-guard.svelte'
+  import UnsavedChangesDialog from './UnsavedChangesDialog.svelte'
+  import Save from '@lucide/svelte/icons/save'
   import * as Dialog from '$lib/components/ui/dialog'
   import { Button } from '$lib/components/ui/button'
   import { Input } from '$lib/components/ui/input'
@@ -20,10 +24,12 @@
   } = $props()
 
   let name = $state('')
+  let originalName = $state('')
+  const guard = new CloseGuard(() => name !== originalName, () => false, () => (open = false))
 
   // Fill the field on every open (save and rename share this dialog).
   $effect(() => {
-    if (open) name = initialName
+    if (open) untrack(() => { name = initialName; originalName = initialName })
   })
 
   function submit(event: SubmitEvent) {
@@ -35,7 +41,7 @@
   }
 </script>
 
-<Dialog.Root bind:open>
+<Dialog.Root bind:open={() => open, guard.change}>
   <Dialog.Content class="sm:max-w-md">
     <form class="grid gap-5" onsubmit={submit}>
       <Dialog.Header>
@@ -47,9 +53,10 @@
         <Input id="query-name" bind:value={name} placeholder={t('sql.dialog.placeholder')} maxlength={120} />
       </div>
       <Dialog.Footer>
-        <Button variant="outline" onclick={() => (open = false)}>{t('common.cancel')}</Button>
-        <Button type="submit" disabled={!name.trim()}>{confirmLabel ?? t('common.save')}</Button>
+        <Button variant="outline" onclick={guard.request}>{t('common.cancel')}</Button>
+        <Button type="submit" disabled={!name.trim()}><Save data-icon="inline-start" aria-hidden="true" />{confirmLabel ?? t('common.save')}</Button>
       </Dialog.Footer>
     </form>
   </Dialog.Content>
 </Dialog.Root>
+<UnsavedChangesDialog bind:open={guard.pending} ondiscard={guard.discard} />

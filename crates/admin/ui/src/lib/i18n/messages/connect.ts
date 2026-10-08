@@ -3,6 +3,7 @@ import type { Messages } from '../index.svelte'
 
 const ptBR = {
   title: 'API',
+  navigation: 'Seções da documentação da API',
   description: 'Como o seu app conversa com este projeto.',
   openapi: 'Documentação OpenAPI',
   address: 'Endereço do projeto',
@@ -14,15 +15,15 @@ const ptBR = {
   },
   caller: 'Quem faz a chamada',
   callerHint:
-    'Não existe chave anon: quem não manda token já é anon. O acesso de cada role é definido por tabela, nos GRANTs (aba Estrutura) e nas policies.',
+    'Não existe chave anon: quem não manda token já é anon. O acesso de cada role é definido por tabela, nos GRANTs (aba Estrutura) e nas políticas.',
   roles: {
     anon: {
       title: 'Visitante',
-      text: 'Request sem header Authorization. Vê o que os GRANTs e as policies liberam para anon.',
+      text: 'Request sem header Authorization. Vê o que os GRANTs e as políticas liberam para anon.',
     },
     authenticated: {
       title: 'Usuário logado',
-      text: 'Authorization: Bearer com o access_token do login. auth.uid() é o id dele nas policies.',
+      text: 'Authorization: Bearer com o access_token do login. auth.uid() é o id dele nas políticas.',
     },
     service_role: {
       title: 'Seu backend',
@@ -97,6 +98,7 @@ const ptBR = {
 
 const en: Messages<typeof ptBR> = {
   title: 'API',
+  navigation: 'API documentation sections',
   description: 'How your app talks to this project.',
   openapi: 'OpenAPI documentation',
   address: 'Project address',

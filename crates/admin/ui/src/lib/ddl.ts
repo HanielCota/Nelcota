@@ -4,9 +4,17 @@
 import { api, enc } from './api'
 import type { MessageKey } from './i18n/index.svelte'
 
-export type ApiRole = 'anon' | 'authenticated' | 'service_role'
-export type Privilege = 'select' | 'insert' | 'update' | 'delete'
-export type OnDelete = 'no_action' | 'restrict' | 'cascade' | 'set_null' | 'set_default'
+import type { ApiRole, Privilege, OnDelete, ReferenceDef, ColumnDef, GrantDef, CreateTable, AlterAction, ColumnInfo, Structure, PolicyRole, PolicyDef, DdlResult } from './generated/contracts'
+import type { Command as PolicyCommand } from './generated/contracts'
+export type { ApiRole, Privilege, OnDelete, ReferenceDef, ColumnDef, GrantDef, CreateTable, AlterAction, ColumnInfo, Structure, PolicyRole, PolicyDef, DdlResult, PolicyCommand }
+import { t } from './i18n/index.svelte'
+import { toast } from 'svelte-sonner'
+
+async function change(pending: Promise<DdlResult>): Promise<DdlResult> {
+  const result = await pending
+  if (result.catalog_pending) toast.warning(t('common.catalogPending'), { duration: 10000 })
+  return result
+}
 
 export const API_ROLES: readonly ApiRole[] = ['anon', 'authenticated', 'service_role']
 export const PRIVILEGES: readonly Privilege[] = ['select', 'insert', 'update', 'delete']
@@ -19,93 +27,6 @@ export const ON_DELETE: readonly { value: OnDelete; label: MessageKey }[] = [
   { value: 'restrict', label: 'tables.columns.onDelete.restrict' },
   { value: 'set_default', label: 'tables.columns.onDelete.set_default' },
 ]
-
-export interface ReferenceDef {
-  table: string
-  column: string
-  on_delete: OnDelete
-}
-
-export interface ColumnDef {
-  name: string
-  data_type: string
-  nullable: boolean
-  default: string | null
-  primary_key: boolean
-  identity: boolean
-  unique: boolean
-  references: ReferenceDef | null
-  comment: string | null
-}
-
-export interface GrantDef {
-  role: ApiRole
-  privileges: Privilege[]
-}
-
-export interface CreateTable {
-  name: string
-  comment: string | null
-  columns: ColumnDef[]
-  rls: boolean
-  grants: GrantDef[]
-}
-
-export type AlterAction =
-  | { action: 'rename_table'; name: string }
-  | { action: 'set_comment'; comment: string | null }
-  | { action: 'set_rls'; enabled: boolean }
-  | { action: 'add_column'; column: ColumnDef }
-  | { action: 'drop_column'; name: string }
-  | { action: 'rename_column'; from: string; to: string }
-  | { action: 'set_type'; column: string; data_type: string; using?: string | null }
-  | { action: 'set_nullable'; column: string; nullable: boolean }
-  | { action: 'set_default'; column: string; default: string | null }
-  | { action: 'set_unique'; column: string; unique: boolean }
-  | { action: 'set_reference'; column: string; reference: ReferenceDef | null }
-  | { action: 'set_column_comment'; column: string; comment: string | null }
-  | { action: 'set_grants'; grant: GrantDef }
-
-// Structure read from pg_catalog (GET /tables/:name/structure).
-export interface ColumnInfo {
-  name: string
-  data_type: string
-  nullable: boolean
-  default: string | null
-  identity: 'always' | 'by default' | null
-  generated: boolean
-  primary_key: boolean
-  unique: string | null
-  references: { table: string; column: string; on_delete: string; constraint: string } | null
-  comment: string | null
-}
-
-export interface Structure {
-  name: string
-  comment: string | null
-  rls_enabled: boolean
-  primary_key: string[]
-  columns: ColumnInfo[]
-  grants: { role: ApiRole; privileges: Privilege[] }[]
-}
-
-export type PolicyCommand = 'all' | 'select' | 'insert' | 'update' | 'delete'
-export type PolicyRole = 'public' | ApiRole
-
-export interface PolicyDef {
-  name: string
-  command: PolicyCommand
-  roles: PolicyRole[]
-  permissive: boolean
-  using: string | null
-  check: string | null
-}
-
-/** Response of every change: the SQL that ran (or its preview). */
-export interface DdlResult {
-  sql: string[]
-  message?: string
-}
 
 export const blankColumn = (): ColumnDef => ({
   name: '',
@@ -215,17 +136,17 @@ type Options = { signal?: AbortSignal }
 
 export const ddl = {
   types: () => api.get<{ base: string[]; enums: string[] }>('/types'),
-  structure: (table: string) => api.get<Structure>(`/tables/${enc(table)}/structure`),
+  structure: (table: string, options: Options = {}) => api.get<Structure>(`/tables/${enc(table)}/structure`, options),
   createTable: (table: CreateTable, preview = false, options: Options = {}) =>
-    api.post<DdlResult>('/tables', { table, preview }, options),
+    change(api.post<DdlResult>('/tables', { table, preview }, options)),
   alterTable: (table: string, actions: AlterAction[], preview = false, options: Options = {}) =>
-    api.patch<DdlResult>(`/tables/${enc(table)}`, { actions, preview }, options),
+    change(api.patch<DdlResult>(`/tables/${enc(table)}`, { actions, preview }, options)),
   dropTable: (table: string, cascade: boolean) =>
-    api.delete<DdlResult>(`/tables/${enc(table)}?cascade=${cascade}`),
+    change(api.delete<DdlResult>(`/tables/${enc(table)}?cascade=${cascade}`)),
   createPolicy: (table: string, policy: PolicyDef, preview = false, options: Options = {}) =>
-    api.post<DdlResult>(`/tables/${enc(table)}/policies`, { policy, preview }, options),
+    change(api.post<DdlResult>(`/tables/${enc(table)}/policies`, { policy, preview }, options)),
   replacePolicy: (table: string, original: string, policy: PolicyDef, preview = false, options: Options = {}) =>
-    api.put<DdlResult>(`/tables/${enc(table)}/policies/${enc(original)}`, { policy, preview }, options),
+    change(api.put<DdlResult>(`/tables/${enc(table)}/policies/${enc(original)}`, { policy, preview }, options)),
   dropPolicy: (table: string, policy: string) =>
-    api.delete<DdlResult>(`/tables/${enc(table)}/policies/${enc(policy)}`),
+    change(api.delete<DdlResult>(`/tables/${enc(table)}/policies/${enc(policy)}`)),
 }

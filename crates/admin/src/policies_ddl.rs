@@ -7,7 +7,6 @@ use axum::{
     extract::{Path, Query, State},
 };
 use serde::Deserialize;
-use serde_json::Value;
 
 use crate::{
     AdminState, ApiError,
@@ -16,7 +15,7 @@ use crate::{
     ddl::policy::{self, PolicyDef},
 };
 
-type ApiResult = Result<Json<Value>, ApiError>;
+type ApiResult = Result<Json<crate::contracts::DdlResult>, ApiError>;
 
 #[derive(Deserialize)]
 pub struct PolicyRequest {

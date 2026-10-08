@@ -97,27 +97,23 @@ pub fn backup(
 ) -> anyhow::Result<PathBuf> {
     let dir = project.path("backups");
     fs::create_dir_all(&dir)?;
-    let name = format!("nelcota-{}-{}.dump", project.name, util::timestamp());
+    let name = format!(
+        "nelcota-{}-{}-{}.dump",
+        project.name,
+        util::timestamp(),
+        util::secret(6)
+    );
     let path = dir.join(&name);
     step(&format!("Backup of {}: {name}", project.name));
 
-    let file = fs::File::create(&path)?;
-    let status = project
-        .as_postgres(&["pg_dump", "-Fc", "postgres"])
-        .stdin(Stdio::null())
-        .stdout(Stdio::from(file))
-        .status()
-        .context("could not run pg_dump")?;
-    let size = fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
-    if !status.success() || size == 0 {
-        let _ = fs::remove_file(&path);
-        bail!("[{}] pg_dump failed ({status})", project.name);
-    }
+    crate::backup::capture(project, &path)?;
+    let size = fs::metadata(&path)?.len();
     ok(&format!("{} ({} KB)", path.display(), size / 1024));
 
     if upload {
+        // Publish the immutable file snapshot before making its dump available.
+        sync_files_up(host, project, &path)?;
         upload_s3(host, &project.name, &path, &name)?;
-        sync_files_up(host, project)?;
     }
     if let Some(keep) = keep {
         prune(&dir, keep)?;
@@ -196,8 +192,12 @@ impl BackupS3 {
         Ok(())
     }
 
-    fn files_url(&self, project: &str) -> String {
-        format!("s3://{}/{project}/storage/", self.bucket)
+    fn files_url(&self, project: &str, dump: &Path) -> anyhow::Result<String> {
+        let name = dump
+            .file_name()
+            .and_then(|n| n.to_str())
+            .context("invalid dump filename")?;
+        Ok(format!("s3://{}/{project}/{name}.files/", self.bucket))
     }
 }
 
@@ -220,68 +220,59 @@ fn upload_s3(host: &Host, project: &str, path: &Path, name: &str) -> anyhow::Res
     Ok(())
 }
 
-/// Mirrors the project's files to `<bucket>/<project>/storage/`. Keys are
-/// immutable versions (D78), so each run only sends what is new, and files
-/// deleted in the app are deleted there too.
-fn sync_files_up(host: &Host, project: &Project) -> anyhow::Result<()> {
-    let dir = project.storage_dir();
-    if !project.stores_files_on_disk() || !dir.is_dir() {
+/// Each dump has its own immutable snapshot; later deletions cannot alter it.
+fn sync_files_up(host: &Host, project: &Project, dump: &Path) -> anyhow::Result<()> {
+    let dir = crate::backup::bundle_path(dump)?;
+    if !dir.is_dir() {
         return Ok(());
     }
     let s3 = BackupS3::from_host(host)?;
-    step(&format!("Syncing files to {}", s3.files_url(&project.name)));
+    let url = s3.files_url(&project.name, dump)?;
+    step(&format!("Uploading file snapshot to {url}"));
     s3.run(
         &dir,
         true,
         None,
-        &[
-            "sync",
-            "/data",
-            &s3.files_url(&project.name),
-            "--delete",
-            "--only-show-errors",
-        ],
+        &["sync", "/data", &url, "--only-show-errors"],
     )?;
     ok("files synced");
     Ok(())
 }
 
-/// Brings the files back from the backup bucket, replacing the local ones.
-fn sync_files_down(host: &Host, project: &Project) -> anyhow::Result<()> {
-    let dir = project.storage_dir();
+/// Fetch the matching snapshot into the backup directory, never the live store.
+fn sync_files_down(host: &Host, project: &Project, dump: &Path) -> anyhow::Result<()> {
+    let dir = crate::backup::bundle_path(dump)?;
     fs::create_dir_all(&dir)?;
     let s3 = BackupS3::from_host(host)?;
-    step(&format!(
-        "Restoring files from {}",
-        s3.files_url(&project.name)
-    ));
-    // On Docker, as the image's user so the app can still replace and delete
-    // them; systemd hands its state directory to the unit's dynamic user.
-    let user = (project.runtime == Runtime::Docker).then_some("65532:65532");
+    let url = s3.files_url(&project.name, dump)?;
+    step(&format!("Fetching file snapshot from {url}"));
     s3.run(
         &dir,
         false,
-        user,
-        &[
-            "sync",
-            &s3.files_url(&project.name),
-            "/data",
-            "--delete",
-            "--only-show-errors",
-        ],
+        None,
+        &["sync", &url, "/data", "--only-show-errors"],
     )?;
     ok("files restored");
     Ok(())
 }
 
-fn prune(dir: &Path, keep: usize) -> anyhow::Result<()> {
+pub(crate) fn prune(dir: &Path, keep: usize) -> anyhow::Result<()> {
     let mut dumps: Vec<PathBuf> = fs::read_dir(dir)?
         .filter_map(|e| e.ok().map(|e| e.path()))
         .filter(|p| p.extension().is_some_and(|x| x == "dump"))
         .collect();
-    dumps.sort();
+    // Random suffixes avoid same-second collisions; use file time for retention.
+    dumps.sort_by_cached_key(|path| {
+        (
+            fs::metadata(path)
+                .and_then(|meta| meta.modified())
+                .unwrap_or(std::time::UNIX_EPOCH),
+            path.clone(),
+        )
+    });
     let excess = dumps.len().saturating_sub(keep);
     for old in dumps.into_iter().take(excess) {
+        crate::backup::remove_bundle(&old)?;
         fs::remove_file(&old)?;
         ok(&format!("removed {}", old.display()));
     }
@@ -290,8 +281,7 @@ fn prune(dir: &Path, keep: usize) -> anyhow::Result<()> {
 
 /// Restores a dump: stops the app, recreates the objects in a single
 /// transaction and starts the app again.
-/// With `files`, also brings the files back from the backup bucket (what
-/// `backup --upload` mirrored), replacing the local ones.
+/// With `files`, verifies the matching immutable snapshot before any change.
 pub fn restore(
     host: &Host,
     project: &Project,
@@ -312,13 +302,28 @@ pub fn restore(
     {
         bail!("restore cancelled (use --yes to skip the question)");
     }
+    let manifest = if files {
+        if !crate::backup::bundle_path(file)?
+            .join("manifest.json")
+            .is_file()
+        {
+            sync_files_down(host, project, file)?;
+        }
+        Some(crate::backup::validate(file)?)
+    } else {
+        None
+    };
     step(&format!("Stopping the {} app", project.name));
     project.stop(&[Service::App])?;
     step(&format!("Restoring {}", file.display()));
-    let mut result = restore_dump(project, file);
-    if files && result.is_ok() {
-        result = sync_files_down(host, project);
-    }
+    // Prepare immutable bytes first. A copy failure cannot leave restored
+    // metadata pointing to missing files; extra versions are harmless on rollback.
+    let result = if let Some(manifest) = manifest.as_ref() {
+        crate::backup::restore_files(project, file, manifest)
+            .and_then(|()| restore_dump(project, file))
+    } else {
+        restore_dump(project, file)
+    };
     step("Starting the app");
     project.start(&[Service::App])?;
     result?;
@@ -327,7 +332,7 @@ pub fn restore(
     Ok(())
 }
 
-fn restore_dump(project: &Project, file: &Path) -> anyhow::Result<()> {
+pub(crate) fn restore_dump(project: &Project, file: &Path) -> anyhow::Result<()> {
     let input = fs::File::open(file)?;
     let status = project
         .as_postgres(&[

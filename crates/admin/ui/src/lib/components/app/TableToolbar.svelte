@@ -9,7 +9,7 @@
   import Columns3 from '@lucide/svelte/icons/columns-3'
   import RlsBadge from './RlsBadge.svelte'
   import { enc } from '$lib/api'
-  import { href } from '$lib/router.svelte'
+  import { href, route } from '$lib/router.svelte'
   import type { TableData } from '$lib/types'
   import { t } from '$lib/i18n/index.svelte'
 
@@ -50,7 +50,7 @@
 <div class="flex min-h-14 shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b bg-background px-4 py-2.5">
   <a
     href={href('/tables')}
-    class="-ml-1 grid size-9 place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground md:hidden"
+    class="-ml-1 grid size-9 place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground lg:hidden"
     aria-label={t('tables.toolbar.back')}><ChevronLeft class="size-4" /></a
   >
   <h1 class="min-w-0 truncate text-base font-semibold">{name}</h1>
@@ -58,7 +58,7 @@
   <nav class="ml-1 flex h-9 items-center gap-0.5 rounded-md border bg-muted/50 p-0.5 text-sm" aria-label={t('tables.toolbar.views')}>
     {#each tabs as tab (tab.view)}
       <a
-        href={href(`/tables/${enc(name)}${tab.suffix}`)}
+        href={href(`/tables/${enc(name)}${tab.suffix}${route.query.size ? `?${route.query}` : ''}`)}
         aria-current={view === tab.view ? 'page' : undefined}
         class={[
           'flex h-full items-center rounded px-3 transition-colors',
@@ -124,11 +124,11 @@
           </DropdownMenu.Item>
         </DropdownMenu.Content>
       </DropdownMenu.Root>
-      <Button variant="ghost" size="icon-sm" onclick={onreload} aria-label={t('tables.toolbar.reload')} title={t('tables.toolbar.reload')}>
+      <Button variant="ghost" size="icon-sm" disabled={loading} onclick={onreload} aria-label={t('tables.toolbar.reload')} title={t('tables.toolbar.reload')}>
         <RefreshCw class={loading ? 'animate-spin' : ''} />
       </Button>
       {#if data?.table.insertable}
-        <Button size="sm" onclick={oninsert}><Plus />{t('tables.toolbar.insertRow')}</Button>
+        <Button size="sm" disabled={loading} onclick={oninsert}><Plus />{t('tables.toolbar.insertRow')}</Button>
       {/if}
     </div>
   {/if}

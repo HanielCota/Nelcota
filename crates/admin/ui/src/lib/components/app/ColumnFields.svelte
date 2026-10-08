@@ -145,7 +145,7 @@
       <div class="flex flex-wrap items-center gap-2">
         <span class="w-24 text-muted-foreground">{t('tables.columns.references')}</span>
         <Select.Root type="single" value={column.references?.table ?? ''} onValueChange={setReference}>
-          <Select.Trigger size="sm" class="w-40 font-mono text-xs">
+          <Select.Trigger aria-label={t('tables.columns.references')} size="sm" class="w-40 font-mono text-xs">
             {column.references?.table ?? t('tables.columns.noTable')}
           </Select.Trigger>
           <Select.Content>
@@ -157,7 +157,7 @@
         </Select.Root>
         {#if column.references}
           <Select.Root type="single" bind:value={column.references.column}>
-            <Select.Trigger size="sm" class="w-32 font-mono text-xs">{column.references.column}</Select.Trigger>
+            <Select.Trigger aria-label={t('tables.columns.referenceColumn')} size="sm" class="w-32 font-mono text-xs">{column.references.column}</Select.Trigger>
             <Select.Content>
               {#each tables[column.references.table] ?? [] as name (name)}
                 <Select.Item value={name} class="font-mono text-xs">{name}</Select.Item>
@@ -166,7 +166,7 @@
           </Select.Root>
           <span class="text-muted-foreground">{t('tables.columns.onDeleteLabel')}</span>
           <Select.Root type="single" bind:value={column.references.on_delete}>
-            <Select.Trigger size="sm" class="w-40 text-xs">{onDeleteLabel(column.references.on_delete)}</Select.Trigger>
+            <Select.Trigger aria-label={t('tables.columns.onDeleteLabel')} size="sm" class="w-40 text-xs">{onDeleteLabel(column.references.on_delete)}</Select.Trigger>
             <Select.Content>
               {#each ON_DELETE as option (option.value)}
                 <Select.Item value={option.value} class="text-xs">{t(option.label)}</Select.Item>
@@ -177,8 +177,9 @@
       </div>
 
       <div class="flex items-center gap-2">
-        <span class="w-24 text-muted-foreground">{t('tables.columns.description')}</span>
+        <label for={`${id}-description`} class="w-24 text-muted-foreground">{t('tables.columns.description')}</label>
         <Input
+          id={`${id}-description`}
           bind:value={() => column.comment ?? '', (v) => (column.comment = v || null)}
           placeholder={t('tables.columns.descriptionPlaceholder')}
           class="flex-1 text-xs"

@@ -235,7 +235,7 @@ impl DataType {
 }
 
 /// API roles the panel lets you configure in GRANTs and policies.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, ts_rs::TS, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ApiRole {
     Anon,
@@ -253,7 +253,9 @@ impl ApiRole {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize, ts_rs::TS, schemars::JsonSchema,
+)]
 #[serde(rename_all = "lowercase")]
 pub enum Privilege {
     Select,
@@ -273,7 +275,7 @@ impl Privilege {
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, ts_rs::TS, schemars::JsonSchema)]
 pub struct GrantDef {
     pub role: ApiRole,
     pub privileges: Vec<Privilege>,

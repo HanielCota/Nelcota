@@ -22,6 +22,33 @@ client ──HTTPS──▶ Caddy ──▶ nelcota (single binary) ──▶ Po
 Everything compiles into a single binary (~19 MB, static with musl in the
 Docker image).
 
+The query compiler separates the validated request representation (`query/mod.rs`),
+URL parsing (`query/parse.rs`) and SQL generation (`query/sql.rs`), behind the
+existing public interface. Panel read/write handlers are organized by feature in
+`admin/src/api/`; DDL validation and execution remain separate modules.
+
+Panel wire DTOs live in `admin/src/contracts.rs` and the existing structure/DDL
+types. Their generated TypeScript and JSON Schemas are versioned with the UI;
+standalone validators reject incompatible responses in the client. Row values
+remain strings or NULL so decimal and bigint values retain precision.
+
+The SQL editor streams messages over dedicated connections with a 30-second
+statement timeout, four concurrent runs, 1000 retained rows per result, an 8 MiB
+retained-value budget and 32 displayed results. It drains the entire batch after
+reaching a display limit, preserving transaction semantics. Dropping the HTTP
+future sends a Postgres cancellation request and closes its dedicated connection.
+Ordinary API pool connections stay separate.
+
+DDL commits once and reports `applied` plus `catalog_pending`. An introspection
+failure after COMMIT does not turn a successful mutation into an error. Catalog
+reloads are serialized, and one worker retries failed refreshes with backoff;
+the client refreshes its view without replaying the change.
+
+`RemoteResource` owns loading, errors, cancellation and result ordering in table,
+user and storage pages. Storage's upload queue owns progress, partial failures
+and conflict retries, capturing the bucket and folder before navigation changes.
+These modules have unit tests; browser flows and real-Postgres regressions run in CI.
+
 ## A request's flow
 
 1. `Auth` (extractor) turns the `Authorization` header into `Claims`.

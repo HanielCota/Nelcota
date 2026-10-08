@@ -2,6 +2,7 @@
   import Copy from '@lucide/svelte/icons/copy'
   import Check from '@lucide/svelte/icons/check'
   import { t } from '$lib/i18n/index.svelte'
+  import { copyText } from '$lib/clipboard'
 
   let {
     code,
@@ -17,8 +18,7 @@
   let copied = $state(false)
 
   async function copy() {
-    await navigator.clipboard.writeText(code)
-    copied = true
+    copied = await copyText(code)
     setTimeout(() => (copied = false), 1500)
   }
 </script>

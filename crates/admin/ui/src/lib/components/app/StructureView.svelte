@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte'
   import { Skeleton } from '$lib/components/ui/skeleton'
   import { toast } from 'svelte-sonner'
   import StructureColumns from './StructureColumns.svelte'
@@ -6,7 +7,9 @@
   import ColumnSheet from './ColumnSheet.svelte'
   import ConfirmDialog from './ConfirmDialog.svelte'
   import DropTableDialog from './DropTableDialog.svelte'
+  import LoadError from './LoadError.svelte'
   import { ddl, type AlterAction, type ColumnInfo, type Structure } from '$lib/ddl'
+  import { isAbort } from '$lib/api'
   import { errorMessage, t } from '$lib/i18n/index.svelte'
 
   let {
@@ -22,6 +25,8 @@
 
   let structure = $state<Structure | null>(null)
   let error = $state('')
+  let loading = $state(true)
+  let inflight: AbortController | undefined
   let columnOpen = $state(false)
   let editing = $state<ColumnInfo | null>(null)
   let toDelete = $state<ColumnInfo | null>(null)
@@ -29,17 +34,25 @@
   let dropOpen = $state(false)
 
   async function load() {
+    inflight?.abort()
+    const controller = (inflight = new AbortController())
+    if (structure?.name !== name) structure = null
+    loading = true
+    error = ''
     try {
-      structure = await ddl.structure(name)
+      structure = await ddl.structure(name, { signal: controller.signal })
       error = ''
     } catch (e) {
-      error = errorMessage(e)
+      if (!isAbort(e)) error = errorMessage(e)
+    } finally {
+      if (inflight === controller) loading = false
     }
   }
 
   $effect(() => {
     void name
-    load()
+    untrack(load)
+    return () => inflight?.abort()
   })
 
   /** Single point of change: applies, notifies and reloads (or follows the rename). */
@@ -63,11 +76,10 @@
   }
 </script>
 
-{#if error}
-  <p class="p-6 text-sm text-destructive">{t('tables.structure.loadError', { message: error })}</p>
-{:else if !structure}
+{#if error}<div class="px-6 pt-6"><LoadError message={error} onretry={load} busy={loading} /></div>{/if}
+{#if !structure && loading}
   <div class="mx-auto grid max-w-5xl gap-6 p-6 lg:p-8"><Skeleton class="h-72 rounded-lg" /><Skeleton class="h-36 rounded-lg" /></div>
-{:else}
+{:else if structure}
   <div class="mx-auto grid max-w-5xl gap-6 p-6 lg:p-8">
     <StructureColumns
       {structure}
@@ -78,7 +90,7 @@
         deleteOpen = true
       }}
     />
-    <TableSettings {structure} onalter={(actions) => alter(actions).catch(() => {})} ondrop={() => (dropOpen = true)} />
+    <TableSettings {structure} onalter={alter} ondrop={() => (dropOpen = true)} />
   </div>
 
   <ColumnSheet bind:open={columnOpen} table={name} original={editing} onsaved={load} />

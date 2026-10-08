@@ -226,6 +226,7 @@ impl TestApp {
             }),
         };
         let panel = nelcota_admin::AdminState {
+            sql: Arc::default(),
             db: db::admin_pool(&admin, 2),
             db_config: admin.clone(),
             catalog: catalog.clone(),

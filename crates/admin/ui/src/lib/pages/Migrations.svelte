@@ -1,5 +1,17 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
+  import { onMount, untrack } from 'svelte'
+  import FilePlus from '@lucide/svelte/icons/file-plus'
+  import Download from '@lucide/svelte/icons/download'
+  import CircleCheck from '@lucide/svelte/icons/circle-check'
+  import CircleAlert from '@lucide/svelte/icons/circle-alert'
+  import FolderOpen from '@lucide/svelte/icons/folder-open'
+  import Terminal from '@lucide/svelte/icons/terminal'
+  import LoaderCircle from '@lucide/svelte/icons/loader-circle'
+  import { Badge } from '$lib/components/ui/badge'
+  import LoadError from '$lib/components/app/LoadError.svelte'
+  import CodeBlock from '$lib/components/app/CodeBlock.svelte'
+  import { CloseGuard } from '$lib/close-guard.svelte'
+  import UnsavedChangesDialog from '$lib/components/app/UnsavedChangesDialog.svelte'
   import * as Table from '$lib/components/ui/table'
   import * as Dialog from '$lib/components/ui/dialog'
   import { Button } from '$lib/components/ui/button'
@@ -9,29 +21,30 @@
   import { toast } from 'svelte-sonner'
   import PageHeader from '$lib/components/app/PageHeader.svelte'
   import EmptyState from '$lib/components/app/EmptyState.svelte'
+  import { RemoteResource } from '$lib/remote-resource.svelte'
   import { api } from '$lib/api'
   import { downloadText } from '$lib/download'
   import type { ExportedMigration, MigrationsData } from '$lib/types'
   import { errorMessage, hasMessage, i18n, intlLocale, t, translate } from '$lib/i18n/index.svelte'
 
-  let data = $state<MigrationsData | null>(null)
-  let error = $state('')
+  const resource = new RemoteResource<MigrationsData>()
+  const data = $derived(resource.data)
+  const error = $derived(resource.error ? errorMessage(resource.error) : '')
+  const loading = $derived(resource.loading)
 
   async function load() {
-    try {
-      data = await api.get<MigrationsData>('/migrations')
-      error = ''
-    } catch (e) {
-      error = errorMessage(e)
-    }
+    await resource.load(signal => api.get<MigrationsData>('/migrations', { signal }))
   }
+  onMount(() => { void load(); return () => resource.cancel() })
 
-  onMount(load)
 
   // "Generate migration" dialog. The default name follows the panel language.
   let dialogOpen = $state(false)
   let name = $state(t('migrations.dialog.defaultName'))
   let saving = $state(false)
+  let initialName = $state('')
+  const guard = new CloseGuard(() => name !== initialName, () => saving, () => (dialogOpen = false))
+  $effect(() => { if (dialogOpen) untrack(() => (initialName = name)) })
   // Last migration generated in this visit, to remind the next step.
   let generated = $state<ExportedMigration | null>(null)
 
@@ -39,7 +52,7 @@
 
   async function generate(event: SubmitEvent) {
     event.preventDefault()
-    if (!validName) return
+    if (!validName || saving) return
     saving = true
     try {
       const result = await api.post<ExportedMigration>('/migrations', { name })
@@ -82,14 +95,16 @@
 <div class="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-10 lg:py-10">
   <PageHeader title={t('migrations.title')} description={t('migrations.description')} />
 
-  {#if error}
-    <p class="text-sm text-destructive">
-      {error} <button type="button" class="ml-1 underline underline-offset-2" onclick={load}>{t('common.retry')}</button>
-    </p>
-  {:else if !data}
+  {#if error}<LoadError message={error} onretry={load} busy={loading} />{/if}
+  {#if !data && loading}
     <Skeleton class="h-40 rounded-lg" />
     <Skeleton class="mt-8 h-64 rounded-lg" />
-  {:else}
+  {:else if data}
+    <ol class="mb-6 grid gap-3 sm:grid-cols-3" aria-label={t('migrations.steps.label')}>
+      <li class="rounded-lg border bg-card p-4"><div class="flex items-center gap-2 text-sm font-medium">{#if generated}<CircleCheck class="size-4 text-brand" aria-hidden="true" />{:else}<FilePlus class="size-4 text-muted-foreground" aria-hidden="true" />{/if}{t('migrations.steps.generate')}</div><p class={['mt-2 text-xs text-muted-foreground', generated && 'break-all']}>{generated ? generated.filename : t('migrations.steps.generateHint')}</p></li>
+      <li class="rounded-lg border bg-card p-4"><div class="flex items-center gap-2 text-sm font-medium"><FolderOpen class="size-4 text-muted-foreground" aria-hidden="true" />{t('migrations.steps.keep')}</div><p class="mt-2 text-xs text-muted-foreground">{t('migrations.steps.keepHint')}</p>{#if generated}<Badge variant="secondary" class="mt-2">{t(data.migrations.some((migration) => migration.version === generated!.version && migration.in_folder === true) ? 'migrations.steps.inFolder' : 'migrations.steps.pending')}</Badge>{/if}</li>
+      <li class="rounded-lg border bg-card p-4"><div class="flex items-center gap-2 text-sm font-medium"><Terminal class="size-4 text-muted-foreground" aria-hidden="true" />{t('migrations.steps.apply')}</div><p class="mt-2 text-xs text-muted-foreground">{t('migrations.steps.applyHint')}</p></li>
+    </ol>
     <section class="grid gap-3">
       <div class="flex flex-wrap items-end justify-between gap-3">
         <div>
@@ -97,7 +112,7 @@
           <p class="mt-0.5 text-sm text-muted-foreground">{t('migrations.pendingHint')}</p>
         </div>
         {#if data.pending.length}
-          <Button onclick={() => (dialogOpen = true)}>{t('migrations.generate')}</Button>
+          <Button onclick={() => (dialogOpen = true)}><FilePlus data-icon="inline-start" aria-hidden="true" />{t('migrations.generate')}</Button>
         {/if}
       </div>
 
@@ -114,6 +129,7 @@
       {#if data.pending.length === 0}
         <EmptyState
           class="rounded-lg border"
+          icon={CircleCheck}
           title={t('migrations.nothingPending')}
           description={t('migrations.nothingPendingHint')}
         />
@@ -129,9 +145,9 @@
                 <summary class="cursor-pointer text-muted-foreground hover:text-foreground">
                   {t('migrations.statements', { count: change.statements.length })}
                 </summary>
-                <pre class="mt-2 overflow-x-auto rounded-md bg-muted/50 px-3 py-2 font-mono text-xs leading-relaxed">{change.statements
+                <div class="mt-2"><CodeBlock code={change.statements
                     .map((s) => s.trim().replace(/;$/, '') + ';')
-                    .join('\n')}</pre>
+                    .join('\n')} /></div>
               </details>
             </li>
           {/each}
@@ -145,10 +161,22 @@
         <EmptyState
           class="rounded-lg border"
           title={t('migrations.noMigrations')}
+          icon={FilePlus}
           description={t('migrations.noMigrationsHint')}
         />
       {:else}
-        <div class="overflow-hidden rounded-lg border bg-card">
+        <div class="grid gap-3 md:hidden">
+          {#each data.migrations as migration (migration.version)}
+            {@const situation = status(migration)}
+            <article class="grid min-w-0 gap-3 rounded-lg border bg-card p-4">
+              <p class="break-words font-mono text-xs"><span class="text-muted-foreground">V{migration.version}</span> · {migration.name}</p>
+              <div class="flex flex-wrap items-center gap-2"><Badge variant="outline" class={situation.warn ? 'border-warning/30 text-warning' : 'text-muted-foreground'}>{#if situation.warn}<CircleAlert aria-hidden="true" />{:else}<CircleCheck aria-hidden="true" />{/if}{situation.label}</Badge>{#if migration.from_panel}<span class="text-xs text-muted-foreground">{t('migrations.fromPanel')}</span>{/if}</div>
+              <p class="text-xs text-muted-foreground">{t('migrations.columns.appliedOn')}: {date(migration.applied_on)}</p>
+              {#if migration.from_panel}<Button variant="outline" size="sm" class="justify-self-start" href={`/admin/api/migrations/${migration.version}/file`} download><Download data-icon="inline-start" aria-hidden="true" />{t('common.download')}</Button>{/if}
+            </article>
+          {/each}
+        </div>
+        <div class="hidden overflow-hidden rounded-lg border bg-card md:block">
           <Table.Root>
             <Table.Header>
               <Table.Row class="hover:bg-transparent">
@@ -168,7 +196,7 @@
                     <span class="font-mono text-xs">{migration.name}</span>
                     {#if migration.from_panel}<span class="ml-2 text-xs text-muted-foreground">{t('migrations.fromPanel')}</span>{/if}
                   </Table.Cell>
-                  <Table.Cell class={situation.warn ? 'text-warning' : 'text-muted-foreground'}>{situation.label}</Table.Cell>
+                  <Table.Cell><Badge variant="outline" class={situation.warn ? 'border-warning/30 text-warning' : 'text-muted-foreground'}>{#if situation.warn}<CircleAlert aria-hidden="true" />{:else}<CircleCheck aria-hidden="true" />{/if}{situation.label}</Badge></Table.Cell>
                   <Table.Cell class="text-muted-foreground">{date(migration.applied_on)}</Table.Cell>
                   <Table.Cell class="text-right">
                     {#if migration.from_panel}
@@ -176,7 +204,7 @@
                         variant="ghost"
                         size="sm"
                         href={`/admin/api/migrations/${migration.version}/file`}
-                        download>{t('common.download')}</Button
+                        download><Download data-icon="inline-start" aria-hidden="true" />{t('common.download')}</Button
                       >
                     {/if}
                   </Table.Cell>
@@ -197,9 +225,10 @@
   {/if}
 </div>
 
-<Dialog.Root bind:open={dialogOpen}>
+<Dialog.Root bind:open={() => dialogOpen, guard.change}>
   <Dialog.Content class="sm:max-w-md">
     <form class="grid gap-5" onsubmit={generate}>
+      <fieldset class="contents" disabled={saving} aria-busy={saving}>
       <Dialog.Header>
         <Dialog.Title>{t('migrations.generate')}</Dialog.Title>
         <Dialog.Description>
@@ -218,9 +247,11 @@
         </p>
       </div>
       <Dialog.Footer>
-        <Button variant="outline" onclick={() => (dialogOpen = false)}>{t('common.cancel')}</Button>
-        <Button type="submit" disabled={!validName || saving}>{saving ? t('migrations.dialog.generating') : t('migrations.dialog.submit')}</Button>
+        <Button variant="outline" disabled={saving} onclick={guard.request}>{t('common.cancel')}</Button>
+        <Button type="submit" disabled={!validName || saving}>{#if saving}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{:else}<FilePlus data-icon="inline-start" aria-hidden="true" />{/if}{saving ? t('migrations.dialog.generating') : t('migrations.dialog.submit')}</Button>
       </Dialog.Footer>
+    </fieldset>
     </form>
   </Dialog.Content>
 </Dialog.Root>
+<UnsavedChangesDialog bind:open={guard.pending} ondiscard={guard.discard} />

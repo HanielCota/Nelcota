@@ -7,6 +7,7 @@ import { newId, readJson, readText, write } from './storage'
 const DRAFT_KEY = 'nelcota:sql-draft'
 const HISTORY_KEY = 'nelcota:sql-history'
 const SAVED_KEY = 'nelcota:sql-saved'
+const WORKSPACE_KEY = 'nelcota:sql-workspace'
 const HISTORY_LIMIT = 20
 
 export interface SavedQuery {
@@ -15,6 +16,24 @@ export interface SavedQuery {
   sql: string
   updatedAt: number
 }
+
+export interface SqlDraft {
+  id: string
+  queryId: string | null
+  sql: string
+}
+
+interface Workspace { v: 1; active: string; items: SqlDraft[] }
+
+function parseWorkspace(value: unknown): Workspace | null {
+  if (!value || typeof value !== 'object') return null
+  const workspace = value as Workspace
+  if (workspace.v !== 1 || typeof workspace.active !== 'string' || !Array.isArray(workspace.items)) return null
+  const items = workspace.items.filter((item) => item && typeof item.id === 'string' && typeof item.sql === 'string' && (item.queryId === null || typeof item.queryId === 'string'))
+  return items.some((item) => item.id === workspace.active) ? { v: 1, active: workspace.active, items } : null
+}
+
+const workspace = readJson<Workspace | null>(WORKSPACE_KEY, parseWorkspace, null)
 
 const isSaved = (item: unknown): item is SavedQuery =>
   typeof item === 'object' &&
@@ -34,27 +53,60 @@ const parseHistory = (data: unknown): string[] | null =>
   Array.isArray(data) ? data.filter((h): h is string => typeof h === 'string') : null
 
 class SqlStore {
-  draft = $state(readText(DRAFT_KEY, 'select now();'))
+  drafts = $state<SqlDraft[]>(workspace?.items ?? [{ id: 'scratch', queryId: null, sql: readText(DRAFT_KEY, 'select now();') }])
+  activeDraftId = $state(workspace?.active ?? 'scratch')
+  activeDraft = $derived(this.drafts.find((item) => item.id === this.activeDraftId)!)
+  draft = $derived(this.activeDraft.sql)
   history = $state<string[]>(readJson(HISTORY_KEY, parseHistory, []))
   saved = $state<SavedQuery[]>(readJson(SAVED_KEY, parseSaved, []))
   /** Saved query open in the editor (`null` = a loose draft). */
-  currentId = $state<string | null>(null)
+  currentId = $derived(this.activeDraft.queryId)
 
   current = $derived(this.saved.find((q) => q.id === this.currentId) ?? null)
   /** The editor text differs from what is saved. */
-  dirty = $derived(this.current !== null && this.current.sql !== this.draft)
+  dirty = $derived(this.current ? this.current.sql !== this.draft : this.draft.trim() !== '')
+  looseDrafts = $derived(this.drafts.filter((item) => !item.queryId && item.sql.trim() !== ''))
   /** Most recent first. */
   sorted = $derived([...this.saved].sort((a, b) => b.updatedAt - a.updatedAt))
 
+  constructor() {
+    // A missing saved copy must not make its persisted draft unreachable.
+    for (const draft of this.drafts) {
+      if (draft.queryId && !this.saved.some((query) => query.id === draft.queryId)) draft.queryId = null
+    }
+  }
+
   setDraft(sql: string) {
-    this.draft = sql
+    this.activeDraft.sql = sql
     write(DRAFT_KEY, sql)
+    this.persistWorkspace()
   }
 
   /** Opens a text in the editor; with `id`, starts editing that saved query. */
   open(sql: string, id: string | null = null) {
-    this.setDraft(sql)
-    this.currentId = id
+    const existing = id ? this.drafts.find((item) => item.queryId === id) : this.drafts.find((item) => !item.queryId && item.sql === sql)
+    if (existing) this.activeDraftId = existing.id
+    else {
+      const draft: SqlDraft = { id: newId(), queryId: id, sql }
+      this.drafts.push(draft)
+      this.activeDraftId = draft.id
+    }
+    this.persistWorkspace()
+  }
+
+  openDraft(id: string) {
+    if (!this.drafts.some((item) => item.id === id)) return
+    this.activeDraftId = id
+    this.persistWorkspace()
+  }
+
+  removeDraft(id: string) {
+    this.drafts = this.drafts.filter((item) => item.id !== id)
+    if (this.activeDraftId === id) {
+      if (this.drafts.length) this.activeDraftId = this.drafts[0].id
+      else this.open('')
+    }
+    this.persistWorkspace()
   }
 
   openSaved(id: string) {
@@ -75,8 +127,13 @@ class SqlStore {
       ? { ...existing, name, sql: this.draft, updatedAt: now }
       : { id: newId(), name, sql: this.draft, updatedAt: now }
     this.saved = existing ? this.saved.map((q) => (q.id === query.id ? query : q)) : [...this.saved, query]
-    this.currentId = query.id
+    if (asNew && this.currentId) {
+      const draft = { id: newId(), queryId: query.id, sql: query.sql }
+      this.drafts.push(draft)
+      this.activeDraftId = draft.id
+    } else this.activeDraft.queryId = query.id
     this.persist()
+    this.persistWorkspace()
     return query
   }
 
@@ -87,8 +144,14 @@ class SqlStore {
 
   remove(id: string) {
     this.saved = this.saved.filter((q) => q.id !== id)
-    if (this.currentId === id) this.currentId = null
+    // Preserve the editor contents even when the saved copy is deleted.
+    for (const draft of this.drafts) if (draft.queryId === id) draft.queryId = null
     this.persist()
+    this.persistWorkspace()
+  }
+
+  private persistWorkspace() {
+    write(WORKSPACE_KEY, JSON.stringify({ v: 1, active: this.activeDraftId, items: this.drafts }))
   }
 
   private persist() {

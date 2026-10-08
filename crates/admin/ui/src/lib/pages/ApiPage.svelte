@@ -1,65 +1,70 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
+  import { onMount, untrack } from 'svelte'
   import * as Select from '$lib/components/ui/select'
   import BookOpen from '@lucide/svelte/icons/book-open'
   import ArrowUpRight from '@lucide/svelte/icons/arrow-up-right'
+  import Globe from '@lucide/svelte/icons/globe'
+  import UserRound from '@lucide/svelte/icons/user-round'
+  import Server from '@lucide/svelte/icons/server'
+  import KeyRound from '@lucide/svelte/icons/key-round'
+  import Table2 from '@lucide/svelte/icons/table-2'
+  import Plus from '@lucide/svelte/icons/plus'
+  import { Skeleton } from '$lib/components/ui/skeleton'
   import { Button } from '$lib/components/ui/button'
   import PageHeader from '$lib/components/app/PageHeader.svelte'
   import CodeBlock from '$lib/components/app/CodeBlock.svelte'
   import ServiceTokenCard from '$lib/components/app/ServiceTokenCard.svelte'
-  import { api, enc, isAbort } from '$lib/api'
+  import LoadError from '$lib/components/app/LoadError.svelte'
+  import EmptyState from '$lib/components/app/EmptyState.svelte'
+  import { href, navigate, route } from '$lib/router.svelte'
+  import { RemoteResource } from '$lib/remote-resource.svelte'
+  import { api, enc } from '$lib/api'
   import { authSnippets, tableSnippets, type Lang, type Snippet } from '$lib/snippets'
-  import type { TableData, TableSummary } from '$lib/types'
-  import { t } from '$lib/i18n/index.svelte'
+  import type { TableData, TablesResponse } from '$lib/types'
+  import { errorMessage, t } from '$lib/i18n/index.svelte'
 
   // The panel is served from the same host as the API.
   const base = location.origin
 
-  let tables = $state<TableSummary[]>([])
-  let table = $state('')
-  let lang = $state<Lang>('curl')
-  let topic = $state<'tables' | 'auth'>('tables')
-  let snippets = $state<Snippet[]>([])
+  const tablesResource = new RemoteResource<TablesResponse>()
+  const snippetsResource = new RemoteResource<Snippet[]>()
+  const tables = $derived(tablesResource.data?.tables ?? [])
+  const table = $derived(tables.find((item) => item.name === route.query.get('table'))?.name ?? tables.find((item) => item.kind === 'table')?.name ?? tables[0]?.name ?? '')
+  const lang = $derived<Lang>(route.query.get('lang') === 'js' ? 'js' : 'curl')
+  const topic = $derived(route.query.get('topic') === 'auth' ? 'auth' : 'tables')
+  const snippets = $derived(topic === 'auth' ? authSnippets(base) : snippetsResource.data ?? [])
+  const tableError = $derived(tablesResource.error ? errorMessage(tablesResource.error) : '')
+  const snippetsError = $derived(snippetsResource.error ? errorMessage(snippetsResource.error) : '')
+  const tablesLoading = $derived(tablesResource.loading)
+  const snippetsLoading = $derived(snippetsResource.loading)
+  async function loadTables() {
+    await tablesResource.load(signal => api.get<TablesResponse>('/tables', { signal }))
+  }
+  onMount(() => { void loadTables(); return () => tablesResource.cancel() })
 
-  onMount(async () => {
-    try {
-      tables = (await api.get<{ tables: TableSummary[] }>('/tables')).tables
-      table = tables.find((t) => t.kind === 'table')?.name ?? tables[0]?.name ?? ''
-    } catch {
-      tables = []
-    }
-  })
+  function choose(patch: { table?: string; lang?: Lang; topic?: 'tables' | 'auth' }) {
+    const query = new URLSearchParams(route.query)
+    for (const [key, value] of Object.entries(patch)) query.set(key, value)
+    navigate(`/connect?${query}`)
+  }
 
   // Examples for the chosen table, with its real columns (type, DEFAULT, generated).
+  async function loadSnippets() {
+    snippetsResource.clear()
+    if (topic === 'auth' || !table) return
+    const selectedTable = table
+    await snippetsResource.load(async signal => {
+      const data = await api.get<TableData>(`/tables/${enc(selectedTable)}?size=1`, { signal })
+      return tableSnippets(base, selectedTable, data.table.columns.map(c => ({
+        name: c.name, type: c.full_type, has_default: c.has_default, generated: c.generated, nullable: c.nullable,
+      })))
+    })
+  }
+
   $effect(() => {
-    if (topic === 'auth') {
-      snippets = authSnippets(base)
-      return
-    }
-    if (!table) {
-      snippets = []
-      return
-    }
-    const controller = new AbortController()
-    api
-      .get<TableData>(`/tables/${enc(table)}?size=1`, { signal: controller.signal })
-      .then((data) => {
-        snippets = tableSnippets(
-          base,
-          table,
-          data.table.columns.map((c) => ({
-            name: c.name,
-            type: c.full_type,
-            has_default: c.has_default,
-            generated: c.generated,
-            nullable: c.nullable,
-          })),
-        )
-      })
-      .catch((e) => {
-        if (!isAbort(e)) snippets = tableSnippets(base, table, [])
-      })
-    return () => controller.abort()
+    void [topic, table]
+    untrack(loadSnippets)
+    return () => snippetsResource.cancel()
   })
 
   const endpoints = [
@@ -69,6 +74,7 @@
   ] as const
 
   const roles = ['anon', 'authenticated', 'service_role'] as const
+  const roleIcons = { anon: Globe, authenticated: UserRound, service_role: Server }
 
   const tab = (active: boolean) =>
     [
@@ -86,7 +92,9 @@
     {/snippet}
   </PageHeader>
 
-  <section class="-mt-2 grid gap-4">
+  <nav class="-mt-6 flex flex-wrap gap-x-5 gap-y-2 text-sm" aria-label={t('connect.navigation')}><a class="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline" href="#api-address">{t('connect.address')}</a><a class="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline" href="#api-roles">{t('connect.caller')}</a><a class="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline" href="#api-examples">{t('connect.examples')}</a><a class="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline" href="#api-token">{t('connect.token.title')}</a></nav>
+
+  <section id="api-address" class="-mt-2 grid scroll-mt-6 gap-4">
     <h2 class="text-base font-semibold">{t('connect.address')}</h2>
     <CodeBlock code={base} label={t('connect.copyAddress')} />
     <dl class="grid gap-2 text-sm sm:grid-cols-[6rem_auto_1fr] sm:gap-x-4">
@@ -98,15 +106,16 @@
     </dl>
   </section>
 
-  <section class="grid gap-4">
+  <section id="api-roles" class="grid scroll-mt-6 gap-4">
     <div>
       <h2 class="text-base font-semibold">{t('connect.caller')}</h2>
       <p class="mt-1 text-sm text-muted-foreground">{t('connect.callerHint')}</p>
     </div>
     <div class="grid gap-3 md:grid-cols-3">
       {#each roles as role (role)}
+        {@const Icon = roleIcons[role]}
         <div class="rounded-lg border bg-card p-4">
-          <p class="text-sm font-medium">{t(`connect.roles.${role}.title`)}</p>
+          <p class="flex items-center gap-2 text-sm font-medium"><Icon class="size-4 text-muted-foreground" aria-hidden="true" />{t(`connect.roles.${role}.title`)}</p>
           <code class="text-xs text-muted-foreground">{role}</code>
           <p class="mt-2 text-sm text-muted-foreground">{t(`connect.roles.${role}.text`)}</p>
           {#if role === 'service_role'}
@@ -117,21 +126,19 @@
     </div>
   </section>
 
-  <ServiceTokenCard />
-
-  <section class="grid gap-4">
+  <section id="api-examples" class="grid scroll-mt-6 gap-4">
     <h2 class="text-base font-semibold">{t('connect.examples')}</h2>
     <div class="flex flex-wrap items-center gap-3">
       <nav class="flex h-9 items-center gap-1 rounded-md bg-muted p-1" aria-label={t('connect.topic')}>
-        <button type="button" class={tab(topic === 'tables')} aria-pressed={topic === 'tables'} onclick={() => (topic = 'tables')}
+        <button type="button" class={tab(topic === 'tables')} aria-pressed={topic === 'tables'} onclick={() => choose({ topic: 'tables' })}
           >{t('connect.topics.tables')}</button
         >
-        <button type="button" class={tab(topic === 'auth')} aria-pressed={topic === 'auth'} onclick={() => (topic = 'auth')}
+        <button type="button" class={tab(topic === 'auth')} aria-pressed={topic === 'auth'} onclick={() => choose({ topic: 'auth' })}
           >{t('connect.topics.auth')}</button
         >
       </nav>
       {#if topic === 'tables' && tables.length}
-        <Select.Root type="single" bind:value={table}>
+        <Select.Root type="single" value={table} onValueChange={(table) => choose({ table })}>
           <Select.Trigger class="w-52 font-mono text-xs" aria-label={t('connect.table')}>{table}</Select.Trigger>
           <Select.Content>
             {#each tables as t (t.name)}
@@ -141,19 +148,20 @@
         </Select.Root>
       {/if}
       <nav class="flex h-9 items-center gap-1 rounded-md bg-muted p-1 sm:ml-auto" aria-label={t('connect.language')}>
-        <button type="button" class={tab(lang === 'curl')} aria-pressed={lang === 'curl'} onclick={() => (lang = 'curl')}
+        <button type="button" class={tab(lang === 'curl')} aria-pressed={lang === 'curl'} onclick={() => choose({ lang: 'curl' })}
           >curl</button
         >
-        <button type="button" class={tab(lang === 'js')} aria-pressed={lang === 'js'} onclick={() => (lang = 'js')}
+        <button type="button" class={tab(lang === 'js')} aria-pressed={lang === 'js'} onclick={() => choose({ lang: 'js' })}
           >JavaScript</button
         >
       </nav>
     </div>
 
-    {#if topic === 'tables' && !tables.length}
-      <p class="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
-        {t('connect.noTables')}
-      </p>
+    {#if topic === 'tables' && tableError}<LoadError message={tableError} onretry={loadTables} busy={tablesLoading} />{/if}
+    {#if snippetsError}<LoadError message={snippetsError} onretry={loadSnippets} busy={snippetsLoading} />{/if}
+    {#if topic === 'tables' && (tablesLoading || snippetsLoading)}<Skeleton class="h-48" />
+    {:else if topic === 'tables' && !tables.length && !tableError}
+      <EmptyState icon={Table2} title={t('connect.noTables')}>{#snippet actions()}<Button href={href('/tables?create=true')}><Plus data-icon="inline-start" aria-hidden="true" />{t('tables.editor.newTable')}</Button>{/snippet}</EmptyState>
     {:else}
       <div class="grid gap-6 *:min-w-0">
         {#each snippets as snippet (snippet.id)}
@@ -171,4 +179,5 @@
       {t('connect.types')} <code class="text-xs text-foreground">nelcota types -o database.ts</code>
     </p>
   </section>
+  <details id="api-token" class="scroll-mt-6 rounded-lg border bg-card p-4"><summary class="flex cursor-pointer items-center gap-2 text-sm font-medium"><KeyRound class="size-4 text-muted-foreground" aria-hidden="true" />{t('connect.token.title')} <code>service_role</code></summary><div class="mt-4"><ServiceTokenCard /></div></details>
 </div>

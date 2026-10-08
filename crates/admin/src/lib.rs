@@ -12,6 +12,7 @@
 
 mod api;
 mod apply;
+pub mod contracts;
 mod ddl;
 mod export;
 mod migrations;
@@ -28,6 +29,7 @@ mod users;
 
 pub use migrations::default_dir as default_migrations_dir;
 pub use projects::HostLink;
+pub use sql::SqlExecutor;
 pub use sso::Sso;
 pub use tokens::TokenIssuer;
 
@@ -102,6 +104,8 @@ impl Sessions {
 
 #[derive(Clone)]
 pub struct AdminState {
+    /// Bounded SQL executions shared by all panel sessions.
+    pub sql: Arc<SqlExecutor>,
     /// Admin pool (role that owns the schema).
     pub db: Pool,
     /// Admin config, for the SQL editor's dedicated connections.

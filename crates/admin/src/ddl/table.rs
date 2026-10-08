@@ -16,7 +16,9 @@ pub struct Context<'a> {
     pub enums: &'a [String],
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, ts_rs::TS, schemars::JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum OnDelete {
     #[default]
@@ -39,7 +41,7 @@ impl OnDelete {
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, ts_rs::TS, schemars::JsonSchema)]
 pub struct ReferenceDef {
     pub table: String,
     pub column: String,
@@ -51,7 +53,7 @@ const fn yes() -> bool {
     true
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, ts_rs::TS, schemars::JsonSchema)]
 pub struct ColumnDef {
     pub name: String,
     pub data_type: String,
@@ -135,7 +137,7 @@ fn comment_on_column(table: &str, column: &str, comment: Option<&str>) -> String
     )
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, ts_rs::TS, schemars::JsonSchema)]
 pub struct CreateTable {
     pub name: String,
     pub comment: Option<String>,
@@ -197,7 +199,7 @@ pub fn create(ctx: &Context, spec: &CreateTable) -> Result<Vec<String>> {
 }
 
 /// One change. The whole list runs in one transaction, in the order sent.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, ts_rs::TS, schemars::JsonSchema)]
 #[serde(tag = "action", rename_all = "snake_case")]
 pub enum AlterAction {
     RenameTable {
@@ -223,6 +225,7 @@ pub enum AlterAction {
     SetType {
         column: String,
         data_type: String,
+        #[ts(optional = nullable)]
         using: Option<String>,
     },
     SetNullable {

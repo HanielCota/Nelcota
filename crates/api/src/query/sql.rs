@@ -1,0 +1,481 @@
+//! SQL generation from the validated request representation.
+use super::parse::column;
+use super::*;
+
+pub(super) fn qualified(schema: &str, table: &Table) -> String {
+    format!("{}.{}", ident(schema), ident(&table.name))
+}
+
+/// The select list over the row aliased `alias`. `path` numbers the embeds
+/// so nested subqueries get distinct aliases (`_e0`, `_e0_1`...).
+pub(super) fn select_list(
+    sql: &mut Sql,
+    schema: &str,
+    select: &Select,
+    alias: &str,
+    path: &str,
+) -> String {
+    let mut parts: Vec<String> = Vec::new();
+    if select.star {
+        parts.push(format!("{alias}.*"));
+    }
+    parts.extend(
+        select
+            .columns
+            .iter()
+            .map(|c| format!("{alias}.{}", ident(c))),
+    );
+    for (n, embed) in select.embeds.iter().enumerate() {
+        let path = if path.is_empty() {
+            n.to_string()
+        } else {
+            format!("{path}_{n}")
+        };
+        parts.push(embed_sql(sql, schema, embed, alias, &path));
+    }
+    parts.join(", ")
+}
+
+/// Correlated subquery for one embedded relation: an object (or null) for
+/// many-to-one, an array for one-to-many. It runs with the request's role,
+/// so the related table's RLS filters what comes back.
+pub(super) fn embed_sql(
+    sql: &mut Sql,
+    schema: &str,
+    embed: &Embed,
+    parent: &str,
+    path: &str,
+) -> String {
+    let row = format!("_e{path}");
+    let json = format!("_j{path}");
+    let columns = select_list(sql, schema, &embed.select, &row, path);
+    let mut conditions: Vec<String> = embed
+        .join
+        .iter()
+        .map(|(related, own)| format!("{row}.{} = {parent}.{}", ident(related), ident(own)))
+        .collect();
+    conditions.extend(
+        embed
+            .filters
+            .iter()
+            .map(|condition| condition_sql(sql, &row, condition)),
+    );
+    let mut rows = format!(
+        "SELECT {columns} FROM {}.{} AS {row} WHERE {}{}",
+        ident(schema),
+        ident(&embed.table),
+        conditions.join(" AND "),
+        order_clause(&row, &embed.order),
+    );
+    rows.push_str(&paging(sql, embed.limit, embed.offset));
+    let value = if embed.many {
+        format!("(SELECT coalesce(json_agg({json}), '[]') FROM ({rows}) AS {json})")
+    } else {
+        // The foreign key references a unique key: at most one row.
+        format!("(SELECT to_json({json}) FROM ({rows}) AS {json})")
+    };
+    format!("{value} AS {}", ident(&embed.alias))
+}
+
+/// Escapes an element of a Postgres array literal (`{"a","b"}`).
+pub(super) fn array_literal(items: &[String]) -> String {
+    let escaped: Vec<String> = items
+        .iter()
+        .map(|item| format!("\"{}\"", item.replace('\\', "\\\\").replace('"', "\\\"")))
+        .collect();
+    format!("{{{}}}", escaped.join(","))
+}
+
+/// Filters on the row aliased `_t` (the request's own table).
+pub(super) fn where_clause(sql: &mut Sql, filters: &[Condition]) -> String {
+    if filters.is_empty() {
+        return String::new();
+    }
+    let conditions: Vec<String> = filters
+        .iter()
+        .map(|condition| condition_sql(sql, "_t", condition))
+        .collect();
+    format!(" WHERE {}", conditions.join(" AND "))
+}
+
+/// A tree node on the row aliased `alias`: groups become `(a OR b)` /
+/// `(a AND b)`, each wrapped so the precedence never depends on what
+/// surrounds it.
+pub(super) fn condition_sql(sql: &mut Sql, alias: &str, condition: &Condition) -> String {
+    match condition {
+        Condition::Filter(filter) => filter_sql(sql, alias, filter),
+        Condition::Group { any, negate, items } => {
+            let parts: Vec<String> = items
+                .iter()
+                .map(|item| condition_sql(sql, alias, item))
+                .collect();
+            let joined = format!("({})", parts.join(if *any { " OR " } else { " AND " }));
+            if *negate {
+                format!("NOT {joined}")
+            } else {
+                joined
+            }
+        }
+    }
+}
+
+pub(super) fn filter_sql(sql: &mut Sql, alias: &str, filter: &Filter) -> String {
+    let target = format!("{alias}.{}", ident(&filter.column));
+    let type_name = &filter.type_name;
+    let condition = match &filter.op {
+        Op::Cmp(op, value) => {
+            let p = sql.param(Param::Text(value.clone()));
+            format!("{target} {} {p}::text::{type_name}", op.sql())
+        }
+        Op::Like {
+            insensitive,
+            pattern,
+        } => {
+            let p = sql.param(Param::Text(pattern.clone()));
+            let op = if *insensitive { "ILIKE" } else { "LIKE" };
+            format!("{target}::text {op} {p}::text")
+        }
+        Op::In(items) if items.is_empty() => "false".to_owned(),
+        Op::In(items) => {
+            let p = sql.param(Param::Text(array_literal(items)));
+            format!("{target} = ANY({p}::text::{type_name}[])")
+        }
+        Op::Is(value) => {
+            let value = match value {
+                IsValue::Null => "NULL",
+                IsValue::True => "TRUE",
+                IsValue::False => "FALSE",
+                IsValue::Unknown => "UNKNOWN",
+            };
+            format!("{target} IS {value}")
+        }
+    };
+    if filter.negate {
+        format!("NOT ({condition})")
+    } else {
+        condition
+    }
+}
+
+pub(super) fn order_clause(alias: &str, order: &[OrderTerm]) -> String {
+    if order.is_empty() {
+        return String::new();
+    }
+    let terms: Vec<String> = order
+        .iter()
+        .map(|o| {
+            let mut term = format!(
+                "{alias}.{} {}",
+                ident(&o.column),
+                if o.desc { "DESC" } else { "ASC" }
+            );
+            match o.nulls_first {
+                Some(true) => term.push_str(" NULLS FIRST"),
+                Some(false) => term.push_str(" NULLS LAST"),
+                None => {}
+            }
+            term
+        })
+        .collect();
+    format!(" ORDER BY {}", terms.join(", "))
+}
+
+/// `SELECT` returning `(json_text, rows)`; Postgres builds the JSON.
+pub fn select(schema: &str, table: &Table, request: &Request, max_rows: Option<i64>) -> Sql {
+    let mut sql = Sql::default();
+    let rows = rows_subquery(&mut sql, schema, table, request, max_rows);
+    sql.text = format!("SELECT coalesce(json_agg(_r), '[]')::text, count(*) FROM ({rows}) _r");
+    sql
+}
+
+/// One record per result row, as JSON text: for streaming reads (export)
+/// without building the whole response in memory.
+pub fn select_rows(schema: &str, table: &Table, request: &Request) -> Sql {
+    let mut sql = Sql::default();
+    let rows = rows_subquery(&mut sql, schema, table, request, None);
+    sql.text = format!("SELECT row_to_json(_r)::text FROM ({rows}) _r");
+    sql
+}
+
+/// Columns, filters, ordering and paging of the table (alias `_t`).
+pub(super) fn rows_subquery(
+    sql: &mut Sql,
+    schema: &str,
+    table: &Table,
+    request: &Request,
+    max_rows: Option<i64>,
+) -> String {
+    let columns = select_list(sql, schema, &request.select, "_t", "");
+    let filters = where_clause(sql, &request.filters);
+    let order = order_clause("_t", &request.order);
+    let limit = match (request.limit, max_rows) {
+        (Some(l), Some(m)) => Some(l.min(m)),
+        (l, m) => l.or(m),
+    };
+    let paging = paging(sql, limit, request.offset);
+    format!(
+        "SELECT {columns} FROM {} AS _t{filters}{order}{paging}",
+        qualified(schema, table),
+    )
+}
+
+/// ` LIMIT $n OFFSET $m`, as far as each is set.
+pub(super) fn paging(sql: &mut Sql, limit: Option<i64>, offset: Option<i64>) -> String {
+    let mut tail = String::new();
+    if let Some(limit) = limit {
+        let p = sql.param(Param::Int(limit));
+        tail.push_str(&format!(" LIMIT {p}"));
+    }
+    if let Some(offset) = offset {
+        let p = sql.param(Param::Int(offset));
+        tail.push_str(&format!(" OFFSET {p}"));
+    }
+    tail
+}
+
+/// Total rows the filters reach (for `Prefer: count=exact`).
+pub fn count(schema: &str, table: &Table, request: &Request) -> Sql {
+    let mut sql = Sql::default();
+    let filters = where_clause(&mut sql, &request.filters);
+    sql.text = format!(
+        "SELECT count(*) FROM {} AS _t{filters}",
+        qualified(schema, table)
+    );
+    sql
+}
+
+/// Wraps a write to return the representation (`Prefer: return=representation`).
+pub(super) fn with_representation(
+    sql: &mut Sql,
+    schema: &str,
+    write: String,
+    select: &Select,
+) -> String {
+    format!(
+        "WITH _w AS ({write} RETURNING _t.*) \
+         SELECT coalesce(json_agg(_r), '[]')::text, count(*) FROM (SELECT {} FROM _w AS _t) _r",
+        select_list(sql, schema, select, "_t", ""),
+    )
+}
+
+/// Columns of a JSON body (object or array of objects), validated.
+pub(super) fn body_columns(table: &Table, rows: &[Value]) -> Result<Vec<String>, QueryError> {
+    let mut columns: Vec<String> = Vec::new();
+    for row in rows {
+        let Value::Object(map) = row else {
+            return Err(invalid(
+                "the body must be a JSON object or an array of objects",
+            ));
+        };
+        for key in map.keys() {
+            if !columns.iter().any(|c| c == key) {
+                columns.push(column(table, key)?.name.clone());
+            }
+        }
+    }
+    Ok(columns)
+}
+
+/// `INSERT` from JSON: Postgres converts each field to the column type
+/// (`json_populate_recordset`).
+///
+/// Columns missing from an object get the DEFAULT, even in batches with
+/// different keys: rows are grouped by column set, and each group becomes an
+/// INSERT (CTEs in the same statement, in a single transaction).
+pub fn insert(
+    schema: &str,
+    table: &Table,
+    body: Value,
+    representation: Option<&Select>,
+    upsert: Option<&Upsert>,
+) -> Result<Sql, QueryError> {
+    let rows = match body {
+        Value::Array(rows) => rows,
+        object @ Value::Object(_) => vec![object],
+        _ => {
+            return Err(invalid(
+                "the body must be a JSON object or an array of objects",
+            ));
+        }
+    };
+    if rows.is_empty() {
+        return Err(invalid("nothing to insert"));
+    }
+    // Group by column set, in the table's column order.
+    let mut groups: Vec<(Vec<String>, Vec<Value>)> = Vec::new();
+    for row in rows {
+        let columns = body_columns(table, std::slice::from_ref(&row))?;
+        let ordered: Vec<String> = table
+            .columns
+            .iter()
+            .filter(|c| columns.contains(&c.name))
+            .map(|c| c.name.clone())
+            .collect();
+        match groups.iter_mut().find(|(cols, _)| *cols == ordered) {
+            Some((_, group)) => group.push(row),
+            None => groups.push((ordered, vec![row])),
+        }
+    }
+
+    let target = qualified(schema, table);
+    let mut sql = Sql::default();
+    let mut statements = Vec::new();
+    for (columns, rows) in groups {
+        if columns.is_empty() {
+            // Empty objects: one all-DEFAULT row for each.
+            let conflict = upsert.map(|u| u.clause(&[])).unwrap_or_default();
+            for _ in rows {
+                statements.push(format!(
+                    "INSERT INTO {target} AS _t DEFAULT VALUES{conflict}"
+                ));
+            }
+            continue;
+        }
+        let list = columns
+            .iter()
+            .map(|c| ident(c))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let p = sql.param(Param::Json(Value::Array(rows)));
+        let conflict = upsert.map(|u| u.clause(&columns)).unwrap_or_default();
+        statements.push(format!(
+            "INSERT INTO {target} AS _t ({list}) SELECT {list} FROM json_populate_recordset(NULL::{target}, {p}::json){conflict}"
+        ));
+    }
+
+    sql.text = match (statements.len(), representation) {
+        (1, Some(select)) => with_representation(&mut sql, schema, statements.remove(0), select),
+        (1, None) => statements.remove(0),
+        (_, Some(select)) => {
+            let ctes: Vec<String> = statements
+                .iter()
+                .enumerate()
+                .map(|(i, s)| format!("_w{i} AS ({s} RETURNING _t.*)"))
+                .collect();
+            let union: Vec<String> = (0..statements.len())
+                .map(|i| format!("SELECT * FROM _w{i}"))
+                .collect();
+            format!(
+                "WITH {} SELECT coalesce(json_agg(_r), '[]')::text, count(*) FROM (SELECT {} FROM ({}) AS _t) _r",
+                ctes.join(", "),
+                select_list(&mut sql, schema, select, "_t", ""),
+                union.join(" UNION ALL "),
+            )
+        }
+        (n, None) => {
+            let ctes: Vec<String> = statements
+                .iter()
+                .enumerate()
+                .map(|(i, s)| format!("_w{i} AS ({s})"))
+                .collect();
+            format!("WITH {} SELECT {n}", ctes.join(", "))
+        }
+    };
+    Ok(sql)
+}
+
+/// `UPDATE` with the JSON object's fields, only on the rows the filters (and RLS) allow.
+pub fn update(
+    schema: &str,
+    table: &Table,
+    body: Value,
+    filters: &[Condition],
+    representation: Option<&Select>,
+) -> Result<Sql, QueryError> {
+    let Value::Object(map) = body else {
+        return Err(invalid("the PATCH body must be a JSON object"));
+    };
+    let columns = body_columns(table, &[Value::Object(map.clone())])?;
+    if columns.is_empty() {
+        return Err(invalid("the PATCH body has no columns"));
+    }
+    let target = qualified(schema, table);
+    let mut sql = Sql::default();
+    let p = sql.param(Param::Json(Value::Object(map)));
+    let assignments = columns
+        .iter()
+        .map(|c| format!("{0} = _b.{0}", ident(c)))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let filters = where_clause(&mut sql, filters);
+    let write = format!(
+        "UPDATE {target} AS _t SET {assignments} FROM json_populate_record(NULL::{target}, {p}::json) AS _b{filters}"
+    );
+    sql.text = match representation {
+        Some(select) => with_representation(&mut sql, schema, write, select),
+        None => write,
+    };
+    Ok(sql)
+}
+
+pub fn delete(
+    schema: &str,
+    table: &Table,
+    filters: &[Condition],
+    representation: Option<&Select>,
+) -> Sql {
+    let mut sql = Sql::default();
+    let filters = where_clause(&mut sql, filters);
+    let write = format!("DELETE FROM {} AS _t{filters}", qualified(schema, table));
+    sql.text = match representation {
+        Some(select) => with_representation(&mut sql, schema, write, select),
+        None => write,
+    };
+    sql
+}
+
+/// Picks the overload whose arguments match the body's keys.
+pub fn resolve_function<'a>(
+    candidates: &'a [Function],
+    args: &Map<String, Value>,
+) -> Result<&'a Function, QueryError> {
+    candidates
+        .iter()
+        .filter(|f| {
+            args.keys().all(|k| f.args.iter().any(|a| &a.name == k))
+                && f.args
+                    .iter()
+                    .all(|a| a.has_default || args.contains_key(&a.name))
+        })
+        .min_by_key(|f| f.args.len())
+        .ok_or_else(|| invalid("the arguments match no signature of the function"))
+}
+
+/// Function call with named arguments, converted by Postgres from the JSON
+/// (`json_to_record`).
+pub fn rpc(schema: &str, function: &Function, args: Map<String, Value>) -> Sql {
+    let mut sql = Sql::default();
+    let used: Vec<_> = function
+        .args
+        .iter()
+        .filter(|a| args.contains_key(&a.name))
+        .collect();
+    let call_args = used
+        .iter()
+        .map(|a| format!("{0} => _a.{0}", ident(&a.name)))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let call = format!("{}.{}({call_args})", ident(schema), ident(&function.name));
+    let source = if used.is_empty() {
+        None
+    } else {
+        let definition = used
+            .iter()
+            .map(|a| format!("{} {}", ident(&a.name), a.type_name))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let p = sql.param(Param::Json(Value::Object(args)));
+        Some(format!("json_to_record({p}::json) AS _a({definition})"))
+    };
+    sql.text = match (function.returns_set, function.returns_void, source) {
+        (true, _, Some(source)) => {
+            format!("SELECT coalesce(json_agg(_r), '[]')::text FROM {source}, LATERAL {call} AS _r")
+        }
+        (true, _, None) => format!("SELECT coalesce(json_agg(_r), '[]')::text FROM {call} AS _r"),
+        (false, true, Some(source)) => format!("SELECT {call}::text FROM {source}"),
+        (false, true, None) => format!("SELECT {call}::text"),
+        (false, false, Some(source)) => format!("SELECT to_json({call})::text FROM {source}"),
+        (false, false, None) => format!("SELECT to_json({call})::text"),
+    };
+    sql
+}

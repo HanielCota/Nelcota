@@ -145,15 +145,17 @@ crash mid-upload).
 
 ## Backups
 
-With the disk backend, `nelcota backup --upload` also mirrors the project's
-files to `s3://<backup bucket>/<project>/storage/` (only new files travel;
-deleted ones are deleted there too). After losing the server:
+With the disk backend, every dump has its own `<dump>.files/` snapshot and
+SHA-256 manifest. `nelcota backup --upload` uploads that immutable snapshot to
+`s3://<backup bucket>/<project>/<dump>.files/`. Later file deletions leave older
+snapshots intact. After losing the server:
 
 ```sh
 nelcota -p shop restore backups/nelcota-shop-<date>.dump --files --yes
 ```
 
-`--files` brings the files back from that mirror. With the S3 backend the
+`--files` verifies and restores that dump's snapshot, locally or from the backup
+bucket. Keep the `.dump` and `.dump.files/` directory together. With the S3 backend the
 files never leave the provider; use its versioning or replication if you need
 more copies.
 

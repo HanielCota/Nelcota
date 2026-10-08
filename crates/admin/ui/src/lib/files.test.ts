@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { baseName, encodePath, folderTrail, formatBytes, parseTypes, publicUrl, validBucketName } from './files'
+import { baseName, encodePath, folderTrail, formatBytes, parseTypes, previewKind, publicUrl, validBucketName } from './files'
 
 describe('formatBytes', () => {
   it('picks a unit', () => {
@@ -42,5 +42,21 @@ describe('bucket settings', () => {
     for (const bad of ['', 'Avatars', '-a', 'a b', 'public', 'sign', 'list', 'x'.repeat(64)]) {
       expect(validBucketName(bad)).toBe(false)
     }
+  })
+})
+
+describe('file previews', () => {
+  it('limits previews to passive formats', () => {
+    expect(previewKind('image/png', 512)).toBe('image')
+    expect(previewKind('application/pdf', 512)).toBe('pdf')
+    expect(previewKind('application/json', 512)).toBe('text')
+    expect(previewKind('text/html', 512)).toBeNull()
+    expect(previewKind('image/svg+xml', 512)).toBeNull()
+  })
+
+  it('limits large binary and text previews independently', () => {
+    expect(previewKind('text/plain', 1024 * 1024 + 1)).toBeNull()
+    expect(previewKind('image/png', 20 * 1024 * 1024)).toBe('image')
+    expect(previewKind('image/png', 20 * 1024 * 1024 + 1)).toBeNull()
   })
 })

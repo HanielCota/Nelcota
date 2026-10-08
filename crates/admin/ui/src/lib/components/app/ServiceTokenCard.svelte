@@ -1,6 +1,8 @@
 <script lang="ts">
   import * as Select from '$lib/components/ui/select'
   import { Button } from '$lib/components/ui/button'
+  import KeyRound from '@lucide/svelte/icons/key-round'
+  import LoaderCircle from '@lucide/svelte/icons/loader-circle'
   import { toast } from 'svelte-sonner'
   import CodeBlock from './CodeBlock.svelte'
   import { api } from '$lib/api'
@@ -15,6 +17,7 @@
   let busy = $state(false)
 
   async function issue() {
+    if (busy) return
     busy = true
     try {
       issued = await api.post<{ token: string; expires_at: number }>('/tokens/service-role', { days: Number(days) })
@@ -59,6 +62,7 @@
       </Select.Content>
     </Select.Root>
     <Button variant="outline" disabled={busy} onclick={issue}>
+      {#if busy}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{:else}<KeyRound data-icon="inline-start" aria-hidden="true" />{/if}
       {busy ? t('connect.token.generating') : issued ? t('connect.token.generateAnother') : t('connect.token.generate')}
     </Button>
     <span class="text-sm text-muted-foreground">

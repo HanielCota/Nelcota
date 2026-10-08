@@ -2,36 +2,38 @@
   import { onMount } from 'svelte'
   import { Skeleton } from '$lib/components/ui/skeleton'
   import ArrowUpRight from '@lucide/svelte/icons/arrow-up-right'
+  import Boxes from '@lucide/svelte/icons/boxes'
+  import RefreshCw from '@lucide/svelte/icons/refresh-cw'
+  import Copy from '@lucide/svelte/icons/copy'
+  import CircleCheck from '@lucide/svelte/icons/circle-check'
+  import CircleAlert from '@lucide/svelte/icons/circle-alert'
   import { Button } from '$lib/components/ui/button'
   import { toast } from 'svelte-sonner'
   import PageHeader from '$lib/components/app/PageHeader.svelte'
+  import LoadError from '$lib/components/app/LoadError.svelte'
+  import EmptyState from '$lib/components/app/EmptyState.svelte'
+  import { copyText } from '$lib/clipboard'
+  import { RemoteResource } from '$lib/remote-resource.svelte'
   import { api } from '$lib/api'
   import { openProject } from '$lib/projects'
   import type { ProjectStatus, ProjectsData } from '$lib/types'
   import { errorMessage, t } from '$lib/i18n/index.svelte'
 
-  let projects = $state<ProjectStatus[] | null>(null)
-  let sso = $state(false)
-  let failure = $state<unknown>(null)
-  let refreshing = $state(false)
-
+  const resource = new RemoteResource<{ projects: ProjectStatus[]; sso: boolean }>()
+  const projects = $derived(resource.data?.projects ?? null)
+  const sso = $derived(resource.data?.sso ?? false)
+  const failure = $derived(resource.error)
+  const refreshing = $derived(resource.loading)
   async function load() {
-    refreshing = true
-    try {
+    await resource.load(async signal => {
       const [list, status] = await Promise.all([
-        api.get<ProjectsData>('/projects'),
-        api.get<{ projects: ProjectStatus[] }>('/projects/status'),
+        api.get<ProjectsData>('/projects', { signal }),
+        api.get<{ projects: ProjectStatus[] }>('/projects/status', { signal }),
       ])
-      sso = list.sso
-      projects = status.projects.length ? status.projects : list.projects.map((p) => ({ ...p, healthy: true, version: null, latency_ms: null }))
-    } catch (e) {
-      failure = e
-    } finally {
-      refreshing = false
-    }
+      return { sso: list.sso, projects: status.projects.length ? status.projects : list.projects.map(p => ({ ...p, healthy: true, version: null, latency_ms: null })) }
+    })
   }
-
-  onMount(load)
+  onMount(() => { void load(); return () => resource.cancel() })
 
   async function open(project: ProjectStatus) {
     try {
@@ -50,35 +52,35 @@
     description={projects ? (sso ? t('projects.sso') : t('projects.separateLogin')) : undefined}
   >
     {#snippet actions()}
-      <Button variant="outline" onclick={load} disabled={refreshing}>{refreshing ? t('projects.refreshing') : t('common.refresh')}</Button>
+      <Button variant="outline" onclick={load} disabled={refreshing}><RefreshCw data-icon="inline-start" class={refreshing ? 'animate-spin' : ''} aria-hidden="true" />{refreshing ? t('projects.refreshing') : t('common.refresh')}</Button>
     {/snippet}
   </PageHeader>
 
-  {#if failure}
-    <p class="text-sm text-destructive">{errorMessage(failure)}</p>
-  {:else if !projects}
+  {#if failure}<LoadError message={errorMessage(failure)} onretry={load} busy={refreshing} />{/if}
+  {#if !projects && refreshing}
     <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {#each [0, 1, 2] as i (i)}<Skeleton class="h-36 rounded-lg" />{/each}
     </div>
-  {:else}
+  {:else if projects}
+    {#if projects.length === 0}<EmptyState icon={Boxes} title={t('projects.empty')} description={t('projects.emptyDescription')} />{/if}
     <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {#each projects as project (project.name)}
         <div class={['flex flex-col rounded-lg border bg-card p-5', project.current && 'border-brand/40']}>
           <div class="flex items-baseline justify-between gap-3">
-            <p class="truncate font-medium">{project.name}</p>
+            <p class="flex min-w-0 items-center gap-2 font-medium"><Boxes class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" /><span class="truncate">{project.name}</span></p>
             {#if project.current}<span class="shrink-0 text-xs text-muted-foreground">{t('projects.current')}</span>{/if}
           </div>
-          <p class="mt-0.5 truncate font-mono text-xs text-muted-foreground">{host(project.url)}</p>
+          <div class="mt-1 flex min-w-0 items-center gap-1"><p class="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">{host(project.url)}</p>{#if project.url}<Button variant="ghost" size="icon-xs" aria-label={t('projects.copyUrl', { name: project.name })} onclick={() => copyText(project.url!)}><Copy aria-hidden="true" /></Button>{/if}</div>
 
           <div class="mt-5 flex items-center gap-2 text-sm">
             {#if project.healthy}
-              <span class="size-2 rounded-full bg-brand"></span>
+              <CircleCheck class="size-4 text-brand" aria-hidden="true" />
               <span>{t('projects.up')}</span>
               {#if project.latency_ms !== null}
                 <span class="text-muted-foreground tabular-nums">· {project.latency_ms} ms</span>
               {/if}
             {:else}
-              <span class="size-2 rounded-full bg-destructive"></span>
+              <CircleAlert class="size-4 text-destructive" aria-hidden="true" />
               <span class="text-destructive">{t('projects.down')}</span>
             {/if}
             {#if project.version}<span class="ml-auto font-mono text-xs text-muted-foreground">{project.version}</span>{/if}

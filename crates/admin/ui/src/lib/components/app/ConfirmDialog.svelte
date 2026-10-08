@@ -22,6 +22,7 @@
   let busy = $state(false)
 
   async function confirm() {
+    if (busy) return
     busy = true
     try {
       await onconfirm()

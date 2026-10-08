@@ -579,7 +579,8 @@ Per-user quotas are left to policies, which see the final row (with its
 size) on insert. Image transformations and resumable (TUS) uploads stay out:
 decoding untrusted images is a steady source of CVEs.
 
-**D81. New projects store files on their disk; backups mirror them.**
+**D81. New projects store files on their disk; backups mirror them**
+(the shared backup mirror is superseded by D82).
 `nelcota init` writes `NELCOTA_STORAGE_BACKEND=disk`: on Docker the app
 mounts `projects/<name>/storage` (owned by the image's user 65532), on
 systemd the unit's `StateDirectory`. Storage works right after `nelcota up`,
@@ -590,6 +591,34 @@ change once written (D78), so each run only sends new files, and
 `restore --files` brings them back. Caddy stops compressing `/storage/*`,
 which would break byte ranges. Projects created before storage keep it off
 until they add the two lines and the volume (docs/storage.md).
+
+## Panel and backup reliability
+
+**D82. Disk backups capture immutable files beside each dump.** A shared
+mirror loses old versions when later uploads replace or delete them, so it
+cannot restore the files referenced by a historical database dump. Each dump
+now has its own `.files/` directory and SHA-256 manifest. An exported Postgres
+snapshot and a SHARE lock on `storage.objects` keep the copied versions and
+dump metadata consistent. Upload files before publishing the dump; retain and
+archive the pair together. Restore validates the manifest before stopping the
+app and copies immutable versions before restoring the database. Older dumps
+remain usable for database-only restores (docs/backup.md).
+
+**D83. The panel validates wire contracts generated from Rust.** `ts-rs` and
+`schemars` export TypeScript and JSON Schema from the server DTOs; Ajv emits
+standalone browser validators so the existing CSP needs no runtime code
+generation. Drift checks run in CI. Database cell values stay text or NULL
+(D48). Resource state and upload queues own cancellation, result ordering and
+the captured upload destination, with unit and browser regression tests.
+
+**D84. SQL display limits bound memory without changing batch semantics.**
+Dedicated editor connections (D47) allow at most four runs with a 30-second
+statement timeout. The client retains up to 1000 rows per result, 8 MiB of
+values and 32 displayed results, while the server drains the remaining batch
+so later statements still execute. Dropping a request sends Postgres
+cancellation and closes its connection. DDL reports `applied` separately from
+`catalog_pending`: a failed refresh after COMMIT retries with backoff instead
+of asking the user to replay an already committed mutation.
 
 ### Known pending items
 

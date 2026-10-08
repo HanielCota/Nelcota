@@ -26,8 +26,9 @@
 
   const id = $derived(`f-${column.name}`)
   const kind = $derived(columnKind(column))
-  // Short text on one line; becomes a text area when long or multi-line.
-  const multiline = $derived(kind === 'json' || (kind === 'text' && (field.value.length > 80 || field.value.includes('\n'))))
+  // Keep the same control while typing, so focus and selection never jump.
+  const multiline = $derived(kind === 'json' || kind === 'text')
+  const descriptionId = $derived(problem ? `${id}-error` : column.comment ? `${id}-description` : undefined)
   const placeholder = $derived(inserting && column.has_default ? 'DEFAULT' : column.nullable ? 'NULL' : '')
   const required = $derived(inserting && !column.nullable && !column.has_default)
   const preview = $derived(
@@ -49,7 +50,7 @@
     <label for={id} class="flex items-center gap-1.5 text-sm font-medium">
       {#if column.is_pk}<KeyRound class="size-3.5 text-muted-foreground" aria-label={t('tables.row.primaryKey')} />{/if}{column.name}
     </label>
-    <span class="rounded-md bg-muted px-1.5 py-0.5 font-mono text-3xs text-muted-foreground">{column.full_type}</span>
+    <span class="rounded-md bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground">{column.full_type}</span>
     {#if required}<span class="text-2xs text-muted-foreground">{t('tables.row.required')}</span>{/if}
     {#if column.nullable}
       <label class="ml-auto flex cursor-pointer items-center gap-1.5 text-xs font-medium text-muted-foreground">
@@ -63,7 +64,7 @@
     <div class="flex h-9 items-center rounded-lg border border-dashed border-border-strong bg-muted/40 px-3 font-mono text-xs text-muted-foreground">NULL</div>
   {:else if options.length}
     <Select.Root type="single" bind:value={field.value}>
-      <Select.Trigger {id} class="w-full">{field.value || placeholder || t('tables.row.select')}</Select.Trigger>
+      <Select.Trigger {id} class="w-full" aria-invalid={problem ? true : undefined} aria-describedby={descriptionId}>{field.value || placeholder || t('tables.row.select')}</Select.Trigger>
       <Select.Content>
         {#each options as option (option)}<Select.Item value={option}>{option}</Select.Item>{/each}
       </Select.Content>
@@ -71,10 +72,11 @@
   {:else if multiline}
     <Textarea
       {id}
-      class={['min-h-20 text-xs', kind === 'json' && 'min-h-28 font-mono']}
+      class={['field-sizing-content min-h-20 text-sm', kind === 'json' && 'min-h-28 font-mono text-xs']}
       {placeholder}
       bind:value={field.value}
       aria-invalid={problem ? true : undefined}
+      aria-describedby={descriptionId}
     />
   {:else}
     <Input
@@ -84,16 +86,17 @@
       {placeholder}
       bind:value={field.value}
       aria-invalid={problem ? true : undefined}
+      aria-describedby={descriptionId}
     />
   {/if}
 
   {#if problem}
-    <p class="text-xs text-destructive">{t(`tables.row.problems.${problem}`)}</p>
+    <p id={`${id}-error`} class="text-xs text-destructive">{t(`tables.row.problems.${problem}`)}</p>
   {:else if preview && preview.text !== field.value}
     <p class="text-xs text-muted-foreground">= {preview.text}{column.type === 'timestamp with time zone' ? ` ${t('tables.row.inYourTimeZone')}` : ''}</p>
   {/if}
   {#if kind === 'json' && !field.isNull && field.value.trim()}
     <Button variant="ghost" size="xs" class="justify-self-start text-muted-foreground" onclick={formatJson}>{t('tables.row.formatJson')}</Button>
   {/if}
-  {#if column.comment}<p class="text-xs text-muted-foreground">{column.comment}</p>{/if}
+  {#if column.comment}<p id={`${id}-description`} class="text-xs text-muted-foreground">{column.comment}</p>{/if}
 </div>

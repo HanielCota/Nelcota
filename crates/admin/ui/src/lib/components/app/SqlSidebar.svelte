@@ -3,17 +3,22 @@
   import { Button } from '$lib/components/ui/button'
   import Ellipsis from '@lucide/svelte/icons/ellipsis'
   import Plus from '@lucide/svelte/icons/plus'
+  import FileCode from '@lucide/svelte/icons/file-code'
+  import Pencil from '@lucide/svelte/icons/pencil'
+  import Trash2 from '@lucide/svelte/icons/trash-2'
   import { SQL_SNIPPETS } from '$lib/sql-snippets'
-  import { sqlStore, type SavedQuery } from '$lib/sql-store.svelte'
+  import { sqlStore, type SavedQuery, type SqlDraft } from '$lib/sql-store.svelte'
   import { cn } from '$lib/utils'
   import { t } from '$lib/i18n/index.svelte'
 
   let {
     onrename,
     ondelete,
+    ondeleteDraft,
   }: {
     onrename: (query: SavedQuery) => void
     ondelete: (query: SavedQuery) => void
+    ondeleteDraft: (draft: SqlDraft) => void
   } = $props()
 
   const item =
@@ -42,6 +47,7 @@
             aria-current={active ? 'true' : undefined}
             onclick={() => sqlStore.openSaved(query.id)}
           >
+            <FileCode class="size-4 shrink-0" aria-hidden="true" />
             <span class="truncate">{query.name}</span>
             {#if active && sqlStore.dirty}<span class="size-1.5 shrink-0 rounded-full bg-muted-foreground" title={t('sql.editor.unsavedTitle')}></span>{/if}
           </button>
@@ -58,9 +64,9 @@
               {/snippet}
             </DropdownMenu.Trigger>
             <DropdownMenu.Content align="start" class="w-44">
-              <DropdownMenu.Item onclick={() => onrename(query)}>{t('sql.sidebar.rename')}</DropdownMenu.Item>
+              <DropdownMenu.Item onclick={() => onrename(query)}><Pencil aria-hidden="true" />{t('sql.sidebar.rename')}</DropdownMenu.Item>
               <DropdownMenu.Separator />
-              <DropdownMenu.Item variant="destructive" onclick={() => ondelete(query)}>{t('common.delete')}</DropdownMenu.Item>
+              <DropdownMenu.Item variant="destructive" onclick={() => ondelete(query)}><Trash2 aria-hidden="true" />{t('common.delete')}</DropdownMenu.Item>
             </DropdownMenu.Content>
           </DropdownMenu.Root>
         </div>
@@ -69,11 +75,25 @@
       {/each}
     </div>
 
+    {#if sqlStore.looseDrafts.length}
+      <p class={cn(heading, 'mt-6')}>{t('sql.editor.drafts')}</p>
+      <div class="grid gap-0.5">
+        {#each sqlStore.looseDrafts as draft (draft.id)}
+          <div class={cn(item, 'pr-1', sqlStore.activeDraftId === draft.id && 'bg-sidebar-accent text-foreground')}>
+            <button class="flex min-w-0 flex-1 items-center gap-2" onclick={() => sqlStore.openDraft(draft.id)} aria-current={sqlStore.activeDraftId === draft.id ? 'true' : undefined}><FileCode class="size-4 shrink-0" aria-hidden="true" /><span class="truncate">{draft.sql.trim().split('\n')[0]}</span></button>
+            <Button variant="ghost" size="icon-xs" aria-label={t('common.discard')} onclick={() => ondeleteDraft(draft)}><Trash2 aria-hidden="true" /></Button>
+          </div>
+        {/each}
+      </div>
+    {/if}
+    <p class="px-2.5 pt-3 text-xs text-muted-foreground">{t('sql.editor.localOnly')}</p>
+
     <p class={cn(heading, 'mt-6')}>{t('sql.editor.templates')}</p>
     <div class="grid gap-0.5">
       {#each SQL_SNIPPETS as snippet (snippet.label)}
         <button class={item} onclick={() => sqlStore.open(t(snippet.sql))}>
-          <span class="truncate">{t(snippet.label)}</span>
+          <FileCode class="size-4 shrink-0" aria-hidden="true" />
+          <span class="min-w-0 flex-1 truncate">{t(snippet.label)}</span>
         </button>
       {/each}
     </div>

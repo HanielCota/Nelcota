@@ -49,3 +49,12 @@ export function parseTypes(text: string): string[] {
 export function validBucketName(id: string): boolean {
   return /^[a-z0-9][a-z0-9_-]{0,62}$/.test(id) && !['public', 'sign', 'list'].includes(id)
 }
+
+/** Only passive formats are previewed; other files remain available for download. */
+export function previewKind(mime: string, size: number): 'image' | 'pdf' | 'text' | null {
+  if (size > 20 * 1024 * 1024) return null
+  if (['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/avif', 'image/bmp'].includes(mime)) return 'image'
+  if (mime === 'application/pdf') return 'pdf'
+  if (size <= 1024 * 1024 && ['text/plain', 'text/csv', 'application/json'].includes(mime)) return 'text'
+  return null
+}

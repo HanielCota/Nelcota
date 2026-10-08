@@ -18,7 +18,7 @@ use crate::{AdminState, ApiError, api::table_or_404};
 /// Roles the panel shows and lets you configure in GRANTs.
 pub const API_ROLES: [&str; 3] = ["anon", "authenticated", "service_role"];
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ts_rs::TS, schemars::JsonSchema)]
 pub struct ForeignKeyRef {
     pub table: String,
     pub column: String,
@@ -27,7 +27,7 @@ pub struct ForeignKeyRef {
     pub constraint: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ts_rs::TS, schemars::JsonSchema)]
 pub struct ColumnInfo {
     pub name: String,
     /// Type as Postgres writes it (`character varying(80)`, `integer[]`).
@@ -36,6 +36,7 @@ pub struct ColumnInfo {
     /// DEFAULT (or generated column) expression, as in `pg_get_expr`.
     pub default: Option<String>,
     /// `always`, `by default` or `None` (not an identity column).
+    #[ts(type = "'always' | 'by default' | null")]
     pub identity: Option<&'static str>,
     pub generated: bool,
     pub primary_key: bool,
@@ -45,14 +46,16 @@ pub struct ColumnInfo {
     pub comment: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ts_rs::TS, schemars::JsonSchema)]
 pub struct Grant {
+    #[ts(type = "'anon' | 'authenticated' | 'service_role'")]
     pub role: &'static str,
     /// Subset of `select`, `insert`, `update`, `delete`.
+    #[ts(type = "Array<'select' | 'insert' | 'update' | 'delete'>")]
     pub privileges: Vec<&'static str>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ts_rs::TS, schemars::JsonSchema)]
 pub struct Structure {
     pub name: String,
     pub comment: Option<String>,

@@ -3,6 +3,9 @@
   import { Button } from '$lib/components/ui/button'
   import { Input } from '$lib/components/ui/input'
   import { Label } from '$lib/components/ui/label'
+  import Eye from '@lucide/svelte/icons/eye'
+  import EyeOff from '@lucide/svelte/icons/eye-off'
+  import LoaderCircle from '@lucide/svelte/icons/loader-circle'
   import { api } from '$lib/api'
   import { session } from '$lib/session.svelte'
   import Mascot, { type Pose } from '$lib/components/app/Mascot.svelte'
@@ -27,9 +30,11 @@
   let failure = $state<unknown>(null)
   let loading = $state(false)
   let typingPassword = $state(false)
+  let showPassword = $state(false)
 
   async function submit(event: SubmitEvent) {
     event.preventDefault()
+    if (loading) return
     loading = true
     failure = null
     try {
@@ -37,6 +42,7 @@
       session.email = me.email
     } catch (e) {
       failure = e
+      document.getElementById('password')?.focus()
     } finally {
       loading = false
     }
@@ -89,24 +95,29 @@
       </div>
       <div class="grid gap-2">
         <Label for="password">{t('login.password')}</Label>
+        <div class="relative">
         <Input
           id="password"
-          type="password"
+          type={showPassword ? 'text' : 'password'}
           autocomplete="current-password"
-          class="h-10"
+          class="h-10 pr-11"
           bind:value={password}
           onfocus={() => (typingPassword = true)}
           onblur={() => (typingPassword = false)}
           oninput={() => (failure = null)}
           required
+          aria-invalid={failure ? true : undefined}
+          aria-describedby={failure ? 'login-error' : undefined}
         />
+        <Button type="button" variant="ghost" size="icon-sm" class="absolute top-1 right-1 z-10" aria-label={t(showPassword ? 'common.hidePassword' : 'common.showPassword')} aria-pressed={showPassword} onclick={() => { showPassword = !showPassword; document.getElementById('password')?.focus() }}>{#if showPassword}<EyeOff aria-hidden="true" />{:else}<Eye aria-hidden="true" />{/if}</Button>
+        </div>
       </div>
 
       {#if failure}
-        <p class="text-sm text-destructive" role="alert">{errorMessage(failure)}</p>
+        <p id="login-error" class="text-sm text-destructive" role="alert">{errorMessage(failure)}</p>
       {/if}
 
-      <Button type="submit" class="mt-1 h-10 w-full" disabled={loading}>{loading ? t('login.signingIn') : t('login.signIn')}</Button>
+      <Button type="submit" class="mt-1 h-10 w-full" disabled={loading}>{#if loading}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{/if}{loading ? t('login.signingIn') : t('login.signIn')}</Button>
     </form>
 
     <p class="mt-6 text-center text-sm text-muted-foreground">{t('login.restricted')}</p>

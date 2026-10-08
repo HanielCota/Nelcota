@@ -6,19 +6,24 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json",
-    "test": "vitest run"
+    "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json && tsc -p tsconfig.e2e.json",
+    "test": "vitest run src",
+    "contracts": "cargo run --manifest-path ../../../Cargo.toml -p nelcota-admin --example export_contracts && node scripts/contracts.mjs",
+    "test:e2e": "playwright test"
   },
   "devDependencies": {
     "@internationalized/date": "^3.12.4",
     "@lucide/svelte": "^1.52.0",
+    "@playwright/test": "^1.64.0",
     "@sveltejs/vite-plugin-svelte": "^7.3.0",
     "@tailwindcss/vite": "^4.3.3",
     "@tsconfig/svelte": "^5.0.8",
     "@types/node": "^24.13.3",
+    "ajv": "^8.20.0",
     "bits-ui": "^2.19.5",
     "cn": "^0.4.0",
     "mode-watcher": "^1.1.0",
+    "paneforge": "^1.0.2",
     "shadcn-svelte": "^1.7.0",
     "svelte": "^5.57.0",
     "svelte-check": "^4.7.6",

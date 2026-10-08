@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
+  import { onMount, untrack } from 'svelte'
   import { Button } from '$lib/components/ui/button'
   import Plus from '@lucide/svelte/icons/plus'
   import ShieldAlert from '@lucide/svelte/icons/shield-alert'
@@ -18,23 +18,32 @@
   import CreateTableSheet from '$lib/components/app/CreateTableSheet.svelte'
   import StructureView from '$lib/components/app/StructureView.svelte'
   import EmptyState from '$lib/components/app/EmptyState.svelte'
-  import { api, enc, isAbort } from '$lib/api'
+  import { api, enc } from '$lib/api'
+  import { RemoteResource } from '$lib/remote-resource.svelte'
   import { HiddenColumns } from '$lib/hidden-columns.svelte'
   import { filtersParam, filtersToSearch, parseFilters, type TableFilter } from '$lib/filters'
   import { href, navigate, route } from '$lib/router.svelte'
   import { cn } from '$lib/utils'
-  import type { Column, RowData, TableData, TableSummary } from '$lib/types'
+  import { rowKey, rowPk } from '$lib/grid'
+  import { parseTableView, tableViewSearch, type TableView } from '$lib/table-view'
+  import type { Column, RowData, TableData, TablesResponse } from '$lib/types'
   import { errorMessage, t } from '$lib/i18n/index.svelte'
 
   let { name, view = 'data' }: { name?: string; view?: 'data' | 'structure' } = $props()
 
-  let tables = $state<TableSummary[]>([])
-  let data = $state<TableData | null>(null)
-  let loading = $state(false)
-  let error = $state('')
-  let page = $state(0)
-  let size = $state('50')
-  let sort = $state<{ column: string; desc: boolean } | null>(null)
+  const tablesResource = new RemoteResource<TablesResponse>()
+  const tables = $derived(tablesResource.data?.tables ?? [])
+  const tablesLoading = $derived(tablesResource.loading)
+  const tablesError = $derived(tablesResource.error ? errorMessage(tablesResource.error) : '')
+  const resource = new RemoteResource<TableData>()
+  const data = $derived(resource.data)
+  const loading = $derived(resource.loading)
+  let savingCell = $state(false)
+  const error = $derived(resource.error ? errorMessage(resource.error) : '')
+  const tableView = $derived(parseTableView(route.query))
+  const page = $derived(tableView.page)
+  const size = $derived(tableView.size)
+  const sort = $derived(tableView.sort)
   let selected = $state<Set<number>>(new Set())
 
   let sheetOpen = $state(false)
@@ -59,14 +68,17 @@
   const filtersKey = $derived(filtersToSearch(filters))
 
   async function loadTables() {
-    try {
-      tables = (await api.get<{ tables: TableSummary[] }>('/tables')).tables
-    } catch (e) {
-      toast.error(errorMessage(e))
-    }
+    await tablesResource.load(signal => api.get<TablesResponse>('/tables', { signal }))
   }
 
-  onMount(loadTables)
+  onMount(() => {
+    loadTables()
+    if (route.query.get('create') === 'true') {
+      createOpen = true
+      navigate('/tables', true)
+    }
+    return () => tablesResource.cancel()
+  })
 
   async function onCreated(table: string) {
     await loadTables()
@@ -95,42 +107,28 @@
     return params
   }
 
-  let inflight: AbortController | undefined
-
   async function load() {
     if (!name) return
-    // Only the latest response counts: the previous one is cancelled.
-    inflight?.abort()
-    const controller = (inflight = new AbortController())
-    loading = true
-    error = ''
-    try {
-      const params = rowsParams()
-      params.set('page', String(page))
-      params.set('size', size)
-      data = await api.get<TableData>(`/tables/${enc(name)}?${params}`, { signal: controller.signal })
-      selected = new Set()
-    } catch (e) {
-      if (isAbort(e)) return
-      error = errorMessage(e)
-      data = null
-    } finally {
-      if (inflight === controller) loading = false
-    }
+    if (data?.table.name !== name) resource.clear()
+    if (view !== 'data') return
+    selected = new Set()
+    const params = rowsParams()
+    params.set('page', String(page))
+    params.set('size', size)
+    await resource.load(signal => api.get<TableData>(`/tables/${enc(name!)}?${params}`, { signal }))
   }
 
   // Reload when the table, page, size, sort or filters change.
   $effect(() => {
-    void [name, view, page, size, sort, filtersKey]
-    load()
-    return () => inflight?.abort()
+    void [name, view, page, size, sort?.column, sort?.desc, filtersKey]
+    untrack(load)
+    return () => resource.cancel()
   })
 
   function setFilters(next: TableFilter[]) {
     filterOpen = false
     filterPreset = undefined
-    page = 0
-    const search = filtersToSearch(next)
+    const search = tableViewSearch(new URLSearchParams(filtersToSearch(next)), { page: 0, size, sort })
     navigate(`/tables/${enc(name!)}${search ? `?${search}` : ''}`)
   }
 
@@ -147,13 +145,16 @@
     )
 
   function toggleSort(column: string) {
-    sort = sort?.column === column ? (sort.desc ? null : { column, desc: true }) : { column, desc: false }
-    page = 0
+    updateView({ page: 0, sort: sort?.column === column ? (sort.desc ? null : { column, desc: true }) : { column, desc: false } })
   }
 
   function setSort(column: string, direction: 'asc' | 'desc' | null) {
-    sort = direction ? { column, desc: direction === 'desc' } : null
-    page = 0
+    updateView({ page: 0, sort: direction ? { column, desc: direction === 'desc' } : null })
+  }
+
+  function updateView(patch: Partial<TableView>) {
+    const search = tableViewSearch(route.query, patch)
+    navigate(`/tables/${enc(name!)}${search ? `?${search}` : ''}`)
   }
 
   /** Column menu: opens the filter bar with a row for that column. */
@@ -163,21 +164,32 @@
   }
 
   function pkOf(row: RowData) {
-    return Object.fromEntries((data?.table.primary_key ?? []).map((k) => [k, row[k]]))
+    return rowPk(row, data?.table.primary_key ?? [])
   }
 
-  async function commitCell(row: number, column: string, value: string | null) {
-    if (!data || !name) return
+  async function commitCell(pk: RowData, column: string, value: string | null) {
+    if (!data || !name || loading || savingCell || data.table.name !== name) return
+    const target = data
+    const table = name
+    const key = rowKey(pk, target.table.primary_key)
+    savingCell = true
     try {
-      const res = await api.patch<{ count: number }>(`/tables/${enc(name)}/rows`, {
-        pk: pkOf(data.rows[row]),
+      const res = await api.patch<{ count: number }>(`/tables/${enc(table)}/rows`, {
+        pk,
         values: { [column]: value },
       })
-      data.rows[row][column] = value
+      if (name === table && data === target) {
+        const row = data.rows.find((candidate) => rowKey(candidate, target.table.primary_key) === key)
+        if (row && res.count > 0) row[column] = value
+      } else if (name === table) {
+        await load()
+      }
       toast.success(t('tables.toast.rowsUpdated', { count: res.count }))
     } catch (e) {
       toast.error(errorMessage(e))
       throw e
+    } finally {
+      savingCell = false
     }
   }
 
@@ -190,6 +202,7 @@
       await load()
     } catch (e) {
       toast.error(errorMessage(e))
+      throw e
     }
   }
 
@@ -200,9 +213,9 @@
 </script>
 
 <div class="flex h-full min-h-0">
-  <TableSidebar {tables} current={name} oncreate={() => (createOpen = true)} />
+  <TableSidebar {tables} current={name} loading={tablesLoading} error={tablesError} onretry={loadTables} oncreate={() => (createOpen = true)} />
 
-  <section class={cn('min-w-0 flex-1 flex-col', name ? 'flex' : 'hidden md:flex')}>
+  <section class={cn('min-w-0 flex-1 flex-col', name ? 'flex' : 'hidden lg:flex')}>
     {#if !name}
       <div class="grid flex-1 place-items-center p-8">
         <EmptyState title={t('tables.editor.noneOpen')} description={t('tables.editor.pickOne')}>
@@ -218,7 +231,7 @@
         {data}
         filterCount={filters.length}
         bind:filterOpen
-        {loading}
+        loading={loading || savingCell}
         hiddenColumns={hidden.names}
         ontogglecolumn={(column) => hidden.toggle(column)}
         onshowallcolumns={() => hidden.showAll()}
@@ -253,8 +266,8 @@
           <SelectionBar
             table={name}
             columns={data.table.columns.map((c) => c.name)}
-            rows={[...selected].sort((a, b) => a - b).map((i) => data!.rows[i])}
-            deletable={data.table.editable}
+            rows={[...selected].sort((a, b) => a - b).map((i) => data!.rows[i]).filter(Boolean)}
+            deletable={data.table.editable && !loading && !savingCell}
             onclear={() => (selected = new Set())}
             ondelete={() => (confirmOpen = true)}
           />
@@ -270,22 +283,24 @@
           </p>
         {/if}
 
-        <div class="relative min-h-0 flex-1 overflow-auto" aria-busy={loading}>
+        <div class="relative min-h-0 flex-1 overflow-auto" aria-busy={loading || savingCell}>
           <!-- Reload (order, filter, page): a bar at the top and a dimmed grid,
                so the old data does not look like the new one. -->
-          {#if loading && data}
+          {#if (loading || savingCell) && data}
             <div class="pointer-events-none sticky top-0 z-20 h-0.5 overflow-hidden bg-brand/15" aria-hidden="true">
               <div class="animate-progress h-full w-2/5 bg-brand"></div>
             </div>
           {/if}
-          {#if error}
+          {#if error && !data}
             <GridState state="error" message={error} onretry={load} />
           {:else if !data}
             <GridState state="loading" />
           {:else}
+            {#if error}<GridState state="error" message={error} onretry={load} />{/if}
             <div class={['transition-opacity', loading && 'opacity-60']}>
               <DataGrid
                 {data}
+                disabled={loading || savingCell}
                 {sort}
                 hidden={hidden.names}
                 bind:selected
@@ -308,7 +323,7 @@
           {/if}
         </div>
 
-        {#if data}<GridFooter {data} bind:page bind:size />{/if}
+        {#if data}<GridFooter {data} {page} {size} disabled={loading || savingCell} onpage={(page) => updateView({ page })} onsize={(size) => updateView({ page: 0, size })} />{/if}
       {/if}
     {/if}
   </section>

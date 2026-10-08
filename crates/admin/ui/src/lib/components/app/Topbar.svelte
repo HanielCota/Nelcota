@@ -75,6 +75,7 @@
 <!-- Navigation on small screens, where the sidebar is hidden. -->
 <Sheet.Root bind:open={mobileOpen}>
   <Sheet.Content side="left" class="w-72 gap-0 bg-sidebar p-0">
+    <Sheet.Title class="sr-only">{t('shell.nav.main')}</Sheet.Title>
     <div class="flex h-14 shrink-0 items-center gap-2 border-b border-sidebar-border px-4">
       <Logo mark />
       <div class="min-w-0 flex-1 pr-8"><ProjectSwitcher /></div>

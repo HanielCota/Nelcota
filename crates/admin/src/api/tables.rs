@@ -1,203 +1,9 @@
-//! Panel JSON handlers: overview, tables (data and writes), users, policies
-//! and the schema for the SQL editor's autocomplete.
+//! Tables panel handlers.
+use super::*;
 
-use std::collections::HashMap;
-
-use axum::{
-    Json,
-    extract::{Path, Query, State},
-};
-use futures_util::future::{join_all, try_join, try_join3};
-use nelcota_api::{
-    Catalog,
-    catalog::{Table, TableKind},
-    query,
-};
-use serde::Deserialize;
-use serde_json::{Map, Value, json, value::RawValue};
-use tokio_postgres::Client;
-
-use crate::{AdminState, ApiError};
-
-type ApiResult = Result<Json<Value>, ApiError>;
-pub(crate) type Row = HashMap<String, Box<RawValue>>;
-
-const MAX_PAGE_SIZE: i64 = 500;
-
-/// Text of a JSON value coming from Postgres, without going through `f64`
-/// (numeric keeps every digit). `None` = NULL.
-pub(crate) fn raw_text(value: Option<&RawValue>) -> Option<String> {
-    let raw = value?.get();
-    if raw == "null" {
-        None
-    } else if raw.starts_with('"') {
-        serde_json::from_str::<String>(raw).ok()
-    } else {
-        Some(raw.to_owned())
-    }
-}
-
-pub(crate) fn table_or_404(state: &AdminState, name: &str) -> Result<Table, ApiError> {
-    state.catalog.get().table(name).cloned().ok_or_else(|| {
-        ApiError::not_found(
-            "table_not_found",
-            format!("table '{name}' does not exist in the exposed schema"),
-        )
-        .params(json!({ "table": name }))
-    })
-}
-
-async fn policy_counts(client: &Client, schema: &str) -> Result<HashMap<String, usize>, ApiError> {
-    let rows = client
-        .query(
-            "SELECT tablename::text, count(*) FROM pg_policies WHERE schemaname = $1 GROUP BY 1",
-            &[&schema],
-        )
-        .await?;
-    Ok(rows
-        .iter()
-        .map(|r| (r.get(0), usize::try_from(r.get::<_, i64>(1)).unwrap_or(0)))
-        .collect())
-}
-
-/// RLS state: `ok` (with policies), `warn` (no policies), `danger` (exposed
-/// without RLS), `none` (no RLS and no GRANT) or `view`.
-fn rls_json(table: &Table, policies: usize) -> Value {
-    let (state, label) = if table.kind != TableKind::Table {
-        ("view", "view".to_owned())
-    } else {
-        match (table.rls_enabled, policies) {
-            (false, _) if table.exposed_without_rls() => ("danger", "no RLS".to_owned()),
-            (false, _) => ("none", "no RLS (no GRANT)".to_owned()),
-            (true, 0) => ("warn", "RLS without policies".to_owned()),
-            (true, n) => ("ok", format!("RLS · {n} policies")),
-        }
-    };
-    json!({
-        "state": state,
-        "label": label,
-        "enabled": table.rls_enabled,
-        "forced": table.rls_forced,
-        "policies": policies,
-    })
-}
-
-fn grants(table: &Table, role: usize) -> Vec<&'static str> {
-    let p = table.privileges[role];
-    [
-        (p.select, "SELECT"),
-        (p.insert, "INSERT"),
-        (p.update, "UPDATE"),
-        (p.delete, "DELETE"),
-    ]
-    .into_iter()
-    .filter(|(on, _)| *on)
-    .map(|(_, name)| name)
-    .collect()
-}
-
-fn kind(table: &Table) -> &'static str {
-    match table.kind {
-        TableKind::Table => "table",
-        TableKind::View => "view",
-        TableKind::MaterializedView => "materialized_view",
-        TableKind::ForeignTable => "foreign_table",
-    }
-}
-
-fn exposed(catalog: &Catalog) -> Vec<&str> {
-    catalog
-        .tables
-        .values()
-        .filter(|t| t.exposed_without_rls())
-        .map(|t| t.name.as_str())
-        .collect()
-}
-
-/// Exact count for small (or never analysed) tables; the planner's estimate
-/// for large ones, so it never costs a seq scan.
-async fn row_count(
-    client: &Client,
-    schema: &str,
-    table: &Table,
-    estimate: i64,
-) -> (Option<i64>, bool) {
-    if table.kind == TableKind::Table && estimate < 10_000 {
-        let sql = format!(
-            "SELECT count(*) FROM {}.{}",
-            query::ident(schema),
-            query::ident(&table.name)
-        );
-        if let Ok(row) = client.query_one(sql.as_str(), &[]).await {
-            return (Some(row.get(0)), true);
-        }
-    }
-    ((estimate >= 0).then_some(estimate), false)
-}
-
-async fn estimates(client: &Client, schema: &str) -> Result<HashMap<String, i64>, ApiError> {
-    Ok(client
-        .query(
-            "SELECT c.relname::text, c.reltuples::int8 FROM pg_class c
-             JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = $1",
-            &[&schema],
-        )
-        .await?
-        .iter()
-        .map(|r| (r.get(0), r.get(1)))
-        .collect())
-}
-
-pub async fn overview(State(state): State<AdminState>) -> ApiResult {
-    let catalog = state.catalog.get();
-    // A single connection, with the independent queries pipelined on it.
-    let client = state.db.get().await?;
-    let (policies, estimates, users) = try_join3(
-        policy_counts(&client, &catalog.schema),
-        estimates(&client, &catalog.schema),
-        async {
-            Ok::<_, ApiError>(
-                client
-                    .query_one("SELECT count(*) FROM auth.users", &[])
-                    .await?,
-            )
-        },
-    )
-    .await?;
-    let users: i64 = users.get(0);
-
-    let counts = join_all(catalog.tables.values().map(|table| {
-        let estimate = estimates.get(&table.name).copied().unwrap_or(-1);
-        row_count(&client, &catalog.schema, table, estimate)
-    }))
-    .await;
-
-    let mut tables = Vec::new();
-    for (table, (rows, exact)) in catalog.tables.values().zip(counts) {
-        tables.push(json!({
-            "name": table.name,
-            "kind": kind(table),
-            "comment": table.comment,
-            "rows": rows,
-            "rows_exact": exact,
-            "rls": rls_json(table, policies.get(&table.name).copied().unwrap_or(0)),
-            "grants": { "anon": grants(table, 0), "authenticated": grants(table, 1) },
-        }));
-    }
-    Ok(Json(json!({
-        "schema": catalog.schema,
-        "counts": {
-            "tables": catalog.tables.len(),
-            "users": users,
-            "policies": policies.values().sum::<usize>(),
-            "functions": catalog.functions.values().map(Vec::len).sum::<usize>(),
-        },
-        "exposed_without_rls": exposed(&catalog),
-        "tables": tables,
-    })))
-}
-
-pub async fn tables(State(state): State<AdminState>) -> ApiResult {
+pub async fn tables(
+    State(state): State<AdminState>,
+) -> ApiResult<crate::contracts::TablesResponse> {
     let catalog = state.catalog.get();
     let client = state.db.get().await?;
     let policies = policy_counts(&client, &catalog.schema).await?;
@@ -213,30 +19,9 @@ pub async fn tables(State(state): State<AdminState>) -> ApiResult {
             })
         })
         .collect();
-    Ok(Json(json!({ "schema": catalog.schema, "tables": list })))
-}
-
-/// Tables and columns for CodeMirror's autocomplete (`schema.table`).
-pub async fn schema(State(state): State<AdminState>) -> ApiResult {
-    let catalog = state.catalog.get();
-    let mut tables = Map::new();
-    for table in catalog.tables.values() {
-        let columns: Vec<&str> = table.columns.iter().map(|c| c.name.as_str()).collect();
-        tables.insert(table.name.clone(), json!(columns));
-    }
-    let client = state.db.get().await?;
-    let rows = client
-        .query(
-            "SELECT table_schema || '.' || table_name, array_agg(column_name::text ORDER BY ordinal_position)
-             FROM information_schema.columns WHERE table_schema = 'auth'
-             GROUP BY 1",
-            &[],
-        )
-        .await?;
-    for row in rows {
-        tables.insert(row.get(0), json!(row.get::<_, Vec<String>>(1)));
-    }
-    Ok(Json(json!({ "schema": catalog.schema, "tables": tables })))
+    crate::contracts::response::<crate::contracts::TablesResponse>(
+        json!({ "schema": catalog.schema, "tables": list }),
+    )
 }
 
 /// Filter operators the panel accepts (a subset of the REST API's).
@@ -405,7 +190,7 @@ pub async fn table(
     State(state): State<AdminState>,
     Path(name): Path<String>,
     Query(params): Query<TableQuery>,
-) -> ApiResult {
+) -> ApiResult<crate::contracts::TableData> {
     let table = table_or_404(&state, &name)?;
     let catalog = state.catalog.get();
     let page = params.page.max(0);
@@ -481,7 +266,7 @@ pub async fn table(
         })
         .collect();
 
-    Ok(Json(json!({
+    crate::contracts::response::<crate::contracts::TableData>(json!({
         "table": {
             "name": table.name,
             "kind": kind(&table),
@@ -499,7 +284,7 @@ pub async fn table(
         "has_next": has_next,
         "total": total,
         "total_exact": exact,
-    })))
+    }))
 }
 
 /// Converts form values (text or null) to JSON: json/jsonb are parsed as
@@ -659,186 +444,4 @@ pub async fn delete_rows(
     Ok(Json(
         json!({ "message": format!("{total} row(s) deleted"), "count": total }),
     ))
-}
-
-#[derive(Deserialize)]
-pub struct UsersQuery {
-    #[serde(default)]
-    page: i64,
-    q: Option<String>,
-}
-
-pub async fn users(State(state): State<AdminState>, Query(params): Query<UsersQuery>) -> ApiResult {
-    const SIZE: i64 = 50;
-    let page = params.page.max(0);
-    let search = params.q.unwrap_or_default();
-    let pattern = format!(
-        "%{}%",
-        search
-            .replace('\\', "\\\\")
-            .replace('%', "\\%")
-            .replace('_', "\\_")
-    );
-    let client = state.db.get().await?;
-    let rows = client
-        .query(
-            "SELECT u.id::text, u.email, u.created_at::text, u.last_sign_in_at::text,
-                    u.email_confirmed_at::text,
-                    (SELECT count(*) FROM auth.sessions s WHERE s.user_id = u.id AND s.revoked_at IS NULL)
-             FROM auth.users u WHERE u.email LIKE $1
-             ORDER BY u.created_at DESC LIMIT $2 OFFSET $3",
-            &[&pattern, &(SIZE + 1), &(page * SIZE)],
-        )
-        .await?;
-    let total: i64 = client
-        .query_one("SELECT count(*) FROM auth.users", &[])
-        .await?
-        .get(0);
-    let users: Vec<Value> = rows
-        .iter()
-        .take(SIZE as usize)
-        .map(|r| {
-            json!({
-                "id": r.get::<_, String>(0),
-                "email": r.get::<_, String>(1),
-                "created_at": r.get::<_, String>(2),
-                "last_sign_in_at": r.get::<_, Option<String>>(3),
-                "email_confirmed_at": r.get::<_, Option<String>>(4),
-                "sessions": r.get::<_, i64>(5),
-            })
-        })
-        .collect();
-    Ok(Json(json!({
-        "total": total,
-        "page": page,
-        "has_next": rows.len() as i64 > SIZE,
-        "users": users,
-    })))
-}
-
-/// uuid format check (8-4-4-4-12 hex).
-pub(crate) fn is_uuid(value: &str) -> bool {
-    let parts: Vec<&str> = value.split('-').collect();
-    parts.len() == 5
-        && parts
-            .iter()
-            .zip([8, 4, 4, 4, 12])
-            .all(|(p, len)| p.len() == len && p.chars().all(|c| c.is_ascii_hexdigit()))
-}
-
-/// The user id in the path is not a uuid.
-pub(crate) fn invalid_id() -> ApiError {
-    ApiError::bad_request("invalid_id", "invalid id")
-}
-
-pub async fn revoke_sessions(State(state): State<AdminState>, Path(id): Path<String>) -> ApiResult {
-    if !is_uuid(&id) {
-        return Err(invalid_id());
-    }
-    let client = state.db.get().await?;
-    let n = client
-        .execute(
-            "UPDATE auth.sessions SET revoked_at = now() WHERE user_id = $1::text::uuid AND revoked_at IS NULL",
-            &[&id],
-        )
-        .await?;
-    Ok(Json(
-        json!({ "message": format!("{n} session(s) ended"), "count": n }),
-    ))
-}
-
-pub async fn delete_user(State(state): State<AdminState>, Path(id): Path<String>) -> ApiResult {
-    if !is_uuid(&id) {
-        return Err(invalid_id());
-    }
-    let client = state.db.get().await?;
-    let n = client
-        .execute("DELETE FROM auth.users WHERE id = $1::text::uuid", &[&id])
-        .await?;
-    if n == 0 {
-        return Err(user_not_found());
-    }
-    Ok(Json(json!({ "message": "user deleted" })))
-}
-
-pub(crate) fn user_not_found() -> ApiError {
-    ApiError::not_found("user_not_found", "user not found")
-}
-
-pub async fn policies(State(state): State<AdminState>) -> ApiResult {
-    let catalog = state.catalog.get();
-    let client = state.db.get().await?;
-    let rows = client
-        .query(
-            "SELECT tablename::text, policyname::text, permissive, roles::text[], cmd,
-                    qual, with_check
-             FROM pg_policies WHERE schemaname = $1 ORDER BY tablename, policyname",
-            &[&catalog.schema],
-        )
-        .await?;
-    let mut by_table: HashMap<String, Vec<Value>> = HashMap::new();
-    for row in &rows {
-        by_table.entry(row.get(0)).or_default().push(json!({
-            "name": row.get::<_, String>(1),
-            "permissive": row.get::<_, String>(2) == "PERMISSIVE",
-            "roles": row.get::<_, Vec<String>>(3),
-            "command": row.get::<_, String>(4),
-            "using": row.get::<_, Option<String>>(5),
-            "check": row.get::<_, Option<String>>(6),
-        }));
-    }
-    let tables: Vec<Value> = catalog
-        .tables
-        .values()
-        .filter(|t| t.kind == TableKind::Table)
-        .map(|t| {
-            let list = by_table.remove(&t.name).unwrap_or_default();
-            json!({
-                "name": t.name,
-                "rls": rls_json(t, list.len()),
-                "exposed_without_rls": t.exposed_without_rls(),
-                "policies": list,
-            })
-        })
-        .collect();
-    let anon_functions: Vec<&str> = catalog
-        .functions
-        .values()
-        .flatten()
-        .filter(|f| f.executable_by(nelcota_core::Role::Anon))
-        .map(|f| f.name.as_str())
-        .collect();
-    Ok(Json(json!({
-        "schema": catalog.schema,
-        "exposed_without_rls": exposed(&catalog),
-        "tables": tables,
-        "anon_functions": anon_functions,
-    })))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn values_keep_postgres_text() {
-        let raw = |s: &str| serde_json::from_str::<Box<RawValue>>(s).unwrap();
-        assert_eq!(raw_text(Some(&raw("\"<b>\""))).as_deref(), Some("<b>"));
-        assert_eq!(
-            raw_text(Some(&raw("12345678901234567890.10"))).as_deref(),
-            Some("12345678901234567890.10")
-        );
-        assert_eq!(raw_text(Some(&raw("null"))), None);
-        assert_eq!(
-            raw_text(Some(&raw("{\"a\": 1}"))).as_deref(),
-            Some("{\"a\": 1}")
-        );
-    }
-
-    #[test]
-    fn validates_uuid() {
-        assert!(is_uuid("054f8cd2-decb-4c78-91a1-f351bd8f5b92"));
-        assert!(!is_uuid("not-a-uuid"));
-        assert!(!is_uuid("054f8cd2-decb-4c78-91a1-f351bd8f5b9z"));
-    }
 }

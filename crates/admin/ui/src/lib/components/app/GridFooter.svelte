@@ -11,9 +11,12 @@
 
   let {
     data,
-    page = $bindable(),
-    size = $bindable(),
-  }: { data: TableData; page: number; size: string } = $props()
+    page,
+    size,
+    disabled = false,
+    onpage,
+    onsize,
+  }: { data: TableData; page: number; size: string; disabled?: boolean; onpage: (page: number) => void; onsize: (size: string) => void } = $props()
 
   const fmt = $derived(new Intl.NumberFormat(intlLocale()))
   const info = $derived(pageInfo(data.page, data.size, data.rows.length, data.total, data.total_exact))
@@ -34,7 +37,7 @@
   </span>
   <div class="ml-auto flex items-center gap-2">
     <span class="mr-1 hidden sm:inline">{t('tables.footer.perPage')}</span>
-    <Select.Root type="single" bind:value={size} onValueChange={() => (page = 0)}>
+    <Select.Root type="single" value={size} onValueChange={onsize} {disabled}>
       <Select.Trigger size="sm" class="w-20" aria-label={t('tables.footer.rowsPerPage')}>{size}</Select.Trigger>
       <Select.Content>
         {#each ['25', '50', '100', '500'] as option (option)}
@@ -47,20 +50,20 @@
         ? t('tables.footer.pageOf', { page: fmt.format(data.page + 1), count: fmt.format(info.pageCount) })
         : t('tables.footer.page', { page: fmt.format(data.page + 1) })}
     </span>
-    <Button variant="outline" size="icon-sm" disabled={page === 0} onclick={() => (page = 0)} aria-label={t('tables.footer.first')}>
+    <Button variant="outline" size="icon-sm" disabled={disabled || page === 0} onclick={() => onpage(0)} aria-label={t('tables.footer.first')}>
       <ChevronsLeft />
     </Button>
-    <Button variant="outline" size="icon-sm" disabled={page === 0} onclick={() => page--} aria-label={t('tables.footer.previous')}>
+    <Button variant="outline" size="icon-sm" disabled={disabled || page === 0} onclick={() => onpage(page - 1)} aria-label={t('tables.footer.previous')}>
       <ChevronLeft />
     </Button>
-    <Button variant="outline" size="icon-sm" disabled={!data.has_next} onclick={() => page++} aria-label={t('tables.footer.next')}>
+    <Button variant="outline" size="icon-sm" disabled={disabled || !data.has_next} onclick={() => onpage(page + 1)} aria-label={t('tables.footer.next')}>
       <ChevronRight />
     </Button>
     <Button
       variant="outline"
       size="icon-sm"
-      disabled={info.lastPage === null || page >= info.lastPage}
-      onclick={() => info.lastPage !== null && (page = info.lastPage)}
+      disabled={disabled || info.lastPage === null || page >= info.lastPage}
+      onclick={() => info.lastPage !== null && onpage(info.lastPage)}
       aria-label={t('tables.footer.last')}
       title={info.lastPage === null ? t('tables.footer.estimated') : undefined}
     >

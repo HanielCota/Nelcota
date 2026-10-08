@@ -48,9 +48,13 @@ fn bucket_id(id: &str) -> Result<&str, ApiError> {
 
 /// `GET /admin/api/storage`: whether storage is on, and each bucket with its
 /// file count and bytes.
-pub async fn overview(State(state): State<AdminState>) -> Result<Json<Value>, ApiError> {
+pub async fn overview(
+    State(state): State<AdminState>,
+) -> Result<Json<crate::contracts::StorageOverview>, ApiError> {
     let Some(storage) = &state.storage else {
-        return Ok(Json(json!({ "enabled": false })));
+        return crate::contracts::response::<crate::contracts::StorageOverview>(
+            json!({ "enabled": false }),
+        );
     };
     let client = state.db.get().await?;
     let row = client
@@ -65,14 +69,14 @@ pub async fn overview(State(state): State<AdminState>) -> Result<Json<Value>, Ap
         .await?;
     let buckets: Value = serde_json::from_str(row.get(0))?;
     let settings = &storage.settings;
-    Ok(Json(json!({
+    crate::contracts::response::<crate::contracts::StorageOverview>(json!({
         "enabled": true,
         "backend": storage.backend(),
         "max_file_size": settings.max_file_size,
         "max_total_size": settings.max_total_size,
         "public_url": settings.public_url,
         "buckets": buckets,
-    })))
+    }))
 }
 
 #[derive(Deserialize)]
@@ -256,7 +260,7 @@ pub async fn list(
     let has_next = objects.len() as i64 > PAGE;
     page["objects"] = Value::Array(objects.into_iter().take(PAGE as usize).collect());
     page["has_next"] = json!(has_next);
-    Ok(Json(page).into_response())
+    Ok(crate::contracts::response::<crate::contracts::StorageListing>(page)?.into_response())
 }
 
 #[derive(Deserialize)]

@@ -1,8 +1,13 @@
 <script lang="ts">
+  import { untrack } from 'svelte'
   import * as Sheet from '$lib/components/ui/sheet'
   import { Button } from '$lib/components/ui/button'
   import { toast } from 'svelte-sonner'
   import RowField from './RowField.svelte'
+  import UnsavedChangesDialog from './UnsavedChangesDialog.svelte'
+  import { CloseGuard } from '$lib/close-guard.svelte'
+  import Save from '@lucide/svelte/icons/save'
+  import LoaderCircle from '@lucide/svelte/icons/loader-circle'
   import { api, enc } from '$lib/api'
   import { fieldProblem, initialFields, rowPayload, type FieldState } from '$lib/row-form'
   import type { Column, RowData } from '$lib/types'
@@ -27,10 +32,15 @@
 
   let fields = $state<Record<string, FieldState>>({})
   let saving = $state(false)
+  let initial = $state('')
+  const guard = new CloseGuard(() => JSON.stringify(fields) !== initial, () => saving, () => (open = false))
 
   // Reload the fields whenever the sheet opens.
   $effect(() => {
-    if (open) fields = initialFields(columns, row)
+    if (open) untrack(() => {
+      fields = initialFields(columns, row)
+      initial = JSON.stringify(fields)
+    })
   })
 
   const inserting = $derived(row === null)
@@ -47,7 +57,11 @@
 
   async function save(event?: SubmitEvent) {
     event?.preventDefault()
-    if (!valid || saving) return
+    if (saving) return
+    if (!valid) {
+      document.querySelector<HTMLElement>('#row-form [aria-invalid="true"]')?.focus()
+      return
+    }
     if (row && changes === 0) {
       open = false
       return
@@ -82,7 +96,7 @@
   }
 </script>
 
-<Sheet.Root bind:open>
+<Sheet.Root bind:open={() => open, guard.change}>
   <Sheet.Content class="flex w-full flex-col gap-0 p-0 data-[side=right]:sm:max-w-xl">
     <Sheet.Header class="border-b px-6 pt-6 pb-5">
       <Sheet.Title>{inserting ? t('tables.row.insertTitle') : t('tables.row.editTitle')}</Sheet.Title>
@@ -94,23 +108,25 @@
     </Sheet.Header>
 
     <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-    <form id="row-form" class="flex-1 space-y-6 overflow-y-auto px-6 py-6" onsubmit={save} onkeydown={onKeydown}>
-      {#if generated.length}
-        <div class="rounded-lg border bg-muted/40 px-4 py-3 text-xs">
-          <p class="font-medium text-muted-foreground">{t('tables.row.generated')}</p>
-          <dl class="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
-            {#each generated as column (column.name)}
-              <dt class="font-mono text-muted-foreground">{column.name}</dt>
-              <dd class="truncate font-mono">{row ? (row[column.name] ?? 'NULL') : t('tables.row.setOnSave')}</dd>
-            {/each}
-          </dl>
-        </div>
-      {/if}
-      {#each editable as column (column.name)}
-        {#if fields[column.name]}
-          <RowField {column} bind:field={fields[column.name]} {inserting} problem={problems[column.name]} />
+    <form id="row-form" class="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-6 py-6" onsubmit={save} onkeydown={onKeydown}>
+      <fieldset class="contents" disabled={saving} aria-busy={saving}>
+        {#if generated.length}
+          <div class="rounded-lg border bg-muted/40 px-4 py-3 text-xs">
+            <p class="font-medium text-muted-foreground">{t('tables.row.generated')}</p>
+            <dl class="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+              {#each generated as column (column.name)}
+                <dt class="font-mono text-muted-foreground">{column.name}</dt>
+                <dd class="truncate font-mono">{row ? (row[column.name] ?? 'NULL') : t('tables.row.setOnSave')}</dd>
+              {/each}
+            </dl>
+          </div>
         {/if}
-      {/each}
+        {#each editable as column (column.name)}
+          {#if fields[column.name]}
+            <RowField {column} bind:field={fields[column.name]} {inserting} problem={problems[column.name]} />
+          {/if}
+        {/each}
+        </fieldset>
     </form>
 
     <Sheet.Footer class="flex-row items-center gap-2 border-t bg-muted/40 px-6 py-4">
@@ -118,10 +134,12 @@
         {#if !inserting}{changes === 0 ? t('tables.row.noChanges') : t('tables.row.changed', { count: changes })}{/if}
         <span class="hidden sm:inline">{inserting ? '' : ' · '}{t('tables.row.saveHint')}</span>
       </span>
-      <Button variant="outline" onclick={() => (open = false)}>{t('common.cancel')}</Button>
-      <Button type="submit" form="row-form" disabled={saving || !valid || (!inserting && changes === 0)}>
+      <Button variant="outline" disabled={saving} onclick={guard.request}>{t('common.cancel')}</Button>
+      <Button type="submit" form="row-form" disabled={saving || (!inserting && changes === 0)}>
+        {#if saving}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{:else}<Save data-icon="inline-start" aria-hidden="true" />{/if}
         {saving ? t('common.saving') : inserting ? t('tables.row.insert') : t('common.save')}
       </Button>
     </Sheet.Footer>
   </Sheet.Content>
 </Sheet.Root>
+<UnsavedChangesDialog bind:open={guard.pending} ondiscard={guard.discard} />

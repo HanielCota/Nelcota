@@ -20,7 +20,7 @@ use crate::{
     structure,
 };
 
-type ApiResult = Result<Json<Value>, ApiError>;
+type ApiResult<T = Value> = Result<Json<T>, ApiError>;
 
 async fn enums(client: &Client, schema: &str) -> Result<Vec<String>, ApiError> {
     Ok(client
@@ -36,12 +36,12 @@ async fn enums(client: &Client, schema: &str) -> Result<Vec<String>, ApiError> {
 }
 
 /// `GET /admin/api/types`: types the form offers.
-pub async fn types(State(state): State<AdminState>) -> ApiResult {
+pub async fn types(State(state): State<AdminState>) -> ApiResult<crate::contracts::TypesResponse> {
     let schema = state.catalog.get().schema.clone();
     let client = state.db.get().await?;
-    Ok(Json(
+    crate::contracts::response::<crate::contracts::TypesResponse>(
         json!({ "base": BASE_TYPES, "enums": enums(&client, &schema).await? }),
-    ))
+    )
 }
 
 #[derive(Deserialize)]
@@ -52,7 +52,10 @@ pub struct CreateRequest {
 }
 
 /// `POST /admin/api/tables`
-pub async fn create(State(state): State<AdminState>, Json(body): Json<CreateRequest>) -> ApiResult {
+pub async fn create(
+    State(state): State<AdminState>,
+    Json(body): Json<CreateRequest>,
+) -> ApiResult<crate::contracts::DdlResult> {
     let schema = state.catalog.get().schema.clone();
     let enums = enums(&*state.db.get().await?, &schema).await?;
     let statements = table::create(
@@ -84,7 +87,7 @@ pub async fn alter(
     State(state): State<AdminState>,
     Path(name): Path<String>,
     Json(body): Json<AlterRequest>,
-) -> ApiResult {
+) -> ApiResult<crate::contracts::DdlResult> {
     let table = table_or_404(&state, &name)?;
     let schema = state.catalog.get().schema.clone();
     let (current, enums) = {
@@ -128,7 +131,7 @@ pub async fn drop(
     State(state): State<AdminState>,
     Path(name): Path<String>,
     Query(params): Query<DropQuery>,
-) -> ApiResult {
+) -> ApiResult<crate::contracts::DdlResult> {
     let table = table_or_404(&state, &name)?;
     let schema = state.catalog.get().schema.clone();
     let statements = table::drop(&schema, &table.name, params.cascade);

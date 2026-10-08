@@ -1,4 +1,10 @@
 <script lang="ts">
+  import { untrack } from 'svelte'
+  import { CloseGuard } from '$lib/close-guard.svelte'
+  import UnsavedChangesDialog from './UnsavedChangesDialog.svelte'
+  import Save from '@lucide/svelte/icons/save'
+  import HardDrive from '@lucide/svelte/icons/hard-drive'
+  import LoaderCircle from '@lucide/svelte/icons/loader-circle'
   import * as Dialog from '$lib/components/ui/dialog'
   import { Button } from '$lib/components/ui/button'
   import { Input } from '$lib/components/ui/input'
@@ -25,13 +31,19 @@
   let limitMb = $state('')
   let types = $state('')
   let saving = $state(false)
+  let initialValue = $state('')
+  const snapshot = () => JSON.stringify([id, isPublic, limitMb, types])
+  const guard = new CloseGuard(() => snapshot() !== initialValue, () => saving, () => (open = false))
 
   $effect(() => {
     if (open) {
-      id = bucket?.id ?? ''
-      isPublic = bucket?.public ?? false
-      limitMb = bucket?.file_size_limit ? String(+(bucket.file_size_limit / MB).toFixed(2)) : ''
-      types = bucket?.allowed_mime_types?.join(', ') ?? ''
+      untrack(() => {
+        id = bucket?.id ?? ''
+        isPublic = bucket?.public ?? false
+        limitMb = bucket?.file_size_limit ? String(+(bucket.file_size_limit / MB).toFixed(2)) : ''
+        types = bucket?.allowed_mime_types?.join(', ') ?? ''
+        initialValue = snapshot()
+        })
     }
   })
 
@@ -41,6 +53,7 @@
 
   async function submit(event: SubmitEvent) {
     event.preventDefault()
+    if (saving || !ready) return
     saving = true
     const settings = { public: isPublic, file_size_limit: limit, allowed_mime_types: parseTypes(types) }
     try {
@@ -61,61 +74,65 @@
   }
 </script>
 
-<Dialog.Root bind:open>
+<Dialog.Root bind:open={() => open, guard.change}>
   <Dialog.Content class="sm:max-w-lg">
     <form class="grid gap-5" onsubmit={submit}>
-      <Dialog.Header>
-        <Dialog.Title>
-          {bucket ? t('storage.dialog.editTitle', { bucket: bucket.id }) : t('storage.dialog.createTitle')}
-        </Dialog.Title>
-      </Dialog.Header>
-      {#if !bucket}
-        <div class="grid gap-2">
-          <Label for="bucket-id">{t('storage.dialog.name')}</Label>
-          <Input
-            id="bucket-id"
-            bind:value={id}
-            placeholder="avatars"
-            autocomplete="off"
-            spellcheck={false}
-            class="h-10 font-mono"
-            aria-invalid={id !== '' && !validBucketName(id)}
-            required
-          />
-          <p class="text-xs text-muted-foreground">{t('storage.dialog.nameHint')}</p>
+      <fieldset class="contents" disabled={saving} aria-busy={saving}>
+        <Dialog.Header>
+          <Dialog.Title>
+            {bucket ? t('storage.dialog.editTitle', { bucket: bucket.id }) : t('storage.dialog.createTitle')}
+          </Dialog.Title>
+        </Dialog.Header>
+        {#if !bucket}
+          <div class="grid gap-2">
+            <Label for="bucket-id">{t('storage.dialog.name')}</Label>
+            <Input
+              id="bucket-id"
+              bind:value={id}
+              placeholder="avatars"
+              autocomplete="off"
+              spellcheck={false}
+              class="h-10 font-mono"
+              aria-invalid={id !== '' && !validBucketName(id)}
+              required
+            />
+            <p class="text-xs text-muted-foreground">{t('storage.dialog.nameHint')}</p>
+          </div>
+        {/if}
+        <div class="grid gap-1.5">
+          <label class="flex cursor-pointer items-center gap-2 text-sm font-medium">
+            <Checkbox bind:checked={isPublic} />{t('storage.dialog.public')}
+          </label>
+          <p class="text-xs text-muted-foreground">{t('storage.dialog.publicHint')}</p>
         </div>
-      {/if}
-      <div class="grid gap-1.5">
-        <label class="flex cursor-pointer items-center gap-2 text-sm font-medium">
-          <Checkbox bind:checked={isPublic} />{t('storage.dialog.public')}
-        </label>
-        <p class="text-xs text-muted-foreground">{t('storage.dialog.publicHint')}</p>
-      </div>
-      <div class="grid gap-2">
-        <Label for="bucket-limit">{t('storage.dialog.limit')}</Label>
-        <Input
-          id="bucket-limit"
-          bind:value={limitMb}
-          inputmode="decimal"
-          autocomplete="off"
-          class="h-10 w-40 font-mono"
-          aria-invalid={!limitOk}
-        />
-        <p class="text-xs text-muted-foreground">
-          {t('storage.dialog.limitHint', { size: formatBytes(serverLimit, intlLocale()) })}
-        </p>
-      </div>
-      <div class="grid gap-2">
-        <Label for="bucket-types">{t('storage.dialog.types')}</Label>
-        <Input id="bucket-types" bind:value={types} placeholder="image/*" autocomplete="off" spellcheck={false} class="h-10 font-mono" />
-        <p class="text-xs text-muted-foreground">{t('storage.dialog.typesHint')}</p>
-      </div>
-      <Dialog.Footer>
-        <Button variant="outline" onclick={() => (open = false)}>{t('common.cancel')}</Button>
-        <Button type="submit" disabled={saving || !ready}>
-          {saving ? t('common.saving') : bucket ? t('storage.dialog.save') : t('storage.dialog.create')}
-        </Button>
-      </Dialog.Footer>
+        <div class="grid gap-2">
+          <Label for="bucket-limit">{t('storage.dialog.limit')}</Label>
+          <Input
+            id="bucket-limit"
+            bind:value={limitMb}
+            inputmode="decimal"
+            autocomplete="off"
+            class="h-10 w-40 font-mono"
+            aria-invalid={!limitOk}
+          />
+          <p class="text-xs text-muted-foreground">
+            {t('storage.dialog.limitHint', { size: formatBytes(serverLimit, intlLocale()) })}
+          </p>
+        </div>
+        <div class="grid gap-2">
+          <Label for="bucket-types">{t('storage.dialog.types')}</Label>
+          <Input id="bucket-types" bind:value={types} placeholder="image/*" autocomplete="off" spellcheck={false} class="h-10 font-mono" />
+          <p class="text-xs text-muted-foreground">{t('storage.dialog.typesHint')}</p>
+        </div>
+        <Dialog.Footer>
+          <Button variant="outline" disabled={saving} onclick={guard.request}>{t('common.cancel')}</Button>
+          <Button type="submit" disabled={saving || !ready}>
+            {#if saving}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{:else if bucket}<Save data-icon="inline-start" aria-hidden="true" />{:else}<HardDrive data-icon="inline-start" aria-hidden="true" />{/if}
+            {saving ? t('common.saving') : bucket ? t('storage.dialog.save') : t('storage.dialog.create')}
+          </Button>
+        </Dialog.Footer>
+        </fieldset>
     </form>
   </Dialog.Content>
 </Dialog.Root>
+<UnsavedChangesDialog bind:open={guard.pending} ondiscard={guard.discard} />

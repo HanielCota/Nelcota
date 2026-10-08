@@ -57,12 +57,11 @@ impl Project {
     }
 
     /// Whether the app keeps its files on this host's disk.
-    pub fn stores_files_on_disk(&self) -> bool {
-        self.env()
-            .get("NELCOTA_STORAGE_BACKEND")
-            .ok()
-            .flatten()
-            .is_some_and(|b| b.trim() == "disk")
+    pub fn stores_files_on_disk(&self) -> anyhow::Result<bool> {
+        Ok(self
+            .env()
+            .get("NELCOTA_STORAGE_BACKEND")?
+            .is_some_and(|b| b.trim() == "disk"))
     }
 
     pub fn env(&self) -> EnvFile {

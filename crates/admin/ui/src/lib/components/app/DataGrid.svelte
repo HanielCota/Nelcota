@@ -3,10 +3,11 @@
   import { Checkbox } from '$lib/components/ui/checkbox'
   import Maximize2 from '@lucide/svelte/icons/maximize-2'
   import ArrowUpRight from '@lucide/svelte/icons/arrow-up-right'
-  import { toast } from 'svelte-sonner'
   import GridCell from './GridCell.svelte'
   import GridColumnHeader from './GridColumnHeader.svelte'
-  import { alignRight, columnKind, columnWidth, monospace, nextCell, type CellPos } from '$lib/grid'
+  import CellDetailDialog from './CellDetailDialog.svelte'
+  import { copyText } from '$lib/clipboard'
+  import { alignRight, columnKind, columnWidth, monospace, nextCell, rowKey, rowPk, type CellPos } from '$lib/grid'
   import type { Column, RowData, TableData } from '$lib/types'
   import { t } from '$lib/i18n/index.svelte'
 
@@ -22,6 +23,7 @@
     onexpand,
     oncommit,
     referenceHref,
+    disabled = false,
   }: {
     data: TableData
     sort: { column: string; desc: boolean } | null
@@ -34,8 +36,9 @@
     onhide: (column: string) => void
     onexpand: (row: RowData) => void
     /** Saves a cell; resolves once stored (or rejects with the error already shown). */
-    oncommit: (row: number, column: string, value: string | null) => Promise<void>
+    oncommit: (pk: RowData, column: string, value: string | null) => Promise<void>
     referenceHref: (column: Column, value: string) => string
+    disabled?: boolean
   } = $props()
 
   const columns = $derived(
@@ -46,13 +49,19 @@
   const editable = $derived(data.table.editable)
 
   // Inline editing: the cell (row, column) being edited and the draft.
-  let editing = $state<{ row: number; column: string } | null>(null)
+  let editing = $state<{ key: string; pk: RowData; column: string; original: string | null } | null>(null)
   let draft = $state('')
+  let detail = $state<{ title: string; value: string | null } | null>(null)
+  let detailOpen = $state(false)
 
   // Keyboard navigation (WAI-ARIA "grid" pattern): one active cell at a time
   // takes focus (roving tabindex); Tab enters and leaves the whole grid.
   let active = $state<CellPos>({ row: 0, col: 0 })
   let tableEl = $state<HTMLTableElement>()
+
+  $effect(() => {
+    if (disabled) editing = null
+  })
 
   // Page, filter or columns changed: the active cell moves back within
   // bounds. Only assign on a real change: with 0 rows the clamped position is
@@ -72,21 +81,32 @@
   }
 
   async function startEdit(rowIndex: number, column: Column) {
-    if (!editable || column.generated) return
-    editing = { row: rowIndex, column: column.name }
-    draft = data.rows[rowIndex][column.name] ?? ''
+    if (disabled || !editable || column.generated) return
+    const row = data.rows[rowIndex]
+    editing = { key: rowKey(row, data.table.primary_key), pk: rowPk(row, data.table.primary_key), column: column.name, original: row[column.name] }
+    draft = row[column.name] ?? ''
     await tick()
     document.getElementById('inline-editor')?.focus()
   }
 
   async function commitEdit(asNull = false) {
     if (!editing) return
-    const { row, column } = editing
+    if (disabled) return
+    const target = editing
+    const { pk, column, original } = editing
     const value = asNull ? null : draft
     editing = null
     focusCell(active)
-    if (value === data.rows[row][column]) return
-    await oncommit(row, column, value).catch(() => {})
+    if (value === original) return
+    try {
+      await oncommit(pk, column, value)
+    } catch {
+      if (data.rows.some((row, i) => rowKey(row, data.table.primary_key, i) === target.key)) {
+        editing = target
+        await tick()
+        document.getElementById('inline-editor')?.focus()
+      }
+    }
   }
 
   function cancelEdit() {
@@ -105,12 +125,11 @@
   }
 
   async function copyCell(value: string | null) {
-    await navigator.clipboard.writeText(value ?? '')
-    toast.success(value === null ? t('tables.toast.nullCopied') : t('tables.toast.valueCopied'))
+    await copyText(value ?? '', value === null ? t('tables.toast.nullCopied') : t('tables.toast.valueCopied'))
   }
 
   function onCellKey(event: KeyboardEvent, row: number, col: number) {
-    if (editing) return
+    if (editing || disabled) return
     const ctrl = event.ctrlKey || event.metaKey
     const next = nextCell(event.key, { row, col }, data.rows.length, columns.length, ctrl)
     if (next) {
@@ -121,7 +140,8 @@
     const column = columns[col].column
     if (event.key === 'Enter' || event.key === 'F2') {
       event.preventDefault()
-      startEdit(row, column)
+      if (editable && !column.generated) startEdit(row, column)
+      else { detail = { title: column.name, value: data.rows[row][column.name] }; detailOpen = true }
     } else if (event.key === ' ' && editable) {
       event.preventDefault()
       toggleRow(row, !selected.has(row))
@@ -134,6 +154,7 @@
   }
 
   function toggleRow(index: number, on: boolean) {
+    if (disabled) return
     const next = new Set(selected)
     if (on) next.add(index)
     else next.delete(index)
@@ -141,6 +162,7 @@
   }
 
   function toggleAll(on: boolean) {
+    if (disabled) return
     selected = on ? new Set(data.rows.map((_, i) => i)) : new Set()
   }
 
@@ -174,6 +196,7 @@
             indeterminate={selected.size > 0 && selected.size < data.rows.length}
             onCheckedChange={(v) => toggleAll(v === true)}
             aria-label={t('tables.grid.selectAll')}
+            {disabled}
           />
         </th>
       {/if}
@@ -194,19 +217,20 @@
     </tr>
   </thead>
   <tbody>
-    {#each data.rows as row, i (i)}
+    {#each data.rows as row, i (rowKey(row, data.table.primary_key, i))}
       {@const isSelected = selected.has(i)}
       <tr class={['group transition-colors', isSelected ? 'bg-brand/[0.07]' : 'hover:bg-muted/60']}>
         {#if editable}
           <td role="gridcell" class={[stickyCell, 'px-3.5 py-2', isSelected ? 'bg-[color-mix(in_oklch,var(--brand)_7%,var(--background))]' : 'group-hover:bg-[color-mix(in_oklch,var(--muted)_60%,var(--background))]']}>
             <div class="flex items-center gap-2">
-              <Checkbox checked={isSelected} onCheckedChange={(v) => toggleRow(i, v === true)} aria-label={t('tables.grid.selectRow', { n: i + 1 })} />
+              <Checkbox checked={isSelected} {disabled} onCheckedChange={(v) => toggleRow(i, v === true)} aria-label={t('tables.grid.selectRow', { n: i + 1 })} />
               <button
                 type="button"
                 class="grid size-7 cursor-pointer place-items-center rounded-md text-muted-foreground transition-opacity hover:bg-accent hover:text-foreground focus-visible:opacity-100 md:opacity-0 md:group-hover:opacity-100"
                 aria-label={t('tables.grid.expandRow', { n: i + 1 })}
                 title={t('tables.grid.expandTitle')}
                 onclick={() => onexpand(row)}
+                {disabled}
               >
                 <Maximize2 class="size-3.5" />
               </button>
@@ -228,8 +252,10 @@
             onkeydown={(e) => onCellKey(e, i, c)}
             ondblclick={() => startEdit(i, column)}
           >
-            {#if editing?.row === i && editing.column === column.name}
-              <div class="flex items-center gap-1 bg-background p-0.5 ring-2 ring-brand ring-inset">
+            {#if editing?.key === rowKey(row, data.table.primary_key, i) && editing.column === column.name}
+              <div class="flex items-center gap-1 bg-background p-0.5 ring-2 ring-brand ring-inset" onfocusout={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) editing = null
+              }}>
                 <input
                   id="inline-editor"
                   class={[
@@ -239,22 +265,23 @@
                   ]}
                   bind:value={draft}
                   onkeydown={onEditorKey}
-                  onblur={() => (editing = null)}
                   aria-label={t('tables.grid.edit', { column: column.name })}
                 />
                 {#if column.nullable}
                   <button
                     class="shrink-0 cursor-pointer rounded border border-border-strong bg-muted px-1.5 py-0.5 font-mono text-3xs text-muted-foreground hover:text-foreground"
-                    onmousedown={(e) => {
-                      e.preventDefault()
-                      commitEdit(true)
-                    }}>NULL</button
+                    type="button"
+                    onkeydown={(event) => { if (event.key === 'Escape') cancelEdit() }}
+                    onclick={() => commitEdit(true)}>NULL</button
                   >
                 {/if}
               </div>
             {:else}
               <div class="flex min-h-10 items-center gap-1 px-3.5 py-2" title={value ?? 'NULL'}>
                 <span class="min-w-0 flex-1"><GridCell {value} type={column.type} {kind} /></span>
+                {#if value && (value.length > 80 || value.includes('\n'))}
+                  <button type="button" class="grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground" aria-label={t('common.details')} onclick={() => { detail = { title: column.name, value }; detailOpen = true }} ondblclick={(event) => event.stopPropagation()}><Maximize2 class="size-3.5" aria-hidden="true" /></button>
+                {/if}
                 {#if column.references && value !== null}
                   <a
                     href={referenceHref(column, value)}
@@ -275,3 +302,4 @@
     {/each}
   </tbody>
 </table>
+{#if detail}<CellDetailDialog bind:open={detailOpen} title={detail.title} value={detail.value} />{/if}

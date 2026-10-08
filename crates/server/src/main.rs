@@ -104,6 +104,7 @@ async fn serve(config: Config) -> anyhow::Result<()> {
     let admin = match (&config.admin_email, &config.admin_password_hash) {
         (Some(email), Some(hash)) if !email.is_empty() && !hash.expose().is_empty() => {
             Some(nelcota_admin::AdminState {
+                sql: Arc::default(),
                 // 3: a long export holds its own and the panel keeps going with the others.
                 db: db::admin_pool(&admin, 3),
                 db_config: admin.clone(),

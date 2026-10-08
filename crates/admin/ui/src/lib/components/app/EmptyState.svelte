@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Snippet } from 'svelte'
+  import Inbox from '@lucide/svelte/icons/inbox'
 
   // Empty state: a short sentence and, if there is one, the obvious action.
   let {
@@ -8,6 +9,7 @@
     children,
     actions,
     class: className = '',
+    icon: Icon = Inbox,
   }: {
     title: string
     description?: string
@@ -15,10 +17,12 @@
     children?: Snippet
     actions?: Snippet
     class?: string
+    icon?: typeof Inbox
   } = $props()
 </script>
 
 <div class={['px-6 py-12 text-center', className]}>
+  <div class="mx-auto mb-4 grid size-12 place-items-center rounded-xl border bg-muted/40 text-muted-foreground"><Icon class="size-6" aria-hidden="true" /></div>
   <p class="text-sm font-medium">{title}</p>
   {#if description || children}
     <p class="mx-auto mt-1 max-w-md text-sm text-muted-foreground">

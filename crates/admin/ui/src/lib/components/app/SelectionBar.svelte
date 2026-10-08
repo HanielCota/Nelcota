@@ -5,7 +5,7 @@
   import Copy from '@lucide/svelte/icons/copy'
   import Download from '@lucide/svelte/icons/download'
   import X from '@lucide/svelte/icons/x'
-  import { toast } from 'svelte-sonner'
+  import { copyText } from '$lib/clipboard'
   import { downloadText, toCsv, toJson } from '$lib/download'
   import type { RowData } from '$lib/types'
   import { t } from '$lib/i18n/index.svelte'
@@ -31,8 +31,7 @@
   const label = $derived(t('tables.selection.selected', { count: rows.length }))
 
   async function copyJson() {
-    await navigator.clipboard.writeText(toJson(columns, matrix))
-    toast.success(t('tables.toast.rowsCopied', { count: rows.length }))
+    await copyText(toJson(columns, matrix), t('tables.toast.rowsCopied', { count: rows.length }))
   }
 
   function exportAs(format: 'csv' | 'json') {

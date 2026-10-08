@@ -96,6 +96,18 @@ cd crates/admin/ui && npm install && npm run dev
 The panel build (`crates/admin/ui/dist`) is versioned: compiling the binary
 does not need Node.
 
+`dev` prints the panel URL and generated admin login; credentials persist in
+`.nelcota/dev.env`. Existing development environments are upgraded automatically.
+For hot reload, run the panel command in a second terminal and open
+`http://127.0.0.1:5173/admin/`. Vite proxies the API to `http://127.0.0.1:8000`;
+set `NELCOTA_API_URL` to use another server address.
+
+After changing panel wire types, run `npm run contracts` in `crates/admin/ui`.
+Rust generates TypeScript and JSON Schema; Node compiles browser validators
+without runtime `eval`. `cargo test` detects stale contracts. Run `npm run check`,
+`npm test`, `npx playwright install chromium`, `npm run test:e2e` and
+`npm run build` for panel changes. Browser regressions are also checked in CI.
+
 The tests prove, against a real Postgres, that a user cannot read or change
 another user's data (with every verb), that invalid, expired or unknown-role
 JWTs get 401, that role and claims do not leak between pooled requests, that

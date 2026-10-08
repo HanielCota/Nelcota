@@ -1,38 +1,44 @@
 <script lang="ts">
+  import { onMount } from 'svelte'
   import * as Table from '$lib/components/ui/table'
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu'
   import { Button } from '$lib/components/ui/button'
   import { Skeleton } from '$lib/components/ui/skeleton'
   import Ellipsis from '@lucide/svelte/icons/ellipsis'
   import Plus from '@lucide/svelte/icons/plus'
+  import HardDrive from '@lucide/svelte/icons/hard-drive'
+  import Globe from '@lucide/svelte/icons/globe'
+  import Lock from '@lucide/svelte/icons/lock'
+  import Pencil from '@lucide/svelte/icons/pencil'
+  import Trash2 from '@lucide/svelte/icons/trash-2'
+  import { Badge } from '$lib/components/ui/badge'
   import { toast } from 'svelte-sonner'
   import PageHeader from '$lib/components/app/PageHeader.svelte'
   import EmptyState from '$lib/components/app/EmptyState.svelte'
+  import LoadError from '$lib/components/app/LoadError.svelte'
   import ConfirmDialog from '$lib/components/app/ConfirmDialog.svelte'
   import BucketDialog from '$lib/components/app/BucketDialog.svelte'
+  import { RemoteResource } from '$lib/remote-resource.svelte'
   import { api, enc } from '$lib/api'
   import { href } from '$lib/router.svelte'
   import { formatBytes } from '$lib/files'
   import type { Bucket, StorageOverview } from '$lib/types'
   import { errorMessage, intlLocale, t } from '$lib/i18n/index.svelte'
 
-  let data = $state<StorageOverview | null>(null)
+  const resource = new RemoteResource<StorageOverview>()
+  const data = $derived(resource.data)
+  const loading = $derived(resource.loading)
+  const error = $derived(resource.error ? errorMessage(resource.error) : '')
   let editing = $state<Bucket | null>(null)
   let dialogOpen = $state(false)
   let removing = $state<Bucket | null>(null)
   let confirmOpen = $state(false)
 
   async function load() {
-    try {
-      data = await api.get<StorageOverview>('/storage')
-    } catch (e) {
-      toast.error(errorMessage(e))
-    }
+    await resource.load(signal => api.get<StorageOverview>('/storage', { signal }))
   }
+  onMount(() => { void load(); return () => resource.cancel() })
 
-  $effect(() => {
-    load()
-  })
 
   const size = (bytes: number) => formatBytes(bytes, intlLocale())
   const total = $derived(data?.enabled ? data.buckets.reduce((sum, b) => sum + b.bytes, 0) : 0)
@@ -56,6 +62,26 @@
   }
 </script>
 
+{#snippet bucketActions(bucket: Bucket)}
+  <DropdownMenu.Root>
+    <DropdownMenu.Trigger>
+      {#snippet child({ props })}
+        <Button variant="ghost" size="icon-sm" aria-label={t('common.actionsFor', { name: bucket.id })} {...props}><Ellipsis aria-hidden="true" /></Button>
+      {/snippet}
+    </DropdownMenu.Trigger>
+    <DropdownMenu.Content align="end" class="w-48">
+      <DropdownMenu.Item onclick={() => edit(bucket)}><Pencil aria-hidden="true" />{t('storage.edit')}</DropdownMenu.Item>
+      <DropdownMenu.Separator />
+      <DropdownMenu.Item variant="destructive" disabled={bucket.files > 0} onclick={() => { removing = bucket; confirmOpen = true }}><Trash2 aria-hidden="true" />{t('storage.deleteBucket')}</DropdownMenu.Item>
+      {#if bucket.files > 0}<p class="px-2 py-2 text-xs text-muted-foreground">{t('storage.emptyBeforeDelete')}</p>{/if}
+    </DropdownMenu.Content>
+  </DropdownMenu.Root>
+{/snippet}
+
+{#snippet accessBadge(bucket: Bucket)}
+  <Badge variant={bucket.public ? 'outline' : 'secondary'}>{#if bucket.public}<Globe aria-hidden="true" />{:else}<Lock aria-hidden="true" />{/if}{bucket.public ? t('storage.public') : t('storage.private')}</Badge>
+{/snippet}
+
 <div class="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-10 lg:py-10">
   <PageHeader
     title={t('storage.title')}
@@ -73,19 +99,36 @@
     {/snippet}
   </PageHeader>
 
+  {#if error}<LoadError message={error} onretry={load} busy={loading} />{/if}
   {#if data === null}
-    <Skeleton class="h-48 rounded-lg" />
+    {#if loading}<Skeleton class="h-48 rounded-lg" />{/if}
   {:else if !data.enabled}
-    <EmptyState class="rounded-lg border" title={t('storage.disabled')} description={t('storage.disabledDescription')} />
+    <EmptyState icon={HardDrive} class="rounded-lg border" title={t('storage.disabled')} description={t('storage.disabledDescription')} />
   {:else}
     {#if data.buckets.length === 0}
-      <EmptyState class="rounded-lg border" title={t('storage.empty')} description={t('storage.emptyDescription')}>
+      <EmptyState icon={HardDrive} class="rounded-lg border" title={t('storage.empty')} description={t('storage.emptyDescription')}>
         {#snippet actions()}
-          <Button variant="outline" onclick={() => edit(null)}>{t('storage.newBucket')}</Button>
+          <Button variant="outline" onclick={() => edit(null)}><Plus data-icon="inline-start" aria-hidden="true" />{t('storage.newBucket')}</Button>
         {/snippet}
       </EmptyState>
     {:else}
-      <div class="overflow-hidden rounded-lg border bg-card">
+      <div class="grid gap-3 md:hidden">
+        {#each data.buckets as bucket (bucket.id)}
+          <article class="min-w-0 rounded-lg border bg-card p-4">
+            <div class="flex min-w-0 items-start justify-between gap-2">
+              <div class="min-w-0"><a class="flex items-center gap-2 font-mono font-medium hover:underline" href={href(`/storage/${enc(bucket.id)}`)}><HardDrive class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" /><span class="truncate">{bucket.id}</span></a><div class="mt-2">{@render accessBadge(bucket)}</div></div>
+              {@render bucketActions(bucket)}
+            </div>
+            <dl class="mt-4 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2 text-xs">
+              <dt class="text-muted-foreground">{t('storage.columns.files')}</dt><dd class="text-right font-mono tabular-nums">{bucket.files}</dd>
+              <dt class="text-muted-foreground">{t('storage.columns.size')}</dt><dd class="text-right font-mono tabular-nums">{size(bucket.bytes)}</dd>
+              <dt class="text-muted-foreground">{t('storage.columns.limit')}</dt><dd class="text-right">{bucket.file_size_limit ? size(bucket.file_size_limit) : t('storage.serverLimit', { size: size(data.max_file_size) })}</dd>
+              <dt class="text-muted-foreground">{t('storage.columns.types')}</dt><dd class="break-words text-right">{bucket.allowed_mime_types?.join(', ') ?? t('storage.anyType')}</dd>
+            </dl>
+          </article>
+        {/each}
+      </div>
+      <div class="hidden overflow-hidden rounded-lg border bg-card md:block">
         <Table.Root>
           <Table.Header>
             <Table.Row class="hover:bg-transparent">
@@ -102,10 +145,10 @@
             {#each data.buckets as bucket (bucket.id)}
               <Table.Row>
                 <Table.Cell>
-                  <a class="font-mono font-medium hover:underline" href={href(`/storage/${enc(bucket.id)}`)}>{bucket.id}</a>
+                  <a class="inline-flex items-center gap-2 font-mono font-medium hover:underline" href={href(`/storage/${enc(bucket.id)}`)}><HardDrive class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />{bucket.id}</a>
                 </Table.Cell>
                 <Table.Cell class="text-muted-foreground">
-                  {bucket.public ? t('storage.public') : t('storage.private')}
+                  {@render accessBadge(bucket)}
                 </Table.Cell>
                 <Table.Cell class="text-right font-mono text-xs tabular-nums">{bucket.files}</Table.Cell>
                 <Table.Cell class="text-right font-mono text-xs tabular-nums">{size(bucket.bytes)}</Table.Cell>
@@ -122,25 +165,7 @@
                   {/if}
                 </Table.Cell>
                 <Table.Cell class="text-right">
-                  <DropdownMenu.Root>
-                    <DropdownMenu.Trigger>
-                      {#snippet child({ props })}
-                        <Button variant="ghost" size="icon-sm" aria-label={t('common.actions')} {...props}><Ellipsis /></Button>
-                      {/snippet}
-                    </DropdownMenu.Trigger>
-                    <DropdownMenu.Content align="end" class="w-48">
-                      <DropdownMenu.Item onclick={() => edit(bucket)}>{t('storage.edit')}</DropdownMenu.Item>
-                      <DropdownMenu.Separator />
-                      <DropdownMenu.Item
-                        variant="destructive"
-                        disabled={bucket.files > 0}
-                        onclick={() => {
-                          removing = bucket
-                          confirmOpen = true
-                        }}>{t('storage.deleteBucket')}</DropdownMenu.Item
-                      >
-                    </DropdownMenu.Content>
-                  </DropdownMenu.Root>
+                  {@render bucketActions(bucket)}
                 </Table.Cell>
               </Table.Row>
             {/each}

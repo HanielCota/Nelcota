@@ -1,4 +1,4 @@
-# dist/ È versionado: È embutido no bin·rio (ver README.md).
+# dist/ √© versionado: √© embutido no bin√°rio (ver README.md).
 
 # Logs
 logs
@@ -10,6 +10,8 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
+test-results/
+playwright-report/
 *.local
 
 # Editor directories and files

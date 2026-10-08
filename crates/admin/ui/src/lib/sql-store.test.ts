@@ -9,6 +9,30 @@ beforeEach(() => {
 })
 
 describe('saved queries', () => {
+  it('keeps edits to one query when opening and editing another', () => {
+    sqlStore.setDraft('select 1')
+    const one = sqlStore.save('one')
+    sqlStore.setDraft('select 11')
+    sqlStore.open('select 2')
+    const two = sqlStore.save('two')
+    sqlStore.setDraft('select 22')
+    sqlStore.openSaved(one.id)
+    expect(sqlStore.draft).toBe('select 11')
+    expect(sqlStore.dirty).toBe(true)
+    sqlStore.openSaved(two.id)
+    expect(sqlStore.draft).toBe('select 22')
+  })
+
+  it('preserves loose work when opening a template and a new query', () => {
+    sqlStore.setDraft('select expensive_work')
+    const original = sqlStore.activeDraftId
+    sqlStore.open('select template')
+    sqlStore.open('')
+    sqlStore.openDraft(original)
+    expect(sqlStore.draft).toBe('select expensive_work')
+    expect(sqlStore.looseDrafts.some((draft) => draft.sql === 'select template')).toBe(true)
+  })
+
   it('saving with no open query creates one and starts editing it', () => {
     sqlStore.setDraft('select 1')
     const query = sqlStore.save('one')

@@ -1,7 +1,7 @@
 <script lang="ts">
   import Copy from '@lucide/svelte/icons/copy'
   import ChevronRight from '@lucide/svelte/icons/chevron-right'
-  import { toast } from 'svelte-sonner'
+  import { copyText } from '$lib/clipboard'
   import type { SqlPreview } from '$lib/preview.svelte'
   import { t } from '$lib/i18n/index.svelte'
 
@@ -11,8 +11,7 @@
   const text = $derived(preview.sql?.map((s) => `${s};`).join('\n\n') ?? '')
 
   async function copy() {
-    await navigator.clipboard.writeText(text)
-    toast.success(t('policies.sqlPreview.copied'))
+    await copyText(text, t('policies.sqlPreview.copied'))
   }
 </script>
 

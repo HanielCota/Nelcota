@@ -18,8 +18,14 @@ getrandom.workspace = true
 refinery.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+sha2.workspace = true
+uuid.workspace = true
 tokio = { workspace = true, features = ["time", "rt"] }
 tokio-postgres.workspace = true
+
+[dev-dependencies]
+tempfile = "3"
+uuid = { workspace = true, features = ["v4"] }
 
 [lints]
 workspace = true

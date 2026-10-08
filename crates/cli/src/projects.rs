@@ -59,7 +59,7 @@ pub fn remove(host: &Host, name: &str, yes: bool, keep_files: bool) -> anyhow::R
         let archived = host
             .archive_dir()
             .join(dump.file_name().unwrap_or_default());
-        fs::copy(&dump, &archived)?;
+        crate::backup::archive(&dump, &archived)?;
         ok(&format!("final backup at {}", archived.display()));
     } else {
         warn("Postgres stopped: removing without a final backup");

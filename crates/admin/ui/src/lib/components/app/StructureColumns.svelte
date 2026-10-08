@@ -19,10 +19,10 @@
     ondelete: (column: ColumnInfo) => void
   } = $props()
 
-  const tag = 'rounded-md border border-border-strong bg-muted px-1.5 py-0.5 text-3xs font-medium text-muted-foreground'
+  const tag = 'rounded-md border border-border-strong bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground'
 </script>
 
-<section class="overflow-hidden rounded-lg border bg-card">
+<section class="@container rounded-lg border bg-card">
   <header class="flex items-center justify-between gap-4 border-b px-5 py-4">
     <div>
       <h2 class="text-base font-semibold">{t('tables.structure.columnsTitle')}</h2>
@@ -32,13 +32,13 @@
   </header>
   <div class="divide-y">
     {#each structure.columns as column (column.name)}
-      <div class="group grid items-center gap-x-4 gap-y-1 px-5 py-3 text-sm transition-colors hover:bg-muted/40 md:grid-cols-[minmax(10rem,14rem)_minmax(8rem,12rem)_1fr_auto]">
+      <div class="group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 px-4 py-3 text-sm transition-colors hover:bg-muted/40 @3xl:grid-cols-[minmax(8rem,1fr)_minmax(6rem,1fr)_minmax(0,2fr)_auto]">
         <div class="flex min-w-0 items-center gap-2">
           {#if column.primary_key}<KeyRound class="size-3.5 shrink-0 text-muted-foreground" aria-label={t('tables.structure.primaryKey')} />{/if}
           <span class="truncate font-mono text-sm font-medium">{column.name}</span>
         </div>
-        <span class="truncate font-mono text-xs text-muted-foreground">{column.data_type}</span>
-        <div class="flex min-w-0 flex-wrap items-center gap-1.5">
+        <span class="col-start-1 row-start-2 truncate font-mono text-xs text-muted-foreground @3xl:col-start-auto @3xl:row-start-auto">{column.data_type}</span>
+        <div class="col-start-1 flex min-w-0 flex-wrap items-center gap-1.5 @3xl:col-start-auto">
           {#if column.identity}<span class={tag}>identity</span>{/if}
           {#if column.generated}<span class={tag}>{t('tables.structure.generated')}</span>{/if}
           {#if !column.nullable}<span class={tag}>{t('tables.structure.required')}</span>{/if}
@@ -51,7 +51,7 @@
           {/if}
           {#if column.comment}<span class="truncate text-xs text-muted-foreground">{column.comment}</span>{/if}
         </div>
-        <div class="flex justify-end gap-1 md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100">
+        <div class="col-start-2 row-start-1 row-span-3 flex justify-end gap-1 @3xl:col-start-auto @3xl:row-start-auto @3xl:row-span-1">
           <Button variant="ghost" size="icon-sm" aria-label={t('tables.structure.edit', { name: column.name })} onclick={() => onedit(column)}>
             <Pencil />
           </Button>

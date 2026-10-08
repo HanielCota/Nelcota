@@ -10,7 +10,7 @@ use serde_json::{Value, json};
 
 use super::{Result, expression, invalid, qualified, validate_name};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, ts_rs::TS, schemars::JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum Command {
     All,
@@ -42,7 +42,7 @@ impl Command {
 }
 
 /// `public` = every role.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, ts_rs::TS, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum PolicyRole {
     Public,
@@ -67,7 +67,7 @@ const fn yes() -> bool {
     true
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, ts_rs::TS, schemars::JsonSchema)]
 pub struct PolicyDef {
     pub name: String,
     pub command: Command,

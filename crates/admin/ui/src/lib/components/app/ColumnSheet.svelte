@@ -1,4 +1,9 @@
 <script lang="ts">
+  import { untrack } from 'svelte'
+  import { CloseGuard } from '$lib/close-guard.svelte'
+  import UnsavedChangesDialog from './UnsavedChangesDialog.svelte'
+  import Save from '@lucide/svelte/icons/save'
+  import LoaderCircle from '@lucide/svelte/icons/loader-circle'
   import * as Sheet from '$lib/components/ui/sheet'
   import { Button } from '$lib/components/ui/button'
   import { toast } from 'svelte-sonner'
@@ -25,15 +30,20 @@
   let column = $state<ColumnDef>(blankColumn())
   let tables = $state<Record<string, string[]>>({})
   let saving = $state(false)
+  let initialValue = $state('')
+  const guard = new CloseGuard(() => JSON.stringify(column) !== initialValue, () => saving, () => (open = false))
   const preview = new Preview()
 
   $effect(() => {
     if (!open) return
-    column = original ? toColumnDef(original) : blankColumn()
-    loadTypes()
-    loadSchemaColumns()
-      .then((t) => (tables = t))
-      .catch(() => (tables = {}))
+    untrack(() => {
+      column = original ? toColumnDef(original) : blankColumn()
+      initialValue = JSON.stringify(column)
+      loadTypes()
+      loadSchemaColumns()
+        .then((t) => (tables = t))
+        .catch(() => (tables = {}))
+      })
   })
 
   const actions = $derived.by((): AlterAction[] => {
@@ -49,6 +59,7 @@
 
   async function submit(event: SubmitEvent) {
     event.preventDefault()
+    if (saving || actions.length === 0) return
     saving = true
     try {
       const result = await ddl.alterTable(table, $state.snapshot(actions))
@@ -63,7 +74,7 @@
   }
 </script>
 
-<Sheet.Root bind:open>
+<Sheet.Root bind:open={() => open, guard.change}>
   <Sheet.Content class="flex w-full flex-col gap-0 p-0 data-[side=right]:sm:max-w-2xl">
     <Sheet.Header class="border-b px-6 pt-6 pb-5">
       <Sheet.Title>{original ? t('tables.columnSheet.editTitle', { name: original.name }) : t('tables.columnSheet.newTitle')}</Sheet.Title>
@@ -73,21 +84,25 @@
       </Sheet.Description>
     </Sheet.Header>
 
-    <form id="column-form" class="flex-1 space-y-6 overflow-y-auto px-6 py-6" onsubmit={submit}>
-      <ColumnFields bind:column {tables} mode={original ? 'edit' : 'add'} />
-      {#if original && column.data_type.trim() !== original.data_type}
-        <p class="rounded-lg border bg-muted/40 px-4 py-3 text-xs text-muted-foreground">
-          {t('tables.columnSheet.conversionBefore')} <code>{original.name}::{column.data_type}</code>. {t('tables.columnSheet.conversionAfter')}
-        </p>
-      {/if}
-      <SqlPreview {preview} placeholder={original ? t('tables.columnSheet.previewEdit') : t('tables.columnSheet.previewAdd')} />
+    <form id="column-form" class="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-6 py-6" onsubmit={submit}>
+      <fieldset class="contents" disabled={saving} aria-busy={saving}>
+        <ColumnFields bind:column {tables} mode={original ? 'edit' : 'add'} />
+        {#if original && column.data_type.trim() !== original.data_type}
+          <p class="rounded-lg border bg-muted/40 px-4 py-3 text-xs text-muted-foreground">
+            {t('tables.columnSheet.conversionBefore')} <code>{original.name}::{column.data_type}</code>. {t('tables.columnSheet.conversionAfter')}
+          </p>
+        {/if}
+        <SqlPreview {preview} placeholder={original ? t('tables.columnSheet.previewEdit') : t('tables.columnSheet.previewAdd')} />
+        </fieldset>
     </form>
 
     <Sheet.Footer class="flex-row justify-end gap-2 border-t bg-muted/40 px-6 py-4">
-      <Button variant="outline" onclick={() => (open = false)}>{t('common.cancel')}</Button>
+      <Button variant="outline" disabled={saving} onclick={guard.request}>{t('common.cancel')}</Button>
       <Button type="submit" form="column-form" disabled={saving || actions.length === 0}>
+        {#if saving}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{:else}<Save data-icon="inline-start" aria-hidden="true" />{/if}
         {saving ? t('common.saving') : original ? t('tables.columnSheet.saveChanges') : t('tables.columnSheet.addColumn')}
       </Button>
     </Sheet.Footer>
   </Sheet.Content>
 </Sheet.Root>
+<UnsavedChangesDialog bind:open={guard.pending} ondiscard={guard.discard} />
