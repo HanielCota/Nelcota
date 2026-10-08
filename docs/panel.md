@@ -79,6 +79,7 @@ without policies) and red (table exposed without RLS).
 | **Tables** | every table in the exposed schema, estimated rows, `anon`/`authenticated` GRANTs and RLS status. List, insert, edit and delete rows (tables with a primary key); create tables and edit the structure |
 | **SQL editor** | runs as the database owner (bypasses RLS); Ctrl+Enter runs; errors with code and position |
 | **Migrations** | panel changes not yet in a migration and the project's migrations, with "Generate migration" |
+| **Storage** | buckets with file count, size, limit and accepted types (create, edit, delete when empty); a file browser by folder: upload (asks before replacing), download, copy the public URL, delete. Files go through the same checks as the API ([storage.md](storage.md)) |
 | **Users** | search by email, last sign-in, active sessions; create a user, reset a password (ends their sessions), end sessions or delete a user |
 | **Policies** | each table's policies (`USING`/`WITH CHECK`): create, edit and delete; tables without RLS; functions `anon` can execute |
 | **API** | project address, how each role calls the API, curl and JavaScript examples generated from each table's columns, service_role token |
