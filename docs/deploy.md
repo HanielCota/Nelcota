@@ -197,6 +197,11 @@ projects are not touched; `upgrade --all` upgrades one at a time.
 nelcota dev        # Postgres 17 in a container (127.0.0.1:54322) + server on :8000
 ```
 
+The development secrets (panel and Postgres passwords, JWT key) live in
+`.nelcota/dev.env`, readable only by you; the startup banner says where they
+are instead of printing them. `nelcota token service-role --days 30` issues a
+`service_role` token for that environment.
+
 To test the full deploy locally (several projects, Caddy, HTTPS with an
 internal certificate): `nelcota init --local --project shop` and open
 `https://shop.localhost/admin/`.
