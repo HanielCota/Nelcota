@@ -11,6 +11,8 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
  && cp target/release/nelcota /nelcota
 
 FROM scratch
+# CA roots for HTTPS to an S3 storage backend (lettre bundles its own).
+COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 COPY --from=build /nelcota /usr/local/bin/nelcota
 USER 65532:65532
 EXPOSE 8000

@@ -16,6 +16,7 @@ nelcota-auth = { path = "crates/auth" }
 nelcota-api = { path = "crates/api" }
 nelcota-cli = { path = "crates/cli" }
 nelcota-admin = { path = "crates/admin" }
+nelcota-storage = { path = "crates/storage" }
 
 anyhow = "1.0.104"
 argon2 = "0.6.0"

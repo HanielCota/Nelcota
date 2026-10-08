@@ -101,6 +101,10 @@ pub struct Options {
     pub rate_limit_per_minute: u32,
     pub access_ttl_secs: u64,
     pub max_rows: Option<i64>,
+    /// Storage limits (on a disk store in a temporary directory).
+    pub storage: nelcota_storage::StorageSettings,
+    /// Another store instead of the temporary directory (S3 tests).
+    pub store: Option<Arc<nelcota_storage::Store>>,
 }
 
 impl Default for Options {
@@ -112,6 +116,14 @@ impl Default for Options {
             rate_limit_per_minute: 10_000,
             access_ttl_secs: 900,
             max_rows: None,
+            storage: nelcota_storage::StorageSettings {
+                max_file_size: 1024 * 1024,
+                max_total_size: None,
+                min_free_bytes: 0,
+                public_url: None,
+                upload_timeout: Duration::from_secs(30),
+            },
+            store: None,
         }
     }
 }
@@ -126,6 +138,9 @@ pub struct TestApp {
     pub user_a: Uuid,
     pub user_b: Uuid,
     pub outbox: Arc<Outbox>,
+    pub storage: nelcota_storage::StorageState,
+    /// Root of the disk store.
+    pub storage_dir: std::path::PathBuf,
     _container: ContainerAsync<Postgres>,
 }
 
@@ -248,8 +263,27 @@ impl TestApp {
                 recovery_url: options.mail.then(|| RECOVERY_URL.to_owned()),
             }),
         };
+        let storage_dir = std::env::temp_dir().join(format!("nelcota-storage-{}", Uuid::new_v4()));
+        let store = match options.store.clone() {
+            Some(store) => store,
+            None => Arc::new(nelcota_storage::Store::disk(storage_dir.clone()).unwrap()),
+        };
+        let storage = nelcota_storage::StorageState::new(
+            pool.clone(),
+            keys.clone(),
+            store,
+            options.storage.clone(),
+        );
         TestApp {
-            router: app(state, auth, Some(panel), Duration::from_secs(10)),
+            router: app(
+                state,
+                auth,
+                Some(panel),
+                Some(storage.clone()),
+                Duration::from_secs(10),
+            ),
+            storage,
+            storage_dir,
             pool,
             admin,
             admin_client,
@@ -339,6 +373,34 @@ impl TestApp {
             body: serde_json::from_slice(&bytes).unwrap_or(Value::Null),
             text: String::from_utf8_lossy(&bytes).into_owned(),
         }
+    }
+
+    /// Request with a raw body, returning the raw response bytes (files).
+    pub async fn bytes(
+        &self,
+        method: Method,
+        path: &str,
+        token: Option<&str>,
+        headers: &[(&str, &str)],
+        body: Vec<u8>,
+    ) -> (StatusCode, HeaderMap, Vec<u8>) {
+        let mut request = Request::builder().method(method).uri(encode_uri(path));
+        for (name, value) in headers {
+            request = request.header(*name, *value);
+        }
+        if let Some(token) = token {
+            request = request.header(header::AUTHORIZATION, format!("Bearer {token}"));
+        }
+        let response = self
+            .router
+            .clone()
+            .oneshot(request.body(Body::from(body)).unwrap())
+            .await
+            .unwrap();
+        let status = response.status();
+        let headers = response.headers().clone();
+        let bytes = response.into_body().collect().await.unwrap().to_bytes();
+        (status, headers, bytes.to_vec())
     }
 
     pub async fn get(&self, path: &str, token: Option<&str>) -> (StatusCode, Value) {

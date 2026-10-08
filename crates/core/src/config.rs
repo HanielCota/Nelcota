@@ -39,6 +39,19 @@ pub enum LogFormat {
     Json,
 }
 
+/// Where storage keeps the bytes (D77).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum StorageBackend {
+    /// No storage routes.
+    #[default]
+    Off,
+    /// A local directory (`NELCOTA_STORAGE_DIR`).
+    Disk,
+    /// An S3-compatible bucket (`NELCOTA_STORAGE_S3_*`).
+    S3,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Config {
     /// Postgres URL with a role that owns the schema (used only for migrations
@@ -96,6 +109,29 @@ pub struct Config {
     /// `statement_timeout` of the API connections.
     pub statement_timeout_secs: u64,
     pub log_format: LogFormat,
+    /// File storage: `off`, `disk` or `s3`.
+    pub storage_backend: StorageBackend,
+    /// Directory of the disk backend.
+    pub storage_dir: Option<std::path::PathBuf>,
+    /// S3 endpoint (`https://<account>.r2.cloudflarestorage.com`); empty = AWS.
+    pub storage_s3_endpoint: Option<String>,
+    pub storage_s3_bucket: Option<String>,
+    pub storage_s3_region: String,
+    pub storage_s3_access_key_id: Option<String>,
+    pub storage_s3_secret_access_key: Option<Secret>,
+    /// `bucket.endpoint` URLs instead of `endpoint/bucket`.
+    pub storage_s3_virtual_hosted: bool,
+    /// Largest file accepted, in bytes (a bucket can only lower it).
+    pub storage_max_file_size: u64,
+    /// Cap on the bytes of all buckets together (`None` = no cap).
+    pub storage_max_total_size: Option<u64>,
+    /// Disk backend: refuse an upload that would leave less free space.
+    pub storage_min_free_bytes: u64,
+    /// Origin of public file URLs (e.g. `https://files.shop.com`); `None` =
+    /// the API's own.
+    pub storage_public_url: Option<String>,
+    /// Longest an upload may take, in seconds.
+    pub storage_upload_timeout_secs: u64,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -137,6 +173,19 @@ impl Default for Config {
             request_timeout_secs: 15,
             statement_timeout_secs: 10,
             log_format: LogFormat::Text,
+            storage_backend: StorageBackend::Off,
+            storage_dir: None,
+            storage_s3_endpoint: None,
+            storage_s3_bucket: None,
+            storage_s3_region: "auto".into(),
+            storage_s3_access_key_id: None,
+            storage_s3_secret_access_key: None,
+            storage_s3_virtual_hosted: false,
+            storage_max_file_size: 50 * 1024 * 1024,
+            storage_max_total_size: None,
+            storage_min_free_bytes: 1024 * 1024 * 1024,
+            storage_public_url: None,
+            storage_upload_timeout_secs: 3600,
         }
     }
 }
@@ -184,7 +233,44 @@ impl Config {
             return Err(ConfigError::Invalid("NELCOTA_DB_POOL_SIZE must be > 0"));
         }
         self.mail()?;
+        self.validate_storage()?;
         self.database_config()?;
+        Ok(())
+    }
+
+    fn validate_storage(&self) -> Result<(), ConfigError> {
+        let set = |value: &Option<String>| value.as_deref().is_some_and(|v| !v.trim().is_empty());
+        match self.storage_backend {
+            StorageBackend::Off => return Ok(()),
+            StorageBackend::Disk if self.storage_dir.is_none() => {
+                return Err(ConfigError::Invalid(
+                    "NELCOTA_STORAGE_BACKEND=disk needs NELCOTA_STORAGE_DIR",
+                ));
+            }
+            StorageBackend::S3
+                if !set(&self.storage_s3_bucket)
+                    || !set(&self.storage_s3_access_key_id)
+                    || non_empty(&self.storage_s3_secret_access_key).is_none() =>
+            {
+                return Err(ConfigError::Invalid(
+                    "NELCOTA_STORAGE_BACKEND=s3 needs NELCOTA_STORAGE_S3_BUCKET,                      NELCOTA_STORAGE_S3_ACCESS_KEY_ID and NELCOTA_STORAGE_S3_SECRET_ACCESS_KEY",
+                ));
+            }
+            _ => {}
+        }
+        if self.storage_max_file_size == 0 || self.storage_upload_timeout_secs == 0 {
+            return Err(ConfigError::Invalid(
+                "NELCOTA_STORAGE_MAX_FILE_SIZE and NELCOTA_STORAGE_UPLOAD_TIMEOUT_SECS must be > 0",
+            ));
+        }
+        if let Some(url) = self.storage_public_url.as_deref().map(str::trim)
+            && !url.is_empty()
+            && !(url.starts_with("https://") || url.starts_with("http://"))
+        {
+            return Err(ConfigError::Invalid(
+                "NELCOTA_STORAGE_PUBLIC_URL must be an http(s) URL",
+            ));
+        }
         Ok(())
     }
 
@@ -298,6 +384,38 @@ mod tests {
         );
         let mail = config.mail().unwrap().unwrap();
         assert_eq!(mail.recovery_url, "https://app.x.com/new-password");
+    }
+
+    #[test]
+    fn storage_needs_its_backend_settings() {
+        let disk = Config {
+            storage_backend: StorageBackend::Disk,
+            ..Config::default()
+        };
+        assert!(disk.validate_storage().is_err());
+        let disk = Config {
+            storage_dir: Some("/storage".into()),
+            ..disk
+        };
+        assert!(disk.validate_storage().is_ok());
+
+        let s3 = Config {
+            storage_backend: StorageBackend::S3,
+            storage_s3_bucket: Some("files".into()),
+            storage_s3_access_key_id: Some("key".into()),
+            ..Config::default()
+        };
+        assert!(s3.validate_storage().is_err());
+        let s3 = Config {
+            storage_s3_secret_access_key: Some(Secret::new("secret")),
+            ..s3
+        };
+        assert!(s3.validate_storage().is_ok());
+        let s3 = Config {
+            storage_public_url: Some("files.shop.com".into()),
+            ..s3
+        };
+        assert!(s3.validate_storage().is_err());
     }
 
     #[test]

@@ -72,7 +72,7 @@ async fn serve(config: Config) -> anyhow::Result<()> {
     };
     let auth = AuthState {
         mailer,
-        pool,
+        pool: pool.clone(),
         keys: keys.clone(),
         passwords: Arc::new(Passwords::new(hash_concurrency())),
         limiter: Arc::new(RateLimiter::new(config.auth_rate_limit_per_minute)),
@@ -101,7 +101,7 @@ async fn serve(config: Config) -> anyhow::Result<()> {
                 secure_cookies: config.trust_proxy,
                 host: Arc::new(host_link(&config)),
                 tokens: Arc::new(nelcota_admin::TokenIssuer {
-                    keys,
+                    keys: keys.clone(),
                     issuer: config.jwt_issuer.clone(),
                 }),
                 migrations_dir: nelcota_admin::default_migrations_dir(
@@ -116,10 +116,27 @@ async fn serve(config: Config) -> anyhow::Result<()> {
             None
         }
     };
+    let storage = match nelcota_storage::Store::from_config(&config)
+        .context("could not open the file storage")?
+    {
+        Some(store) => {
+            let store = Arc::new(store);
+            tracing::info!(backend = ?config.storage_backend, "file storage enabled");
+            nelcota_storage::spawn_collector(pool.clone(), store.clone());
+            Some(nelcota_storage::StorageState::new(
+                pool.clone(),
+                keys.clone(),
+                store,
+                nelcota_storage::StorageSettings::from_config(&config),
+            ))
+        }
+        None => None,
+    };
     let router = app(
         state,
         auth,
         admin,
+        storage,
         Duration::from_secs(config.request_timeout_secs),
     );
 

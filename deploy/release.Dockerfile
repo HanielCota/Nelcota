@@ -5,6 +5,8 @@
 # exact binary published on the release page. The local build is ../Dockerfile.
 FROM scratch
 ARG TARGETARCH
+# CA roots for HTTPS to an S3 storage backend (lettre bundles its own).
+COPY --from=alpine:3.22 /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 COPY --chmod=755 dist/nelcota-${TARGETARCH} /usr/local/bin/nelcota
 USER 65532:65532
 EXPOSE 8000

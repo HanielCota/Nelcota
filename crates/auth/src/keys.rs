@@ -150,8 +150,11 @@ impl Keys {
     }
 }
 
-impl JwtVerifier for Keys {
-    fn verify(&self, token: &str) -> Result<Claims, VerifyError> {
+impl Keys {
+    /// Checks signature and expiry and returns the raw payload, without
+    /// reading it as request claims. For tokens that are not API tokens, such
+    /// as signed storage URLs.
+    pub fn verify_payload(&self, token: &str) -> Result<Value, VerifyError> {
         let header = jsonwebtoken::decode_header(token)?;
         let data = match (header.alg, &self.ed, &self.hs) {
             (Algorithm::EdDSA, Some(ed), _) => {
@@ -165,7 +168,13 @@ impl JwtVerifier for Keys {
             }
             _ => return Err(VerifyError::UnknownKey),
         };
-        Ok(Claims::from_payload(data.claims)?)
+        Ok(data.claims)
+    }
+}
+
+impl JwtVerifier for Keys {
+    fn verify(&self, token: &str) -> Result<Claims, VerifyError> {
+        Ok(Claims::from_payload(self.verify_payload(token)?)?)
     }
 }
 
