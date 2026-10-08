@@ -7,9 +7,9 @@ a 5-minute deploy on a VPS.**
   and keep working without Nelcota.
 - **Authorization belongs to RLS.** The API only validates the JWT and assumes
   its role inside a transaction. It never decides permissions on its own.
-- **One binary (~10 MB)** with an automatic REST API, auth (EdDSA JWT + JWKS,
-  argon2id, refresh with rotation, password recovery by email), an admin panel
-  and a deploy CLI.
+- **One binary** with an automatic REST API, auth (EdDSA JWT + JWKS,
+  argon2id, refresh with rotation, password recovery by email), file storage
+  under RLS (disk or S3), an admin panel and a deploy CLI.
 - **Open standards:** JWT/JWKS, PHC argon2id, plain SQL, OpenAPI,
   S3-compatible. You can leave and take everything with you
   ([leaving.md](docs/leaving.md)).
@@ -65,6 +65,13 @@ curl -X POST https://api.yourdomain.com/rest/v1/notes -H "authorization: Bearer 
 curl "https://api.yourdomain.com/rest/v1/notes?body=ilike.*hi*&order=id.desc" -H "authorization: Bearer $TOKEN"
 ```
 
+Files under the same policies: a row in `storage.objects` per file, bytes on
+disk or in any S3 bucket ([storage.md](docs/storage.md)).
+
+```sh
+curl -X POST https://api.yourdomain.com/storage/v1/object/avatars/$USER_ID/me.png   -H "authorization: Bearer $TOKEN" -H 'content-type: image/png' --data-binary @me.png
+```
+
 Frontend types: `nelcota types -o database.ts`. OpenAPI at `/rest/v1/`.
 Panel at `/admin/`: table editor with inline editing, SQL editor with
 autocomplete, users, RLS policies and migrations generated from panel changes.
@@ -98,6 +105,7 @@ token kills the session.
 ## Documentation
 
 - [REST API](docs/api.md): filters, writes, RPC, OpenAPI, errors
+- [Storage](docs/storage.md): buckets, policies, uploads, signed URLs
 - [JWT and roles](docs/jwt-and-roles.md): the token contract and the JWT → RLS flow
 - [Auth schema](docs/schema-auth.md): tables, password format, endpoints
 - [Panel](docs/panel.md)
@@ -109,7 +117,7 @@ token kills the session.
 
 ## Out of the MVP
 
-Realtime, Storage (use any S3), Edge Functions, OAuth/MFA/magic link,
+Realtime, Edge Functions, OAuth/MFA/magic link, image transformations,
 multi-tenant. The architecture leaves room for them.
 
 ## License

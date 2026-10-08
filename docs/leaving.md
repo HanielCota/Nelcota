@@ -37,7 +37,19 @@ providers without rewriting the policies, the new provider only has to issue
 tokens with `role` and `sub`. The `auth.uid()`/`auth.jwt()` functions stay the
 same.
 
-## 4. What stays behind
+## 4. The files
+
+`storage.objects` is part of the dump above. The bytes are plain files in
+`projects/<name>/storage/` (disk) or objects in your own bucket (S3), stored
+as `<bucket>/<version>`. The name of each one:
+
+```sh
+docker compose exec -T postgres psql -U postgres -c "\copy (
+  SELECT bucket_id || '/' || version AS key, bucket_id || '/' || name AS name
+  FROM storage.objects) TO STDOUT WITH CSV HEADER" > files.csv
+```
+
+## 5. What stays behind
 
 Only the `nelcota` binary: the automatic REST API and the panel. Without
 Nelcota, Postgres keeps serving exactly the same data with the same policies,

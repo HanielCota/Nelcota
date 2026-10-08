@@ -1,0 +1,168 @@
+# Storage
+
+Files with the same rule as everything else: **Postgres decides access.**
+Each file is a row in `storage.objects`; RLS policies on that table say who
+may upload, read, replace or delete it. The bytes live on the server's disk
+or in any S3-compatible bucket. The design and its reasons are D77–D80 in
+[decisions.md](decisions.md).
+
+## Turning it on
+
+New projects (`nelcota init`) keep files on the project's disk:
+
+```sh
+NELCOTA_STORAGE_BACKEND=disk
+NELCOTA_STORAGE_DIR=/storage        # projects/<name>/storage on the host
+```
+
+In production, an S3-compatible bucket keeps files off a single disk
+(Cloudflare R2, Backblaze B2, AWS S3, Wasabi...):
+
+```sh
+NELCOTA_STORAGE_BACKEND=s3
+NELCOTA_STORAGE_S3_ENDPOINT=https://<account>.r2.cloudflarestorage.com   # empty = AWS
+NELCOTA_STORAGE_S3_BUCKET=files
+NELCOTA_STORAGE_S3_REGION=auto                                          # R2: auto; AWS: us-east-1...
+NELCOTA_STORAGE_S3_ACCESS_KEY_ID=...
+NELCOTA_STORAGE_S3_SECRET_ACCESS_KEY=...
+# NELCOTA_STORAGE_S3_VIRTUAL_HOSTED=true   # bucket.endpoint URLs, if the provider requires them
+```
+
+Then `nelcota -p <name> up`. Without `NELCOTA_STORAGE_BACKEND` storage is off
+and `/storage/v1` does not exist. A project created before storage existed
+turns it on by adding the two `disk` lines to its `.env` and
+`- ./storage:/storage` to the app's `volumes` in `docker-compose.yml`
+(`mkdir storage && chown 65532:65532 storage` first).
+
+| Variable | Default | |
+|---|---|---|
+| `NELCOTA_STORAGE_MAX_FILE_SIZE` | 50 MiB | largest file; a bucket can only lower it |
+| `NELCOTA_STORAGE_MAX_TOTAL_SIZE` | none | cap on all buckets together, in bytes |
+| `NELCOTA_STORAGE_MIN_FREE_BYTES` | 1 GiB | disk backend: refuse uploads that would leave less free space |
+| `NELCOTA_STORAGE_UPLOAD_TIMEOUT_SECS` | 3600 | longest an upload may take |
+| `NELCOTA_STORAGE_PUBLIC_URL` | the API's | origin of public file URLs, e.g. `https://files.shop.com` |
+
+## Buckets and policies
+
+A bucket is a row in `storage.buckets`. Create it in a migration (or with
+`POST /storage/v1/bucket` as `service_role`):
+
+```sql
+-- migrations/V2__avatars.sql
+INSERT INTO storage.buckets (id, public, file_size_limit, allowed_mime_types)
+VALUES ('avatars', true, 2097152, '{image/*}');
+
+-- Each user writes only into the folder named after their id.
+CREATE POLICY avatar_owner ON storage.objects FOR ALL TO authenticated
+    USING (bucket_id = 'avatars' AND (storage.foldername(name))[1] = auth.uid()::text)
+    WITH CHECK (bucket_id = 'avatars' AND (storage.foldername(name))[1] = auth.uid()::text);
+```
+
+**Until a policy says otherwise, nobody but `service_role` reaches any file.**
+`public` only opens reads through `/object/public/`; writes to a public bucket
+still go through the policies.
+
+| Operation | Policies needed |
+|---|---|
+| upload (`POST`) | `INSERT` |
+| replace (`PUT`) | `INSERT`, `SELECT`, `UPDATE` |
+| download, sign, list | `SELECT` |
+| delete | `SELECT`, `DELETE` |
+
+`owner` is filled with `auth.uid()` on upload, so `owner = auth.uid()` is the
+simplest private-files policy. Helpers for paths:
+`storage.foldername('a/b/c.png')` → `{a,b}`, `storage.filename(...)` →
+`c.png`, `storage.extension(...)` → `png`. A policy sees the final row,
+including `size`, so a per-user quota is a policy too:
+
+```sql
+CREATE POLICY quota ON storage.objects AS RESTRICTIVE FOR INSERT TO authenticated
+    WITH CHECK ((SELECT coalesce(sum(size), 0) FROM storage.objects
+                  WHERE owner = auth.uid()) + size <= 100 * 1024 * 1024);
+```
+
+Bucket names: lowercase letters, digits, `-` and `_`; `public`, `sign` and
+`list` are reserved. A bucket with files cannot be dropped.
+
+## HTTP API
+
+Every route takes the usual `Authorization: Bearer <jwt>` (none = `anon`).
+Paths are percent-encoded; segments cannot be empty, `.` or `..`.
+
+```sh
+# upload (409 if the name exists; PUT replaces)
+curl -X POST "$API/storage/v1/object/avatars/$USER_ID/me.png" \
+  -H "authorization: Bearer $TOKEN" -H 'content-type: image/png' --data-binary @me.png
+# {"id":"...","bucket":"avatars","name":"<id>/me.png","size":48213,
+#  "mime_type":"image/png","etag":"...","public_url":"/storage/v1/object/public/avatars/<id>/me.png"}
+
+curl "$API/storage/v1/object/avatars/$USER_ID/me.png" -H "authorization: Bearer $TOKEN"   # download
+curl "$API/storage/v1/object/public/avatars/$USER_ID/me.png"                               # public bucket
+curl -X DELETE "$API/storage/v1/object/avatars/$USER_ID/me.png" -H "authorization: Bearer $TOKEN"
+```
+
+| Route | |
+|---|---|
+| `POST /storage/v1/object/{bucket}/{path}` | upload a new file (201) |
+| `PUT /storage/v1/object/{bucket}/{path}` | upload or replace (200 replaced, 201 created) |
+| `GET /storage/v1/object/{bucket}/{path}` | download under the caller's policies |
+| `GET /storage/v1/object/public/{bucket}/{path}` | download from a public bucket, no token |
+| `POST /storage/v1/object/sign/{bucket}/{path}` | `{"expires_in": 3600}` → `{"signed_url": "..."}` (up to 7 days) |
+| `GET /storage/v1/object/sign/{bucket}/{path}?token=...` | download with a signed URL, no token |
+| `POST /storage/v1/object/list/{bucket}` | `{"prefix": "a/", "limit": 100, "offset": 0}` → `{"folders": [...], "objects": [...]}` |
+| `DELETE /storage/v1/object/{bucket}/{path}` | delete (204) |
+| `GET/POST /storage/v1/bucket`, `GET/PUT/DELETE /storage/v1/bucket/{id}` | buckets (writes: `service_role`) |
+
+A file the caller may not see answers 404, as if it did not exist. Downloads
+take `?download` to force a "save as". Errors: 400 `invalid_path`, 404
+`bucket_not_found`/`object_not_found`, 409 `object_exists`, 413
+`file_too_large`, 415 `mime_type_not_allowed`, 507 `storage_full`.
+
+## How files are served
+
+- **The type comes from the bytes**, not from the client: a "PNG" that is
+  really HTML is stored as `text/html` (and refused by an `image/*` bucket).
+- **Files are inert.** Every response has `X-Content-Type-Options: nosniff` and
+  `Content-Security-Policy: sandbox`. Only images (not SVG), audio, video and
+  plain text open in the browser; HTML, SVG, PDF and the rest download.
+  For public files on their own origin, point `NELCOTA_STORAGE_PUBLIC_URL` at
+  a second domain that proxies `/storage/v1/object/public/*` to the app.
+- **Disk:** `Range` (video seeking, resumed downloads), `ETag` and
+  `If-None-Match`. Public files are cacheable for 60 s; private ones are
+  revalidated each time.
+- **S3:** downloads are a `302` to a presigned URL valid for at most 5 minutes;
+  the bytes come straight from the provider.
+
+## Consistency
+
+A file's bytes are stored under a new key (`<bucket>/<uuidv7>`) on every
+upload, and the row is written only after the bytes are complete. Readers
+never see a half-written file, and an upload that fails or is refused leaves
+nothing behind. Replacing or deleting a file removes the old bytes right
+away: **a database restore does not bring deleted files back**. An hourly
+collector removes bytes no row points to once they are a day old (left by a
+crash mid-upload).
+
+## Backups
+
+With the disk backend, `nelcota backup --upload` also mirrors the project's
+files to `s3://<backup bucket>/<project>/storage/` (only new files travel;
+deleted ones are deleted there too). After losing the server:
+
+```sh
+nelcota -p shop restore backups/nelcota-shop-<date>.dump --files --yes
+```
+
+`--files` brings the files back from that mirror. With the S3 backend the
+files never leave the provider; use its versioning or replication if you need
+more copies.
+
+## Leaving
+
+The metadata is plain SQL (`storage.objects`), the bytes are ordinary files or
+S3 objects. To get them back under their names:
+
+```sql
+SELECT bucket_id || '/' || version AS key, bucket_id || '/' || name AS name
+  FROM storage.objects;
+```
