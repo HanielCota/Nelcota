@@ -631,6 +631,18 @@ reconciliation while the page owns navigation and presentation. Existing
 transaction, RLS and snapshot guarantees remain coordinated inside their
 operation modules (docs/architecture.md).
 
+**D86. Operation interfaces own complete lifetimes.** Recovery and migration
+workflows return data without HTTP extraction or response construction. Their
+atomic database changes stay under one transaction owner. The SQL executor
+owns its connection, cancellation and display budgets behind one execution
+method; the route chooses the HTTP response. REST execution returns the JSON
+already built by PostgreSQL and response metadata, preserving RLS and error
+ordering. Catalog model, introspection and refresh workers remain internal to
+the existing facade. Panel SQL and storage modules accept transport adapters
+and own cancellation, captured destinations and mutation refreshes. Native
+provisioning and PITR configuration/process adapters are separate from restore
+sequencing, with no new deployment runtime or command contract.
+
 ### Known pending items
 
 - Filtering parent rows by their embeds (`!inner`) and self-referencing embeds.

@@ -69,10 +69,35 @@ These modules have unit tests; browser flows and real-Postgres regressions run i
 captured primary keys and navigation during writes. The table page owns its
 navigation, dialogs and presentation; its HTTP adapter supplies row operations.
 
+Recovery operations own link issuance and atomic consumption, password updates,
+session revocation and post-commit email delivery. HTTP handlers only extract
+request metadata, apply public endpoint rate limits and adapt their results.
+Migration operations return typed records and commit version allocation,
+checksums and change tracking together; their `files` module owns names,
+rendering and directory discovery, while the root handles HTTP downloads.
+
+The REST root composes routes. Its `http` adapter handles URLs, preferences,
+status codes and headers; `operations` compiles and executes CRUD/RPC under
+the caller's role, returning PostgreSQL-generated JSON and range metadata.
+Catalog internals separate `model`, `introspection`, `refresh` and `listener`
+without adding concepts to the public `CatalogHandle` interface.
+
+The SQL executor owns connection lifetime, concurrency, result budgets and
+cancellation behind `execute`; the route handles HTTP status and serialization.
+The panel's `SqlExecution` owns request state and timing, and `StorageBrowser`
+owns folder paging and refreshes after uploads/deletions. Both accept adapters
+and discard stale responses when cancelled or navigated away from.
+
+Native deployment separates machine/package provisioning, systemd units,
+PostgreSQL configuration and atomic binary replacement. Caddy owns its own
+configuration writes. PITR separates private configuration from process adapters
+and restore sequencing; restore still coordinates stopping services, restoring,
+waiting for promotion, taking a backup on the new timeline and starting the app.
+
 ## A request's flow
 
 1. `Auth` (extractor) turns the `Authorization` header into `Claims`.
-2. The handler takes a connection from the pool (always as `authenticator`).
+2. The operation takes a connection from the pool (always as `authenticator`).
 3. `db::begin_request` opens the transaction and sets role + claims.
 4. The query runs under RLS; Postgres builds the JSON (`json_agg`) and the API
    just passes the bytes through.
