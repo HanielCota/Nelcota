@@ -723,6 +723,19 @@ is an error page, since there is no trusted place to return to. The HTTPS
 client is the `reqwest` already in the tree for S3, on rustls with `ring`
 (D16), with a 10 s timeout, no redirects and bounded response bodies.
 
+## Panel
+
+**D92. Code gets syntax colours, the second exception to D55.** The SQL
+editor colours keywords, function calls, types, strings, numbers and
+comments; table and column names keep the text colour. Colour there carries
+meaning (it is how people read code) rather than decorating the page. The
+palette follows GitHub's light and dark syntax themes, a tested and
+readable reference, as `--syntax-*` tokens next to the other theme colours.
+The SQL grammar does not mark function calls, so a small view plugin tints an
+identifier right before `(` and a built-in keyword glued to it (`count(`),
+but not keywords that open a clause or a list (`in (`, `exists(`). Only the
+lazily loaded editor changes (D54); read-only SQL blocks stay plain.
+
 ### Known pending items
 
 - Filtering parent rows by their embeds (`!inner`) and self-referencing embeds.
