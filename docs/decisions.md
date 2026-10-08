@@ -687,10 +687,16 @@ confirmation 24 hours, magic link 15 minutes (it signs in by itself). The
 sign-in by link); `recovery` keeps only the password change, `confirmation`
 the signup policy and `verify` the routing by `type`.
 
-### Known pending items
+**D90. Panel accounts count as confirmed.** An account the administrator
+creates is marked confirmed at once: the operator vouches for the address,
+and with signup confirmation on it would otherwise be held until a magic
+link or `resend`. The users page marks unconfirmed accounts and offers
+"Confirm email" for them (`POST /admin/api/users/{id}/confirm`, idempotent),
+which replaces the SQL `UPDATE` of D89 for projects that turn confirmation
+on with older accounts. It sends no email: the panel has no mailer and an
+invitation flow is a separate decision.
 
-- Accounts created in the panel stay unconfirmed: with email confirmation on
-  they need a magic link or `resend` before password sign-in.
+### Known pending items
 
 - Filtering parent rows by their embeds (`!inner`) and self-referencing embeds.
 - `nelcota.com/install` should redirect to
