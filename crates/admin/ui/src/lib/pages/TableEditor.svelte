@@ -24,9 +24,10 @@
   import { filtersParam, filtersToSearch, parseFilters, type TableFilter } from '$lib/filters'
   import { href, navigate, route } from '$lib/router.svelte'
   import { cn } from '$lib/utils'
-  import { rowKey, rowPk } from '$lib/grid'
+  import { TableRows } from '$lib/features/tables/table-rows.svelte'
+  import { tableRowsApi } from '$lib/features/tables/api'
   import { parseTableView, tableViewSearch, type TableView } from '$lib/table-view'
-  import type { Column, RowData, TableData, TablesResponse } from '$lib/types'
+  import type { Column, RowData, TablesResponse } from '$lib/types'
   import { errorMessage, t } from '$lib/i18n/index.svelte'
 
   let { name, view = 'data' }: { name?: string; view?: 'data' | 'structure' } = $props()
@@ -35,16 +36,16 @@
   const tables = $derived(tablesResource.data?.tables ?? [])
   const tablesLoading = $derived(tablesResource.loading)
   const tablesError = $derived(tablesResource.error ? errorMessage(tablesResource.error) : '')
-  const resource = new RemoteResource<TableData>()
-  const data = $derived(resource.data)
-  const loading = $derived(resource.loading)
-  let savingCell = $state(false)
-  const error = $derived(resource.error ? errorMessage(resource.error) : '')
+  const rows = new TableRows(tableRowsApi)
+  const data = $derived(rows.data)
+  const loading = $derived(rows.loading)
+  const savingCell = $derived(rows.saving)
+  const error = $derived(rows.error ? errorMessage(rows.error) : '')
   const tableView = $derived(parseTableView(route.query))
   const page = $derived(tableView.page)
   const size = $derived(tableView.size)
   const sort = $derived(tableView.sort)
-  let selected = $state<Set<number>>(new Set())
+  const selected = $derived(rows.selected)
 
   let sheetOpen = $state(false)
   let sheetRow = $state<RowData | null>(null)
@@ -108,21 +109,19 @@
   }
 
   async function load() {
-    if (!name) return
-    if (data?.table.name !== name) resource.clear()
-    if (view !== 'data') return
-    selected = new Set()
+    rows.setTable(name)
+    if (!name || view !== 'data') return
     const params = rowsParams()
     params.set('page', String(page))
     params.set('size', size)
-    await resource.load(signal => api.get<TableData>(`/tables/${enc(name!)}?${params}`, { signal }))
+    await rows.load(name, params)
   }
 
   // Reload when the table, page, size, sort or filters change.
   $effect(() => {
     void [name, view, page, size, sort?.column, sort?.desc, filtersKey]
     untrack(load)
-    return () => resource.cancel()
+    return () => rows.cancel()
   })
 
   function setFilters(next: TableFilter[]) {
@@ -163,43 +162,20 @@
     filterOpen = true
   }
 
-  function pkOf(row: RowData) {
-    return rowPk(row, data?.table.primary_key ?? [])
-  }
-
   async function commitCell(pk: RowData, column: string, value: string | null) {
-    if (!data || !name || loading || savingCell || data.table.name !== name) return
-    const target = data
-    const table = name
-    const key = rowKey(pk, target.table.primary_key)
-    savingCell = true
     try {
-      const res = await api.patch<{ count: number }>(`/tables/${enc(table)}/rows`, {
-        pk,
-        values: { [column]: value },
-      })
-      if (name === table && data === target) {
-        const row = data.rows.find((candidate) => rowKey(candidate, target.table.primary_key) === key)
-        if (row && res.count > 0) row[column] = value
-      } else if (name === table) {
-        await load()
-      }
-      toast.success(t('tables.toast.rowsUpdated', { count: res.count }))
+      const count = await rows.edit(pk, column, value)
+      if (count !== undefined) toast.success(t('tables.toast.rowsUpdated', { count }))
     } catch (e) {
       toast.error(errorMessage(e))
       throw e
-    } finally {
-      savingCell = false
     }
   }
 
   async function deleteSelected() {
-    if (!data || !name) return
-    const pks = [...selected].map((i) => pkOf(data!.rows[i]))
     try {
-      const res = await api.delete<{ count: number }>(`/tables/${enc(name)}/rows`, { pks })
-      toast.success(t('tables.toast.rowsDeleted', { count: res.count }))
-      await load()
+      const count = await rows.deleteSelected()
+      if (count !== undefined) toast.success(t('tables.toast.rowsDeleted', { count }))
     } catch (e) {
       toast.error(errorMessage(e))
       throw e
@@ -268,7 +244,7 @@
             columns={data.table.columns.map((c) => c.name)}
             rows={[...selected].sort((a, b) => a - b).map((i) => data!.rows[i]).filter(Boolean)}
             deletable={data.table.editable && !loading && !savingCell}
-            onclear={() => (selected = new Set())}
+            onclear={() => (rows.selected = new Set())}
             ondelete={() => (confirmOpen = true)}
           />
         {/if}
@@ -303,7 +279,7 @@
                 disabled={loading || savingCell}
                 {sort}
                 hidden={hidden.names}
-                bind:selected
+                bind:selected={rows.selected}
                 onsort={toggleSort}
                 onsortset={setSort}
                 onfilter={filterBy}
