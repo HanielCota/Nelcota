@@ -129,6 +129,9 @@ pub enum Command {
     /// Restores a dump (replaces the project's current database).
     Restore {
         file: PathBuf,
+        /// Also restores the files from the backup bucket (disk storage).
+        #[arg(long)]
+        files: bool,
         /// Does not ask for confirmation.
         #[arg(long)]
         yes: bool,
@@ -362,11 +365,13 @@ pub fn run(cli: Cli) -> anyhow::Result<Outcome> {
             }
             Ok(Outcome::Done)
         }
-        Command::Restore { file, yes } => {
+        Command::Restore { file, files, yes } => {
             let manifest = host.require()?;
             done(ops::restore(
+                &host,
                 &host.select(&manifest, selection)?,
                 &file,
+                files,
                 yes,
             ))
         }

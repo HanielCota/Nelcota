@@ -48,6 +48,23 @@ impl Project {
         self.dir.join(name)
     }
 
+    /// Directory of the disk storage backend, as seen from the host.
+    pub fn storage_dir(&self) -> PathBuf {
+        match self.runtime {
+            Runtime::Docker => self.path("storage"),
+            Runtime::Systemd => PathBuf::from(format!("/var/lib/nelcota-{}/storage", self.name)),
+        }
+    }
+
+    /// Whether the app keeps its files on this host's disk.
+    pub fn stores_files_on_disk(&self) -> bool {
+        self.env()
+            .get("NELCOTA_STORAGE_BACKEND")
+            .ok()
+            .flatten()
+            .is_some_and(|b| b.trim() == "disk")
+    }
+
     pub fn env(&self) -> EnvFile {
         EnvFile::new(self.path(".env"))
     }

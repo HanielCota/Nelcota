@@ -8,7 +8,10 @@ use std::{
 };
 
 use anyhow::{Context, bail};
-use nelcota_core::{Config, Secret, config::LogFormat};
+use nelcota_core::{
+    Config, Secret,
+    config::{LogFormat, StorageBackend},
+};
 use tokio_postgres::NoTls;
 
 use std::path::Path;
@@ -47,7 +50,7 @@ fn load_state(root: &Path) -> anyhow::Result<Option<DevState>> {
     }))
 }
 
-fn config_for(state: &DevState, listen: std::net::SocketAddr) -> Config {
+fn config_for(root: &Path, state: &DevState, listen: std::net::SocketAddr) -> Config {
     Config {
         database_url: Secret::new(format!(
             "postgres://postgres:{}@127.0.0.1:{}/postgres",
@@ -58,13 +61,15 @@ fn config_for(state: &DevState, listen: std::net::SocketAddr) -> Config {
         jwt_issuer: "nelcota-dev".into(),
         listen,
         log_format: LogFormat::Text,
+        storage_backend: StorageBackend::Disk,
+        storage_dir: Some(root.join(".nelcota/storage")),
         ..Config::default()
     }
 }
 
 /// Configuration of the already created dev environment (for `migrate`/`types`).
 pub fn saved_config(root: &Path) -> anyhow::Result<Option<Config>> {
-    Ok(load_state(root)?.map(|s| config_for(&s, ([127, 0, 0, 1], 8000).into())))
+    Ok(load_state(root)?.map(|s| config_for(root, &s, ([127, 0, 0, 1], 8000).into())))
 }
 
 pub fn run(root: &Path, args: DevArgs) -> anyhow::Result<Outcome> {
@@ -124,7 +129,7 @@ pub fn run(root: &Path, args: DevArgs) -> anyhow::Result<Outcome> {
             .status()?;
     }
 
-    let config = config_for(&state, args.listen);
+    let config = config_for(root, &state, args.listen);
     wait_for_postgres(&config)?;
     ok(&format!("Postgres at 127.0.0.1:{}", state.db_port));
 

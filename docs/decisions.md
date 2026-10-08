@@ -579,6 +579,18 @@ Per-user quotas are left to policies, which see the final row (with its
 size) on insert. Image transformations and resumable (TUS) uploads stay out:
 decoding untrusted images is a steady source of CVEs.
 
+**D81. New projects store files on their disk; backups mirror them.**
+`nelcota init` writes `NELCOTA_STORAGE_BACKEND=disk`: on Docker the app
+mounts `projects/<name>/storage` (owned by the image's user 65532), on
+systemd the unit's `StateDirectory`. Storage works right after `nelcota up`,
+and moving to S3 is two lines in `.env`. A file on the same disk as the
+database is lost with it, so `backup --upload` also runs `aws s3 sync
+--delete` of that directory to `<bucket>/<project>/storage/`: keys never
+change once written (D78), so each run only sends new files, and
+`restore --files` brings them back. Caddy stops compressing `/storage/*`,
+which would break byte ranges. Projects created before storage keep it off
+until they add the two lines and the volume (docs/storage.md).
+
 ### Known pending items
 
 - Filtering parent rows by their embeds (`!inner`) and self-referencing embeds.

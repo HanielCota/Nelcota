@@ -92,6 +92,27 @@ done
 [ "$(code_of "$SHOP/rest/v1/notes")" = "401" ] || fail "anon should get 401"
 echo "ok: the user reads their own note; anon gets 401"
 
+say "Storage on the project's disk (via Caddy/HTTPS)"
+cat > "$WORK/projects/shop/migrations/V2__files.sql" <<'SQL'
+INSERT INTO storage.buckets (id) VALUES ('files');
+CREATE POLICY own_files ON storage.objects FOR ALL TO authenticated
+    USING (bucket_id = 'files' AND owner = auth.uid())
+    WITH CHECK (bucket_id = 'files' AND owner = auth.uid());
+SQL
+nelcota -p shop migrate
+file_url="$SHOP/storage/v1/object/files/notes/hello.txt"
+for _ in $(seq 1 200); do printf 'hello storage '; done > "$WORK/upload.txt"
+"${CURL[@]}" -H "authorization: Bearer $token" -H 'content-type: text/plain' \
+  --data-binary @"$WORK/upload.txt" "$file_url" | grep -q '"size":2800' || fail "upload failed"
+"${CURL[@]}" -H "authorization: Bearer $token" -o "$WORK/download.txt" "$file_url"
+cmp -s "$WORK/upload.txt" "$WORK/download.txt" || fail "downloaded file differs"
+# Caddy must not compress storage responses: a range stays a byte range.
+range=$("${CURL[@]}" -H "authorization: Bearer $token" -H 'accept-encoding: gzip' -H 'range: bytes=0-4' "$file_url")
+[ "$range" = "hello" ] || fail "range through Caddy returned: $range"
+[ "$(code_of "$file_url")" = "404" ] || fail "anon must not read the file"
+ls "$WORK"/projects/shop/storage/files/* >/dev/null 2>&1 || fail "the file is not on the project's disk"
+echo "ok: upload, download and ranges through Caddy; anon gets 404"
+
 say "Isolation between projects"
 [ "$(code_of -H "authorization: Bearer $token" "$BLOG/rest/v1/")" = "401" ] || fail "a shop JWT must not work on blog"
 [ "$(code_of "$BLOG/rest/v1/notes")" = "404" ] || fail "the shop table must not exist on blog"
@@ -141,7 +162,38 @@ nelcota -p shop restore "$(native "$dump")" --yes
 body=$("${CURL[@]}" "${auth[@]}" "$SHOP/rest/v1/notes")
 echo "$body" | grep -q "before the backup" || fail "restore lost data from the backup"
 if echo "$body" | grep -q "after the backup"; then fail "restore did not go back to the backup state"; fi
-echo "ok: backup state restored"
+"${CURL[@]}" -H "authorization: Bearer $token" "$file_url" | grep -q "hello storage" || fail "file lost in the restore"
+echo "ok: backup state restored, files kept"
+
+say "Files mirrored to S3 by backup --upload and brought back by restore --files"
+docker run -d --rm --name nelcota-accept-s3 -p 9101:9000 \
+  -e RUSTFS_ACCESS_KEY=accepttest -e RUSTFS_SECRET_KEY=accepttestsecret rustfs/rustfs:1.0.1 >/dev/null
+cleanup_s3() { docker rm -f nelcota-accept-s3 >/dev/null 2>&1 || true; }
+trap 'cleanup_s3; cleanup' EXIT
+# The aws-cli container reaches the host's port 9101.
+if command -v cygpath >/dev/null 2>&1; then s3_host=host.docker.internal; else s3_host=172.17.0.1; fi
+cat >> "$WORK/host.env" <<ENV
+NELCOTA_BACKUP_S3_ENDPOINT=http://$s3_host:9101
+NELCOTA_BACKUP_S3_BUCKET=accept-backups
+NELCOTA_BACKUP_S3_ACCESS_KEY=accepttest
+NELCOTA_BACKUP_S3_SECRET_KEY=accepttestsecret
+ENV
+for _ in $(seq 1 30); do
+  docker run --rm -e AWS_ACCESS_KEY_ID=accepttest -e AWS_SECRET_ACCESS_KEY=accepttestsecret \
+    -e AWS_DEFAULT_REGION=us-east-1 amazon/aws-cli --endpoint-url "http://$s3_host:9101" \
+    s3 mb s3://accept-backups >/dev/null 2>&1 && break
+  sleep 1
+done
+nelcota -p shop backup --upload
+s3_dump=$(ls "$WORK"/projects/shop/backups/*.dump | tail -1)
+rm -rf "$WORK"/projects/shop/storage/files
+[ "$(code_of -H "authorization: Bearer $token" "$file_url")" = "404" ] || fail "the file should be gone from the disk"
+nelcota -p shop restore "$(native "$s3_dump")" --files --yes
+"${CURL[@]}" -H "authorization: Bearer $token" "$file_url" | grep -q "hello storage" || fail "restore --files did not bring the file back"
+# The app can still replace the restored file (ownership kept).
+"${CURL[@]}" -X PUT -H "authorization: Bearer $token" -H 'content-type: text/plain' \
+  --data-binary 'replaced' "$file_url" >/dev/null || fail "the app cannot replace a restored file"
+echo "ok: files went to S3 and came back"
 
 say "Upgrade to a missing version → automatic rollback (shop)"
 if nelcota -p shop upgrade --version does-not-exist-999; then fail "upgrade should have failed"; fi

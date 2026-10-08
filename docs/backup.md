@@ -12,6 +12,10 @@ The first `init` (as root) installs a daily cron job at 03:00
 (`/etc/cron.d/nelcota-backup`) running `backup --all`, plus `--upload` when S3
 is configured. A broken project does not stop the others from being backed up.
 
+With disk storage, `--upload` also mirrors the project's files to
+`s3://<bucket>/<project>/storage/`; `restore --files` brings them back
+([storage.md](storage.md#backups)).
+
 The dump uses `pg_dump`'s custom format: it includes schema, data, RLS
 policies, functions and the `auth` schema (users with their argon2id hashes).
 Cluster roles (`anon`, `authenticated`...) are not in the dump, but Nelcota's
