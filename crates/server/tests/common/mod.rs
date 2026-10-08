@@ -56,8 +56,22 @@ fn registry_file() -> std::path::PathBuf {
 }
 pub const ADMIN_PASSWORD: &str = "test-admin-password";
 
-/// App page that receives the recovery link in the tests.
+/// App pages that receive the email links in the tests.
 pub const RECOVERY_URL: &str = "https://app.example.com/new-password";
+pub const CONFIRMATION_URL: &str = "https://app.example.com/confirmed";
+pub const MAGIC_LINK_URL: &str = "https://app.example.com/signed-in";
+
+/// Token of an email link (`<page>#type=<kind>&token=<token>`).
+pub fn link_token(email: &Email, page: &str, kind: &str) -> String {
+    let link = email
+        .text
+        .split_whitespace()
+        .find(|word| word.starts_with(page))
+        .unwrap_or_else(|| panic!("no link to {page} in: {}", email.text));
+    link.strip_prefix(&format!("{page}#type={kind}&token="))
+        .unwrap_or_else(|| panic!("link out of format: {link}"))
+        .to_owned()
+}
 
 /// Test mailer: keeps the messages instead of sending them.
 #[derive(Default)]
@@ -96,8 +110,10 @@ impl Mailer for Outbox {
 
 pub struct Options {
     pub pool_size: usize,
-    /// Password recovery on (with the [`Outbox`] instead of SMTP).
+    /// Password recovery and magic link on (with the [`Outbox`] instead of SMTP).
     pub mail: bool,
+    /// Signup waits for the email to be confirmed (needs `mail`).
+    pub confirm_email: bool,
     /// `migrations/` folder the panel sees.
     pub migrations_dir: Option<std::path::PathBuf>,
     pub rate_limit_per_minute: u32,
@@ -114,6 +130,7 @@ impl Default for Options {
         Options {
             pool_size: 4,
             mail: true,
+            confirm_email: false,
             migrations_dir: None,
             rate_limit_per_minute: 10_000,
             access_ttl_secs: 900,
@@ -264,7 +281,12 @@ impl TestApp {
                 refresh_ttl_days: 30,
                 signup_enabled: true,
                 trust_proxy: false,
-                recovery_url: options.mail.then(|| RECOVERY_URL.to_owned()),
+                links: nelcota_auth::EmailLinks {
+                    recovery: options.mail.then(|| RECOVERY_URL.to_owned()),
+                    signup_confirmation: (options.mail && options.confirm_email)
+                        .then(|| CONFIRMATION_URL.to_owned()),
+                    magic_link: options.mail.then(|| MAGIC_LINK_URL.to_owned()),
+                },
             }),
         };
         let storage_dir = std::env::temp_dir().join(format!("nelcota-storage-{}", Uuid::new_v4()));

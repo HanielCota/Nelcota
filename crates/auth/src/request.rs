@@ -63,7 +63,7 @@ mod tests {
             refresh_ttl_days: 1,
             signup_enabled: true,
             trust_proxy: false,
-            recovery_url: None,
+            links: Default::default(),
         };
         let mut headers = HeaderMap::new();
         headers.insert("x-forwarded-for", "1.1.1.1, 2.2.2.2".parse().unwrap());

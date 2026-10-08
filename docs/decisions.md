@@ -652,6 +652,50 @@ share panel request helpers and keep feature scenarios under one admin suite.
 This changes source navigation without introducing another runtime, crate
 layer, HTTP contract or transaction owner (docs/architecture.md).
 
+**D88. Facades expose complete operations in the modular monolith.** The
+existing capability crates and single binary remain the architecture. Bucket
+reads and mutations now have one storage owner shared by the public API and
+panel, with typed records and errors. HTTP adapters keep their existing wire
+contracts and input normalization; PostgreSQL still enforces privileges, RLS
+and nonempty-bucket deletion through its foreign key. Panel account operations
+own validation, SQL and password/session transactions independently of HTTP.
+Reuse the existing disk/S3 and mail adapters where implementations vary; add no
+generic repository, dependency container or extra crate layer. Integration
+tests exercise bucket policies through the operation interface and prove that
+a failed session revocation rolls back the password change.
+
+## Email links
+
+**D89. Signup confirmation and magic links reuse the recovery link.** Two
+optional pages, `NELCOTA_EMAIL_CONFIRMATION_URL` and `NELCOTA_MAGIC_LINK_URL`,
+need the D66 SMTP and turn on one flow each; without them nothing changes.
+Their tokens share `auth.one_time_tokens` (V9 widens the `kind` CHECK to
+`signup` and `magiclink`), the token in the URL fragment, the one email per
+minute per account and kind, and background sending. A token only works as
+the kind it was issued for. With confirmation on, signup answers `201 {user}`
+without a session, and password sign-in answers `400 email_not_confirmed`
+(only after a correct password, so it reveals nothing) until a signup, magic
+or recovery link is opened; `POST /auth/v1/resend {type: "signup"}` sends a
+new link to unconfirmed accounts only. Turning confirmation on in a project
+with unconfirmed accounts holds them too: they confirm through `resend` or a
+magic link, or the operator runs `UPDATE auth.users SET email_confirmed_at =
+now()`. A magic link only signs in existing accounts: creating accounts from
+an unauthenticated email request would let anyone fill `auth.users` and
+squat addresses before their owners sign up. Lifetimes: recovery 1 hour,
+confirmation 24 hours, magic link 15 minutes (it signs in by itself). The
+`links` module owns the link lifecycle (token storage, email text, sending,
+sign-in by link); `recovery` keeps only the password change, `confirmation`
+the signup policy and `verify` the routing by `type`.
+
+**D90. Panel accounts count as confirmed.** An account the administrator
+creates is marked confirmed at once: the operator vouches for the address,
+and with signup confirmation on it would otherwise be held until a magic
+link or `resend`. The users page marks unconfirmed accounts and offers
+"Confirm email" for them (`POST /admin/api/users/{id}/confirm`, idempotent),
+which replaces the SQL `UPDATE` of D89 for projects that turn confirmation
+on with older accounts. It sends no email: the panel has no mailer and an
+invitation flow is a separate decision.
+
 ### Known pending items
 
 - Filtering parent rows by their embeds (`!inner`) and self-referencing embeds.

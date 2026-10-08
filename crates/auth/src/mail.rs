@@ -1,4 +1,4 @@
-//! Sending email (today only the password recovery link).
+//! Sending email (the single-use links of `links`).
 //!
 //! It sits behind the [`Mailer`] trait: SMTP in production ([`SmtpMailer`]);
 //! in tests, a mailer that only keeps the messages. Nelcota runs no mail server

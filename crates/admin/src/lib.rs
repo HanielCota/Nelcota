@@ -76,6 +76,7 @@ pub fn router(state: AdminState) -> Router {
         .route("/admin/api/users", get(users::users).post(users::create))
         .route("/admin/api/users/{id}/password", put(users::set_password))
         .route("/admin/api/users/{id}/revoke", post(users::revoke_sessions))
+        .route("/admin/api/users/{id}/confirm", post(users::confirm_email))
         .route("/admin/api/users/{id}", delete(users::delete_user))
         .route("/admin/api/policies", get(policies::policies))
         .route("/admin/api/tables/{name}/policies", post(policies::create))

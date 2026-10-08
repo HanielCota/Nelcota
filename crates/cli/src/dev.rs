@@ -161,20 +161,23 @@ pub fn run(root: &Path, args: DevArgs) -> anyhow::Result<Outcome> {
     wait_for_postgres(&config)?;
     ok(&format!("Postgres at 127.0.0.1:{}", state.db_port));
 
-    let keys = nelcota_auth::Keys::new(config.jwt_private_key(), None)?;
-    let service = keys.service_role_token(&config.jwt_issuer, 30)?;
+    // Secrets stay in the 0600 state file: terminal scrollback and CI logs
+    // only get where to find them.
     println!();
     println!("  API:      http://{}/rest/v1/", args.listen);
     println!("  Auth:     http://{}/auth/v1/", args.listen);
     println!("  Panel:    http://{}/admin/", args.listen);
     println!(
-        "  Login:    {}  /  {}",
-        state.admin_email, state.admin_password
+        "  Login:    {}  (ADMIN_PASSWORD in {STATE_FILE})",
+        state.admin_email
     );
-    println!("  Postgres: {}", config.database_url.expose());
-    println!("  service_role (30 days, bypasses RLS): {service}");
+    println!(
+        "  Postgres: postgres://postgres:***@127.0.0.1:{}/postgres  (POSTGRES_PASSWORD in {STATE_FILE})",
+        state.db_port
+    );
     println!();
     println!("  Migrations: nelcota migrate   ·   Types: nelcota types -o database.ts");
+    println!("  service_role token (bypasses RLS): nelcota token service-role --days 30");
     println!();
     Ok(Outcome::Serve(Box::new(config)))
 }

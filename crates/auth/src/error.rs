@@ -14,6 +14,10 @@ pub(crate) fn validation(message: &str) -> ApiError {
     )
 }
 
+pub(crate) fn unsupported_type(message: &str) -> ApiError {
+    ApiError::new(StatusCode::BAD_REQUEST, "unsupported_type", message)
+}
+
 /// A credential rejected by the `credentials` rules becomes a validation error.
 pub(crate) fn invalid(err: InvalidCredential) -> ApiError {
     validation(err.0)
