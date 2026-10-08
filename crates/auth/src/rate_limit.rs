@@ -5,6 +5,9 @@
 //! which let a client spend almost twice the limit across the boundary.
 //! Still in memory: a single binary per install needs no Redis (D26).
 
+use crate::AuthState;
+use nelcota_core::ApiError;
+
 use std::{num::NonZeroU32, time::Duration};
 
 use governor::{
@@ -56,6 +59,13 @@ impl<C: Clock + Clone> RateLimiter<C> {
             .check_key(&key.to_owned())
             .map_err(|not_until| not_until.wait_time_from(self.clock.now()))
     }
+}
+
+pub(crate) fn limit(state: &AuthState, key: &str) -> Result<(), ApiError> {
+    state
+        .limiter
+        .check(key)
+        .map_err(|wait| ApiError::rate_limited(wait.as_secs()))
 }
 
 #[cfg(test)]

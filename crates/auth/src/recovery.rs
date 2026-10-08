@@ -18,12 +18,13 @@ use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 use crate::{
-    Email,
+    AuthState, Email,
     credentials::{normalize_email, validate_password},
-    handlers::{
-        AuthState, PeerAddr, begin_auth, client_ip, db_error, invalid, invalid_grant, ip_key,
-        limit, new_opaque_token, start_session, user_agent,
-    },
+    db::{begin_auth, db_error},
+    error::{invalid, invalid_grant},
+    rate_limit::limit,
+    request::{PeerAddr, client_ip, ip_key, user_agent},
+    sessions::{new_opaque_token, start_session},
 };
 
 /// Lifetime of the link.
