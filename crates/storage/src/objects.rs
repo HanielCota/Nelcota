@@ -134,6 +134,23 @@ const UPSERT: &str =
             mime_type = EXCLUDED.mime_type, etag = EXCLUDED.etag, updated_at = now()
      RETURNING id";
 
+impl StorageState {
+    /// Uploads a file as `claims` (the panel passes `service_role`);
+    /// `replace` overwrites an existing name. Returns the upload's response.
+    pub async fn upload(
+        &self,
+        claims: Claims,
+        bucket: &str,
+        name: &str,
+        headers: &HeaderMap,
+        body: Body,
+        replace: bool,
+    ) -> Result<Response, ApiError> {
+        let mode = if replace { Mode::Upsert } else { Mode::Create };
+        write(self.clone(), claims, bucket, name, headers, body, mode).await
+    }
+}
+
 async fn write(
     state: StorageState,
     claims: Claims,
@@ -470,34 +487,50 @@ pub async fn download(
     Query(query): Query<DownloadQuery>,
     headers: HeaderMap,
 ) -> Result<Response, ApiError> {
-    let bucket = path::bucket(&bucket)?;
-    let name = path::object(&name)?;
-    let object = {
-        let mut client = state.pool.get().await.map_err(ApiError::from_pool)?;
-        let tx = begin_request(&mut client, &claims)
-            .await
-            .map_err(|e| ApiError::from_db(e, claims.role()))?;
-        let sql = format!(
-            "SELECT {} FROM storage.objects WHERE bucket_id = $1 AND name = $2",
-            db::OBJECT_COLUMNS
-        );
-        let row = tx
-            .query_opt(&sql, &[&bucket, &name])
-            .await
-            .map_err(|e| ApiError::from_db(e, claims.role()))?;
-        row.as_ref().map(db::Object::from_row)
+    state
+        .download(&claims, &bucket, &name, &headers, query.download.is_some())
+        .await
+}
+
+impl StorageState {
+    /// A file under `claims`' policies (the panel passes `service_role`).
+    pub async fn download(
+        &self,
+        claims: &Claims,
+        bucket: &str,
+        name: &str,
+        headers: &HeaderMap,
+        attachment: bool,
+    ) -> Result<Response, ApiError> {
+        let bucket = path::bucket(bucket)?;
+        let name = path::object(name)?;
+        let object = {
+            let mut client = self.pool.get().await.map_err(ApiError::from_pool)?;
+            let tx = begin_request(&mut client, claims)
+                .await
+                .map_err(|e| ApiError::from_db(e, claims.role()))?;
+            let sql = format!(
+                "SELECT {} FROM storage.objects WHERE bucket_id = $1 AND name = $2",
+                db::OBJECT_COLUMNS
+            );
+            let row = tx
+                .query_opt(&sql, &[&bucket, &name])
+                .await
+                .map_err(|e| ApiError::from_db(e, claims.role()))?;
+            row.as_ref().map(db::Object::from_row)
+        }
+        .ok_or_else(serve::not_found)?;
+        serve::respond(
+            self,
+            bucket,
+            &name,
+            &object,
+            headers,
+            Access::Private,
+            attachment,
+        )
+        .await
     }
-    .ok_or_else(serve::not_found)?;
-    serve::respond(
-        &state,
-        bucket,
-        &name,
-        &object,
-        &headers,
-        Access::Private,
-        query.download.is_some(),
-    )
-    .await
 }
 
 /// `GET /storage/v1/object/public/{bucket}/{*name}`: anyone, if the bucket
@@ -642,13 +675,20 @@ pub async fn remove(
     Auth(claims): Auth,
     Path((bucket, name)): Path<(String, String)>,
 ) -> Result<Response, ApiError> {
-    let bucket = path::bucket(&bucket)?;
-    let name = path::object(&name)?;
-    let db_err = |e| ApiError::from_db(e, claims.role());
-    let version: Uuid = {
-        let mut client = state.pool.get().await.map_err(ApiError::from_pool)?;
-        let tx = begin_request(&mut client, &claims).await.map_err(db_err)?;
-        let row = tx
+    state.delete(&claims, &bucket, &name).await?;
+    Ok(StatusCode::NO_CONTENT.into_response())
+}
+
+impl StorageState {
+    /// Deletes a file under `claims`' policies: the row, then the bytes.
+    pub async fn delete(&self, claims: &Claims, bucket: &str, name: &str) -> Result<(), ApiError> {
+        let bucket = path::bucket(bucket)?;
+        let name = path::object(name)?;
+        let db_err = |e| ApiError::from_db(e, claims.role());
+        let version: Uuid = {
+            let mut client = self.pool.get().await.map_err(ApiError::from_pool)?;
+            let tx = begin_request(&mut client, claims).await.map_err(db_err)?;
+            let row = tx
             .query_opt(
                 "DELETE FROM storage.objects WHERE bucket_id = $1 AND name = $2 RETURNING version",
                 &[&bucket, &name],
@@ -656,14 +696,14 @@ pub async fn remove(
             .await
             .map_err(db_err)?
             .ok_or_else(serve::not_found)?;
-        tx.commit().await.map_err(db_err)?;
-        row.get(0)
-    };
-    state
-        .store
-        .delete_quietly(&Store::key(bucket, version))
-        .await;
-    Ok(StatusCode::NO_CONTENT.into_response())
+            tx.commit().await.map_err(db_err)?;
+            row.get(0)
+        };
+        self.store
+            .delete_quietly(&Store::key(bucket, version))
+            .await;
+        Ok(())
+    }
 }
 
 #[derive(Deserialize)]
@@ -683,24 +723,47 @@ pub async fn list(
     Path(bucket): Path<String>,
     Json(request): Json<ListRequest>,
 ) -> Result<Response, ApiError> {
-    let bucket = path::bucket(&bucket)?;
-    let prefix = path::prefix(&request.prefix)?;
-    let limit = request.limit.unwrap_or(100).clamp(1, MAX_LIST);
-    let offset = request.offset.max(0);
-    let pattern = format!(
-        "{}%",
-        prefix
-            .replace('\\', "\\\\")
-            .replace('%', "\\%")
-            .replace('_', "\\_")
-    );
-    let skip = prefix.chars().count() as i32;
-    let db_err = |e| ApiError::from_db(e, claims.role());
-    let mut client = state.pool.get().await.map_err(ApiError::from_pool)?;
-    let tx = begin_request(&mut client, &claims).await.map_err(db_err)?;
-    let row = tx
-        .query_one(
-            "WITH under AS (
+    let body = state
+        .list(
+            &claims,
+            &bucket,
+            &request.prefix,
+            request.limit,
+            request.offset,
+        )
+        .await?;
+    Ok(([(header::CONTENT_TYPE, "application/json")], body).into_response())
+}
+
+impl StorageState {
+    /// Folders and files right under `prefix`, as JSON text
+    /// (`{"folders": [...], "objects": [...]}`), under `claims`' policies.
+    pub async fn list(
+        &self,
+        claims: &Claims,
+        bucket: &str,
+        prefix: &str,
+        limit: Option<i64>,
+        offset: i64,
+    ) -> Result<String, ApiError> {
+        let bucket = path::bucket(bucket)?;
+        let prefix = path::prefix(prefix)?;
+        let limit = limit.unwrap_or(100).clamp(1, MAX_LIST);
+        let offset = offset.max(0);
+        let pattern = format!(
+            "{}%",
+            prefix
+                .replace('\\', "\\\\")
+                .replace('%', "\\%")
+                .replace('_', "\\_")
+        );
+        let skip = prefix.chars().count() as i32;
+        let db_err = |e| ApiError::from_db(e, claims.role());
+        let mut client = self.pool.get().await.map_err(ApiError::from_pool)?;
+        let tx = begin_request(&mut client, claims).await.map_err(db_err)?;
+        let row = tx
+            .query_one(
+                "WITH under AS (
                 SELECT o.*, substr(o.name, $3 + 1) AS rest
                   FROM storage.objects o
                  WHERE o.bucket_id = $1 AND o.name LIKE $2 ESCAPE '\\'
@@ -720,10 +783,10 @@ pub async fn list(
                       FROM (SELECT * FROM under WHERE strpos(rest, '/') = 0
                              ORDER BY name LIMIT $4 OFFSET $5) page), '[]')
              )::text",
-            &[&bucket, &pattern, &skip, &limit, &offset],
-        )
-        .await
-        .map_err(db_err)?;
-    let body: String = row.get(0);
-    Ok(([(header::CONTENT_TYPE, "application/json")], body).into_response())
+                &[&bucket, &pattern, &skip, &limit, &offset],
+            )
+            .await
+            .map_err(db_err)?;
+        Ok(row.get(0))
+    }
 }

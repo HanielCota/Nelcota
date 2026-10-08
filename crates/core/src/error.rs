@@ -69,6 +69,14 @@ impl ApiError {
         self.status
     }
 
+    pub fn code(&self) -> &'static str {
+        self.code
+    }
+
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+
     /// Maps a Postgres error. Missing privileges become 401 for `anon` (must
     /// sign in) and 403 for the other roles, as in PostgREST.
     pub fn from_db(err: tokio_postgres::Error, role: Role) -> Self {

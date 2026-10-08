@@ -24,6 +24,7 @@ use nelcota_auth::{Keys, SharedVerifier};
 use nelcota_core::Config;
 use tokio::sync::Semaphore;
 
+pub use buckets::mime_entry_ok;
 pub use gc::{collect as collect_orphans, spawn_collector};
 pub use store::{Store, StoreError};
 
@@ -50,6 +51,18 @@ impl StorageState {
             uploads: Arc::new(Semaphore::new(CONCURRENT_UPLOADS)),
         }
     }
+}
+
+impl StorageState {
+    /// `disk` or `s3`.
+    pub fn backend(&self) -> &'static str {
+        if self.store.is_s3() { "s3" } else { "disk" }
+    }
+}
+
+/// Whether `id` is a valid bucket name (D77).
+pub fn valid_bucket(id: &str) -> bool {
+    path::bucket(id).is_ok()
 }
 
 impl FromRef<StorageState> for SharedVerifier {
