@@ -1705,6 +1705,57 @@ async fn panel_changes_become_a_migration_recognised_by_migrate() {
 }
 
 #[tokio::test]
+async fn concurrent_migration_exports_record_pending_changes_once() {
+    let app = TestApp::spawn().await;
+    let cookie = login(&app).await;
+    let created = send(
+        &app,
+        Method::POST,
+        "/admin/api/tables",
+        &cookie,
+        json!({ "table": simple_table("concurrent_export") }),
+    )
+    .await;
+    assert_eq!(created.status, StatusCode::OK);
+    let (first, second) = tokio::join!(
+        send(
+            &app,
+            Method::POST,
+            "/admin/api/migrations",
+            &cookie,
+            json!({ "name": "first_export" })
+        ),
+        send(
+            &app,
+            Method::POST,
+            "/admin/api/migrations",
+            &cookie,
+            json!({ "name": "second_export" })
+        )
+    );
+    let (winner, loser) = if first.status == StatusCode::OK {
+        (first, second)
+    } else {
+        (second, first)
+    };
+    assert_eq!(winner.status, StatusCode::OK);
+    assert_eq!(loser.status, StatusCode::CONFLICT);
+    assert_eq!(loser.body["code"], "no_pending_changes");
+    let listed = get(&app, "/admin/api/migrations", &cookie).await;
+    assert_eq!(listed.body["pending"], json!([]));
+    assert_eq!(listed.body["migrations"].as_array().unwrap().len(), 1);
+    let filename = winner.body["filename"]
+        .as_str()
+        .unwrap()
+        .strip_suffix(".sql")
+        .unwrap();
+    assert_eq!(
+        refinery_migrate(&app, &[(filename, winner.body["sql"].as_str().unwrap())]).await,
+        Ok(0)
+    );
+}
+
+#[tokio::test]
 async fn generated_migration_never_collides_with_an_unapplied_file() {
     let dir = std::env::temp_dir().join(format!("nelcota-migrations-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&dir).unwrap();
