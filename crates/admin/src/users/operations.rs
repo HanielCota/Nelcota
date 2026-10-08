@@ -91,6 +91,24 @@ pub(super) async fn delete(pool: &Pool, id: &str) -> Result<(), ApiError> {
     Ok(())
 }
 
+/// Marks the email as confirmed; already confirmed accounts keep their date.
+pub(super) async fn confirm_email(pool: &Pool, id: &str) -> Result<(), ApiError> {
+    check_id(id)?;
+    let client = pool.get().await?;
+    let updated = client
+        .execute(
+            "UPDATE auth.users SET email_confirmed_at = coalesce(email_confirmed_at, now())
+             WHERE id = $1::text::uuid",
+            &[&id],
+        )
+        .await?;
+    if updated == 0 {
+        return Err(user_not_found());
+    }
+    tracing::info!("email confirmed by the panel");
+    Ok(())
+}
+
 fn user_not_found() -> ApiError {
     ApiError::not_found("user_not_found", "user not found")
 }
@@ -130,7 +148,10 @@ pub(super) async fn create(
     let client = pool.get().await?;
     let row = client
         .query_one(
-            "INSERT INTO auth.users (email, encrypted_password) VALUES ($1, $2) RETURNING id::text",
+            // The administrator vouches for the address: with signup
+            // confirmation on, the account can sign in right away.
+            "INSERT INTO auth.users (email, encrypted_password, email_confirmed_at)
+             VALUES ($1, $2, now()) RETURNING id::text",
             &[&email, &hash],
         )
         .await

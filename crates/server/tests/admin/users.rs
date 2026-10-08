@@ -272,3 +272,81 @@ async fn create_user_and_reset_password_from_the_panel() {
     .await;
     assert_eq!(bad_id.status, StatusCode::BAD_REQUEST);
 }
+
+async fn confirm(app: &TestApp, cookie: &str, id: &str) -> Reply {
+    send(
+        app,
+        Method::POST,
+        &format!("/admin/api/users/{id}/confirm"),
+        cookie,
+        json!({}),
+    )
+    .await
+}
+
+#[tokio::test]
+async fn panel_accounts_are_confirmed_and_pending_ones_can_be_confirmed() {
+    let app = TestApp::spawn_with(Options {
+        confirm_email: true,
+        ..Options::default()
+    })
+    .await;
+    let cookie = login(&app).await;
+
+    // Created by the administrator: signs in right away, even with
+    // confirmation on.
+    let created = send(
+        &app,
+        Method::POST,
+        "/admin/api/users",
+        &cookie,
+        json!({ "email": "staff@example.com", "password": "strong-password-123" }),
+    )
+    .await;
+    assert_eq!(created.status, StatusCode::CREATED, "{}", created.body);
+    assert_eq!(
+        password_login(&app, "staff@example.com", "strong-password-123")
+            .await
+            .status,
+        StatusCode::OK
+    );
+
+    // Signed up on their own: held until confirmed, here by the panel.
+    let pending = app
+        .post(
+            "/auth/v1/signup",
+            None,
+            json!({ "email": "pending@example.com", "password": "strong-password-123" }),
+        )
+        .await;
+    let id = pending.body["user"]["id"].as_str().unwrap().to_owned();
+    let listed = get(&app, "/admin/api/users?q=pending", &cookie).await;
+    assert!(listed.body["users"][0]["email_confirmed_at"].is_null());
+    assert_eq!(
+        password_login(&app, "pending@example.com", "strong-password-123")
+            .await
+            .body["code"],
+        "email_not_confirmed"
+    );
+
+    assert_eq!(confirm(&app, &cookie, &id).await.status, StatusCode::OK);
+    let listed = get(&app, "/admin/api/users?q=pending", &cookie).await;
+    let confirmed_at = listed.body["users"][0]["email_confirmed_at"].clone();
+    assert!(confirmed_at.is_string());
+    assert_eq!(
+        password_login(&app, "pending@example.com", "strong-password-123")
+            .await
+            .status,
+        StatusCode::OK
+    );
+
+    // Idempotent: the first confirmation date stays.
+    assert_eq!(confirm(&app, &cookie, &id).await.status, StatusCode::OK);
+    let listed = get(&app, "/admin/api/users?q=pending", &cookie).await;
+    assert_eq!(listed.body["users"][0]["email_confirmed_at"], confirmed_at);
+
+    let missing = confirm(&app, &cookie, "054f8cd2-decb-4c78-91a1-f351bd8f5b92").await;
+    assert_eq!(missing.body["code"], "user_not_found");
+    let invalid = confirm(&app, &cookie, "not-a-uuid").await;
+    assert_eq!(invalid.body["code"], "invalid_id");
+}
