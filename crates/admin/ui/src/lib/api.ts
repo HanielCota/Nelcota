@@ -24,6 +24,21 @@ async function request<T>(method: string, path: string, body?: unknown, signal?:
     headers: body === undefined ? {} : { 'content-type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),
   })
+  return parse<T>(res, path)
+}
+
+/** Sends a file as the raw request body (storage uploads). */
+export async function uploadFile<T>(path: string, file: File): Promise<T> {
+  const res = await fetch(`/admin/api${path}`, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'content-type': file.type || 'application/octet-stream' },
+    body: file,
+  })
+  return parse<T>(res, path)
+}
+
+async function parse<T>(res: Response, path: string): Promise<T> {
   const text = await res.text()
   let data: unknown = null
   try {

@@ -8,6 +8,7 @@ const titles: Record<string, MessageKey> = {
   '/sql': 'shell.pages.sql',
   '/migrations': 'shell.pages.migrations',
   '/users': 'shell.pages.users',
+  '/storage': 'shell.pages.storage',
   '/policies': 'shell.pages.policies',
   '/projects': 'shell.pages.projects',
   '/connect': 'shell.pages.connect',
@@ -19,6 +20,8 @@ export type Crumb = { label: string; path?: string }
 export function crumbsFor(path: string): Crumb[] {
   const table = match('/tables/:name', path)
   if (table) return [{ label: t('shell.pages.tables'), path: '/tables' }, { label: table.name }]
+  const bucket = match('/storage/:bucket', path)
+  if (bucket) return [{ label: t('shell.pages.storage'), path: '/storage' }, { label: bucket.bucket }]
   const structure = match('/tables/:name/structure', path)
   if (structure) {
     return [

@@ -66,6 +66,23 @@ const ptBR = {
   policy_check_not_allowed: 'Policy de {command} não usa WITH CHECK: nenhuma linha é gravada (use USING).',
   policy_insert_needs_check: 'Policy de INSERT precisa de WITH CHECK.',
   policy_needs_using: 'A policy precisa da expressão USING.',
+
+  // Storage
+  storage_disabled: 'Storage desligado: defina NELCOTA_STORAGE_BACKEND.',
+  invalid_bucket_name: 'Nome de bucket com letras minúsculas, números, - e _ (até 63). public, sign e list são reservados.',
+  invalid_mime_type: "Tipo inválido: '{type}'. Use image/png ou image/*.",
+  invalid_size_limit: 'O limite precisa ser maior que zero.',
+  bucket_exists: "Já existe um bucket '{bucket}'.",
+  bucket_not_found: 'Bucket não encontrado.',
+  bucket_not_empty: 'O bucket ainda tem arquivos: apague-os antes.',
+  invalid_path: 'Nome de arquivo inválido: sem barras duplas, . ou .. e caracteres de controle.',
+  object_not_found: 'Arquivo não encontrado.',
+  object_exists: 'Já existe um arquivo com este nome.',
+  file_too_large: 'O arquivo passa do limite deste bucket.',
+  mime_type_not_allowed: 'Este bucket não aceita esse tipo de arquivo.',
+  storage_full: 'Sem espaço: a cota de storage ou o disco do servidor está cheio.',
+  upload_timeout: 'O envio demorou demais.',
+  upload_interrupted: 'O envio foi interrompido.',
 }
 
 const en: Messages<typeof ptBR> = {
@@ -125,6 +142,22 @@ const en: Messages<typeof ptBR> = {
   policy_check_not_allowed: 'A {command} policy does not use WITH CHECK: no row is written (use USING).',
   policy_insert_needs_check: 'An INSERT policy needs WITH CHECK.',
   policy_needs_using: 'The policy needs a USING expression.',
+
+  storage_disabled: 'Storage is off: set NELCOTA_STORAGE_BACKEND.',
+  invalid_bucket_name: 'Bucket name with lowercase letters, digits, - and _ (up to 63). public, sign and list are reserved.',
+  invalid_mime_type: "Invalid type: '{type}'. Use image/png or image/*.",
+  invalid_size_limit: 'The limit must be greater than zero.',
+  bucket_exists: "A bucket '{bucket}' already exists.",
+  bucket_not_found: 'Bucket not found.',
+  bucket_not_empty: 'The bucket still has files: delete them first.',
+  invalid_path: 'Invalid file name: no double slashes, . or .. and no control characters.',
+  object_not_found: 'File not found.',
+  object_exists: 'A file with this name already exists.',
+  file_too_large: "The file exceeds this bucket's limit.",
+  mime_type_not_allowed: 'This bucket does not accept this file type.',
+  storage_full: "No room: the storage quota or the server's disk is full.",
+  upload_timeout: 'The upload took too long.',
+  upload_interrupted: 'The upload was interrupted.',
 }
 
 export default { 'pt-BR': ptBR, en }

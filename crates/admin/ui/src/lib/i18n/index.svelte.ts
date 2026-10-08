@@ -13,6 +13,7 @@ import shell from './messages/shell'
 import login from './messages/login'
 import overview from './messages/overview'
 import users from './messages/users'
+import storage from './messages/storage'
 import projects from './messages/projects'
 import profile from './messages/profile'
 import policies from './messages/policies'
@@ -32,6 +33,7 @@ const catalogs = {
   login,
   overview,
   users,
+  storage,
   projects,
   profile,
   policies,

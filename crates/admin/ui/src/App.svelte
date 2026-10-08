@@ -10,6 +10,8 @@
   import Overview from '$lib/pages/Overview.svelte'
   import TableEditor from '$lib/pages/TableEditor.svelte'
   import Users from '$lib/pages/Users.svelte'
+  import Storage from '$lib/pages/Storage.svelte'
+  import StorageBucket from '$lib/pages/StorageBucket.svelte'
   import Policies from '$lib/pages/Policies.svelte'
   import Migrations from '$lib/pages/Migrations.svelte'
   import NotFound from '$lib/pages/NotFound.svelte'
@@ -46,6 +48,7 @@
   const tableName = $derived(match('/tables/:name', path)?.name ?? structureName)
   // Switching tabs (Data/Structure) keeps the editor mounted; switching tables
   // does not (sort, page and selection belong to each table).
+  const bucketName = $derived(match('/storage/:bucket', path)?.bucket)
   const pageKey = $derived(tableName ? `/tables/${tableName}` : route.path)
 
   // Tab title: the current page (or the login) followed by the product name.
@@ -96,6 +99,10 @@
               <Migrations />
             {:else if path === '/users'}
               <Users />
+            {:else if path === '/storage'}
+              <Storage />
+            {:else if bucketName}
+              <StorageBucket bucket={bucketName} />
             {:else if path === '/policies'}
               <Policies />
             {:else if path === '/projects'}
