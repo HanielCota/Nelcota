@@ -246,6 +246,7 @@ impl TestApp {
                 issuer: "nelcota-test".into(),
             }),
             migrations_dir: options.migrations_dir.clone(),
+            storage: None,
         };
         let outbox = Arc::new(Outbox::default());
         let auth = AuthState {
@@ -274,6 +275,10 @@ impl TestApp {
             store,
             options.storage.clone(),
         );
+        let panel = nelcota_admin::AdminState {
+            storage: Some(storage.clone()),
+            ..panel
+        };
         TestApp {
             router: app(
                 state,
