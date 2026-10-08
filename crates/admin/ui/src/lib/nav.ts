@@ -7,6 +7,7 @@ import Users from '@lucide/svelte/icons/users'
 import ShieldCheck from '@lucide/svelte/icons/shield-check'
 import Boxes from '@lucide/svelte/icons/boxes'
 import Plug from '@lucide/svelte/icons/plug'
+import HardDrive from '@lucide/svelte/icons/hard-drive'
 import type { MessageKey } from './i18n/index.svelte'
 import { route } from './router.svelte'
 
@@ -23,6 +24,7 @@ export const navGroups: NavGroup[] = [
       { title: 'shell.pages.tables', path: '/tables', icon: Table2 },
       { title: 'shell.pages.sql', path: '/sql', icon: SquareTerminal },
       { title: 'shell.pages.migrations', path: '/migrations', icon: History },
+      { title: 'shell.pages.storage', path: '/storage', icon: HardDrive },
     ],
   },
   {

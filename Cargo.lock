@@ -2051,6 +2051,7 @@ dependencies = [
  "nelcota-api",
  "nelcota-auth",
  "nelcota-core",
+ "nelcota-storage",
  "refinery",
  "rust-embed",
  "serde",

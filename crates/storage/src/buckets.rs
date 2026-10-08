@@ -45,20 +45,8 @@ impl Settings {
         if self.file_size_limit.is_some_and(|l| l <= 0) {
             return Err(invalid("file_size_limit must be > 0"));
         }
-        let entry_ok = |entry: &String| {
-            let mut parts = entry.split('/');
-            let token = |s: &str| {
-                !s.is_empty()
-                    && s.bytes()
-                        .all(|b| b.is_ascii_alphanumeric() || b"!#$&-^_.+".contains(&b))
-            };
-            match (parts.next(), parts.next(), parts.next()) {
-                (Some(kind), Some(sub), None) => token(kind) && (sub == "*" || token(sub)),
-                _ => false,
-            }
-        };
         if let Some(list) = &self.allowed_mime_types
-            && !list.iter().all(entry_ok)
+            && !list.iter().all(|entry| mime_entry_ok(entry))
         {
             return Err(invalid(
                 "allowed_mime_types holds types like 'image/png' or 'image/*'",
@@ -71,6 +59,20 @@ impl Settings {
         self.allowed_mime_types
             .as_ref()
             .map(|list| list.iter().map(|m| m.to_ascii_lowercase()).collect())
+    }
+}
+
+/// An `allowed_mime_types` entry: `type/subtype` or `type/*`.
+pub fn mime_entry_ok(entry: &str) -> bool {
+    let token = |s: &str| {
+        !s.is_empty()
+            && s.bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b"!#$&-^_.+".contains(&b))
+    };
+    let mut parts = entry.split('/');
+    match (parts.next(), parts.next(), parts.next()) {
+        (Some(kind), Some(sub), None) => token(kind) && (sub == "*" || token(sub)),
+        _ => false,
     }
 }
 

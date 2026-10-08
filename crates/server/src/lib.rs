@@ -83,7 +83,7 @@ pub fn app(
         .merge(nelcota_api::router())
         .with_state(state)
         .merge(nelcota_auth::router(auth));
-    if let Some(admin) = admin {
+    if let Some(admin) = admin.clone() {
         router = router.merge(nelcota_admin::router(admin));
     }
     router = router
@@ -96,6 +96,9 @@ pub fn app(
     // with their own cap) and gzip (files are served byte for byte, by range).
     if let Some(storage) = storage {
         router = router.merge(nelcota_storage::router(storage));
+        if let Some(admin) = admin {
+            router = router.merge(nelcota_admin::upload_router(admin));
+        }
     }
     router
         .layer(cors)

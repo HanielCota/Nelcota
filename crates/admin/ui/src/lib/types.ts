@@ -148,3 +148,39 @@ export type MigrationsData = {
 
 /** `POST /admin/api/migrations` */
 export type ExportedMigration = { version: number; filename: string; sql: string; message: string }
+
+/** `GET /admin/api/storage` */
+export type StorageOverview =
+  | { enabled: false }
+  | {
+      enabled: true
+      backend: 'disk' | 's3'
+      max_file_size: number
+      max_total_size: number | null
+      /** Origin of public file URLs, when it is not the API's own. */
+      public_url: string | null
+      buckets: Bucket[]
+    }
+
+export type Bucket = {
+  id: string
+  public: boolean
+  file_size_limit: number | null
+  allowed_mime_types: string[] | null
+  created_at: string
+  files: number
+  bytes: number
+}
+
+export type StoredFile = {
+  id: string
+  /** Full path inside the bucket. */
+  name: string
+  size: number
+  mime_type: string
+  owner: string | null
+  updated_at: string
+}
+
+/** `GET /admin/api/storage/buckets/{id}/objects` */
+export type StorageListing = { folders: string[]; objects: StoredFile[]; has_next: boolean }

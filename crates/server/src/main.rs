@@ -85,6 +85,22 @@ async fn serve(config: Config) -> anyhow::Result<()> {
             recovery_url: mail.map(|m| m.recovery_url.to_owned()),
         }),
     };
+    let storage = match nelcota_storage::Store::from_config(&config)
+        .context("could not open the file storage")?
+    {
+        Some(store) => {
+            let store = Arc::new(store);
+            tracing::info!(backend = ?config.storage_backend, "file storage enabled");
+            nelcota_storage::spawn_collector(pool.clone(), store.clone());
+            Some(nelcota_storage::StorageState::new(
+                pool.clone(),
+                keys.clone(),
+                store,
+                nelcota_storage::StorageSettings::from_config(&config),
+            ))
+        }
+        None => None,
+    };
     let admin = match (&config.admin_email, &config.admin_password_hash) {
         (Some(email), Some(hash)) if !email.is_empty() && !hash.expose().is_empty() => {
             Some(nelcota_admin::AdminState {
@@ -107,6 +123,7 @@ async fn serve(config: Config) -> anyhow::Result<()> {
                 migrations_dir: nelcota_admin::default_migrations_dir(
                     config.migrations_dir.clone(),
                 ),
+                storage: storage.clone(),
             })
         }
         _ => {
@@ -115,22 +132,6 @@ async fn serve(config: Config) -> anyhow::Result<()> {
             );
             None
         }
-    };
-    let storage = match nelcota_storage::Store::from_config(&config)
-        .context("could not open the file storage")?
-    {
-        Some(store) => {
-            let store = Arc::new(store);
-            tracing::info!(backend = ?config.storage_backend, "file storage enabled");
-            nelcota_storage::spawn_collector(pool.clone(), store.clone());
-            Some(nelcota_storage::StorageState::new(
-                pool.clone(),
-                keys.clone(),
-                store,
-                nelcota_storage::StorageSettings::from_config(&config),
-            ))
-        }
-        None => None,
     };
     let router = app(
         state,
