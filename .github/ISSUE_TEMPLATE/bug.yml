@@ -1,0 +1,38 @@
+name: Bug report
+description: Something does not work as documented.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected and what you got (error messages, status codes).
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce
+      description: The smallest steps, SQL or request that shows it.
+      render: shell
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `nelcota --version`, or the commit.
+    validations:
+      required: true
+  - type: dropdown
+    id: runtime
+    attributes:
+      label: Where it runs
+      options:
+        - Docker (nelcota up)
+        - systemd (--runtime systemd)
+        - nelcota dev
+        - Other
+  - type: markdown
+    attributes:
+      value: "**Security issue?** Do not file it here: see SECURITY.md."

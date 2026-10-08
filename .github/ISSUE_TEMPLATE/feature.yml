@@ -1,0 +1,21 @@
+name: Feature request
+description: Something Nelcota should do.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What you are trying to do and why it is hard today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you propose
+      description: How it could work. If it touches a decision in docs/decisions.md, say which.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: Plain SQL, a policy or another tool that gets close.
