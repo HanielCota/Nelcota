@@ -652,6 +652,18 @@ share panel request helpers and keep feature scenarios under one admin suite.
 This changes source navigation without introducing another runtime, crate
 layer, HTTP contract or transaction owner (docs/architecture.md).
 
+**D88. Facades expose complete operations in the modular monolith.** The
+existing capability crates and single binary remain the architecture. Bucket
+reads and mutations now have one storage owner shared by the public API and
+panel, with typed records and errors. HTTP adapters keep their existing wire
+contracts and input normalization; PostgreSQL still enforces privileges, RLS
+and nonempty-bucket deletion through its foreign key. Panel account operations
+own validation, SQL and password/session transactions independently of HTTP.
+Reuse the existing disk/S3 and mail adapters where implementations vary; add no
+generic repository, dependency container or extra crate layer. Integration
+tests exercise bucket policies through the operation interface and prove that
+a failed session revocation rolls back the password change.
+
 ## Email links
 
 **D89. Signup confirmation and magic links reuse the recovery link.** Two
