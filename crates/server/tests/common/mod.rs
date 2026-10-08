@@ -103,6 +103,8 @@ pub struct Options {
     pub max_rows: Option<i64>,
     /// Storage limits (on a disk store in a temporary directory).
     pub storage: nelcota_storage::StorageSettings,
+    /// Another store instead of the temporary directory (S3 tests).
+    pub store: Option<Arc<nelcota_storage::Store>>,
 }
 
 impl Default for Options {
@@ -121,6 +123,7 @@ impl Default for Options {
                 public_url: None,
                 upload_timeout: Duration::from_secs(30),
             },
+            store: None,
         }
     }
 }
@@ -261,10 +264,14 @@ impl TestApp {
             }),
         };
         let storage_dir = std::env::temp_dir().join(format!("nelcota-storage-{}", Uuid::new_v4()));
+        let store = match options.store.clone() {
+            Some(store) => store,
+            None => Arc::new(nelcota_storage::Store::disk(storage_dir.clone()).unwrap()),
+        };
         let storage = nelcota_storage::StorageState::new(
             pool.clone(),
             keys.clone(),
-            Arc::new(nelcota_storage::Store::disk(storage_dir.clone()).unwrap()),
+            store,
             options.storage.clone(),
         );
         TestApp {

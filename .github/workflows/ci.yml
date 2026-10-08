@@ -21,6 +21,25 @@ jobs:
       - run: cargo clippy --all-targets -- -D warnings
       # Integration tests start Postgres 17 via testcontainers (the runner's Docker).
       - run: cargo test --all
+      # Storage on a real S3-compatible service (presigned URLs, multipart).
+      - name: storage on S3
+        env:
+          AWS_ACCESS_KEY_ID: nelcotatest
+          AWS_SECRET_ACCESS_KEY: nelcotatestsecret
+          AWS_DEFAULT_REGION: us-east-1
+          NELCOTA_TEST_S3_ENDPOINT: http://127.0.0.1:9100
+          NELCOTA_TEST_S3_BUCKET: nelcota-files
+          NELCOTA_TEST_S3_ACCESS_KEY_ID: nelcotatest
+          NELCOTA_TEST_S3_SECRET_ACCESS_KEY: nelcotatestsecret
+        run: |
+          docker run -d --name s3 -p 127.0.0.1:9100:9000 \
+            -e RUSTFS_ACCESS_KEY=nelcotatest -e RUSTFS_SECRET_KEY=nelcotatestsecret \
+            rustfs/rustfs:1.0.1
+          for i in $(seq 1 30); do
+            aws --endpoint-url "$NELCOTA_TEST_S3_ENDPOINT" s3 mb s3://nelcota-files && break
+            sleep 1
+          done
+          cargo test -p nelcota-server --test storage_s3 -- --ignored
 
   supply-chain:
     runs-on: ubuntu-latest
