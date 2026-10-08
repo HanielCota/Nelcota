@@ -1,5 +1,37 @@
-//! Tables panel handlers.
-use super::*;
+//! Table listing, row reads and writes through the validated query compiler.
+use super::catalog::{estimates, kind, policy_counts, rls_json, row_count, table_or_404};
+use crate::{AdminState, ApiError, error::user_query_error};
+use axum::{
+    Json,
+    extract::{Path, Query, State},
+};
+use futures_util::future::try_join;
+use nelcota_api::{
+    Catalog,
+    catalog::{Table, TableKind},
+    query,
+};
+use serde::Deserialize;
+use serde_json::{Map, Value, json, value::RawValue};
+use std::collections::HashMap;
+use tokio_postgres::Client;
+
+type ApiResult<T = Value> = Result<Json<T>, ApiError>;
+pub(super) type Row = HashMap<String, Box<RawValue>>;
+const MAX_PAGE_SIZE: i64 = 500;
+
+/// Text of a JSON value coming from Postgres, without going through `f64`
+/// (numeric keeps every digit). `None` = NULL.
+pub(crate) fn raw_text(value: Option<&RawValue>) -> Option<String> {
+    let raw = value?.get();
+    if raw == "null" {
+        None
+    } else if raw.starts_with('"') {
+        serde_json::from_str::<String>(raw).ok()
+    } else {
+        Some(raw.to_owned())
+    }
+}
 
 pub async fn tables(
     State(state): State<AdminState>,
@@ -127,16 +159,6 @@ pub(crate) fn invalid_query(err: impl std::fmt::Display) -> ApiError {
     let detail = err.to_string();
     ApiError::bad_request("invalid_query", format!("invalid query: {detail}"))
         .params(json!({ "detail": detail }))
-}
-
-/// Error of a query built from what the admin typed (filter value of the
-/// wrong type, constraint violation…): 400 with Postgres' text, no code.
-pub(crate) fn user_query_error(err: tokio_postgres::Error) -> ApiError {
-    ApiError::raw(
-        axum::http::StatusCode::BAD_REQUEST,
-        err.as_db_error()
-            .map_or_else(|| err.to_string(), |db| db.message().to_owned()),
-    )
 }
 
 /// Count with a time cap: an unindexed filter on a big table must not freeze
@@ -444,4 +466,24 @@ pub async fn delete_rows(
     Ok(Json(
         json!({ "message": format!("{total} row(s) deleted"), "count": total }),
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn values_keep_postgres_text() {
+        let raw = |s: &str| serde_json::from_str::<Box<RawValue>>(s).unwrap();
+        assert_eq!(raw_text(Some(&raw("\"<b>\""))).as_deref(), Some("<b>"));
+        assert_eq!(
+            raw_text(Some(&raw("12345678901234567890.10"))).as_deref(),
+            Some("12345678901234567890.10")
+        );
+        assert_eq!(raw_text(Some(&raw("null"))), None);
+        assert_eq!(
+            raw_text(Some(&raw("{\"a\": 1}"))).as_deref(),
+            Some("{\"a\": 1}")
+        );
+    }
 }

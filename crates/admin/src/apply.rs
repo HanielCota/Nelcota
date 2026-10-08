@@ -2,7 +2,7 @@
 
 use axum::Json;
 
-use crate::{AdminState, ApiError, api::user_query_error};
+use crate::{AdminState, ApiError, error::user_query_error};
 
 /// What a DDL batch did. Recorded in `nelcota.panel_changes` as kind and
 /// target, so the panel describes the change in the viewer's language; the

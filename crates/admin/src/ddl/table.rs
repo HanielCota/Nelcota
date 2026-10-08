@@ -8,7 +8,7 @@ use super::{
     DataType, GrantDef, Result, error, expression, grant, invalid, literal, qualified,
     validate_name,
 };
-use crate::structure::{ColumnInfo, Structure};
+use crate::tables::structure::{ColumnInfo, Structure};
 
 /// Context for validating types: the exposed schema and its enums.
 pub struct Context<'a> {
@@ -274,7 +274,7 @@ fn added_column(col: &ColumnDef) -> ColumnInfo {
 fn column_exists<'a>(
     current: &'a Structure,
     name: &str,
-) -> Result<&'a crate::structure::ColumnInfo> {
+) -> Result<&'a crate::tables::structure::ColumnInfo> {
     current.column(name).ok_or_else(|| {
         error(
             "column_not_found",
@@ -455,7 +455,7 @@ pub fn drop(schema: &str, name: &str, cascade: bool) -> Vec<String> {
 mod tests {
     use super::*;
     use crate::ddl::{ApiRole, Privilege};
-    use crate::structure::ForeignKeyRef;
+    use crate::tables::structure::ForeignKeyRef;
 
     const ENUMS: &[String] = &[];
 

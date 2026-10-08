@@ -10,31 +10,29 @@
 //!   sees and changes everything, as in `psql`. Table writes reuse the API's
 //!   SQL builder (identifiers only from the catalog, values as parameters).
 
-mod api;
 mod apply;
 mod assets;
 mod auth;
 pub mod contracts;
 mod ddl;
 mod error;
-mod export;
 mod middleware;
 mod migrations;
-mod policies_ddl;
+mod overview;
+mod policies;
 mod profile;
 mod projects;
 mod sql;
 mod sso;
 mod state;
 mod storage;
-mod structure;
-mod tables_ddl;
+mod tables;
 mod tokens;
 mod users;
 
 pub use migrations::default_dir as default_migrations_dir;
 pub use projects::HostLink;
-pub use sql::SqlExecutor;
+pub use sql::{SqlBusy, SqlExecutor};
 pub use sso::Sso;
 pub use tokens::TokenIssuer;
 
@@ -55,43 +53,35 @@ pub fn router(state: AdminState) -> Router {
     let protected = Router::new()
         .route("/admin/api/session", get(session))
         .route("/admin/api/logout", post(logout))
-        .route("/admin/api/overview", get(api::overview))
-        .route("/admin/api/schema", get(api::schema))
-        .route("/admin/api/types", get(tables_ddl::types))
+        .route("/admin/api/overview", get(overview::overview))
+        .route("/admin/api/schema", get(sql::schema))
+        .route("/admin/api/types", get(tables::types))
         .route(
             "/admin/api/tables",
-            get(api::tables).post(tables_ddl::create),
+            get(tables::tables).post(tables::create),
         )
         .route(
             "/admin/api/tables/{name}",
-            get(api::table)
-                .patch(tables_ddl::alter)
-                .delete(tables_ddl::drop),
+            get(tables::table).patch(tables::alter).delete(tables::drop),
         )
-        .route("/admin/api/tables/{name}/export", get(export::export))
-        .route(
-            "/admin/api/tables/{name}/structure",
-            get(structure::structure),
-        )
+        .route("/admin/api/tables/{name}/export", get(tables::export))
+        .route("/admin/api/tables/{name}/structure", get(tables::structure))
         .route(
             "/admin/api/tables/{name}/rows",
-            post(api::insert_row)
-                .patch(api::update_row)
-                .delete(api::delete_rows),
+            post(tables::insert_row)
+                .patch(tables::update_row)
+                .delete(tables::delete_rows),
         )
         .route("/admin/api/sql", post(sql::run))
-        .route("/admin/api/users", get(api::users).post(users::create))
+        .route("/admin/api/users", get(users::users).post(users::create))
         .route("/admin/api/users/{id}/password", put(users::set_password))
-        .route("/admin/api/users/{id}/revoke", post(api::revoke_sessions))
-        .route("/admin/api/users/{id}", delete(api::delete_user))
-        .route("/admin/api/policies", get(api::policies))
-        .route(
-            "/admin/api/tables/{name}/policies",
-            post(policies_ddl::create),
-        )
+        .route("/admin/api/users/{id}/revoke", post(users::revoke_sessions))
+        .route("/admin/api/users/{id}", delete(users::delete_user))
+        .route("/admin/api/policies", get(policies::policies))
+        .route("/admin/api/tables/{name}/policies", post(policies::create))
         .route(
             "/admin/api/tables/{name}/policies/{policy}",
-            put(policies_ddl::replace).delete(policies_ddl::drop),
+            put(policies::replace).delete(policies::drop),
         )
         .route("/admin/api/projects", get(projects::list))
         .route("/admin/api/projects/status", get(projects::status))

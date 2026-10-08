@@ -1,5 +1,13 @@
-//! Policies panel handlers.
-use super::*;
+//! Policy listing and exposure diagnostics.
+use crate::{
+    AdminState, ApiError,
+    tables::catalog::{exposed, rls_json},
+};
+use axum::{Json, extract::State};
+use nelcota_api::catalog::TableKind;
+use serde_json::{Value, json};
+use std::collections::HashMap;
+type ApiResult<T> = Result<Json<T>, ApiError>;
 
 pub async fn policies(
     State(state): State<AdminState>,

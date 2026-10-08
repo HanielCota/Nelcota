@@ -1,8 +1,8 @@
 //! HTTP adaptation for the SQL editor.
 mod executor;
-pub use executor::SqlExecutor;
+pub use executor::{SqlBusy, SqlExecutor};
 
-use crate::AdminState;
+use crate::{AdminState, ApiError};
 use axum::{
     Json,
     extract::State,
@@ -10,6 +10,9 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use serde::Deserialize;
+use serde_json::{Map, json};
+
+type ApiResult<T> = Result<Json<T>, ApiError>;
 
 #[derive(Deserialize)]
 pub struct SqlRequest {
@@ -23,4 +26,31 @@ pub async fn run(State(state): State<AdminState>, Json(request): Json<SqlRequest
             "error": "SQL execution is busy; wait for a running query to finish", "code": "sql_busy"
         }))).into_response(),
     }
+}
+
+/// Tables and columns for CodeMirror's autocomplete (`schema.table`).
+pub async fn schema(
+    State(state): State<AdminState>,
+) -> ApiResult<crate::contracts::SchemaResponse> {
+    let catalog = state.catalog.get();
+    let mut tables = Map::new();
+    for table in catalog.tables.values() {
+        let columns: Vec<&str> = table.columns.iter().map(|c| c.name.as_str()).collect();
+        tables.insert(table.name.clone(), json!(columns));
+    }
+    let client = state.db.get().await?;
+    let rows = client
+        .query(
+            "SELECT table_schema || '.' || table_name, array_agg(column_name::text ORDER BY ordinal_position)
+             FROM information_schema.columns WHERE table_schema = 'auth'
+             GROUP BY 1",
+            &[],
+        )
+        .await?;
+    for row in rows {
+        tables.insert(row.get(0), json!(row.get::<_, Vec<String>>(1)));
+    }
+    crate::contracts::response::<crate::contracts::SchemaResponse>(
+        json!({ "schema": catalog.schema, "tables": tables }),
+    )
 }

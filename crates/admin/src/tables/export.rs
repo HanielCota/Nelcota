@@ -16,7 +16,11 @@ use serde::Deserialize;
 
 use crate::{
     AdminState, ApiError,
-    api::{Row, RowsQuery, build_request, raw_text, table_or_404, user_query_error},
+    error::user_query_error,
+    tables::{
+        catalog::table_or_404,
+        rows::{Row, RowsQuery, build_request, raw_text},
+    },
 };
 
 type BoxError = Box<dyn Error + Send + Sync>;

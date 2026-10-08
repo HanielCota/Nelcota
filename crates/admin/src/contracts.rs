@@ -203,10 +203,10 @@ pub fn exports() -> (String, String) {
         SqlResponse
     );
     export!(
-        crate::structure::ForeignKeyRef,
-        crate::structure::ColumnInfo,
-        crate::structure::Grant,
-        crate::structure::Structure,
+        crate::tables::structure::ForeignKeyRef,
+        crate::tables::structure::ColumnInfo,
+        crate::tables::structure::Grant,
+        crate::tables::structure::Structure,
         crate::ddl::ApiRole,
         crate::ddl::Privilege,
         crate::ddl::GrantDef,

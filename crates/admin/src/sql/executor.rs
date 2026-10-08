@@ -96,6 +96,7 @@ impl Drop for Driver {
 }
 
 /// All execution slots are occupied. HTTP adapters choose how to report it.
+#[derive(Debug)]
 pub struct SqlBusy;
 
 impl SqlExecutor {

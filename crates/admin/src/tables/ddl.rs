@@ -11,13 +11,13 @@ use tokio_postgres::Client;
 
 use crate::{
     AdminState, ApiError,
-    api::table_or_404,
     apply::{ChangeKind, apply},
     ddl::{
         BASE_TYPES,
         table::{self, AlterAction, Context, CreateTable},
     },
-    structure,
+    tables::catalog::table_or_404,
+    tables::structure,
 };
 
 type ApiResult<T = Value> = Result<Json<T>, ApiError>;

@@ -82,3 +82,13 @@ impl IntoResponse for ApiError {
 pub(crate) async fn api_not_found() -> ApiError {
     ApiError::not_found("route_not_found", "route not found")
 }
+
+/// Error of a query built from what the admin typed (filter value of the
+/// wrong type, constraint violation…): 400 with Postgres' text, no code.
+pub(crate) fn user_query_error(err: tokio_postgres::Error) -> ApiError {
+    ApiError::raw(
+        axum::http::StatusCode::BAD_REQUEST,
+        err.as_db_error()
+            .map_or_else(|| err.to_string(), |db| db.message().to_owned()),
+    )
+}

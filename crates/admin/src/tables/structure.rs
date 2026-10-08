@@ -13,7 +13,7 @@ use tokio_postgres::Client;
 
 use serde_json::json;
 
-use crate::{AdminState, ApiError, api::table_or_404};
+use crate::{AdminState, ApiError, tables::catalog::table_or_404};
 
 /// Roles the panel shows and lets you configure in GRANTs.
 pub const API_ROLES: [&str; 3] = ["anon", "authenticated", "service_role"];

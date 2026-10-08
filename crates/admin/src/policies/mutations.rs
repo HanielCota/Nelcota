@@ -10,9 +10,9 @@ use serde::Deserialize;
 
 use crate::{
     AdminState, ApiError,
-    api::table_or_404,
     apply::{ChangeKind, apply},
     ddl::policy::{self, PolicyDef},
+    tables::catalog::table_or_404,
 };
 
 type ApiResult = Result<Json<crate::contracts::DdlResult>, ApiError>;
