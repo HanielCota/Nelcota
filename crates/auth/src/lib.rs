@@ -6,11 +6,13 @@
 //! only AUTHENTICATES: authorization belongs exclusively to RLS.
 
 mod accounts;
+mod confirmation;
 mod credentials;
 mod db;
 mod error;
 mod handlers;
 mod keys;
+mod links;
 mod mail;
 mod password;
 mod rate_limit;
@@ -18,6 +20,7 @@ mod recovery;
 mod request;
 mod sessions;
 mod state;
+mod verify;
 
 use std::sync::Arc;
 
@@ -33,7 +36,7 @@ pub use keys::{KeyError, Keys, generate_ed25519_private_key};
 pub use mail::{Email, MailError, Mailer, SmtpMailer};
 pub use password::{Passwords, hash_password, verify_password};
 pub use rate_limit::RateLimiter;
-pub use state::{AuthSettings, AuthState};
+pub use state::{AuthSettings, AuthState, EmailLinks};
 
 #[derive(Debug, thiserror::Error)]
 pub enum VerifyError {

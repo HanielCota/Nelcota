@@ -159,7 +159,10 @@ pub fn create(host: &Host, new: &NewProject) -> anyhow::Result<()> {
          # app page that receives the link. Then: nelcota -p {name} up\n\
          # NELCOTA_SMTP_URL=smtps://user:password@smtp.example.com:465\n\
          # NELCOTA_SMTP_FROM=Name <no-reply@{domain}>\n\
-         # NELCOTA_PASSWORD_RECOVERY_URL=https://app.example.com/new-password\n",
+         # NELCOTA_PASSWORD_RECOVERY_URL=https://app.example.com/new-password\n\
+         # Optional: confirm emails at signup and passwordless sign-in links.\n\
+         # NELCOTA_EMAIL_CONFIRMATION_URL=https://app.example.com/welcome\n\
+         # NELCOTA_MAGIC_LINK_URL=https://app.example.com/signed-in\n",
         name = new.entry.name,
         now = util::timestamp(),
         domain = new.entry.domain,
