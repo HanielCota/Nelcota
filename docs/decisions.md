@@ -643,6 +643,15 @@ and own cancellation, captured destinations and mutation refreshes. Native
 provisioning and PITR configuration/process adapters are separate from restore
 sequencing, with no new deployment runtime or command contract.
 
+**D87. Feature ownership determines source location.** Panel pages, state,
+adapters, components and unit tests live with their feature. The shell and
+shared schema/presentation helpers have named locations; generated wire
+contracts remain authoritative. Admin backend facades group table, policy and
+account handlers and explicitly export their interface. Integration tests
+share panel request helpers and keep feature scenarios under one admin suite.
+This changes source navigation without introducing another runtime, crate
+layer, HTTP contract or transaction owner (docs/architecture.md).
+
 ### Known pending items
 
 - Filtering parent rows by their embeds (`!inner`) and self-referencing embeds.

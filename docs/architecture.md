@@ -24,8 +24,12 @@ Docker image).
 
 The query compiler separates the validated request representation (`query/mod.rs`),
 URL parsing (`query/parse.rs`) and SQL generation (`query/sql.rs`), behind the
-existing public interface. Panel read/write handlers are organized by feature in
-`admin/src/api/`; DDL validation and execution remain separate modules.
+existing public interface. Panel handlers are grouped under `admin/src/tables/`,
+`users/` and `policies/`, with small root facades that expose named handlers to
+the router. Tables own row queries, structure, exports and DDL adaptation;
+`tables/catalog` supplies metadata also used by overview and policies. Pure
+DDL generation stays in `ddl/`, execution in `apply`, and SQL error adaptation
+in `error`. The SQL feature also owns its autocomplete schema endpoint.
 
 Authentication's HTTP handlers adapt requests to `accounts` and `sessions`.
 `db` owns auth-role transactions, `request` owns HTTP metadata, and recovery
@@ -93,6 +97,39 @@ PostgreSQL configuration and atomic binary replacement. Caddy owns its own
 configuration writes. PITR separates private configuration from process adapters
 and restore sequencing; restore still coordinates stopping services, restoring,
 waiting for promotion, taking a backup on the new timeline and starting the app.
+
+## Source organization
+
+Keep the existing crate boundaries: each crate owns a product capability,
+and `server` assembles them. Add an internal module when behavior needs an
+independent owner; file length alone does not require a new crate or layer.
+Rust module facades use explicit exports. Types returned by a public method
+must be reachable through its public interface, including errors such as
+`SqlBusy` alongside `SqlExecutor`.
+
+The panel's `ui/src/lib/features/<feature>/` owns its page, state, HTTP
+adapter, pure helpers, components and adjacent unit tests. `shell/` owns
+navigation, the command palette and the application frame. Reusable panel
+components live in `components/shared/`; shadcn primitives stay in
+`components/ui/`. Table/policy metadata and DDL previews shared by several
+features live in `shared/schema/`. Keep shared transport, contracts, resource
+loading and browser persistence at the library root; persistence is named
+`local-storage.ts` to distinguish it from the storage feature. API usage
+examples belong to `features/api/api-examples.ts`.
+
+Use relative imports within a feature and `$lib/...` for dependencies outside
+it. Rust filenames use snake_case, TypeScript helpers use kebab-case, and
+Svelte components use PascalCase. Use structs/enums or plain TypeScript types
+for data; stateful modules compose existing resource modules behind their
+own methods. Reuse generated wire types instead of copying their shape;
+`SchemaResponse` serves both autocomplete and SQL request state. Do not edit
+the generated contracts or validators by hand.
+
+Rust unit tests stay with their implementation. Integration scenarios stay in
+`server/tests`, where the production router and a real PostgreSQL instance
+are assembled. `tests/admin.rs` loads feature modules under `tests/admin/`
+as one integration suite. `tests/common/panel.rs` owns panel login, cookie
+assertions and request helpers shared with storage and architecture suites.
 
 ## A request's flow
 
