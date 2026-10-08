@@ -521,6 +521,64 @@ image is the released musl binaries copied into `scratch`
 (`deploy/release.Dockerfile`), linked to this repository by the
 `org.opencontainers.image.source` label.
 
+## Storage
+
+**D77. Metadata in Postgres under RLS, bytes in an object store.** A
+`storage` schema holds `storage.buckets` and `storage.objects` (bucket, name,
+owner `DEFAULT auth.uid()`, size, type, etag). Who may read, write or delete
+a file is decided by RLS policies on `storage.objects`, written in plain SQL
+like any other policy; the server never decides it. The bytes live behind the
+`object_store` crate (Apache Arrow) with two backends: the local disk (the
+default, nothing to configure after `nelcota up`) and any S3-compatible
+service (recommended for production: R2, B2, AWS...). `object_store` is used
+with `aws-base` + `ring`, never `aws-lc-rs`, for the same reason as D16. No
+bundled object server: Garage on a single node keeps the files on the same
+disk as a plain directory would, for one more service to run, and MinIO's
+community edition went into maintenance mode in 2025. The routes follow the
+shape of Supabase Storage (`/storage/v1/object/{bucket}/{path}`), without
+promising compatibility with its client; the route words (`public`, `sign`,
+`list`) cannot be bucket names.
+
+**D78. Uploads stream through the server; keys are versioned.** The client
+sends the file to Nelcota, which streams it to the store: one endpoint, the
+usual `Bearer`, no CORS on a second origin, and size, type and quota checked
+in the same flow. Before taking the bytes, a rolled-back `INSERT` under the
+caller's role checks the policy, so a caller without permission cannot fill
+the disk. The bytes go to `{bucket}/{version}` (a UUIDv7), not to the
+object's name; only after the upload completes does a short transaction
+insert or update the row under RLS. Holding no connection while bytes flow
+keeps slow clients from draining the pool; versioned keys make an overwrite
+atomic (readers see the old file or the new one, never half) and keep a
+failed upload from clobbering anything. Deleting or replacing a file removes
+the old bytes right after the commit: a delete means the file is gone, which
+also means a database restore does not bring deleted files back. A periodic
+collector removes bytes no row points to (left by a crash mid-upload) once
+they are a day old, so it never races an upload in flight. A plain upload
+needs only an `INSERT` policy; overwriting and deleting also need `SELECT`,
+as `UPDATE`/`DELETE` with a `WHERE` do in Postgres. Storage routes run
+outside the request timeout and the gzip layer.
+
+**D79. User files are served as inert content.** Every object response
+carries `X-Content-Type-Options: nosniff` and `Content-Security-Policy:
+sandbox`; only raster images, audio, video and plain text are served
+`inline`, everything else (HTML, SVG, PDF...) as an `attachment`. The type is
+sniffed from the first bytes, not taken from the client. Paths reject `..`,
+empty segments, control characters and over-long names, and are normalized
+to Unicode NFC. Signed URLs are short-lived JWTs signed with the project's
+keys and bound to one bucket and path. On the S3 backend a download is a
+`302` to a presigned URL on the provider's domain; on disk the server
+streams it with `Range` and `ETag`. `NELCOTA_STORAGE_PUBLIC_URL` can move
+public files to their own origin (e.g. `files.shop.com`).
+
+**D80. Storage cannot take the database down.** On a single VPS the files and
+Postgres share a disk. Every upload has a size cap (per bucket, and a global
+`NELCOTA_STORAGE_MAX_FILE_SIZE`, 50 MiB by default); an optional total quota
+covers all buckets; and on the disk backend an upload is refused when free
+space would fall under `NELCOTA_STORAGE_MIN_FREE_BYTES` (1 GiB by default).
+Per-user quotas are left to policies, which see the final row (with its
+size) on insert. Image transformations and resumable (TUS) uploads stay out:
+decoding untrusted images is a steady source of CVEs.
+
 ### Known pending items
 
 - Filtering parent rows by their embeds (`!inner`) and self-referencing embeds.
