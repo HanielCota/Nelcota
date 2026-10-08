@@ -78,6 +78,90 @@ async fn password_login(app: &TestApp, email: &str, password: &str) -> Reply {
 }
 
 #[tokio::test]
+async fn failed_session_revocation_rolls_back_the_password_change() {
+    let app = TestApp::spawn().await;
+    let cookie = login(&app).await;
+    let session = app
+        .post(
+            "/auth/v1/signup",
+            None,
+            json!({
+                "email": "atomic@example.com", "password": "original-password-123",
+            }),
+        )
+        .await;
+    assert_eq!(session.status, StatusCode::CREATED);
+    let id = session.body["user"]["id"].as_str().unwrap();
+    let original_hash: String = app
+        .admin_client
+        .query_one(
+            "SELECT encrypted_password FROM auth.users WHERE id = $1::text::uuid",
+            &[&id],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    app.admin_client
+        .batch_execute(
+            "CREATE FUNCTION public.reject_revocation() RETURNS trigger LANGUAGE plpgsql AS $$
+         BEGIN RAISE EXCEPTION 'test revocation failure'; END $$;
+         CREATE TRIGGER reject_revocation BEFORE UPDATE OF revoked_at ON auth.sessions
+             FOR EACH ROW EXECUTE FUNCTION public.reject_revocation();",
+        )
+        .await
+        .unwrap();
+
+    let reset = send(
+        &app,
+        Method::PUT,
+        &format!("/admin/api/users/{id}/password"),
+        &cookie,
+        json!({ "password": "replacement-password-456" }),
+    )
+    .await;
+    assert_eq!(reset.status, StatusCode::INTERNAL_SERVER_ERROR);
+    let unchanged_hash: String = app
+        .admin_client
+        .query_one(
+            "SELECT encrypted_password FROM auth.users WHERE id = $1::text::uuid",
+            &[&id],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    assert_eq!(unchanged_hash, original_hash);
+    let active: i64 = app.admin_client.query_one(
+        "SELECT count(*) FROM auth.sessions WHERE user_id = $1::text::uuid AND revoked_at IS NULL",
+        &[&id],
+    ).await.unwrap().get(0);
+    assert_eq!(active, 1);
+    app.admin_client
+        .batch_execute("DROP TRIGGER reject_revocation ON auth.sessions")
+        .await
+        .unwrap();
+    let refreshed = app
+        .post(
+            "/auth/v1/token?grant_type=refresh_token",
+            None,
+            json!({ "refresh_token": session.body["refresh_token"] }),
+        )
+        .await;
+    assert_eq!(refreshed.status, StatusCode::OK);
+    assert_eq!(
+        password_login(&app, "atomic@example.com", "original-password-123")
+            .await
+            .status,
+        StatusCode::OK
+    );
+    assert_eq!(
+        password_login(&app, "atomic@example.com", "replacement-password-456")
+            .await
+            .status,
+        StatusCode::BAD_REQUEST
+    );
+}
+
+#[tokio::test]
 async fn create_user_and_reset_password_from_the_panel() {
     let app = TestApp::spawn().await;
     let cookie = login(&app).await;
@@ -187,4 +271,82 @@ async fn create_user_and_reset_password_from_the_panel() {
     )
     .await;
     assert_eq!(bad_id.status, StatusCode::BAD_REQUEST);
+}
+
+async fn confirm(app: &TestApp, cookie: &str, id: &str) -> Reply {
+    send(
+        app,
+        Method::POST,
+        &format!("/admin/api/users/{id}/confirm"),
+        cookie,
+        json!({}),
+    )
+    .await
+}
+
+#[tokio::test]
+async fn panel_accounts_are_confirmed_and_pending_ones_can_be_confirmed() {
+    let app = TestApp::spawn_with(Options {
+        confirm_email: true,
+        ..Options::default()
+    })
+    .await;
+    let cookie = login(&app).await;
+
+    // Created by the administrator: signs in right away, even with
+    // confirmation on.
+    let created = send(
+        &app,
+        Method::POST,
+        "/admin/api/users",
+        &cookie,
+        json!({ "email": "staff@example.com", "password": "strong-password-123" }),
+    )
+    .await;
+    assert_eq!(created.status, StatusCode::CREATED, "{}", created.body);
+    assert_eq!(
+        password_login(&app, "staff@example.com", "strong-password-123")
+            .await
+            .status,
+        StatusCode::OK
+    );
+
+    // Signed up on their own: held until confirmed, here by the panel.
+    let pending = app
+        .post(
+            "/auth/v1/signup",
+            None,
+            json!({ "email": "pending@example.com", "password": "strong-password-123" }),
+        )
+        .await;
+    let id = pending.body["user"]["id"].as_str().unwrap().to_owned();
+    let listed = get(&app, "/admin/api/users?q=pending", &cookie).await;
+    assert!(listed.body["users"][0]["email_confirmed_at"].is_null());
+    assert_eq!(
+        password_login(&app, "pending@example.com", "strong-password-123")
+            .await
+            .body["code"],
+        "email_not_confirmed"
+    );
+
+    assert_eq!(confirm(&app, &cookie, &id).await.status, StatusCode::OK);
+    let listed = get(&app, "/admin/api/users?q=pending", &cookie).await;
+    let confirmed_at = listed.body["users"][0]["email_confirmed_at"].clone();
+    assert!(confirmed_at.is_string());
+    assert_eq!(
+        password_login(&app, "pending@example.com", "strong-password-123")
+            .await
+            .status,
+        StatusCode::OK
+    );
+
+    // Idempotent: the first confirmation date stays.
+    assert_eq!(confirm(&app, &cookie, &id).await.status, StatusCode::OK);
+    let listed = get(&app, "/admin/api/users?q=pending", &cookie).await;
+    assert_eq!(listed.body["users"][0]["email_confirmed_at"], confirmed_at);
+
+    let missing = confirm(&app, &cookie, "054f8cd2-decb-4c78-91a1-f351bd8f5b92").await;
+    assert_eq!(missing.body["code"], "user_not_found");
+    let invalid = confirm(&app, &cookie, "not-a-uuid").await;
+    assert_eq!(invalid.body["code"], "invalid_id");
 }

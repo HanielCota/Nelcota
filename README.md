@@ -8,7 +8,8 @@ a 5-minute deploy on a VPS.**
 - **Authorization belongs to RLS.** The API only validates the JWT and assumes
   its role inside a transaction. It never decides permissions on its own.
 - **One binary** with an automatic REST API, auth (EdDSA JWT + JWKS,
-  argon2id, refresh with rotation, password recovery by email), file storage
+  argon2id, refresh with rotation, password recovery, email confirmation
+  and magic link by email), file storage
   under RLS (disk or S3), an admin panel and a deploy CLI.
 - **Open standards:** JWT/JWKS, PHC argon2id, plain SQL, OpenAPI,
   S3-compatible. You can leave and take everything with you
@@ -129,7 +130,7 @@ token kills the session.
 
 ## Out of the MVP
 
-Realtime, Edge Functions, OAuth/MFA/magic link, image transformations,
+Realtime, Edge Functions, OAuth/MFA, image transformations,
 multi-tenant. The architecture leaves room for them.
 
 ## License

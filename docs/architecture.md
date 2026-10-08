@@ -12,7 +12,7 @@ client ──HTTPS──▶ Caddy ──▶ nelcota (single binary) ──▶ Po
 | Crate | Responsibility |
 |---|---|
 | `nelcota-core` | config (`figment`), HTTP errors, `Claims`/`Role`, pool, migrations, `begin_request` |
-| `nelcota-auth` | `JwtVerifier` trait, EdDSA/HS256 keys and JWKS, `Auth` extractor, signup/login/refresh/logout, password recovery, argon2id, rate limit |
+| `nelcota-auth` | `JwtVerifier` trait, EdDSA/HS256 keys and JWKS, `Auth` extractor, signup/login/refresh/logout, email links (recovery, confirmation, magic link), argon2id, rate limit |
 | `nelcota-api`  | catalog introspection, SQL builder, CRUD/RPC, OpenAPI, TS types |
 | `nelcota-storage` | files: buckets and objects under RLS (`storage` schema), bytes on disk or S3 (`object_store`), signed URLs, orphan collector |
 | `nelcota-admin` | panel at `/admin`: JSON API (`/admin/api`) + embedded Svelte SPA (`ui/dist`) |
@@ -32,8 +32,10 @@ DDL generation stays in `ddl/`, execution in `apply`, and SQL error adaptation
 in `error`. The SQL feature also owns its autocomplete schema endpoint.
 
 Authentication's HTTP handlers adapt requests to `accounts` and `sessions`.
-`db` owns auth-role transactions, `request` owns HTTP metadata, and recovery
-uses the shared session interface directly. The panel's root assembles routes;
+`db` owns auth-role transactions and `request` owns HTTP metadata. `links`
+owns single-use email links (token storage, email text, sending and sign-in
+by link); `recovery` adds the password change, `confirmation` the signup
+policy and `verify` routes a link by its `type`. The panel's root assembles routes;
 `auth`, `middleware`, `error`, `assets` and `state` own their respective behavior.
 
 Storage's `upload` module owns streamed writes and their metadata commit,
@@ -100,12 +102,30 @@ waiting for promotion, taking a backup on the new timeline and starting the app.
 
 ## Source organization
 
+Nelcota is a modular monolith: capability modules ship in one binary. Use a
+small facade to expose a complete operation, keeping its validation, transaction
+and cleanup together. HTTP adapters translate requests, results and errors.
+Introduce interchangeable adapters where implementations actually vary, such
+as disk/S3 storage and SMTP/test mail delivery. Concrete functions and existing
+types are enough elsewhere; a generic repository or another layer is not needed
+to wrap PostgreSQL.
+
 Keep the existing crate boundaries: each crate owns a product capability,
 and `server` assembles them. Add an internal module when behavior needs an
 independent owner; file length alone does not require a new crate or layer.
 Rust module facades use explicit exports. Types returned by a public method
 must be reachable through its public interface, including errors such as
 `SqlBusy` alongside `SqlExecutor`.
+
+Bucket mutations belong to storage's operation interface on `StorageState`.
+Both the public routes and panel call it; bucket privileges, RLS and foreign
+keys remain PostgreSQL's responsibility. Operations return typed records and
+bucket errors, while each HTTP adapter preserves its response/error vocabulary.
+Only the panel adapter trims empty MIME inputs from forms. A failed deletion
+rolls back before reading the optional file count for its error response.
+Panel user operations accept the admin pool and return data; their HTTP adapter
+owns messages and status codes. Password changes and session revocation remain
+one transaction inside the operation.
 
 The panel's `ui/src/lib/features/<feature>/` owns its page, state, HTTP
 adapter, pure helpers, components and adjacent unit tests. `shell/` owns
@@ -157,7 +177,7 @@ assertions and request helpers shared with storage and architecture suites.
 |---|---|---|
 | `/health` | server | public |
 | `/rest/v1/*` | api | JWT → role → GRANTs + RLS |
-| `/auth/v1/*` | auth | public (signup/login/recovery) or the user's JWT |
+| `/auth/v1/*` | auth | public (signup/login/email links) or the user's JWT |
 | `/storage/v1/*` | storage | JWT → role → RLS on `storage.objects`; public buckets and signed URLs without a token |
 | `/admin/*` | admin | panel login (session), admin connection |
 

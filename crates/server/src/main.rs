@@ -59,13 +59,18 @@ async fn serve(config: Config) -> anyhow::Result<()> {
             max_rows: config.max_rows,
         }),
     };
-    // Auth email (password recovery). Without SMTP the endpoint answers
-    // `recovery_disabled`; a half-done configuration already failed in `validate`.
+    // Auth email (single-use links). Without SMTP those endpoints answer
+    // `*_disabled`; a half-done configuration already failed in `validate`.
     let mail = config.mail()?;
     let mailer = match &mail {
         Some(mail) => {
             let smtp = nelcota_auth::SmtpMailer::new(mail.smtp_url, mail.from)?;
-            tracing::info!(sender = mail.from, "password recovery by email enabled");
+            tracing::info!(
+                sender = mail.from,
+                signup_confirmation = mail.confirmation_url.is_some(),
+                magic_link = mail.magic_link_url.is_some(),
+                "auth email links enabled"
+            );
             Some(Arc::new(smtp) as Arc<dyn nelcota_auth::Mailer>)
         }
         None => None,
@@ -82,7 +87,13 @@ async fn serve(config: Config) -> anyhow::Result<()> {
             refresh_ttl_days: config.refresh_token_ttl_days,
             signup_enabled: config.signup_enabled,
             trust_proxy: config.trust_proxy,
-            recovery_url: mail.map(|m| m.recovery_url.to_owned()),
+            links: mail
+                .map(|m| nelcota_auth::EmailLinks {
+                    recovery: Some(m.recovery_url.to_owned()),
+                    signup_confirmation: m.confirmation_url.map(str::to_owned),
+                    magic_link: m.magic_link_url.map(str::to_owned),
+                })
+                .unwrap_or_default(),
         }),
     };
     let storage = match nelcota_storage::Store::from_config(&config)
