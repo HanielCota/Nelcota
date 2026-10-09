@@ -2,11 +2,14 @@
 //!
 //! The shape (`Database[schema]["Tables"][t]["Row" | "Insert" | "Update"]`)
 //! follows the convention the ecosystem already knows, but it is plain
-//! TypeScript: it depends on no SDK.
+//! TypeScript: it depends on no SDK. `Relationships` lists each table's foreign
+//! keys inside the exposed schema, which is what a typed client needs to know
+//! whether an embed is an object (this table has the key) or an array (the
+//! other table points here).
 
 use std::fmt::Write;
 
-use crate::catalog::{Catalog, Column, TableKind};
+use crate::catalog::{Catalog, Column, Table, TableKind};
 
 fn ts_scalar(type_name: &str) -> String {
     if let Some(element) = type_name.strip_suffix("[]") {
@@ -58,6 +61,46 @@ fn string(value: &str) -> String {
     serde_json::to_string(value).unwrap_or_default()
 }
 
+fn string_tuple(values: &[String]) -> String {
+    let items = values.iter().map(|v| string(v)).collect::<Vec<_>>();
+    format!("[{}]", items.join(", "))
+}
+
+fn relationships(out: &mut String, catalog: &Catalog, table: &Table) {
+    let keys: Vec<_> = table
+        .foreign_keys
+        .iter()
+        .filter(|fk| {
+            fk.foreign_schema == catalog.schema && catalog.tables.contains_key(&fk.foreign_table)
+        })
+        .collect();
+    if keys.is_empty() {
+        out.push_str(
+            "        Relationships: [];
+",
+        );
+        return;
+    }
+    out.push_str(
+        "        Relationships: [
+",
+    );
+    for fk in keys {
+        let _ = writeln!(
+            out,
+            "          {{ foreignKeyName: {}; columns: {}; referencedRelation: {}; referencedColumns: {} }},",
+            string(&fk.name),
+            string_tuple(&fk.columns),
+            string(&fk.foreign_table),
+            string_tuple(&fk.foreign_columns),
+        );
+    }
+    out.push_str(
+        "        ];
+",
+    );
+}
+
 pub fn generate(catalog: &Catalog) -> String {
     let mut out = String::new();
     let schema = key(&catalog.schema);
@@ -98,6 +141,7 @@ pub fn generate(catalog: &Catalog) -> String {
                     out.push_str("        };\n");
                 }
             }
+            relationships(&mut out, catalog, table);
             out.push_str("      };\n");
         }
         out.push_str("    };\n");
@@ -180,7 +224,7 @@ pub fn generate(catalog: &Catalog) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::catalog::{Argument, ForeignKey, Function, Privileges, Table};
+    use crate::catalog::{Argument, ForeignKey, Function, Privileges};
 
     fn column(name: &str, type_name: &str) -> Column {
         Column {
@@ -265,6 +309,19 @@ mod tests {
             }],
         );
         catalog
+    }
+
+    #[test]
+    fn relationships_list_foreign_keys_inside_the_schema() {
+        let out = generate(&shop("public"));
+        assert!(
+            out.contains(
+                r#"{ foreignKeyName: "orders_customer_id_fkey"; columns: ["customer_id"]; referencedRelation: "customers"; referencedColumns: ["id"] },"#
+            ),
+            "{out}"
+        );
+        assert!(!out.contains("orders_audit_fkey"), "{out}");
+        assert!(out.contains("Relationships: [];"), "{out}");
     }
 
     #[test]
