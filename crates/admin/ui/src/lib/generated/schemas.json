@@ -3573,6 +3573,9 @@
           "null"
         ]
       },
+      "has_password": {
+        "type": "boolean"
+      },
       "id": {
         "type": "string"
       },
@@ -3581,6 +3584,12 @@
           "string",
           "null"
         ]
+      },
+      "providers": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
       },
       "sessions": {
         "format": "int64",
@@ -3593,7 +3602,9 @@
       "created_at",
       "last_sign_in_at",
       "email_confirmed_at",
-      "sessions"
+      "sessions",
+      "has_password",
+      "providers"
     ],
     "title": "User",
     "type": "object"
@@ -3614,6 +3625,9 @@
               "null"
             ]
           },
+          "has_password": {
+            "type": "boolean"
+          },
           "id": {
             "type": "string"
           },
@@ -3622,6 +3636,12 @@
               "string",
               "null"
             ]
+          },
+          "providers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
           },
           "sessions": {
             "format": "int64",
@@ -3634,7 +3654,9 @@
           "created_at",
           "last_sign_in_at",
           "email_confirmed_at",
-          "sessions"
+          "sessions",
+          "has_password",
+          "providers"
         ],
         "type": "object"
       }

@@ -52,7 +52,7 @@ dto!(Column { name: String, r#type: String, full_type: String, category: String,
 pub type RowData = BTreeMap<String, Option<String>>;
 dto!(TableInfo { name: String, kind: String, comment: Option<String>, primary_key: Vec<String>, editable: bool, insertable: bool, exposed_without_rls: bool, rls: Rls, columns: Vec<Column> });
 dto!(TableData { table: TableInfo, rows: Vec<RowData>, page: i64, size: i64, has_next: bool, total: Option<i64>, total_exact: bool });
-dto!(User { id: String, email: String, created_at: String, last_sign_in_at: Option<String>, email_confirmed_at: Option<String>, sessions: i64 });
+dto!(User { id: String, email: String, created_at: String, last_sign_in_at: Option<String>, email_confirmed_at: Option<String>, sessions: i64, has_password: bool, providers: Vec<String> });
 dto!(UsersResponse { users: Vec<User>, total: i64, page: i64, has_next: bool });
 dto!(Policy { name: String, permissive: bool, roles: Vec<String>, command: String, using: Option<String>, check: Option<String> });
 dto!(PolicyTable { name: String, rls: Rls, exposed_without_rls: bool, policies: Vec<Policy> });

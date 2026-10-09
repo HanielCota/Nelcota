@@ -27,7 +27,10 @@ pub(super) async fn list(pool: &Pool, page: i64, search: &str) -> Result<UsersRe
     let rows = client.query(
         "SELECT u.id::text, u.email, u.created_at::text, u.last_sign_in_at::text,
                 u.email_confirmed_at::text,
-                (SELECT count(*) FROM auth.sessions s WHERE s.user_id = u.id AND s.revoked_at IS NULL)
+                (SELECT count(*) FROM auth.sessions s WHERE s.user_id = u.id AND s.revoked_at IS NULL),
+                u.encrypted_password IS NOT NULL,
+                -- Sign-in providers linked to the account (D91), in a stable order.
+                ARRAY(SELECT i.provider FROM auth.identities i WHERE i.user_id = u.id ORDER BY i.provider)
          FROM auth.users u WHERE u.email LIKE $1
          ORDER BY u.created_at DESC LIMIT $2 OFFSET $3",
         &[&pattern, &(SIZE + 1), &(page * SIZE)],
@@ -50,6 +53,8 @@ pub(super) async fn list(pool: &Pool, page: i64, search: &str) -> Result<UsersRe
                 last_sign_in_at: row.get(3),
                 email_confirmed_at: row.get(4),
                 sessions: row.get(5),
+                has_password: row.get(6),
+                providers: row.get(7),
             })
             .collect(),
     })
