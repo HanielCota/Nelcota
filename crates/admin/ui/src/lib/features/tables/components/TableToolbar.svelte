@@ -55,7 +55,7 @@
   ] as const
 </script>
 
-<div class="flex min-h-14 shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b bg-background px-4 py-2.5">
+<div class="flex min-h-14 shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b bg-card px-4 py-2.5">
   <a
     href={href('/tables')}
     class="-ml-1 grid size-9 place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground lg:hidden"
@@ -63,14 +63,14 @@
   >
   <h1 class="min-w-0 truncate text-base font-semibold">{name}</h1>
   {#if data}<RlsBadge rls={data.table.rls} />{/if}
-  <nav class="ml-1 flex h-9 items-center gap-0.5 rounded-md border bg-muted/50 p-0.5 text-sm" aria-label={t('tables.toolbar.views')}>
+  <nav class="ml-1 flex h-10 items-center gap-0.5 rounded-full bg-secondary p-1 text-sm" aria-label={t('tables.toolbar.views')}>
     {#each tabs as tab (tab.view)}
       <a
         href={href(`/tables/${enc(name)}${tab.suffix}${route.query.size ? `?${route.query}` : ''}`)}
         aria-current={view === tab.view ? 'page' : undefined}
         class={[
-          'flex h-full items-center rounded px-3 transition-colors',
-          view === tab.view ? 'bg-background font-medium text-foreground ring-1 ring-border' : 'text-muted-foreground hover:text-foreground',
+          'flex h-full items-center rounded-full px-3.5 transition-colors',
+          view === tab.view ? 'bg-nav-active font-medium text-nav-active-foreground' : 'text-muted-foreground hover:text-foreground',
         ]}>{t(tab.label)}</a
       >
     {/each}

@@ -170,7 +170,7 @@
 
   // Column pinned to the left (selection + expand): opaque background so the
   // content scrolling underneath does not show through.
-  const stickyCell = 'sticky left-0 z-[1] border-r border-b bg-background'
+  const stickyCell = 'sticky left-0 z-[1] border-r border-b bg-card'
 </script>
 
 <!-- table-layout fixed + per-column widths: editing a cell does not resize
@@ -253,7 +253,7 @@
             ondblclick={() => startEdit(i, column)}
           >
             {#if editing?.key === rowKey(row, data.table.primary_key, i) && editing.column === column.name}
-              <div class="flex items-center gap-1 bg-background p-0.5 ring-2 ring-brand ring-inset" onfocusout={(event) => {
+              <div class="flex items-center gap-1 bg-card p-0.5 ring-2 ring-brand ring-inset" onfocusout={(event) => {
                 if (!event.currentTarget.contains(event.relatedTarget as Node | null)) editing = null
               }}>
                 <input

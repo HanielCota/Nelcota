@@ -42,7 +42,7 @@
 
 <aside
   aria-label={t('tables.sidebar.label')}
-  class={cn('w-full shrink-0 flex-col border-r bg-sidebar lg:flex lg:w-64 xl:w-72', current ? 'hidden' : 'flex lg:w-64 xl:w-72')}
+  class={cn('w-full shrink-0 flex-col overflow-hidden rounded-3xl bg-card lg:flex lg:w-64 xl:w-72', current ? 'hidden' : 'flex lg:w-64 xl:w-72')}
 >
   <div class="grid gap-3 border-b p-4">
     <div class="flex items-center justify-between gap-2">
@@ -70,7 +70,7 @@
         title={rlsTitle(table.rls)}
         aria-current={table.name === current ? 'page' : undefined}
         class={cn(
-          'flex h-11 items-center gap-2.5 rounded-md px-3 text-sm text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground md:h-9',
+          'flex h-11 items-center gap-2.5 rounded-full px-3.5 text-sm text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground md:h-9',
           table.name === current && 'bg-accent font-medium text-foreground',
         )}
       >

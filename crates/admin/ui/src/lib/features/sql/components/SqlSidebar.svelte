@@ -25,7 +25,7 @@
   } = $props()
 
   const item =
-    'group flex h-9 w-full min-w-0 cursor-pointer items-center gap-2 rounded-md px-2.5 text-left text-sm text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground'
+    'group flex h-9 w-full min-w-0 cursor-pointer items-center gap-2 rounded-full px-3 text-left text-sm text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground'
   const heading = 'px-2.5 pb-1 text-xs font-medium text-muted-foreground'
   // With nothing saved yet, the templates are the most useful thing here.
   const templatesFirst = $derived(sqlStore.saved.length === 0)
@@ -43,7 +43,7 @@
   </div>
 {/snippet}
 
-<aside class="hidden w-72 shrink-0 flex-col border-r bg-sidebar lg:flex" aria-label={t('sql.sidebar.label')}>
+<aside class="hidden w-72 shrink-0 flex-col overflow-hidden rounded-3xl bg-card lg:flex" aria-label={t('sql.sidebar.label')}>
   <div class="flex h-14 shrink-0 items-center justify-between border-b pr-2 pl-4">
     <p class="text-sm font-semibold">{t('sql.sidebar.title')}</p>
     <Button variant="ghost" size="icon-sm" onclick={() => sqlStore.open('')} title={t('sql.editor.newQuery')} aria-label={t('sql.editor.newQuery')}>

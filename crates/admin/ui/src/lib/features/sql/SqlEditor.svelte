@@ -161,10 +161,10 @@
 
 <svelte:window onkeydown={onKeydown} />
 
-<div class="flex h-full min-h-0">
+<div class="flex h-full min-h-0 gap-3 px-3 pt-1 pb-3 sm:px-5 lg:px-6">
   <SqlSidebar onrename={(query) => openDialog({ mode: 'rename', query })} ondelete={askDelete} ondeleteDraft={(draft) => { toDeleteDraft = draft; deleteDraftOpen = true }} />
 
-  <div class="flex min-w-0 flex-1 flex-col">
+  <div class="flex min-w-0 flex-1 flex-col overflow-hidden rounded-3xl bg-card">
     <div class="flex min-h-14 shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b px-4 py-2.5 xl:flex-nowrap">
       <div class="min-w-0 flex-1 basis-48">
       <QueryTitle
@@ -275,7 +275,7 @@
     <Resizable.Handle withHandle aria-label={t('sql.editor.resize')} />
     <Resizable.Pane bind:this={resultsPane} defaultSize={58} minSize={20} collapsible collapsedSize={0}>
 
-    <div class="relative h-full min-h-0 overflow-auto bg-background" aria-busy={running}>
+    <div class="relative h-full min-h-0 overflow-auto bg-card" aria-busy={running}>
       {#if running}
         <div class="pointer-events-none sticky top-0 z-20 h-0.5 overflow-hidden bg-brand/15" aria-hidden="true">
           <div class="animate-progress h-full w-2/5 bg-brand"></div>

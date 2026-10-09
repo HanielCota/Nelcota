@@ -100,7 +100,7 @@
 
 </script>
 
-<div class="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-10 lg:py-10">
+<div class="mx-auto max-w-7xl px-4 pt-6 pb-10 sm:px-6 lg:px-8">
   <PageHeader title={t('policies.title')} description={t('policies.description')}>
     {#snippet actions()}<TechnicalToggle />{/snippet}
   </PageHeader>

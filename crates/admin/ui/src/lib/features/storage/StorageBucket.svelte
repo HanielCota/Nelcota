@@ -120,7 +120,7 @@
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-10 lg:py-10" ondragenter={(event) => { if (event.dataTransfer?.types.includes('Files')) { event.preventDefault(); dragDepth++; dragging = true } }} ondragleave={() => { dragDepth = Math.max(0, dragDepth - 1); if (!dragDepth) dragging = false }} ondragover={(event) => { if (event.dataTransfer?.types.includes('Files')) event.preventDefault() }} ondrop={dropped}>
+<div class="mx-auto max-w-7xl px-4 pt-6 pb-10 sm:px-6 lg:px-8" ondragenter={(event) => { if (event.dataTransfer?.types.includes('Files')) { event.preventDefault(); dragDepth++; dragging = true } }} ondragleave={() => { dragDepth = Math.max(0, dragDepth - 1); if (!dragDepth) dragging = false }} ondragover={(event) => { if (event.dataTransfer?.types.includes('Files')) event.preventDefault() }} ondrop={dropped}>
   <PageHeader
     title={bucket}
     description={info ? `${info.bucket.public ? t('storage.public') : t('storage.private')} · ${size(info.bucket.bytes)}` : undefined}

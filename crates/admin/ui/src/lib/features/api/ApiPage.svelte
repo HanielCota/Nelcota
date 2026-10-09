@@ -82,12 +82,12 @@
 
   const tab = (active: boolean) =>
     [
-      'h-7 cursor-pointer rounded px-3 text-sm transition-colors',
-      active ? 'border border-border bg-card text-foreground' : 'text-muted-foreground hover:text-foreground',
+      'h-8 cursor-pointer rounded-full px-3.5 text-sm transition-colors',
+      active ? 'bg-nav-active font-medium text-nav-active-foreground' : 'text-muted-foreground hover:text-foreground',
     ]
 </script>
 
-<div class="mx-auto grid max-w-5xl gap-10 px-4 py-8 *:min-w-0 sm:px-6 lg:px-10 lg:py-10">
+<div class="mx-auto grid max-w-7xl gap-10 px-4 pt-6 pb-10 *:max-w-4xl *:min-w-0 sm:px-6 lg:px-8">
   <PageHeader title={t('connect.title')} description={t('connect.description')}>
     {#snippet actions()}
       <Button variant="outline" href="/rest/v1/" target="_blank" rel="noopener">
@@ -160,7 +160,7 @@
   <section id="api-examples" class="grid scroll-mt-6 gap-4">
     <h2 class="text-base font-semibold">{t('connect.examples')}</h2>
     <div class="flex flex-wrap items-center gap-3">
-      <nav class="flex h-9 items-center gap-1 rounded-md bg-muted p-1" aria-label={t('connect.topic')}>
+      <nav class="flex h-10 items-center gap-1 rounded-full bg-secondary p-1" aria-label={t('connect.topic')}>
         <button type="button" class={tab(topic === 'tables')} aria-pressed={topic === 'tables'} onclick={() => choose({ topic: 'tables' })}
           >{t('connect.topics.tables')}</button
         >
@@ -178,7 +178,7 @@
           </Select.Content>
         </Select.Root>
       {/if}
-      <nav class="flex h-9 items-center gap-1 rounded-md bg-muted p-1 sm:ml-auto" aria-label={t('connect.language')}>
+      <nav class="flex h-10 items-center gap-1 rounded-full bg-secondary p-1 sm:ml-auto" aria-label={t('connect.language')}>
         <button type="button" class={tab(lang === 'ts')} aria-pressed={lang === 'ts'} onclick={() => choose({ lang: 'ts' })}
           >{t('connect.sdkLabel')}</button
         >
