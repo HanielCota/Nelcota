@@ -12,6 +12,7 @@
   import * as Select from '$lib/components/ui/select'
   import { toast } from 'svelte-sonner'
   import PageHeader from '$lib/components/shared/PageHeader.svelte'
+  import RecentlyBlocked from '$lib/features/policies/components/RecentlyBlocked.svelte'
   import RlsBadge from '$lib/shared/schema/components/RlsBadge.svelte'
   import PolicySheet from '$lib/features/policies/components/PolicySheet.svelte'
   import ConfirmDialog from '$lib/components/shared/ConfirmDialog.svelte'
@@ -116,6 +117,8 @@
         {#snippet actions()}<Button variant="outline" size="sm" onclick={() => (rlsFilter = 'attention')}><ShieldCheck data-icon="inline-start" aria-hidden="true" />{t('common.reviewAccess')}</Button>{/snippet}
       </Callout>
     {/if}
+
+    <RecentlyBlocked />
 
     {#if data.tables.length === 0}
       <EmptyState icon={ShieldCheck} title={t('policies.noTables')} description={t('policies.noTablesHint')}>{#snippet actions()}<Button href={href('/tables?create=true')}><Plus data-icon="inline-start" aria-hidden="true" />{t('tables.editor.newTable')}</Button>{/snippet}</EmptyState>
