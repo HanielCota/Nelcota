@@ -2,11 +2,14 @@
 //!
 //! The shape (`Database[schema]["Tables"][t]["Row" | "Insert" | "Update"]`)
 //! follows the convention the ecosystem already knows, but it is plain
-//! TypeScript: it depends on no SDK.
+//! TypeScript: it depends on no SDK. `Relationships` lists each table's foreign
+//! keys inside the exposed schema, which is what a typed client needs to know
+//! whether an embed is an object (this table has the key) or an array (the
+//! other table points here).
 
 use std::fmt::Write;
 
-use crate::catalog::{Catalog, Column, TableKind};
+use crate::catalog::{Catalog, Column, Table, TableKind};
 
 fn ts_scalar(type_name: &str) -> String {
     if let Some(element) = type_name.strip_suffix("[]") {
@@ -53,6 +56,51 @@ fn key(name: &str) -> String {
     }
 }
 
+/// A TypeScript string literal (JSON escaping is valid TypeScript).
+fn string(value: &str) -> String {
+    serde_json::to_string(value).unwrap_or_default()
+}
+
+fn string_tuple(values: &[String]) -> String {
+    let items = values.iter().map(|v| string(v)).collect::<Vec<_>>();
+    format!("[{}]", items.join(", "))
+}
+
+fn relationships(out: &mut String, catalog: &Catalog, table: &Table) {
+    let keys: Vec<_> = table
+        .foreign_keys
+        .iter()
+        .filter(|fk| {
+            fk.foreign_schema == catalog.schema && catalog.tables.contains_key(&fk.foreign_table)
+        })
+        .collect();
+    if keys.is_empty() {
+        out.push_str(
+            "        Relationships: [];
+",
+        );
+        return;
+    }
+    out.push_str(
+        "        Relationships: [
+",
+    );
+    for fk in keys {
+        let _ = writeln!(
+            out,
+            "          {{ foreignKeyName: {}; columns: {}; referencedRelation: {}; referencedColumns: {} }},",
+            string(&fk.name),
+            string_tuple(&fk.columns),
+            string(&fk.foreign_table),
+            string_tuple(&fk.foreign_columns),
+        );
+    }
+    out.push_str(
+        "        ];
+",
+    );
+}
+
 pub fn generate(catalog: &Catalog) -> String {
     let mut out = String::new();
     let schema = key(&catalog.schema);
@@ -93,6 +141,7 @@ pub fn generate(catalog: &Catalog) -> String {
                     out.push_str("        };\n");
                 }
             }
+            relationships(&mut out, catalog, table);
             out.push_str("      };\n");
         }
         out.push_str("    };\n");
@@ -123,7 +172,13 @@ pub fn generate(catalog: &Catalog) -> String {
                         f.return_type
                             .trim_start_matches(&format!("{}.", catalog.schema)),
                     )
-                    .map(|t| format!("Database[{schema:?}][\"Tables\"][{:?}][\"Row\"]", t.name))
+                    .map(|t| {
+                        format!(
+                            "Database[{}][\"Tables\"][{}][\"Row\"]",
+                            string(&catalog.schema),
+                            string(&t.name)
+                        )
+                    })
                     .unwrap_or_else(|| ts_scalar(&f.return_type));
                 let returns = if f.returns_set {
                     format!("{base}[]")
@@ -164,4 +219,123 @@ pub fn generate(catalog: &Catalog) -> String {
     }
     out.push_str("    };\n  };\n}\n");
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::catalog::{Argument, ForeignKey, Function, Privileges};
+
+    fn column(name: &str, type_name: &str) -> Column {
+        Column {
+            name: name.into(),
+            type_name: type_name.into(),
+            full_type: type_name.into(),
+            category: 'N',
+            element_type: None,
+            enum_values: Vec::new(),
+            nullable: false,
+            has_default: false,
+            generated: false,
+            comment: None,
+        }
+    }
+
+    fn table(name: &str, columns: Vec<Column>, foreign_keys: Vec<ForeignKey>) -> Table {
+        Table {
+            name: name.into(),
+            kind: TableKind::Table,
+            columns,
+            primary_key: vec!["id".into()],
+            foreign_keys,
+            rls_enabled: true,
+            rls_forced: false,
+            comment: None,
+            privileges: [Privileges::default(); 3],
+        }
+    }
+
+    fn foreign_key(name: &str, column: &str, schema: &str, target: &str) -> ForeignKey {
+        ForeignKey {
+            name: name.into(),
+            columns: vec![column.into()],
+            foreign_schema: schema.into(),
+            foreign_table: target.into(),
+            foreign_columns: vec!["id".into()],
+        }
+    }
+
+    fn shop(schema: &str) -> Catalog {
+        let mut catalog = Catalog {
+            schema: schema.into(),
+            ..Catalog::default()
+        };
+        catalog.tables.insert(
+            "customers".into(),
+            table("customers", vec![column("id", "bigint")], Vec::new()),
+        );
+        catalog.tables.insert(
+            "orders".into(),
+            table(
+                "orders",
+                vec![column("id", "bigint"), column("customer_id", "bigint")],
+                vec![
+                    foreign_key(
+                        "orders_customer_id_fkey",
+                        "customer_id",
+                        schema,
+                        "customers",
+                    ),
+                    // Outside the exposed schema: not embeddable, not listed.
+                    foreign_key("orders_audit_fkey", "id", "audit", "events"),
+                ],
+            ),
+        );
+        catalog.functions.insert(
+            "recent_orders".into(),
+            vec![Function {
+                name: "recent_orders".into(),
+                args: vec![Argument {
+                    name: "since".into(),
+                    type_name: "timestamptz".into(),
+                    has_default: true,
+                }],
+                return_type: format!("{schema}.orders"),
+                returns_set: true,
+                returns_void: false,
+                volatility: 's',
+                comment: None,
+                executable: [true; 3],
+            }],
+        );
+        catalog
+    }
+
+    #[test]
+    fn relationships_list_foreign_keys_inside_the_schema() {
+        let out = generate(&shop("public"));
+        assert!(
+            out.contains(
+                r#"{ foreignKeyName: "orders_customer_id_fkey"; columns: ["customer_id"]; referencedRelation: "customers"; referencedColumns: ["id"] },"#
+            ),
+            "{out}"
+        );
+        assert!(!out.contains("orders_audit_fkey"), "{out}");
+        assert!(out.contains("Relationships: [];"), "{out}");
+    }
+
+    #[test]
+    fn function_rows_refer_to_the_table_with_plain_string_keys() {
+        let out = generate(&shop("public"));
+        assert!(
+            out.contains(r#"Returns: Database["public"]["Tables"]["orders"]["Row"][]"#),
+            "{out}"
+        );
+        let out = generate(&shop("my-app"));
+        assert!(out.contains(r#"  "my-app": {"#), "{out}");
+        assert!(
+            out.contains(r#"Returns: Database["my-app"]["Tables"]["orders"]["Row"][]"#),
+            "{out}"
+        );
+    }
 }

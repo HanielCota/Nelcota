@@ -1207,3 +1207,34 @@ async fn embedded_rows_follow_the_related_tables_rls() {
         ])
     );
 }
+
+#[tokio::test]
+async fn cors_exposes_what_a_browser_client_reads() {
+    let app = TestApp::spawn().await;
+    let reply = app
+        .request_with(
+            Method::GET,
+            "/rest/v1/products?select=id",
+            None,
+            None,
+            &[
+                ("origin", "https://app.example.com"),
+                ("prefer", "count=exact"),
+            ],
+        )
+        .await;
+    assert_eq!(reply.status, StatusCode::OK);
+    let exposed = reply.headers["access-control-expose-headers"]
+        .to_str()
+        .unwrap()
+        .to_ascii_lowercase();
+    for name in [
+        "content-range",
+        "etag",
+        "last-modified",
+        "retry-after",
+        "preference-applied",
+    ] {
+        assert!(exposed.contains(name), "{name} not exposed: {exposed}");
+    }
+}
