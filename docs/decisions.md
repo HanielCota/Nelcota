@@ -736,6 +736,20 @@ identifier right before `(` and a built-in keyword glued to it (`count(`),
 but not keywords that open a clause or a list (`in (`, `exists(`). Only the
 lazily loaded editor changes (D54); read-only SQL blocks stay plain.
 
+**D93. Plain language first, technical on demand; the overview guides.**
+Access rules read as what they mean for the app's users: a table is
+Protected, Locked (protection on, no rules) or Unprotected; grants become
+"Read only" or "Read and write" for Visitors and Signed-in users; a policy is
+a sentence ("Each user only sees and changes their own rows") when it matches
+a known shape (public or signed-in reading, owner by `auth.uid()`), and
+"Custom rule" with its SQL in view otherwise. A "Technical details" toggle,
+remembered per browser, brings back RLS, roles, grants and SQL. The overview
+opens with what needs action (unprotected and locked tables, each linked to
+its policies) and a next-steps list that is only ever ticked by the project's
+state: a first table, every API table protected, a user, and a first sign-in
+through the API (`signed_in_users`), which means an app is connected. Counts
+shrink to one line. Navigation and the accent colour stay (D55, D63).
+
 ### Known pending items
 
 - Filtering parent rows by their embeds (`!inner`) and self-referencing embeds.

@@ -8,16 +8,17 @@
   import Callout from '$lib/components/shared/Callout.svelte'
   import RlsBadge from '$lib/shared/schema/components/RlsBadge.svelte'
   import Grants from '$lib/shared/schema/components/Grants.svelte'
+  import TechnicalToggle from '$lib/shared/schema/components/TechnicalToggle.svelte'
   import LoadError from '$lib/components/shared/LoadError.svelte'
+  import NextSteps from '$lib/features/overview/components/NextSteps.svelte'
   import Table2 from '@lucide/svelte/icons/table-2'
-  import Users from '@lucide/svelte/icons/users'
-  import ShieldCheck from '@lucide/svelte/icons/shield-check'
-  import SquareFunction from '@lucide/svelte/icons/square-function'
   import ArrowUpRight from '@lucide/svelte/icons/arrow-up-right'
   import Plus from '@lucide/svelte/icons/plus'
   import { RemoteResource } from '$lib/remote-resource.svelte'
   import { api } from '$lib/api'
   import { href } from '$lib/router.svelte'
+  import { technical } from '$lib/shared/schema/technical.svelte'
+  import { attention, nextSteps } from '$lib/features/overview/next-steps'
   import type { Overview } from '$lib/types'
   import { errorMessage, intlLocale, t, type MessageKey } from '$lib/i18n/index.svelte'
 
@@ -31,60 +32,57 @@
   }
   onMount(() => { void load(); return () => resource.cancel() })
 
-
   const fmt = $derived(new Intl.NumberFormat(intlLocale()))
-
-  const stats = $derived(
+  const steps = $derived(data ? nextSteps(data) : [])
+  const alerts = $derived(data ? attention(data) : { exposed: [], locked: [] })
+  const summary = $derived(
     data
       ? [
-          { label: 'overview.stats.tables' as MessageKey, value: data.counts.tables, path: '/tables', icon: Table2 },
-          { label: 'overview.stats.users' as MessageKey, value: data.counts.users, path: '/users', icon: Users },
-          { label: 'overview.stats.policies' as MessageKey, value: data.counts.policies, path: '/policies', icon: ShieldCheck },
-          { label: 'overview.stats.functions' as MessageKey, value: data.counts.functions, path: '/sql', icon: SquareFunction },
+          { key: 'overview.summary.tables' as MessageKey, count: data.counts.tables, path: '/tables' },
+          { key: 'overview.summary.users' as MessageKey, count: data.counts.users, path: '/users' },
+          { key: 'overview.summary.policies' as MessageKey, count: data.counts.policies, path: '/policies' },
+          { key: 'overview.summary.functions' as MessageKey, count: data.counts.functions, path: '/sql' },
         ]
       : [],
   )
+  const policiesFor = (table: string) => href(`/policies?table=${encodeURIComponent(table)}`)
 </script>
 
 <div class="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-10 lg:py-10">
-  <PageHeader
-    title={t('overview.title')}
-    description={data ? t('overview.description', { schema: data.schema }) : undefined}
-  />
+  <PageHeader title={t('overview.title')} description={data ? t('overview.description') : undefined}>
+    {#snippet actions()}<TechnicalToggle />{/snippet}
+  </PageHeader>
 
   {#if failure}<LoadError message={errorMessage(failure)} onretry={load} busy={loading} />{/if}
   {#if !data && loading}
-    <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
-      {#each [0, 1, 2, 3] as i (i)}<Skeleton class="h-24 rounded-lg" />{/each}
-    </div>
+    <Skeleton class="h-56 rounded-lg" />
     <Skeleton class="mt-10 h-64 rounded-lg" />
   {:else if data}
-    <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
-      {#each stats as stat (stat.label)}
-        <a
-          href={href(stat.path)}
-          class="group rounded-lg border bg-card px-4 py-4 transition-colors hover:border-border-strong hover:bg-muted/40 sm:px-5"
-        >
-          <div class="flex items-center justify-between gap-2 text-muted-foreground"><stat.icon class="size-5" aria-hidden="true" /><ArrowUpRight class="size-4 transition-colors group-hover:text-brand" aria-hidden="true" /></div>
-          <p class="mt-3 text-sm text-muted-foreground">{t(stat.label)}</p>
-          <p class="mt-1 text-2xl font-semibold tabular-nums">{fmt.format(stat.value)}</p>
-          {#if stat.path === '/sql'}<p class="mt-1 text-xs text-muted-foreground">{t('overview.stats.inSql')}</p>{/if}
-        </a>
+    <div class="grid gap-3">
+      {#each alerts.exposed as table (table)}
+        <Callout variant="danger" title={t('overview.attention.exposed', { table })}>
+          {t('overview.attention.exposedHint')}
+          {#snippet actions()}<Button variant="outline" size="sm" href={policiesFor(table)}>{t('overview.attention.protect')}</Button>{/snippet}
+        </Callout>
+      {/each}
+      {#each alerts.locked as table (table)}
+        <Callout title={t('overview.attention.blocked', { table })}>
+          {t('overview.attention.blockedHint')}
+          {#snippet actions()}<Button variant="outline" size="sm" href={policiesFor(table)}>{t('overview.attention.addRule')}</Button>{/snippet}
+        </Callout>
       {/each}
     </div>
 
-    {#if data.exposed_without_rls.length}
-      <Callout
-        variant="danger"
-        title={t('overview.exposed.title', { tables: data.exposed_without_rls.join(', ') })}
-        class="mt-6"
-      >
-        {t('overview.exposed.before')}
-        <code class="text-xs text-foreground">alter table … enable row level security</code>
-        {t('overview.exposed.after')}
-        {#snippet actions()}<Button variant="outline" size="sm" href={href('/policies')}><ShieldCheck data-icon="inline-start" aria-hidden="true" />{t('common.reviewAccess')}</Button>{/snippet}
-      </Callout>
-    {/if}
+    <div class={[(alerts.exposed.length || alerts.locked.length) && 'mt-6']}>
+      <NextSteps {steps} />
+    </div>
+
+    <p class="mt-6 flex flex-wrap gap-x-2 gap-y-1 text-sm text-muted-foreground">
+      {#each summary as item, i (item.key)}
+        {#if i > 0}<span aria-hidden="true">·</span>{/if}
+        <a href={href(item.path)} class="hover:text-foreground hover:underline">{t(item.key, { count: item.count })}</a>
+      {/each}
+    </p>
 
     <section class="mt-10">
       <div class="mb-3 flex items-center justify-between gap-3">
@@ -92,7 +90,7 @@
         <Button variant="ghost" size="sm" href={href('/tables')}>{t('overview.tables.openEditor')}<ArrowUpRight data-icon="inline-end" aria-hidden="true" /></Button>
       </div>
 
-      <div class="overflow-hidden rounded-lg border bg-card">
+      <div class="overflow-x-auto rounded-lg border bg-card">
         {#if data.tables.length === 0}
           <EmptyState icon={Table2} title={t('overview.tables.empty')}>
             {t('overview.tables.emptyBefore')} <code class="text-xs text-foreground">nelcota migrate</code>
@@ -106,9 +104,9 @@
               <Table.Row class="hover:bg-transparent">
                 <Table.Head>{t('overview.tables.table')}</Table.Head>
                 <Table.Head class="text-right">{t('overview.tables.rows')}</Table.Head>
-                <Table.Head>RLS</Table.Head>
-                <Table.Head>anon</Table.Head>
-                <Table.Head>authenticated</Table.Head>
+                <Table.Head>{technical.on ? 'RLS' : t('overview.tables.protection')}</Table.Head>
+                <Table.Head>{technical.on ? 'anon' : t('policies.plain.who.anon')}</Table.Head>
+                <Table.Head>{technical.on ? 'authenticated' : t('policies.plain.who.authenticated')}</Table.Head>
               </Table.Row>
             </Table.Header>
             <Table.Body>

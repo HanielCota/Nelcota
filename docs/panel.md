@@ -77,7 +77,7 @@ without policies) and red (table exposed without RLS).
 
 | Page | What it has |
 |---|---|
-| **Overview** | counters (tables, users, policies, functions), a warning for tables without RLS and the table list with GRANTs |
+| **Overview** | what needs action (unprotected or locked tables), next steps ticked by the project's state (first table, data protected, a user, a first sign-in through the app), a one-line summary and the table list with who can read and write. Pages that show access rules read in plain language; "Technical details" shows RLS, roles, grants and SQL |
 | **Tables** | every table in the exposed schema, estimated rows, `anon`/`authenticated` GRANTs and RLS status. List, insert, edit and delete rows (tables with a primary key); create tables and edit the structure |
 | **SQL editor** | runs as the database owner (bypasses RLS); Ctrl+Enter runs; errors with code and position |
 | **Migrations** | panel changes not yet in a migration and the project's migrations, with "Generate migration" |

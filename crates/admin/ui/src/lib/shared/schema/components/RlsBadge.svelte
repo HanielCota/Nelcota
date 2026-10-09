@@ -2,6 +2,7 @@
   import type { Rls } from '$lib/types'
   import { t } from '$lib/i18n/index.svelte'
   import { Badge } from '$lib/components/ui/badge'
+  import { technical } from '$lib/shared/schema/technical.svelte'
   import ShieldCheck from '@lucide/svelte/icons/shield-check'
   import ShieldAlert from '@lucide/svelte/icons/shield-alert'
   import ShieldOff from '@lucide/svelte/icons/shield-off'
@@ -9,9 +10,12 @@
 
   let { rls }: { rls: Rls } = $props()
 
-  // Colour only for problems: no RLS (red) and RLS without policies (amber).
-  const label = $derived.by(() => {
-    switch (rls.state) {
+  type State = 'ok' | 'warn' | 'danger' | 'none' | 'view'
+  const state = $derived((['ok', 'warn', 'danger', 'none', 'view'].includes(rls.state) ? rls.state : 'view') as State)
+
+  // The Postgres view of the same state (D93: technical on demand).
+  const technicalLabel = $derived.by(() => {
+    switch (state) {
       case 'danger':
         return t('policies.rls.none')
       case 'warn':
@@ -24,17 +28,22 @@
         return t('policies.rls.view')
     }
   })
+  const label = $derived(technical.on ? technicalLabel : t(`policies.plain.state.${state}`))
+  const hint = $derived(`${t(`policies.plain.stateHint.${state}`)} (${technicalLabel})`)
 </script>
 
-<Badge variant="outline"
+<!-- Colour only for problems: unprotected (red) and locked (amber). -->
+<Badge
+  variant="outline"
+  title={hint}
   class={[
     'gap-1 whitespace-nowrap',
-    rls.state === 'danger' && 'border-destructive/30 bg-destructive/10 text-destructive',
-    rls.state === 'warn' && 'border-warning/30 bg-warning/10 text-warning',
-    rls.state === 'ok' && 'border-brand/25 bg-brand/5 text-brand',
-    (rls.state === 'none' || rls.state === 'view') && 'border-border-strong bg-muted text-muted-foreground',
+    state === 'danger' && 'border-destructive/30 bg-destructive/10 text-destructive',
+    state === 'warn' && 'border-warning/30 bg-warning/10 text-warning',
+    state === 'ok' && 'border-brand/25 bg-brand/5 text-brand',
+    (state === 'none' || state === 'view') && 'border-border-strong bg-muted text-muted-foreground',
   ]}
 >
-  {#if rls.state === 'ok'}<ShieldCheck aria-hidden="true" />{:else if rls.state === 'warn' || rls.state === 'danger'}<ShieldAlert aria-hidden="true" />{:else if rls.state === 'view'}<Table2 aria-hidden="true" />{:else}<ShieldOff aria-hidden="true" />{/if}
+  {#if state === 'ok'}<ShieldCheck aria-hidden="true" />{:else if state === 'warn' || state === 'danger'}<ShieldAlert aria-hidden="true" />{:else if state === 'view'}<Table2 aria-hidden="true" />{:else}<ShieldOff aria-hidden="true" />{/if}
   {label}
 </Badge>

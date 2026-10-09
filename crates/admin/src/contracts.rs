@@ -37,6 +37,7 @@ dto!(TablesResponse { schema: String, tables: Vec<TableSummary> });
 dto!(Counts {
     tables: usize,
     users: i64,
+    signed_in_users: i64,
     policies: usize,
     functions: usize
 });

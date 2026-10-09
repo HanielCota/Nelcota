@@ -30,6 +30,12 @@ describe('t', () => {
     expect(translate('en', 'common.page')).toBe('Page {page}')
   })
 
+  it('uses the plural for zero in Portuguese too', () => {
+    expect(translate('pt-BR', 'overview.summary.users', { count: 0 })).toBe('0 usuários')
+    expect(translate('pt-BR', 'overview.summary.users', { count: 1 })).toBe('1 usuário')
+    expect(translate('en', 'overview.summary.users', { count: 0 })).toBe('0 users')
+  })
+
   it('returns the key for a missing text (visible in development)', () => {
     expect(translate('en', 'common.nope')).toBe('common.nope')
   })

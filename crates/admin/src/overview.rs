@@ -18,13 +18,16 @@ pub async fn overview(State(state): State<AdminState>) -> ApiResult<crate::contr
         async {
             Ok::<_, ApiError>(
                 client
-                    .query_one("SELECT count(*) FROM auth.users", &[])
+                    .query_one(
+                        "SELECT count(*), count(last_sign_in_at) FROM auth.users",
+                        &[],
+                    )
                     .await?,
             )
         },
     )
     .await?;
-    let users: i64 = users.get(0);
+    let (signed_in_users, users): (i64, i64) = (users.get(1), users.get(0));
 
     let counts = join_all(catalog.tables.values().map(|table| {
         let estimate = estimates.get(&table.name).copied().unwrap_or(-1);
@@ -49,6 +52,7 @@ pub async fn overview(State(state): State<AdminState>) -> ApiResult<crate::contr
         "counts": {
             "tables": catalog.tables.len(),
             "users": users,
+            "signed_in_users": signed_in_users,
             "policies": policies.values().sum::<usize>(),
             "functions": catalog.functions.values().map(Vec::len).sum::<usize>(),
         },
