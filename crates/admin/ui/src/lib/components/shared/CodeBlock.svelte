@@ -46,7 +46,7 @@
     aria-label={wrap ? undefined : t('connect.code.label')}
     class={[
       'px-4 py-3.5 pr-14 font-mono text-xs leading-relaxed sm:text-[0.8125rem]',
-      wrap ? 'break-all whitespace-pre-wrap' : 'overflow-x-auto',
+      wrap ? 'break-words whitespace-pre-wrap' : 'overflow-x-auto',
     ]}>{#if tokens}{#each tokens as token, i (i)}{#if token.kind}<span class={COLOURS[token.kind]}>{token.text}</span>{:else}{token.text}{/if}{/each}{:else}{code}{/if}</pre>
   <button
     type="button"

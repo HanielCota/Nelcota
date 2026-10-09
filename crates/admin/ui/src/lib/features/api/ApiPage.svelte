@@ -113,7 +113,7 @@
     ]
 </script>
 
-<div class="mx-auto grid w-full max-w-page gap-6 px-4 pt-2 pb-12 sm:px-6 lg:px-8 [&>:first-child]:mb-0">
+<div class="mx-auto grid w-full max-w-page gap-6 px-4 pt-2 pb-12 *:min-w-0 sm:px-6 lg:px-8 [&>:first-child]:mb-0">
   <PageHeader title={t('connect.title')} description={t('connect.description')}>
     {#snippet actions()}
       <Button variant="outline" href="/rest/v1/" target="_blank" rel="noopener">
@@ -122,7 +122,7 @@
     {/snippet}
   </PageHeader>
 
-  <div class="grid gap-6">
+  <div class="grid gap-6 *:min-w-0">
     <!-- Sections as pills under the title, like the other pages' tabs; the one
          in view is lit while scrolling. -->
     <!-- Sticks to the top of the scrolling area on a strip of page colour, so

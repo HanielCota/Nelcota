@@ -176,7 +176,7 @@
       />
       </div>
       <RunAsPicker viewer={runAs} labels={runAsLabels} warnOwner onchange={chooseRunAs} />
-      <div class="ml-auto flex shrink-0 flex-wrap items-center gap-2">
+      <div class="ml-auto flex min-w-0 max-w-full flex-wrap items-center justify-end gap-2">
         <!-- On screens without the sidebar, templates and saved queries live in a menu. -->
         <DropdownMenu.Root>
           <DropdownMenu.Trigger>
@@ -289,7 +289,7 @@
         />
       {:else if 'error' in response}
         <div class="p-4" role="alert">
-          <div class="rounded-md border border-destructive/30 px-4 py-3 text-sm">
+          <div class="rounded-2xl bg-destructive/10 px-4 py-3 text-sm">
             <p class="font-mono text-xs leading-relaxed text-destructive">
               {#if response.error.code}{response.error.code}:{' '}{/if}{response.error.message}
             </p>

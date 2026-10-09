@@ -97,7 +97,7 @@
   }
 </script>
 
-<div class="mx-auto grid w-full max-w-page gap-6 px-4 pt-2 pb-12 sm:px-6 lg:px-8 [&>:first-child]:mb-0">
+<div class="mx-auto grid w-full max-w-page gap-6 px-4 pt-2 pb-12 *:min-w-0 sm:px-6 lg:px-8 [&>:first-child]:mb-0">
   <PageHeader title={t('migrations.title')} description={t('migrations.description')} />
   <DatabaseTabs />
 
@@ -122,7 +122,7 @@
       </div>
     </div>
 
-    <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_24rem] xl:items-start">
+    <div class="grid gap-6 *:min-w-0 xl:grid-cols-[minmax(0,1fr)_24rem] xl:items-start">
       <div class="grid min-w-0 gap-6">
         <section class="grid gap-4 rounded-3xl bg-card p-5" aria-labelledby="migrations-pending">
           <div class="flex flex-wrap items-start justify-between gap-3">

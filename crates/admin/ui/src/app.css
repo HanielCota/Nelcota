@@ -28,7 +28,7 @@
 	--primary-border: oklch(0.74 0.19 153);
 	--primary-hover: oklch(0.7 0.19 153);
 	/* Text and icons in the brand colour: the stronger step keeps AA on white. */
-	--brand: oklch(0.55 0.15 152);
+	--brand: oklch(0.51 0.14 152);
 	--brand-soft: oklch(0.74 0.19 153 / 14%);
 	--secondary: oklch(0.94 0.003 260);
 	--secondary-foreground: oklch(0.205 0 0);
@@ -36,7 +36,7 @@
 	--muted-foreground: oklch(0.52 0.008 260);
 	--accent: oklch(0.94 0.003 260);
 	--accent-foreground: oklch(0.205 0 0);
-	--destructive: oklch(0.577 0.245 27.325);
+	--destructive: oklch(0.54 0.23 27.325);
 	--border: oklch(0 0 0 / 8%);
 	--border-strong: oklch(0 0 0 / 12%);
 	--input: oklch(0 0 0 / 12%);
@@ -99,7 +99,7 @@
 	--border: oklch(1 0 0 / 7%);
 	--border-strong: oklch(1 0 0 / 12%);
 	--input: oklch(1 0 0 / 12%);
-	--field: oklch(0.275 0.005 260);
+	--field: oklch(0.295 0.005 260);
 	--well: oklch(0.275 0.005 260);
 	--ring: oklch(0.87 0.16 152);
 	--chart-1: oklch(0.76 0.17 150);
@@ -226,6 +226,13 @@
 
 /* Panel-wide adjustments. */
 @layer base {
+	/* A one-column grid's track is `auto` by default and grows to its widest
+	   child (a long URL, a code line), pushing the page sideways on phones.
+	   Every grid starts at the container's width instead; grid-cols-*
+	   utilities, in a later layer, still set their own tracks. */
+	.grid {
+		grid-template-columns: minmax(0, 1fr);
+	}
 	:focus-visible {
 		outline: 2px solid var(--brand);
 		outline-offset: 2px;

@@ -116,7 +116,7 @@
 
 </script>
 
-<div class="mx-auto grid w-full max-w-page gap-6 px-4 pt-2 pb-12 sm:px-6 lg:px-8 [&>:first-child]:mb-0">
+<div class="mx-auto grid w-full max-w-page gap-6 px-4 pt-2 pb-12 *:min-w-0 sm:px-6 lg:px-8 [&>:first-child]:mb-0">
   <PageHeader title={t('policies.title')} description={t('policies.description')}>
     {#snippet actions()}<TechnicalToggle />{/snippet}
   </PageHeader>
@@ -151,7 +151,7 @@
       </div>
     </div>
 
-    <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_24rem] xl:items-start">
+    <div class="grid gap-6 *:min-w-0 xl:grid-cols-[minmax(0,1fr)_24rem] xl:items-start">
     <div class="grid min-w-0 gap-4">
     {#if data.tables.length === 0}
       <EmptyState icon={ShieldCheck} title={t('policies.noTables')} description={t('policies.noTablesHint')}>{#snippet actions()}<Button href={href('/tables?create=true')}><Plus data-icon="inline-start" aria-hidden="true" />{t('tables.editor.newTable')}</Button>{/snippet}</EmptyState>
@@ -216,10 +216,10 @@
                   </p>
                   <div class="col-start-1 grid min-w-0 gap-1 font-mono text-xs @4xl:col-start-auto">
                     {#if policy.using}
-                      {#if policy.using.length > 160}<details><summary class="cursor-pointer text-muted-foreground">USING · {t('common.details')}</summary><CodeBlock code={policy.using} lang="sql" wrap /></details>{:else}<p class="break-all"><span class="text-muted-foreground">using</span> {policy.using}</p>{/if}
+                      {#if policy.using.length > 160}<details><summary class="cursor-pointer text-muted-foreground">USING · {t('common.details')}</summary><CodeBlock code={policy.using} lang="sql" wrap /></details>{:else}<p class="break-words"><span class="text-muted-foreground">using</span> {policy.using}</p>{/if}
                     {/if}
                     {#if policy.check}
-                      {#if policy.check.length > 160}<details><summary class="cursor-pointer text-muted-foreground">WITH CHECK · {t('common.details')}</summary><CodeBlock code={policy.check} lang="sql" wrap /></details>{:else}<p class="break-all"><span class="text-muted-foreground">with check</span> {policy.check}</p>{/if}
+                      {#if policy.check.length > 160}<details><summary class="cursor-pointer text-muted-foreground">WITH CHECK · {t('common.details')}</summary><CodeBlock code={policy.check} lang="sql" wrap /></details>{:else}<p class="break-words"><span class="text-muted-foreground">with check</span> {policy.check}</p>{/if}
                     {/if}
                   </div>
                   {/if}

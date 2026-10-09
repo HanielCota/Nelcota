@@ -76,9 +76,9 @@
     {/each}
   </nav>
   {#if view === 'data'}
-    <div class="ml-auto flex flex-wrap items-center gap-2">
+    <div class="ml-auto flex min-w-0 max-w-full flex-wrap items-center justify-end gap-2">
       <RunAsPicker {viewer} labels={viewerLabels} onchange={onviewer} />
-      <div class="flex h-10 items-center gap-0.5 rounded-full bg-well p-1">
+      <div class="flex h-10 max-w-full items-center gap-0.5 overflow-x-auto rounded-full bg-well p-1">
       <Button
         variant={filterOpen || filterCount ? 'secondary' : 'ghost'}
         size="sm"

@@ -45,7 +45,7 @@
         {/each}
       </Select.Content>
     </Select.Root>
-    <span class="px-2 font-medium text-foreground tabular-nums">
+    <span class="px-2 font-medium whitespace-nowrap text-foreground tabular-nums">
       {info.pageCount
         ? t('tables.footer.pageOf', { page: fmt.format(data.page + 1), count: fmt.format(info.pageCount) })
         : t('tables.footer.page', { page: fmt.format(data.page + 1) })}
