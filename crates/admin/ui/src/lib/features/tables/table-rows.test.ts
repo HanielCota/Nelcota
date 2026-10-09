@@ -25,6 +25,15 @@ function fixture() {
 }
 
 describe('table row operations', () => {
+  it('clear forgets rows and selection, so a read as someone else never shows stale ones', async () => {
+    const { rows } = fixture()
+    await rows.load('docs', new URLSearchParams())
+    rows.selected = new Set([0])
+    rows.clear()
+    expect(rows.data).toBeNull()
+    expect(rows.selected.size).toBe(0)
+  })
+
   it('reconciles an edit by primary key after rows change position', async () => {
     const { rows, adapter } = fixture(), pending = deferred<{ count: number }>()
     adapter.update = vi.fn(() => pending.promise)

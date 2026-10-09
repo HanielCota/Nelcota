@@ -38,6 +38,13 @@ export class TableRows {
 
   cancel() { this.resource.cancel() }
 
+  /** Forgets the loaded rows, so a read as someone else never shows stale ones. */
+  clear() {
+    this.resource.clear()
+    this.target = undefined
+    this.selected = new Set()
+  }
+
   private async reload(table: string) {
     if (this.target?.table === table) await this.load(table, this.target.params)
   }
