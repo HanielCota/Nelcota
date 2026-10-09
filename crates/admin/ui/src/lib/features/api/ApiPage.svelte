@@ -14,6 +14,7 @@
   import { Button } from '$lib/components/ui/button'
   import PageHeader from '$lib/components/shared/PageHeader.svelte'
   import CodeBlock from '$lib/components/shared/CodeBlock.svelte'
+  import LangMark from '$lib/features/api/components/LangMark.svelte'
   import ServiceTokenCard from '$lib/features/api/components/ServiceTokenCard.svelte'
   import LoadError from '$lib/components/shared/LoadError.svelte'
   import EmptyState from '$lib/components/shared/EmptyState.svelte'
@@ -90,7 +91,7 @@
 
   const tab = (active: boolean) =>
     [
-      'h-8 cursor-pointer rounded-full px-3.5 text-sm transition-colors',
+      'flex h-8 cursor-pointer items-center gap-2 rounded-full px-3.5 text-sm transition-colors',
       active ? 'bg-nav-active font-medium text-nav-active-foreground' : 'text-muted-foreground hover:text-foreground',
     ]
 </script>
@@ -210,13 +211,13 @@
           {/if}
           <nav class="flex h-10 items-center gap-1 rounded-full bg-well p-1 sm:ml-auto" aria-label={t('connect.language')}>
             <button type="button" class={tab(lang === 'ts')} aria-pressed={lang === 'ts'} onclick={() => choose({ lang: 'ts' })}
-              >{t('connect.sdkLabel')}</button
+              ><LangMark lang="ts" />{t('connect.sdkLabel')}</button
             >
             <button type="button" class={tab(lang === 'curl')} aria-pressed={lang === 'curl'} onclick={() => choose({ lang: 'curl' })}
-              >curl</button
+              ><LangMark lang="curl" />curl</button
             >
             <button type="button" class={tab(lang === 'js')} aria-pressed={lang === 'js'} onclick={() => choose({ lang: 'js' })}
-              >JavaScript</button
+              ><LangMark lang="js" />JavaScript</button
             >
           </nav>
         </div>
