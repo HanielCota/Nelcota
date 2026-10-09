@@ -147,7 +147,7 @@
                 </summary>
                 <div class="mt-2"><CodeBlock code={change.statements
                     .map((s) => s.trim().replace(/;$/, '') + ';')
-                    .join('\n')} /></div>
+                    .join('\n')} lang="sql" /></div>
               </details>
             </li>
           {/each}

@@ -41,6 +41,8 @@
 	--border-strong: oklch(0 0 0 / 12%);
 	--input: oklch(0 0 0 / 12%);
 	--field: oklch(1 0 0);
+	/* Inset surface inside a card: code, tiles, rows. */
+	--well: oklch(0.965 0.002 260);
 	--ring: oklch(0.74 0.19 153);
 	/* Chart series: the brand green and a neutral grey. */
 	--chart-1: oklch(0.62 0.16 152);
@@ -98,6 +100,7 @@
 	--border-strong: oklch(1 0 0 / 12%);
 	--input: oklch(1 0 0 / 12%);
 	--field: oklch(0.275 0.005 260);
+	--well: oklch(0.275 0.005 260);
 	--ring: oklch(0.87 0.16 152);
 	--chart-1: oklch(0.76 0.17 150);
 	--chart-2: oklch(0.78 0 0);
@@ -160,6 +163,7 @@
 	--color-brand-soft: var(--brand-soft);
 	--color-nav: var(--nav);
 	--color-field: var(--field);
+	--color-well: var(--well);
 	--color-nav-active: var(--nav-active);
 	--color-nav-active-foreground: var(--nav-active-foreground);
 	--color-primary-hover: var(--primary-hover);

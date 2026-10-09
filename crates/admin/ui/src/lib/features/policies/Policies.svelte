@@ -169,7 +169,7 @@
       {#each visible as table (table.name)}
         <section class="@container grid gap-4 rounded-3xl bg-card p-5">
           <header class="flex flex-wrap items-center gap-3">
-            <span class="grid size-10 shrink-0 place-items-center rounded-full bg-field text-muted-foreground"><Rows3 class="size-[18px]" aria-hidden="true" /></span>
+            <span class="grid size-10 shrink-0 place-items-center rounded-full bg-well text-muted-foreground"><Rows3 class="size-[18px]" aria-hidden="true" /></span>
             <div class="grid min-w-0 gap-0.5">
               <div class="flex flex-wrap items-center gap-2">
                 <h2 class="text-base font-semibold">
@@ -187,7 +187,7 @@
             </div>
           </header>
           {#if table.policies.length === 0}
-            <p class="rounded-2xl bg-field px-4 py-3.5 text-sm text-muted-foreground">
+            <p class="rounded-2xl bg-well px-4 py-3.5 text-sm text-muted-foreground">
               {#if table.rls.enabled}
                 {t('policies.noPoliciesRlsBefore')} <code class="text-xs text-foreground">service_role</code> {t('policies.noPoliciesRlsAfter')}
               {:else}
@@ -199,7 +199,7 @@
               {#each table.policies as policy (policy.name)}
                 {@const meaning = describePolicy(policy)}
                 {@const showSql = technical.on || meaning.kind === 'custom'}
-                <div class={['grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-2xl bg-field px-4 py-3 text-sm', showSql && '@4xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,2fr)_auto] @4xl:items-start']}>
+                <div class={['grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-2xl bg-well px-4 py-3 text-sm', showSql && '@4xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,2fr)_auto] @4xl:items-start']}>
                   <div class="min-w-0">
                     <p class="break-words font-medium">
                       {sentence(meaning)}
@@ -216,10 +216,10 @@
                   </p>
                   <div class="col-start-1 grid min-w-0 gap-1 font-mono text-xs @4xl:col-start-auto">
                     {#if policy.using}
-                      {#if policy.using.length > 160}<details><summary class="cursor-pointer text-muted-foreground">USING · {t('common.details')}</summary><CodeBlock code={policy.using} wrap /></details>{:else}<p class="break-all"><span class="text-muted-foreground">using</span> {policy.using}</p>{/if}
+                      {#if policy.using.length > 160}<details><summary class="cursor-pointer text-muted-foreground">USING · {t('common.details')}</summary><CodeBlock code={policy.using} lang="sql" wrap /></details>{:else}<p class="break-all"><span class="text-muted-foreground">using</span> {policy.using}</p>{/if}
                     {/if}
                     {#if policy.check}
-                      {#if policy.check.length > 160}<details><summary class="cursor-pointer text-muted-foreground">WITH CHECK · {t('common.details')}</summary><CodeBlock code={policy.check} wrap /></details>{:else}<p class="break-all"><span class="text-muted-foreground">with check</span> {policy.check}</p>{/if}
+                      {#if policy.check.length > 160}<details><summary class="cursor-pointer text-muted-foreground">WITH CHECK · {t('common.details')}</summary><CodeBlock code={policy.check} lang="sql" wrap /></details>{:else}<p class="break-all"><span class="text-muted-foreground">with check</span> {policy.check}</p>{/if}
                     {/if}
                   </div>
                   {/if}

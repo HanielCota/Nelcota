@@ -120,7 +120,7 @@
         </div>
         <ul class="grid gap-3 md:grid-cols-3">
           {#each endpoints as endpoint (endpoint.path)}
-            <li class="grid content-start gap-1.5 rounded-2xl bg-field p-4">
+            <li class="grid content-start gap-1.5 rounded-2xl bg-well p-4">
               <p class="text-sm font-semibold">{endpoint.label}</p>
               <code class="text-xs break-all">{endpoint.path}</code>
               <p class="text-sm text-muted-foreground">{t(`connect.endpoints.${endpoint.id}`)}</p>
@@ -137,7 +137,7 @@
         <ul class="grid gap-3 md:grid-cols-3">
           {#each roles as role (role)}
             {@const Icon = roleIcons[role]}
-            <li class="flex flex-col gap-3 rounded-2xl bg-field p-4">
+            <li class="flex flex-col gap-3 rounded-2xl bg-well p-4">
               <div class="flex items-center gap-3">
                 <span class="grid size-10 shrink-0 place-items-center rounded-full bg-card text-muted-foreground"><Icon class="size-[18px]" aria-hidden="true" /></span>
                 <div class="grid min-w-0">
@@ -166,12 +166,12 @@
         </div>
         <ol class="grid gap-5">
           {#snippet step(n: number, title: string)}
-            <span class="grid size-7 shrink-0 place-items-center rounded-full bg-field text-xs font-semibold tabular-nums">{n}</span>
+            <span class="grid size-7 shrink-0 place-items-center rounded-full bg-well text-xs font-semibold tabular-nums">{n}</span>
             <h3 class="text-sm font-medium">{title}</h3>
           {/snippet}
           <li class="grid grid-cols-[1.75rem_minmax(0,1fr)] items-center gap-x-3 gap-y-2">
             {@render step(1, t('connect.sdk.install'))}
-            <div class="col-start-2"><CodeBlock code={setup.install} /></div>
+            <div class="col-start-2"><CodeBlock code={setup.install} lang="sh" /></div>
           </li>
           <li class="grid grid-cols-[1.75rem_minmax(0,1fr)] items-center gap-x-3 gap-y-2">
             {@render step(2, t('connect.sdk.types'))}
@@ -182,7 +182,7 @@
           </li>
           <li class="grid grid-cols-[1.75rem_minmax(0,1fr)] items-center gap-x-3 gap-y-2">
             {@render step(3, t('connect.sdk.client'))}
-            <div class="col-start-2"><CodeBlock code={setup.client} /></div>
+            <div class="col-start-2"><CodeBlock code={setup.client} lang="ts" /></div>
           </li>
         </ol>
       </section>
@@ -190,7 +190,7 @@
       <section id="api-examples" class="grid scroll-mt-24 gap-5 rounded-3xl bg-card p-6">
         <h2 class="text-lg font-semibold">{t('connect.examples')}</h2>
         <div class="flex flex-wrap items-center gap-3">
-          <nav class="flex h-10 items-center gap-1 rounded-full bg-field p-1" aria-label={t('connect.topic')}>
+          <nav class="flex h-10 items-center gap-1 rounded-full bg-well p-1" aria-label={t('connect.topic')}>
             <button type="button" class={tab(topic === 'tables')} aria-pressed={topic === 'tables'} onclick={() => choose({ topic: 'tables' })}
               >{t('connect.topics.tables')}</button
             >
@@ -208,7 +208,7 @@
               </Select.Content>
             </Select.Root>
           {/if}
-          <nav class="flex h-10 items-center gap-1 rounded-full bg-field p-1 sm:ml-auto" aria-label={t('connect.language')}>
+          <nav class="flex h-10 items-center gap-1 rounded-full bg-well p-1 sm:ml-auto" aria-label={t('connect.language')}>
             <button type="button" class={tab(lang === 'ts')} aria-pressed={lang === 'ts'} onclick={() => choose({ lang: 'ts' })}
               >{t('connect.sdkLabel')}</button
             >
@@ -234,7 +234,7 @@
                   <h3 class="text-sm font-medium">{t(`connect.snippets.${snippet.id}.label`)}</h3>
                   <p class="text-sm text-muted-foreground">{t(lang === 'ts' ? `connect.snippets.${snippet.id}.sdk` : `connect.snippets.${snippet.id}.description`, snippet.params)}</p>
                 </div>
-                <CodeBlock code={snippet.code[lang]} />
+                <CodeBlock code={snippet.code[lang]} lang={lang === 'curl' ? 'sh' : 'ts'} />
               </article>
             {/each}
           </div>

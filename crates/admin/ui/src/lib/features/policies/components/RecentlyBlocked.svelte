@@ -57,9 +57,9 @@
   {:else if !data}
     <Skeleton class="h-12" />
   {:else if data.requests.length === 0}
-    <p class="rounded-2xl bg-field px-4 py-3.5 text-sm text-muted-foreground">{t('policies.blocked.none')}</p>
+    <p class="rounded-2xl bg-well px-4 py-3.5 text-sm text-muted-foreground">{t('policies.blocked.none')}</p>
   {:else}
-    <ul class="divide-y overflow-hidden rounded-2xl bg-field">
+    <ul class="divide-y overflow-hidden rounded-2xl bg-well">
       {#each shown as request, index (`${request.at}-${index}`)}
         <li class="grid gap-1 px-4 py-3">
           <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm">
