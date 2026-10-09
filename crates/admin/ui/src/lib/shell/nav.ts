@@ -8,6 +8,7 @@ import ShieldCheck from '@lucide/svelte/icons/shield-check'
 import Boxes from '@lucide/svelte/icons/boxes'
 import Plug from '@lucide/svelte/icons/plug'
 import HardDrive from '@lucide/svelte/icons/hard-drive'
+import LogIn from '@lucide/svelte/icons/log-in'
 import type { MessageKey } from '$lib/i18n/index.svelte'
 import { route } from '$lib/router.svelte'
 
@@ -31,6 +32,7 @@ export const navGroups: NavGroup[] = [
     label: 'shell.groups.access',
     items: [
       { title: 'shell.pages.users', path: '/users', icon: Users },
+      { title: 'shell.pages.userSignIn', path: '/sign-in', icon: LogIn },
       { title: 'shell.pages.policies', path: '/policies', icon: ShieldCheck },
     ],
   },

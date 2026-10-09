@@ -11,8 +11,6 @@
   import TableEditor from '$lib/features/tables/TableEditor.svelte'
   import Users from '$lib/features/users/Users.svelte'
   import Storage from '$lib/features/storage/Storage.svelte'
-  import StorageBucket from '$lib/features/storage/StorageBucket.svelte'
-  import Policies from '$lib/features/policies/Policies.svelte'
   import Migrations from '$lib/features/migrations/Migrations.svelte'
   import NotFound from '$lib/shell/NotFound.svelte'
   import Projects from '$lib/features/projects/Projects.svelte'
@@ -99,12 +97,15 @@
               <Migrations />
             {:else if path === '/users'}
               <Users />
+            {:else if path === '/sign-in'}
+              {#await import('$lib/features/sign-in/SignIn.svelte') then m}<m.default />{/await}
             {:else if path === '/storage'}
               <Storage />
             {:else if bucketName}
-              <StorageBucket bucket={bucketName} />
+              <!-- Pages off the main path load on demand (the main chunk has a 900 kB budget). -->
+              {#await import('$lib/features/storage/StorageBucket.svelte') then m}<m.default bucket={bucketName} />{/await}
             {:else if path === '/policies'}
-              <Policies />
+              {#await import('$lib/features/policies/Policies.svelte') then m}<m.default />{/await}
             {:else if path === '/projects'}
               <Projects />
             {:else if path === '/connect'}

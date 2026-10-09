@@ -15,6 +15,7 @@ const ptBR = {
     projects: 'Projetos',
     notFound: 'Página não encontrada',
     signIn: 'Entrar',
+    userSignIn: 'Login dos usuários',
   },
   groups: {
     database: 'Banco de dados',
@@ -74,6 +75,7 @@ const en: Messages<typeof ptBR> = {
     projects: 'Projects',
     notFound: 'Page not found',
     signIn: 'Sign in',
+    userSignIn: 'User sign-in',
   },
   groups: {
     database: 'Database',

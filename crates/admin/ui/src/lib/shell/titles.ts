@@ -8,6 +8,7 @@ const titles: Record<string, MessageKey> = {
   '/sql': 'shell.pages.sql',
   '/migrations': 'shell.pages.migrations',
   '/users': 'shell.pages.users',
+  '/sign-in': 'shell.pages.userSignIn',
   '/storage': 'shell.pages.storage',
   '/policies': 'shell.pages.policies',
   '/projects': 'shell.pages.projects',
