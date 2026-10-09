@@ -824,17 +824,21 @@ load on demand so the main chunk stays inside its 900 kB budget.
 ## Panel redesign
 
 **D98. A dashboard look with real traffic, replacing D55's restraint and
-D63's sidebar.** Asked for a layout like a modern dashboard, the panel moves
-to pills across the top (the current page an inverted pill), large page
-titles and headline numbers, rounded cards layered by tone instead of
-borders, pill-shaped controls and the green accent filling primary actions.
-Workspaces (tables, SQL) become two cards side by side. Light and dark keep
-the same language. The overview's charts need data over time, so the server
-now counts API requests per minute (refused, server errors, a latency
-histogram for p95) for 24 hours in memory, alongside the D97 log: no write
-per request, gone on restart, which the overview says. Chart colours follow
-a validated pair per theme (green requests, violet refusals), checked for
-colour-vision deficiency, with a legend, a keyboard crosshair (a slider for
+D63's sidebar.** The panel follows a reference dashboard the user maintains:
+its tokens (oklch page and card tones, a bright green for actions, a 0.75rem
+base radius giving 26.4px cards), a three-column top bar with the pages as
+short pills and an account chip, full-width pages with 32px gutters, 24px
+titles inside and a large one on the overview, borderless cards, pill
+searches and lighter tables. The overview mirrors the reference layout: one
+period selector for the page, the period's traffic as the headline with
+meters, stat cards beside a chart, and three cards below (rows per table,
+recently blocked calls, what needs attention). The charts need data over
+time, so the server counts API requests per minute (refused, server errors,
+a latency histogram for p95) for 24 hours in memory, alongside the D97 log:
+no write per request, gone on restart, which the overview says. As in the
+reference, requests are a green area and refused calls a grey one; a grey
+series alone would fail a colour-vision check, so values stay reachable
+through the series filters, the tooltip, a keyboard crosshair (a slider for
 assistive technology) and a table view. The mascot and the syntax colours
 (D62, D92) stay; plain language first (D93) stays.
 
