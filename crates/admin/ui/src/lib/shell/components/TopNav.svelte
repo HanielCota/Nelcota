@@ -2,7 +2,6 @@
   import * as Sheet from '$lib/components/ui/sheet'
   import Menu from '@lucide/svelte/icons/menu'
   import Search from '@lucide/svelte/icons/search'
-  import Logo from './Logo.svelte'
   import ProjectSwitcher from '$lib/features/projects/components/ProjectSwitcher.svelte'
   import AccountMenu from './AccountMenu.svelte'
   import { palette } from '$lib/shell/palette.svelte'
@@ -23,14 +22,17 @@
 </script>
 
 {#snippet search()}
+  <!-- Search everything (the command palette), with its shortcut in view so it
+       does not read as one more page. -->
   <button
     type="button"
     onclick={() => (palette.open = true)}
-    class="grid size-10 shrink-0 cursor-pointer place-items-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-    aria-label={t('shell.topbar.searchLabel')}
-    title={`${t('shell.topbar.searchLabel')} (${isMac ? '⌘' : 'Ctrl'} K)`}
+    class="flex h-14 shrink-0 cursor-pointer items-center gap-2.5 rounded-full bg-nav px-4 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground 2xl:pr-2"
+    aria-label={`${t('shell.topbar.searchLabel')} (${isMac ? '⌘' : 'Ctrl'} K)`}
   >
-    <Search class="size-[18px]" />
+    <Search class="size-[18px]" aria-hidden="true" />
+    <span class="hidden 2xl:inline">{t('shell.topbar.searchLabel')}</span>
+    <kbd class="hidden h-9 items-center rounded-full bg-well px-3 font-sans text-xs 2xl:flex">{isMac ? '⌘' : 'Ctrl'} K</kbd>
   </button>
 {/snippet}
 
@@ -53,18 +55,15 @@
       >
         <Menu class="size-5" />
       </button>
-      <a href={href('/')} class="shrink-0" aria-label={t('shell.pages.overview')}><Logo mark size="lg" /></a>
-      <div class="hidden min-w-0 max-w-52 sm:block"><ProjectSwitcher /></div>
+      <div class="min-w-0 max-w-64"><ProjectSwitcher /></div>
     </div>
 
     <nav aria-label={t('shell.nav.main')} class="hidden items-center gap-1 rounded-full bg-nav p-1.5 lg:flex">
       {@render pills()}
-      {@render search()}
     </nav>
 
     <div class="flex min-w-0 items-center justify-end gap-2">
-      <!-- Below lg the pill bar moves down, so search stays up here. -->
-      <div class="lg:hidden">{@render search()}</div>
+      {@render search()}
       <AccountMenu />
     </div>
   </div>
@@ -79,9 +78,8 @@
 <Sheet.Root bind:open={mobileOpen}>
   <Sheet.Content side="left" class="w-72 gap-0 p-0">
     <Sheet.Title class="sr-only">{t('shell.nav.main')}</Sheet.Title>
-    <div class="flex h-16 shrink-0 items-center gap-2 px-4">
-      <Logo mark />
-      <div class="min-w-0 flex-1 pr-8"><ProjectSwitcher /></div>
+    <div class="flex shrink-0 items-center gap-2 p-3 pr-12">
+      <div class="min-w-0 flex-1"><ProjectSwitcher /></div>
     </div>
     <nav class="grid content-start gap-1 overflow-y-auto p-3" aria-label={t('shell.nav.main')}>
       {#each navPills as item (item.path)}

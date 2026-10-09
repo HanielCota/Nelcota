@@ -4,7 +4,7 @@
   import Sun from '@lucide/svelte/icons/sun'
   import Moon from '@lucide/svelte/icons/moon'
   import LogOut from '@lucide/svelte/icons/log-out'
-  import Settings from '@lucide/svelte/icons/settings'
+  import ChevronDown from '@lucide/svelte/icons/chevron-down'
   import ImageUp from '@lucide/svelte/icons/image-up'
   import Languages from '@lucide/svelte/icons/languages'
   import Avatar from '$lib/features/profile/components/Avatar.svelte'
@@ -38,13 +38,11 @@
         aria-label={t('shell.account.label')}
       >
         <Avatar class="size-11 text-sm" />
-        <span class="hidden min-w-0 flex-1 flex-col leading-tight sm:flex">
+        <span class="hidden min-w-0 flex-1 flex-col leading-tight sm:flex lg:hidden xl:flex">
           <span class="truncate text-sm font-semibold" title={session.email}>{displayName}</span>
           <span class="truncate text-xs text-muted-foreground">{t('shell.account.role')}</span>
         </span>
-        <span class="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-muted-foreground" aria-hidden="true">
-          <Settings class="size-[18px]" />
-        </span>
+        <ChevronDown class="mr-2 hidden size-4 shrink-0 text-muted-foreground sm:block lg:hidden xl:block" aria-hidden="true" />
       </button>
     {/snippet}
   </DropdownMenu.Trigger>

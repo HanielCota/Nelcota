@@ -49,7 +49,12 @@ because of the CSP `font-src 'self'`). Dark theme by default; theme and
 language are in the account menu, at the top right.
 
 The pages are pills across the top (on narrow screens, in their own row; on
-phones, in the menu). **User sign-in** is reached from the Users page. The
+phones, in the menu). **Database** groups Tables, SQL and Migrations, with
+tabs between them inside each page; **User sign-in** is reached from the
+Users page. The project chip at the top left shows the project, whether it
+runs locally or on which host, and a dot for whether the server answers
+(checked every minute and when the window regains focus). Search (Ctrl K)
+sits beside the account chip. The
 **overview** leads with the API's traffic: requests in the last 24 hours,
 the share refused and the share that failed, then cards for tables (how
 many are protected), users (how many have signed in from the app) and
