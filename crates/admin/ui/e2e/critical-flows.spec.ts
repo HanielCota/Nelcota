@@ -47,6 +47,29 @@ test('the SQL editor runs a selection and underlines where it failed', async ({ 
   await page.keyboard.type(' ')
   await expect(page.locator('.cm-sql-error')).toHaveCount(0)
 })
+test('the SQL editor runs as a visitor or a chosen user', async ({ page }) => {
+  const sent: unknown[] = []
+  await page.route('**/admin/api/sql', async route => {
+    sent.push(route.request().postDataJSON().run_as)
+    await route.fulfill({ json: { results: [], results_truncated: false } })
+  })
+  await page.goto('/admin/sql')
+  await page.getByRole('textbox', { name: 'Editor SQL', exact: true }).waitFor()
+  const run = page.getByRole('button', { name: 'Executar', exact: true })
+  await run.click()
+  await page.getByRole('button', { name: /^Executar como: Dono do banco/ }).click()
+  await page.getByRole('menuitem', { name: /Visitante/ }).click()
+  await run.click()
+  await page.getByRole('button', { name: /^Executar como: Visitante/ }).click()
+  await page.getByRole('menuitem', { name: /Usuário logado/ }).click()
+  await page.getByRole('option', { name: /bruno@example.test/ }).first().click()
+  await expect(page.getByRole('button', { name: /^Executar como: bruno@example.test/ })).toBeVisible()
+  await run.click()
+  await expect.poll(() => sent.length).toBe(3)
+  expect(sent[0]).toEqual({ role: 'owner' })
+  expect(sent[1]).toEqual({ role: 'anon' })
+  expect(sent[2]).toMatchObject({ role: 'authenticated' })
+})
 test('upload conflicts keep their original destination and SQL cells show full content', async ({ page }) => { await uploadsAndDetails(page) })
 test('an incompatible API response can be retried without losing the page', async ({ page }) => {
   let failed = true

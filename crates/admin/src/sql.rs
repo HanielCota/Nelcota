@@ -1,6 +1,8 @@
 //! HTTP adaptation for the SQL editor.
 mod executor;
+mod run_as;
 pub use executor::{SqlBusy, SqlExecutor};
+use run_as::RunAs;
 
 use crate::{AdminState, ApiError};
 use axum::{
@@ -17,10 +19,17 @@ type ApiResult<T> = Result<Json<T>, ApiError>;
 #[derive(Deserialize)]
 pub struct SqlRequest {
     sql: String,
+    /// Who the run acts as; the database owner when absent.
+    #[serde(default)]
+    run_as: RunAs,
 }
 
 pub async fn run(State(state): State<AdminState>, Json(request): Json<SqlRequest>) -> Response {
-    match state.sql.execute(&state.db_config, &request.sql).await {
+    let claims = match request.run_as.claims(&state.db).await {
+        Ok(claims) => claims,
+        Err(err) => return err.into_response(),
+    };
+    match state.sql.execute(&state.db_config, &request.sql, claims.as_ref()).await {
         Ok(result) => Json(result).into_response(),
         Err(_) => (StatusCode::SERVICE_UNAVAILABLE, Json(serde_json::json!({
             "error": "SQL execution is busy; wait for a running query to finish", "code": "sql_busy"
