@@ -74,7 +74,7 @@
     <DropdownMenu.Trigger>
       {#snippet child({ props })}{@render chip(props)}{/snippet}
     </DropdownMenu.Trigger>
-    <DropdownMenu.Content align="start" class="w-72">
+    <DropdownMenu.Content align="start" class="min-w-72">
       <DropdownMenu.Label class="text-xs font-normal text-muted-foreground">
         {data.sso ? t('shell.projects.heading') : t('shell.projects.separateLogin')}
       </DropdownMenu.Label>

@@ -29,7 +29,7 @@
   {:else if kind === 'boolean'}
     <span class={['font-mono', value === 'true' ? 'text-foreground' : 'text-muted-foreground']}>{value}</span>
   {:else if kind === 'enum'}
-    <span class="rounded border px-1.5 py-px text-2xs">{value}</span>
+    <span class="rounded-full bg-well px-2 py-0.5 text-2xs">{value}</span>
   {:else if kind === 'json'}
     <span class="text-muted-foreground">{compactJson(value)}</span>
   {:else}

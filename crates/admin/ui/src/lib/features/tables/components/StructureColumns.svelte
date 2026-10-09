@@ -19,12 +19,12 @@
     ondelete: (column: ColumnInfo) => void
   } = $props()
 
-  const tag = 'rounded-md border border-border-strong bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground'
+  const tag = 'rounded-full bg-card px-2 py-0.5 text-xs font-medium text-muted-foreground'
 </script>
 
-<section class="@container rounded-3xl bg-card">
-  <header class="flex items-center justify-between gap-4 border-b px-5 py-4">
-    <div>
+<section class="@container rounded-3xl bg-well">
+  <header class="flex flex-wrap items-center justify-between gap-4 border-b px-5 py-4">
+    <div class="min-w-0 flex-1 basis-60">
       <h2 class="text-base font-semibold">{t('tables.structure.columnsTitle')}</h2>
       <p class="text-sm text-muted-foreground">{t('tables.structure.columnsCount', { count: structure.columns.length })}</p>
     </div>

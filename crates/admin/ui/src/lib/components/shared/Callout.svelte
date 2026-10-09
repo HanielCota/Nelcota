@@ -23,8 +23,8 @@
 <Alert.Root
   variant={variant === 'danger' ? 'destructive' : 'default'}
   class={[
-    'rounded-lg border px-4 py-3 text-sm',
-    variant === 'danger' ? 'border-destructive/30 bg-destructive/5' : 'border-warning/30 bg-warning/5',
+    'rounded-2xl px-4 py-3 text-sm',
+    variant === 'danger' ? 'bg-destructive/10' : 'bg-warning/10',
     className,
   ]}
 >

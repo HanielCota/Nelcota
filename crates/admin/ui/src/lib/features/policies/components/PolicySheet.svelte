@@ -173,7 +173,7 @@
           <div class="grid gap-2 sm:grid-cols-3">
             {#each ROLES as role (role)}
               <label
-                class="flex cursor-pointer items-center gap-3 rounded-md border bg-card px-3 py-2.5 text-sm transition-colors hover:border-border-strong has-data-checked:border-brand/50"
+                class="flex cursor-pointer items-center gap-3 rounded-2xl border border-transparent bg-well px-3 py-2.5 text-sm transition-colors hover:border-border-strong has-data-checked:border-brand/50"
               >
                 <Checkbox checked={policy.roles.includes(role)} onCheckedChange={(v) => toggleRole(role, v === true)} />
                 <span class="grid">

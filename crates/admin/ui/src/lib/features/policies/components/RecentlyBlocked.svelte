@@ -78,7 +78,7 @@
       {/each}
     </ul>
     {#if data.requests.length > PREVIEW}
-      <Button variant="ghost" size="sm" class="justify-self-start" onclick={() => (expanded = !expanded)}>
+      <Button variant="outline" size="sm" class="w-full" onclick={() => (expanded = !expanded)}>
         {expanded ? t('policies.blocked.showLess') : t('policies.blocked.showAll', { count: data.requests.length })}
       </Button>
     {/if}

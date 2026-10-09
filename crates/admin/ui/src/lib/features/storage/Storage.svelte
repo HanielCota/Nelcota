@@ -101,12 +101,12 @@
 
   {#if error}<LoadError message={error} onretry={load} busy={loading} />{/if}
   {#if data === null}
-    {#if loading}<Skeleton class="h-48 rounded-lg" />{/if}
+    {#if loading}<Skeleton class="h-48 rounded-3xl" />{/if}
   {:else if !data.enabled}
-    <EmptyState icon={HardDrive} class="rounded-lg border" title={t('storage.disabled')} description={t('storage.disabledDescription')} />
+    <EmptyState icon={HardDrive} class="rounded-3xl bg-card" title={t('storage.disabled')} description={t('storage.disabledDescription')} />
   {:else}
     {#if data.buckets.length === 0}
-      <EmptyState icon={HardDrive} class="rounded-lg border" title={t('storage.empty')} description={t('storage.emptyDescription')}>
+      <EmptyState icon={HardDrive} class="rounded-3xl bg-card" title={t('storage.empty')} description={t('storage.emptyDescription')}>
         {#snippet actions()}
           <Button variant="outline" onclick={() => edit(null)}><Plus data-icon="inline-start" aria-hidden="true" />{t('storage.newBucket')}</Button>
         {/snippet}

@@ -62,7 +62,7 @@
 </script>
 
 <fieldset class="grid min-w-0 gap-6" disabled={busy !== null} aria-busy={busy !== null}>
-  <section class="rounded-3xl bg-card p-5">
+  <section class="rounded-3xl bg-well p-5">
     <h2 class="text-base font-semibold">{t('tables.settings.table')}</h2>
     <form
       class="mt-3 grid gap-3 sm:grid-cols-[1fr_2fr_auto] sm:items-end"
@@ -83,15 +83,15 @@
     </form>
   </section>
 
-  <section class="flex flex-wrap items-center gap-4 rounded-3xl bg-card p-5">
+  <section class="flex flex-wrap items-center gap-4 rounded-3xl bg-well p-5">
     {#if structure.rls_enabled}
-      <div class="flex-1">
+      <div class="min-w-0 flex-1 basis-60">
         <h2 class="text-base font-semibold">{t('tables.settings.rls')}</h2>
         <p class="mt-0.5 text-sm text-muted-foreground">{t('tables.settings.rlsOn')}</p>
       </div>
       <Button variant="outline" disabled={busy !== null} onclick={() => (disableRlsOpen = true)}><ShieldOff data-icon="inline-start" aria-hidden="true" />{t('tables.settings.disable')}</Button>
     {:else}
-      <div class="flex-1">
+      <div class="min-w-0 flex-1 basis-60">
         <h2 class="text-base font-semibold">{t('tables.settings.rls')}</h2>
         <p class="mt-0.5 text-sm text-destructive">{t('tables.settings.rlsOff')}</p>
       </div>
@@ -99,9 +99,9 @@
     {/if}
   </section>
 
-  <section class="grid gap-3 rounded-3xl bg-card p-5">
+  <section class="grid gap-3 rounded-3xl bg-well p-5">
     <div class="flex flex-wrap items-center justify-between gap-3">
-      <div>
+      <div class="min-w-0 flex-1 basis-60">
         <h2 class="text-base font-semibold">{t('tables.settings.grants')}</h2>
         <p class="mt-0.5 text-sm text-muted-foreground">{t('tables.settings.grantsHint')}</p>
       </div>
@@ -110,11 +110,11 @@
         {t('tables.settings.saveGrants')}
       </Button>
     </div>
-    <GrantsEditor bind:grants />
+    <GrantsEditor bind:grants surface="bg-card" />
   </section>
 
-  <section class="flex flex-wrap items-center gap-4 rounded-lg border border-destructive/30 p-5">
-    <div class="flex-1">
+  <section class="flex flex-wrap items-center gap-4 rounded-2xl bg-destructive/10 p-5">
+    <div class="min-w-0 flex-1 basis-60">
       <h2 class="text-base font-semibold">{t('tables.settings.dropTitle')}</h2>
       <p class="mt-0.5 text-sm text-muted-foreground">{t('tables.settings.dropHint')}</p>
     </div>

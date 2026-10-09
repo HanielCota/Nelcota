@@ -245,8 +245,9 @@
             tabindex={active.row === i && active.col === c ? 0 : -1}
             aria-selected={isSelected}
             class={[
-              'group/cell border-r border-b p-0 focus-visible:bg-brand/[0.06] focus-visible:outline-offset-[-2px]',
-              editable && !column.generated && 'cursor-text',
+              'group/cell border-b p-0 focus-visible:bg-brand/[0.06] focus-visible:outline-offset-[-2px]',
+              // Only rows are ruled; an editable cell lights up under the pointer.
+              editable && !column.generated && 'cursor-text hover:bg-accent/50',
             ]}
             onfocus={() => (active = { row: i, col: c })}
             onkeydown={(e) => onCellKey(e, i, c)}

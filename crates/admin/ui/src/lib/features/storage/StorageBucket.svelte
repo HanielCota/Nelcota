@@ -140,7 +140,7 @@
   {#if error}<LoadError message={error} onretry={() => load()} busy={loading} />{/if}
   {#if info}
     <BucketAccess {bucket} />
-    <button type="button" disabled={uploading !== null} class={['mb-4 flex w-full cursor-pointer flex-col items-center gap-2 rounded-lg border border-dashed px-4 py-5 text-sm text-muted-foreground transition-colors hover:border-brand/50 hover:bg-muted/30 disabled:cursor-wait', dragging && 'border-brand bg-brand/5 text-brand']} onclick={() => picker?.click()}><Upload class="size-5" aria-hidden="true" />{t('storage.browser.dropHint')}</button>
+    <button type="button" disabled={uploading !== null} class={['mb-4 flex w-full cursor-pointer flex-col items-center gap-2 rounded-3xl border-2 border-dashed border-border bg-card px-4 py-6 text-sm text-muted-foreground transition-colors hover:border-brand/50 hover:text-foreground disabled:cursor-wait', dragging && 'border-brand bg-brand/5 text-brand']} onclick={() => picker?.click()}><Upload class="size-5" aria-hidden="true" />{t('storage.browser.dropHint')}</button>
   {/if}
   {#if queue.length}
     <section class="mb-4 grid gap-3 rounded-3xl bg-card p-4" aria-label={t('storage.browser.uploadProgress')}>
@@ -152,7 +152,7 @@
   {/if}
 
   {#if info === null}
-    <EmptyState class="rounded-lg border" title={t('storage.browser.notFound', { bucket })}>
+    <EmptyState class="rounded-3xl bg-card" title={t('storage.browser.notFound', { bucket })}>
       {#snippet actions()}
         <Button variant="outline" href={href('/storage')}>{t('storage.browser.back')}</Button>
       {/snippet}
@@ -168,10 +168,10 @@
     </nav>
 
     {#if files === null}
-      {#if loading}<Skeleton class="h-48 rounded-lg" />{/if}
+      {#if loading}<Skeleton class="h-48 rounded-3xl" />{/if}
     {:else if files.length === 0 && folders.length === 0}
       <EmptyState
-        class="rounded-lg border"
+        class="rounded-3xl bg-card"
         icon={Folder}
         title={prefix ? t('storage.browser.emptyFolder') : t('storage.browser.emptyBucket')}
         description={t('storage.browser.emptyFolderDescription')}

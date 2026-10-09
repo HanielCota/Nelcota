@@ -64,14 +64,14 @@
   }
 </script>
 
-<div class="rounded-3xl bg-card">
-  <div class="flex flex-wrap items-center gap-2.5 p-3">
-    <Input bind:value={column.name} placeholder={t('tables.columns.name')} class="w-40 font-mono text-xs" aria-label={t('tables.columns.nameLabel')} />
+<div class="rounded-2xl bg-well">
+  <div class="flex flex-wrap items-center gap-2 p-3">
+    <Input bind:value={column.name} placeholder={t('tables.columns.name')} class="w-32 font-mono text-xs" aria-label={t('tables.columns.nameLabel')} />
     <Input
       bind:value={column.data_type}
       list={`${id}-types`}
       placeholder={t('tables.columns.type')}
-      class="w-40 font-mono text-xs"
+      class="w-32 font-mono text-xs"
       aria-label={t('tables.columns.typeLabel')}
     />
     <datalist id={`${id}-types`}>
@@ -83,7 +83,7 @@
       list={`${id}-defaults`}
       placeholder={column.identity ? 'identity' : t('tables.columns.defaultPlaceholder')}
       disabled={column.identity}
-      class="min-w-32 flex-1 font-mono text-xs"
+      class="min-w-24 flex-1 font-mono text-xs"
       aria-label={t('tables.columns.defaultLabel')}
     />
     <datalist id={`${id}-defaults`}>

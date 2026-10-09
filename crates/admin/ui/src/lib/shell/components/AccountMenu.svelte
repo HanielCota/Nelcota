@@ -51,7 +51,7 @@
       <Avatar class="size-9 text-sm" />
       <div class="min-w-0">
         <p class="text-xs text-muted-foreground">{t('shell.account.signedInAs')}</p>
-        <p class="truncate text-sm font-medium">{session.email}</p>
+        <p class="text-sm font-medium break-all">{session.email}</p>
       </div>
     </div>
     <DropdownMenu.Separator />

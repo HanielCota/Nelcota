@@ -99,14 +99,14 @@
       <p class="text-sm text-muted-foreground">{t('storage.access.publicNote')}</p>
     {/if}
     {#if access.policies.length}
-      <ul class="divide-y rounded-md border">
+      <ul class="divide-y overflow-hidden rounded-2xl bg-well">
         {#each access.policies as policy (policy.name)}
           <li class="flex items-start gap-3 px-3 py-2.5">
             <div class="grid min-w-0 flex-1 gap-1">
               <p class="text-sm">{sentence(policy)}</p>
               {#if policy.all_buckets}<p class="text-xs text-muted-foreground">{t('storage.access.allBuckets')}</p>{/if}
               {#if technical.on || describeRule(policy, bucket).kind === 'custom'}
-                <p class="font-mono text-xs break-all text-muted-foreground">
+                <p class="font-mono text-xs break-words text-muted-foreground">
                   {policy.name} · {policy.command} · {policy.roles.join(', ')}{#if policy.using} · USING {policy.using}{/if}{#if policy.check} · WITH CHECK {policy.check}{/if}
                 </p>
               {/if}

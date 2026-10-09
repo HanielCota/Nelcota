@@ -173,10 +173,10 @@
 
   {#if error}<LoadError message={error} onretry={load} busy={loading} />{/if}
   {#if users === null}
-    {#if loading}<Skeleton class="h-64 rounded-lg" />{/if}
+    {#if loading}<Skeleton class="h-64 rounded-3xl" />{/if}
   {:else if users.length === 0}
     <EmptyState
-      class="rounded-lg border"
+      class="rounded-3xl bg-card"
       icon={appliedQuery ? Search : UsersIcon}
       title={appliedQuery ? t('users.noResults') : t('users.empty')}
       description={appliedQuery
