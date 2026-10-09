@@ -341,7 +341,7 @@
               {:else if viewing}
                 <p class="p-8 text-center text-sm text-muted-foreground">{t('tables.viewAs.hidden')}</p>
               {:else}
-                <GridState state="empty" insertable={data.table.insertable} oninsert={() => openSheet(null)} />
+                <GridState state="empty" table={name} insertable={data.table.insertable} oninsert={() => openSheet(null)} />
               {/if}
             {/if}
           {/if}

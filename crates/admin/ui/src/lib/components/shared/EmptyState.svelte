@@ -22,8 +22,8 @@
 </script>
 
 <div class={['px-6 py-12 text-center', className]}>
-  <div class="mx-auto mb-4 grid size-12 place-items-center rounded-full bg-well text-muted-foreground"><Icon class="size-6" aria-hidden="true" /></div>
-  <p class="text-sm font-medium">{title}</p>
+  <div class="mx-auto mb-4 grid size-14 place-items-center rounded-full bg-well text-muted-foreground"><Icon class="size-6" aria-hidden="true" /></div>
+  <p class="text-base font-semibold">{title}</p>
   {#if description || children}
     <p class="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
       {#if children}{@render children()}{:else}{description}{/if}

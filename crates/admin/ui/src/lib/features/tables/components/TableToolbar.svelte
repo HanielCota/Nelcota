@@ -55,7 +55,7 @@
   ] as const
 </script>
 
-<div class="flex min-h-14 shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b bg-card px-4 py-2.5">
+<div class="flex min-h-16 shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b bg-card px-5 py-3">
   <a
     href={href('/tables')}
     class="-ml-1 grid size-9 place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground lg:hidden"
@@ -63,7 +63,7 @@
   >
   <h1 class="min-w-0 truncate text-base font-semibold">{name}</h1>
   {#if data}<RlsBadge rls={data.table.rls} />{/if}
-  <nav class="ml-1 flex h-10 items-center gap-0.5 rounded-full bg-secondary p-1 text-sm" aria-label={t('tables.toolbar.views')}>
+  <nav class="ml-1 flex h-10 items-center gap-0.5 rounded-full bg-well p-1 text-sm" aria-label={t('tables.toolbar.views')}>
     {#each tabs as tab (tab.view)}
       <a
         href={href(`/tables/${enc(name)}${tab.suffix}${route.query.size ? `?${route.query}` : ''}`)}
@@ -78,6 +78,7 @@
   {#if view === 'data'}
     <div class="ml-auto flex flex-wrap items-center gap-2">
       <RunAsPicker {viewer} labels={viewerLabels} onchange={onviewer} />
+      <div class="flex h-10 items-center gap-0.5 rounded-full bg-well p-1">
       <Button
         variant={filterOpen || filterCount ? 'secondary' : 'ghost'}
         size="sm"
@@ -136,6 +137,7 @@
       <Button variant="ghost" size="icon-sm" disabled={loading} onclick={onreload} aria-label={t('tables.toolbar.reload')} title={t('tables.toolbar.reload')}>
         <RefreshCw class={loading ? 'animate-spin' : ''} />
       </Button>
+      </div>
       {#if data?.table.insertable}
         <Button size="sm" disabled={loading} onclick={oninsert}><Plus />{t('tables.toolbar.insertRow')}</Button>
       {/if}

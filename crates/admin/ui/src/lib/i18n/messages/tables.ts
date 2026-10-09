@@ -127,7 +127,10 @@ const ptBR = {
     noMatch: 'Nenhuma linha para esses filtros',
     clearFilters: 'Limpar filtros',
     empty: 'Tabela vazia',
+    emptyHint: 'Ainda não há linhas em {table}. Insira a primeira aqui, pelo SQL ou pela API.',
+    emptyReadOnly: 'Ainda não há linhas em {table}.',
     insertRow: 'Inserir linha',
+    insertFirst: 'Inserir a primeira linha',
   },
   selection: {
     selected: { one: '1 linha selecionada', other: '{count} linhas selecionadas' },
@@ -414,7 +417,10 @@ const en: Messages<typeof ptBR> = {
     noMatch: 'No rows match these filters',
     clearFilters: 'Clear filters',
     empty: 'Empty table',
+    emptyHint: 'No rows in {table} yet. Insert the first one here, through SQL or through the API.',
+    emptyReadOnly: 'No rows in {table} yet.',
     insertRow: 'Insert row',
+    insertFirst: 'Insert the first row',
   },
   selection: {
     selected: { one: '1 row selected', other: '{count} rows selected' },
