@@ -1,6 +1,6 @@
-//! Who a SQL editor run acts as: the database owner (default, no RLS), a
-//! visitor (`anon`) or a real signed-in user (`authenticated` with their id),
-//! so the access rules can be tried from the editor.
+//! Who a SQL editor run (or a table view) acts as: the database owner
+//! (default, no RLS), a visitor (`anon`) or a real signed-in user
+//! (`authenticated` with their id), so the access rules can be tried.
 use crate::ApiError;
 use deadpool_postgres::Pool;
 use nelcota_core::Claims;
@@ -22,7 +22,7 @@ impl RunAs {
     /// The request claims the run assumes, as the API sets them; `None` keeps
     /// the owner. A signed-in user must exist: their id and email are what
     /// `auth.uid()` and `auth.jwt()` return.
-    pub(super) async fn claims(self, pool: &Pool) -> Result<Option<Claims>, ApiError> {
+    pub(crate) async fn claims(self, pool: &Pool) -> Result<Option<Claims>, ApiError> {
         match self {
             RunAs::Owner => Ok(None),
             RunAs::Anon => Ok(Some(Claims::anon())),

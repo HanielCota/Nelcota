@@ -4,6 +4,7 @@
   import Plus from '@lucide/svelte/icons/plus'
   import ShieldAlert from '@lucide/svelte/icons/shield-alert'
   import KeyRound from '@lucide/svelte/icons/key-round'
+  import Eye from '@lucide/svelte/icons/eye'
   import { toast } from 'svelte-sonner'
   import TableSidebar from '$lib/features/tables/components/TableSidebar.svelte'
   import TableToolbar from '$lib/features/tables/components/TableToolbar.svelte'
@@ -18,7 +19,8 @@
   import CreateTableSheet from '$lib/features/tables/components/CreateTableSheet.svelte'
   import StructureView from '$lib/features/tables/components/StructureView.svelte'
   import EmptyState from '$lib/components/shared/EmptyState.svelte'
-  import { api, enc } from '$lib/api'
+  import { api, enc, ApiError } from '$lib/api'
+  import type { RunAsLabels, Viewer } from '$lib/shared/run-as'
   import { RemoteResource } from '$lib/remote-resource.svelte'
   import { HiddenColumns } from '$lib/features/tables/hidden-columns.svelte'
   import { filtersParam, filtersToSearch, parseFilters, type TableFilter } from '$lib/features/tables/filters'
@@ -40,7 +42,38 @@
   const data = $derived(rows.data)
   const loading = $derived(rows.loading)
   const savingCell = $derived(rows.saving)
-  const error = $derived(rows.error ? errorMessage(rows.error) : '')
+  // Who the grid reads as (not persisted: a reload goes back to full access).
+  let viewer = $state<Viewer>({ mode: 'owner', user: null })
+  const viewing = $derived(viewer.mode !== 'owner')
+  const viewerLabels: RunAsLabels = $derived({
+    label: t('tables.viewAs.label'),
+    owner: t('tables.viewAs.owner'),
+    ownerHint: t('tables.viewAs.ownerHint'),
+    anon: t('tables.viewAs.anon'),
+    anonHint: t('tables.viewAs.anonHint'),
+    authenticated: t('tables.viewAs.authenticated'),
+    authenticatedHint: t('tables.viewAs.authenticatedHint'),
+    asVisitor: t('tables.viewAs.asVisitor'),
+    asUser: (email: string) => t('tables.viewAs.asUser', { email }),
+    ownerTrigger: t('tables.viewAs.ownerTrigger'),
+    pickTitle: t('tables.viewAs.pickTitle'),
+    search: t('tables.viewAs.search'),
+    empty: t('tables.viewAs.empty'),
+    noUsers: t('tables.viewAs.noUsers'),
+    loading: t('tables.viewAs.loading'),
+  })
+  // A role without a GRANT is the answer to "what do they see", not a failure.
+  const denied = $derived.by(() => {
+    const failure = rows.error
+    if (!(failure instanceof ApiError) || failure.code !== 'view_denied') return ''
+    return failure.params?.role === 'anon' ? t('tables.viewAs.denied.anon') : t('tables.viewAs.denied.authenticated')
+  })
+  const error = $derived(rows.error && !denied ? errorMessage(rows.error) : '')
+
+  function setViewer(next: Viewer) {
+    rows.clear()
+    viewer = next
+  }
   const tableView = $derived(parseTableView(route.query))
   const page = $derived(tableView.page)
   const size = $derived(tableView.size)
@@ -114,12 +147,14 @@
     const params = rowsParams()
     params.set('page', String(page))
     params.set('size', size)
+    if (viewer.mode !== 'owner') params.set('as', viewer.mode)
+    if (viewer.mode === 'authenticated' && viewer.user) params.set('user', viewer.user.id)
     await rows.load(name, params)
   }
 
   // Reload when the table, page, size, sort or filters change.
   $effect(() => {
-    void [name, view, page, size, sort?.column, sort?.desc, filtersKey]
+    void [name, view, page, size, sort?.column, sort?.desc, filtersKey, viewer.mode, viewer.user?.id]
     untrack(load)
     return () => rows.cancel()
   })
@@ -214,6 +249,9 @@
         {exportHref}
         onreload={load}
         oninsert={() => openSheet(null)}
+        {viewer}
+        {viewerLabels}
+        onviewer={setViewer}
       />
 
       {#if view === 'structure'}
@@ -249,7 +287,13 @@
           />
         {/if}
 
-        {#if data?.table.exposed_without_rls}
+        {#if viewing}
+          <p class="flex flex-wrap items-center gap-x-3 gap-y-1 border-b bg-muted/40 px-4 py-2 text-sm text-muted-foreground">
+            <Eye class="size-4 shrink-0" aria-hidden="true" />
+            <span>{viewer.mode === 'anon' ? t('tables.viewAs.bannerVisitor') : t('tables.viewAs.bannerUser', { email: viewer.user?.email ?? '' })}</span>
+            <button type="button" class="cursor-pointer text-foreground underline underline-offset-4" onclick={() => setViewer({ mode: 'owner', user: null })}>{t('tables.viewAs.back')}</button>
+          </p>
+        {:else if data?.table.exposed_without_rls}
           <p class="flex items-center gap-2 border-b border-destructive/30 bg-destructive/5 px-4 py-2 text-sm text-destructive">
             <ShieldAlert class="size-4 shrink-0" />{t('tables.editor.noRls')}
           </p>
@@ -267,7 +311,9 @@
               <div class="animate-progress h-full w-2/5 bg-brand"></div>
             </div>
           {/if}
-          {#if error && !data}
+          {#if denied}
+            <p class="mx-auto max-w-xl p-8 text-center text-sm text-muted-foreground">{denied}</p>
+          {:else if error && !data}
             <GridState state="error" message={error} onretry={load} />
           {:else if !data}
             <GridState state="loading" />
@@ -292,6 +338,8 @@
             {#if data.rows.length === 0}
               {#if filters.length}
                 <GridState state="no-match" onclearfilters={() => setFilters([])} />
+              {:else if viewing}
+                <p class="p-8 text-center text-sm text-muted-foreground">{t('tables.viewAs.hidden')}</p>
               {:else}
                 <GridState state="empty" insertable={data.table.insertable} oninsert={() => openSheet(null)} />
               {/if}

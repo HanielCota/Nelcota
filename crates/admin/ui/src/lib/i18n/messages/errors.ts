@@ -25,6 +25,8 @@ const ptBR = {
   no_primary_key: 'Tabela sem chave primária: edição pelo painel indisponível (use o editor SQL).',
   missing_key_value: "Valor da chave '{column}' ausente.",
   no_rows_selected: 'Nenhuma linha selecionada.',
+  view_denied: 'Sem acesso: {role} não tem permissão (GRANT) para ler esta tabela.',
+  invalid_view_as: 'Escolha ver como visitante ou como um usuário.',
 
   // Users
   invalid_id: 'Id inválido.',
@@ -106,6 +108,8 @@ const en: Messages<typeof ptBR> = {
   no_primary_key: 'Table without a primary key: editing from the panel is unavailable (use the SQL editor).',
   missing_key_value: "Missing value for key '{column}'.",
   no_rows_selected: 'No rows selected.',
+  view_denied: 'No access: {role} has no permission (GRANT) to read this table.',
+  invalid_view_as: 'Choose to view as a visitor or as a user.',
 
   invalid_id: 'Invalid id.',
   user_not_found: 'User not found.',

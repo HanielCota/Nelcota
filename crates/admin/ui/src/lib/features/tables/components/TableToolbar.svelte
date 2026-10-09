@@ -8,6 +8,8 @@
   import Download from '@lucide/svelte/icons/download'
   import Columns3 from '@lucide/svelte/icons/columns-3'
   import RlsBadge from '$lib/shared/schema/components/RlsBadge.svelte'
+  import RunAsPicker from '$lib/components/shared/RunAsPicker.svelte'
+  import type { RunAsLabels, Viewer } from '$lib/shared/run-as'
   import { enc } from '$lib/api'
   import { href, route } from '$lib/router.svelte'
   import type { TableData } from '$lib/types'
@@ -26,6 +28,9 @@
     exportHref,
     onreload,
     oninsert,
+    viewer,
+    viewerLabels,
+    onviewer,
   }: {
     name: string
     view: 'data' | 'structure'
@@ -39,6 +44,9 @@
     exportHref: (format: 'csv' | 'json') => string
     onreload: () => void
     oninsert: () => void
+    viewer: Viewer
+    viewerLabels: RunAsLabels
+    onviewer: (viewer: Viewer) => void
   } = $props()
 
   const tabs = [
@@ -69,6 +77,7 @@
   </nav>
   {#if view === 'data'}
     <div class="ml-auto flex flex-wrap items-center gap-2">
+      <RunAsPicker {viewer} labels={viewerLabels} onchange={onviewer} />
       <Button
         variant={filterOpen || filterCount ? 'secondary' : 'ghost'}
         size="sm"

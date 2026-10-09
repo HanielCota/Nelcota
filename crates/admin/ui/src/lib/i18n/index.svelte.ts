@@ -18,6 +18,7 @@ import projects from './messages/projects'
 import profile from './messages/profile'
 import policies from './messages/policies'
 import connect from './messages/connect'
+import signIn from './messages/signIn'
 import migrations from './messages/migrations'
 import tables from './messages/tables'
 import sql from './messages/sql'
@@ -38,6 +39,7 @@ const catalogs = {
   profile,
   policies,
   connect,
+  signIn,
   migrations,
   tables,
   sql,

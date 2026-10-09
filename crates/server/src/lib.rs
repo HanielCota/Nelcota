@@ -6,9 +6,10 @@ use std::time::Duration;
 
 use axum::{
     Json, Router,
-    extract::{FromRef, State},
+    extract::{FromRef, Request, State},
     http::{HeaderName, Method, StatusCode, header},
-    response::IntoResponse,
+    middleware::{self, Next},
+    response::{IntoResponse, Response},
     routing::get,
 };
 use deadpool_postgres::Pool;
@@ -83,11 +84,13 @@ pub fn app(
             HeaderName::from_static("preference-applied"),
         ]);
 
+    let verifier = state.verifier.clone();
     let mut router = Router::new()
         .route("/health", get(health))
         .merge(nelcota_api::router())
         .with_state(state)
         .merge(nelcota_auth::router(auth));
+    let admin_log = admin.as_ref().map(|admin| admin.denied.clone());
     if let Some(admin) = admin.clone() {
         router = router.merge(nelcota_admin::router(admin));
     }
@@ -105,10 +108,70 @@ pub fn app(
             router = router.merge(nelcota_admin::upload_router(admin));
         }
     }
+    // Refused API calls feed the panel's "Recently blocked" list.
+    if let Some(admin) = &admin_log {
+        router = router.layer(middleware::from_fn_with_state(
+            (admin.clone(), verifier),
+            record_denied,
+        ));
+    }
     router
         .layer(cors)
         // The default span records method and URI, never headers (Authorization).
         .layer(TraceLayer::new_for_http())
+}
+
+/// Records API requests answered with 401, 403 or 429 (not the panel's own
+/// routes). The role comes from verifying the token again, only for refused
+/// requests; the token itself and the query string are never kept.
+async fn record_denied(
+    State((log, verifier)): State<(Arc<nelcota_admin::DeniedLog>, SharedVerifier)>,
+    request: Request,
+    next: Next,
+) -> Response {
+    let path = request.uri().path().to_owned();
+    if path.starts_with("/admin") || path == "/health" {
+        return next.run(request).await;
+    }
+    let method = request.method().to_string();
+    let bearer = request
+        .headers()
+        .get(header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .map(|v| v.strip_prefix("Bearer ").unwrap_or(v).to_owned());
+    let response = next.run(request).await;
+    let status = response.status();
+    if !matches!(status.as_u16(), 401 | 403 | 429) {
+        return response;
+    }
+    let (role, user_id, email) = match bearer.map(|token| verifier.verify(&token)) {
+        None => ("anon".to_owned(), None, None),
+        Some(Ok(claims)) => (
+            claims.role().as_str().to_owned(),
+            claims.sub().map(|id| id.to_string()),
+            claims
+                .claim("email")
+                .and_then(|v| v.as_str())
+                .map(str::to_owned),
+        ),
+        Some(Err(_)) => ("invalid_token".to_owned(), None, None),
+    };
+    let info = response.extensions().get::<nelcota_core::ErrorInfo>();
+    log.record(nelcota_admin::contracts::DeniedRequest {
+        at: nelcota_admin::now_rfc3339(),
+        method,
+        path,
+        status: status.as_u16(),
+        code: info.map_or_else(
+            || format!("http_{}", status.as_u16()),
+            |i| i.code.to_owned(),
+        ),
+        message: info.map_or_else(String::new, |i| i.message.clone()),
+        role,
+        user_id,
+        email,
+    });
+    response
 }
 
 /// `GET /health`: 200 if Postgres answers, 503 otherwise.

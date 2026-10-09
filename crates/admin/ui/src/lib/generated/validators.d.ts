@@ -15,3 +15,6 @@ export function StorageListing(value: unknown): boolean;
 export function SqlResponse(value: unknown): boolean;
 export function ExportedMigration(value: unknown): boolean;
 export function DdlResult(value: unknown): boolean;
+export function StorageAccess(value: unknown): boolean;
+export function DeniedRequests(value: unknown): boolean;
+export function SignIn(value: unknown): boolean;

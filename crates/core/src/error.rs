@@ -10,6 +10,15 @@ use tokio_postgres::error::SqlState;
 
 use crate::Role;
 
+/// The code and message of an error response, attached to the response's
+/// extensions so a layer (the panel's log of denied requests) can read them
+/// without parsing the body.
+#[derive(Debug, Clone)]
+pub struct ErrorInfo {
+    pub code: &'static str,
+    pub message: String,
+}
+
 #[derive(Debug)]
 pub struct ApiError {
     status: StatusCode,
@@ -131,6 +140,10 @@ impl IntoResponse for ApiError {
             Json(json!({ "code": self.code, "message": self.message })),
         )
             .into_response();
+        response.extensions_mut().insert(ErrorInfo {
+            code: self.code,
+            message: self.message,
+        });
         if self.status == StatusCode::UNAUTHORIZED {
             response.headers_mut().insert(
                 header::WWW_AUTHENTICATE,

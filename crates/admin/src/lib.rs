@@ -13,8 +13,10 @@
 mod apply;
 mod assets;
 mod auth;
+mod connect;
 pub mod contracts;
 mod ddl;
+mod denied;
 mod error;
 mod middleware;
 mod migrations;
@@ -22,14 +24,17 @@ mod overview;
 mod policies;
 mod profile;
 mod projects;
+mod sign_in;
 mod sql;
 mod sso;
 mod state;
 mod storage;
+mod storage_access;
 mod tables;
 mod tokens;
 mod users;
 
+pub use denied::{DeniedLog, now_rfc3339};
 pub use migrations::default_dir as default_migrations_dir;
 pub use projects::HostLink;
 pub use sql::{SqlBusy, SqlExecutor};
@@ -56,6 +61,9 @@ pub fn router(state: AdminState) -> Router {
         .route("/admin/api/overview", get(overview::overview))
         .route("/admin/api/schema", get(sql::schema))
         .route("/admin/api/types", get(tables::types))
+        .route("/admin/api/typescript", get(connect::typescript))
+        .route("/admin/api/sign-in", get(sign_in::get))
+        .route("/admin/api/denied", get(denied::list))
         .route(
             "/admin/api/tables",
             get(tables::tables).post(tables::create),
@@ -101,6 +109,14 @@ pub fn router(state: AdminState) -> Router {
         .route(
             "/admin/api/storage/buckets/{id}",
             put(storage::update_bucket).delete(storage::delete_bucket),
+        )
+        .route(
+            "/admin/api/storage/buckets/{id}/access",
+            get(storage_access::access).post(storage_access::create),
+        )
+        .route(
+            "/admin/api/storage/buckets/{id}/access/{policy}",
+            delete(storage_access::drop),
         )
         .route(
             "/admin/api/storage/buckets/{id}/objects",

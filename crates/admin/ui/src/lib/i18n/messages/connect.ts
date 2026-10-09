@@ -41,38 +41,57 @@ const ptBR = {
   language: 'Linguagem',
   noTables: 'Crie uma tabela para ver exemplos com as colunas dela.',
   types: 'Tipos TypeScript das tabelas:',
+  downloadTypes: 'Baixar database.ts',
+  sdkLabel: 'TypeScript (SDK)',
+  sdk: {
+    title: 'Conectar com o SDK',
+    text: 'O cliente oficial em TypeScript: tipado pelas suas tabelas, renova a sessão sozinho e roda no navegador, Node, Deno e Bun.',
+    install: 'Instale',
+    client: 'Crie o cliente',
+    types: 'Gere os tipos das suas tabelas e salve ao lado do cliente',
+    orCli: 'ou pelo terminal:',
+    docs: 'Documentação do SDK',
+  },
   snippets: {
     list: {
       label: 'Listar linhas',
       description: 'As 20 primeiras (order=coluna.desc ordena). Sem token, vale o que a role anon pode ver.',
+      sdk: 'As 20 primeiras. Sem login, vale o que um visitante pode ver.',
     },
     filter: {
       label: 'Filtrar',
       description: 'Operadores: eq, neq, gt, gte, lt, lte, ilike, in, is (ex.: {column}=ilike.*abc*).',
+      sdk: 'Filtros: eq, neq, gt, gte, lt, lte, like, ilike, in, is e or(...). O valor é checado pelo tipo da coluna {column}.',
     },
     insert: {
       label: 'Inserir',
       description: 'Colunas ausentes recebem o DEFAULT. Prefer: return=representation devolve a linha criada.',
+      sdk: 'Colunas ausentes recebem o DEFAULT. .select() devolve a linha criada.',
     },
     update: {
       label: 'Atualizar',
       description: 'PATCH exige filtro: sem ele a API recusa, para não alterar a tabela inteira.',
+      sdk: 'Exige filtro: sem ele a API recusa, para não alterar a tabela inteira.',
     },
     delete: {
       label: 'Apagar',
       description: 'DELETE também exige filtro.',
+      sdk: 'Também exige filtro.',
     },
     signup: {
       label: 'Criar conta',
       description: 'Devolve a sessão (access_token e refresh_token) já logada.',
+      sdk: 'session vem null enquanto o email aguarda confirmação.',
     },
     login: {
       label: 'Entrar',
       description: 'O access_token vai no header Authorization das chamadas à API (role authenticated).',
+      sdk: 'Depois disso, toda chamada vai com o token do usuário (role authenticated).',
     },
     refresh: {
       label: 'Renovar a sessão',
       description: 'O access_token expira em minutos; troque o refresh_token por um par novo.',
+      sdk: 'O SDK renova a sessão antes de expirar, em todas as abas. onChange avisa quando ela muda.',
     },
   },
   code: {
@@ -136,38 +155,57 @@ const en: Messages<typeof ptBR> = {
   language: 'Language',
   noTables: 'Create a table to see examples with its columns.',
   types: 'TypeScript types for the tables:',
+  downloadTypes: 'Download database.ts',
+  sdkLabel: 'TypeScript (SDK)',
+  sdk: {
+    title: 'Connect with the SDK',
+    text: 'The official TypeScript client: typed from your tables, refreshes the session by itself and runs in browsers, Node, Deno and Bun.',
+    install: 'Install it',
+    client: 'Create the client',
+    types: 'Generate your tables’ types and save them next to the client',
+    orCli: 'or from the terminal:',
+    docs: 'SDK documentation',
+  },
   snippets: {
     list: {
       label: 'List rows',
       description: 'The first 20 (order=column.desc sorts). Without a token, you get what the anon role can see.',
+      sdk: 'The first 20. Without signing in, you get what a visitor can see.',
     },
     filter: {
       label: 'Filter',
       description: 'Operators: eq, neq, gt, gte, lt, lte, ilike, in, is (e.g. {column}=ilike.*abc*).',
+      sdk: 'Filters: eq, neq, gt, gte, lt, lte, like, ilike, in, is and or(...). The value is checked against the type of {column}.',
     },
     insert: {
       label: 'Insert',
       description: 'Missing columns get their DEFAULT. Prefer: return=representation returns the created row.',
+      sdk: 'Missing columns get their DEFAULT. .select() returns the created row.',
     },
     update: {
       label: 'Update',
       description: 'PATCH requires a filter: without one the API refuses, so the whole table is not changed.',
+      sdk: 'Requires a filter: without one the API refuses, so the whole table is not changed.',
     },
     delete: {
       label: 'Delete',
       description: 'DELETE also requires a filter.',
+      sdk: 'Also requires a filter.',
     },
     signup: {
       label: 'Sign up',
       description: 'Returns the session (access_token and refresh_token), already signed in.',
+      sdk: 'session is null while the email awaits confirmation.',
     },
     login: {
       label: 'Sign in',
       description: 'The access_token goes in the Authorization header of API calls (authenticated role).',
+      sdk: 'From then on, every call carries the user’s token (authenticated role).',
     },
     refresh: {
       label: 'Refresh the session',
       description: 'The access_token expires in minutes; trade the refresh_token for a new pair.',
+      sdk: 'The SDK refreshes the session before it expires, in every tab. onChange tells you when it changes.',
     },
   },
   code: {

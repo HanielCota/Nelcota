@@ -2,11 +2,15 @@
   import * as Command from '$lib/components/ui/command'
   import { RemoteResource } from '$lib/remote-resource.svelte'
   import { api } from '$lib/api'
-  import { errorMessage, t } from '$lib/i18n/index.svelte'
+  import { errorMessage } from '$lib/i18n/index.svelte'
   import type { UsersResponse } from '$lib/types'
-  import type { RunAsUser } from '$lib/features/sql/run-as.svelte'
+  import type { RunAsLabels, RunAsUser } from '$lib/shared/run-as'
 
-  let { open = $bindable(false), onpick }: { open?: boolean; onpick: (user: RunAsUser) => void } = $props()
+  let {
+    open = $bindable(false),
+    labels,
+    onpick,
+  }: { open?: boolean; labels: RunAsLabels; onpick: (user: RunAsUser) => void } = $props()
 
   // The 50 most recent users, or those matching the search on the server.
   const resource = new RemoteResource<UsersResponse>()
@@ -34,15 +38,15 @@
   }
 </script>
 
-<Command.Dialog bind:open title={t('sql.runAs.pickTitle')} description={t('sql.runAs.authenticatedHint')}>
-  <Command.Input bind:value={search} placeholder={t('sql.runAs.search')} />
+<Command.Dialog bind:open title={labels.pickTitle} description={labels.authenticatedHint}>
+  <Command.Input bind:value={search} placeholder={labels.search} />
   <Command.List class="max-h-[min(60vh,360px)]">
     {#if resource.error}
       <p class="px-4 py-6 text-sm text-destructive">{errorMessage(resource.error)}</p>
     {:else if resource.data && resource.data.users.length === 0}
-      <p class="px-4 py-6 text-sm text-muted-foreground">{search.trim() ? t('sql.runAs.empty') : t('sql.runAs.noUsers')}</p>
+      <p class="px-4 py-6 text-sm text-muted-foreground">{search.trim() ? labels.empty : labels.noUsers}</p>
     {:else if resource.data}
-      <Command.Group heading={t('sql.runAs.pickTitle')}>
+      <Command.Group heading={labels.pickTitle}>
         {#each resource.data.users as user (user.id)}
           <Command.Item value={`${user.email} ${user.id}`} onSelect={() => pick({ id: user.id, email: user.email })}>
             <span class="truncate">{user.email}</span>
@@ -50,7 +54,7 @@
         {/each}
       </Command.Group>
     {:else}
-      <p class="px-4 py-6 text-sm text-muted-foreground">{t('sql.runAs.loading')}</p>
+      <p class="px-4 py-6 text-sm text-muted-foreground">{labels.loading}</p>
     {/if}
   </Command.List>
 </Command.Dialog>

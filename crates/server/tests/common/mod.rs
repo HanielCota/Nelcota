@@ -272,6 +272,23 @@ impl TestApp {
             }),
             migrations_dir: options.migrations_dir.clone(),
             storage: None,
+            sign_in: Arc::new(nelcota_admin::contracts::SignIn {
+                signup_enabled: options.signup_enabled,
+                email: options.mail,
+                email_confirmation: options.mail && options.confirm_email,
+                password_recovery: options.mail,
+                magic_link: options.mail,
+                providers: nelcota_admin::contracts::SignInProviders {
+                    google: false,
+                    github: options.oauth.is_some(),
+                },
+                redirect_urls: Vec::new(),
+                callback_url: None,
+                access_ttl_secs: options.access_ttl_secs,
+                refresh_ttl_days: 30,
+                rate_limit_per_minute: options.rate_limit_per_minute,
+            }),
+            denied: Arc::default(),
         };
         let outbox = Arc::new(Outbox::default());
         let auth = AuthState {

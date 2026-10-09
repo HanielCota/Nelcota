@@ -107,6 +107,15 @@ fn disabled(schema: &mut schemars::Schema) {
 dto!(StoredFile { id: String, name: String, size: u64, mime_type: String, owner: Option<String>, updated_at: String });
 dto!(StorageListing { folders: Vec<String>, objects: Vec<StoredFile>, has_next: bool });
 dto!(SchemaResponse { schema: String, tables: BTreeMap<String, Vec<String>> });
+dto!(StoragePolicy { name: String, command: String, roles: Vec<String>, using: Option<String>, check: Option<String>, all_buckets: bool });
+dto!(StorageAccess { bucket: String, public: bool, policies: Vec<StoragePolicy> });
+dto!(DeniedRequest { at: String, method: String, path: String, status: u16, code: String, message: String, role: String, user_id: Option<String>, email: Option<String> });
+dto!(DeniedRequests { capacity: usize, requests: Vec<DeniedRequest> });
+dto!(SignInProviders {
+    google: bool,
+    github: bool
+});
+dto!(SignIn { signup_enabled: bool, email: bool, email_confirmation: bool, password_recovery: bool, magic_link: bool, providers: SignInProviders, redirect_urls: Vec<String>, callback_url: Option<String>, access_ttl_secs: u64, refresh_ttl_days: u32, rate_limit_per_minute: u32 });
 dto!(TypesResponse { base: Vec<String>, enums: Vec<String> });
 
 #[derive(Default, Serialize, Deserialize, JsonSchema, TS)]
@@ -197,6 +206,12 @@ pub fn exports() -> (String, String) {
         StoredFile,
         StorageListing,
         SchemaResponse,
+        StoragePolicy,
+        StorageAccess,
+        DeniedRequest,
+        DeniedRequests,
+        SignInProviders,
+        SignIn,
         TypesResponse,
         DdlResult,
         SqlResult,

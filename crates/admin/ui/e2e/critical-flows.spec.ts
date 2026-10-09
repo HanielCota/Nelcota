@@ -5,7 +5,7 @@ import { draftsAndFiles } from './draftsAndFiles'
 import { uploadsAndDetails } from './uploadsAndDetails'
 
 test.beforeEach(async ({ page }) => { await fixture(page) })
-for (const route of ['policies', 'migrations', 'storage', 'projects', 'connect']) {
+for (const route of ['policies', 'migrations', 'storage', 'storage/documents', 'projects', 'connect', 'sign-in']) {
   test(`${route} loads its generated contract without an error`, async ({ page }) => {
     await page.goto(`/admin/${route}`)
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
