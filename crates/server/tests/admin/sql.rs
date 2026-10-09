@@ -146,7 +146,7 @@ async fn sql_runs_as_a_visitor_or_a_signed_in_user_under_the_access_rules() {
             json!({ "role": "authenticated", "user_id": user_id }),
         )
         .await;
-        assert_eq!(missing.status, StatusCode::NOT_FOUND, "{user_id}");
+        assert_eq!(missing.status, StatusCode::NOT_FOUND);
         assert_eq!(missing.body["code"], "user_not_found");
     }
 }
