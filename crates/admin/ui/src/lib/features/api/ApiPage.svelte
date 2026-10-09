@@ -87,7 +87,7 @@
     ]
 </script>
 
-<div class="grid gap-10 px-4 pt-2 pb-12 *:max-w-4xl *:min-w-0 sm:px-6 lg:px-8">
+<div class="mx-auto grid w-full max-w-page gap-10 px-4 pt-2 pb-12 *:max-w-4xl *:min-w-0 sm:px-6 lg:px-8">
   <PageHeader title={t('connect.title')} description={t('connect.description')}>
     {#snippet actions()}
       <Button variant="outline" href="/rest/v1/" target="_blank" rel="noopener">

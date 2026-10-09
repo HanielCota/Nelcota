@@ -29,7 +29,8 @@
   {/each}
 {/snippet}
 
-<header class="shrink-0 bg-background/85 px-4 py-4 backdrop-blur sm:px-6 lg:px-8">
+<header class="shrink-0 bg-background/85 backdrop-blur">
+  <div class="mx-auto w-full max-w-page px-4 py-4 sm:px-6 lg:px-8">
   <div class="grid grid-cols-[1fr_auto] items-center gap-3 lg:grid-cols-[1fr_auto_1fr]">
     <div class="flex min-w-0 items-center gap-2">
       <button
@@ -66,6 +67,7 @@
   <nav aria-label={t('shell.nav.main')} class="mt-3 hidden overflow-x-auto md:block lg:hidden">
     <div class="mx-auto flex w-max items-center gap-1 rounded-full bg-nav p-1.5">{@render pills()}</div>
   </nav>
+  </div>
 </header>
 
 <Sheet.Root bind:open={mobileOpen}>

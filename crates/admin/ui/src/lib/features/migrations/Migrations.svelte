@@ -92,7 +92,7 @@
   }
 </script>
 
-<div class="px-4 pt-2 pb-12 sm:px-6 lg:px-8">
+<div class="mx-auto w-full max-w-page px-4 pt-2 pb-12 sm:px-6 lg:px-8">
   <PageHeader title={t('migrations.title')} description={t('migrations.description')} />
 
   {#if error}<LoadError message={error} onretry={load} busy={loading} />{/if}

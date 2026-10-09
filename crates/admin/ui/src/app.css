@@ -149,6 +149,8 @@
 	--text-4xl--line-height: 1.05;
 	--text-5xl: 3.5rem;
 	--text-5xl--line-height: 1;
+	/* Pages stop growing at 1440px and sit centred, like the reference (D98). */
+	--container-page: 90rem;
 	--font-sans: 'Manrope Variable', 'Manrope', sans-serif;
 	--font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 	--color-warning: var(--warning);

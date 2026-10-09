@@ -82,7 +82,7 @@
   <Badge variant={bucket.public ? 'outline' : 'secondary'}>{#if bucket.public}<Globe aria-hidden="true" />{:else}<Lock aria-hidden="true" />{/if}{bucket.public ? t('storage.public') : t('storage.private')}</Badge>
 {/snippet}
 
-<div class="px-4 pt-2 pb-12 sm:px-6 lg:px-8">
+<div class="mx-auto w-full max-w-page px-4 pt-2 pb-12 sm:px-6 lg:px-8">
   <PageHeader
     title={t('storage.title')}
     description={data?.enabled

@@ -223,7 +223,7 @@
   }
 </script>
 
-<div class="flex h-full min-h-0 gap-3 px-3 pt-1 pb-3 sm:px-5 lg:px-6">
+<div class="mx-auto flex h-full min-h-0 w-full max-w-page gap-3 px-4 pt-1 pb-4 sm:px-6 lg:px-8">
   <TableSidebar {tables} current={name} loading={tablesLoading} error={tablesError} onretry={loadTables} oncreate={() => (createOpen = true)} />
 
   <section class={cn('min-w-0 flex-1 flex-col overflow-hidden rounded-3xl bg-card', name ? 'flex' : 'hidden lg:flex')}>

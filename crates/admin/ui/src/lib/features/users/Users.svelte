@@ -149,7 +149,7 @@
   </DropdownMenu.Root>
 {/snippet}
 
-<div class="px-4 pt-2 pb-12 sm:px-6 lg:px-8">
+<div class="mx-auto w-full max-w-page px-4 pt-2 pb-12 sm:px-6 lg:px-8">
   <PageHeader
     title={t('users.title')}
     description={users ? t('users.count', { count: total }) : undefined}

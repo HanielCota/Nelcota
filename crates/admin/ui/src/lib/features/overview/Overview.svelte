@@ -123,7 +123,7 @@
   </div>
 {/snippet}
 
-<div class="grid gap-6 px-4 pt-2 pb-12 sm:px-6 lg:px-8">
+<div class="grid gap-6 mx-auto w-full max-w-page px-4 pt-2 pb-12 sm:px-6 lg:px-8">
   <!-- Headline: the page's name and the period's traffic. -->
   <section class="grid gap-8 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
     <h1 class="max-w-xl text-5xl leading-[1.02] font-semibold tracking-[-0.035em]">{t('overview.title')}</h1>

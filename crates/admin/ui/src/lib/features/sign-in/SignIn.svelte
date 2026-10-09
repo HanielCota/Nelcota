@@ -25,7 +25,7 @@
   })
 </script>
 
-<div class="grid gap-8 px-4 pt-2 pb-12 *:max-w-3xl *:min-w-0 sm:px-6 lg:px-8">
+<div class="mx-auto grid w-full max-w-page gap-8 px-4 pt-2 pb-12 *:max-w-3xl *:min-w-0 sm:px-6 lg:px-8">
   <PageHeader title={t('signIn.title')} description={t('signIn.description')} />
   <div class="-mt-6"><PillTabs label={t('shell.pages.users')} current={'/sign-in'} tabs={[{ path: '/users', label: t('shell.pages.users') }, { path: '/sign-in', label: t('shell.pages.userSignIn') }]} /></div>
 
