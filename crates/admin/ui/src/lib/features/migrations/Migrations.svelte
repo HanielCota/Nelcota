@@ -92,7 +92,7 @@
   }
 </script>
 
-<div class="mx-auto max-w-7xl px-4 pt-6 pb-10 sm:px-6 lg:px-8">
+<div class="px-4 pt-2 pb-12 sm:px-6 lg:px-8">
   <PageHeader title={t('migrations.title')} description={t('migrations.description')} />
 
   {#if error}<LoadError message={error} onretry={load} busy={loading} />{/if}
@@ -101,9 +101,9 @@
     <Skeleton class="mt-8 h-64 rounded-lg" />
   {:else if data}
     <ol class="mb-6 grid gap-3 sm:grid-cols-3" aria-label={t('migrations.steps.label')}>
-      <li class="rounded-lg border bg-card p-4"><div class="flex items-center gap-2 text-sm font-medium">{#if generated}<CircleCheck class="size-4 text-brand" aria-hidden="true" />{:else}<FilePlus class="size-4 text-muted-foreground" aria-hidden="true" />{/if}{t('migrations.steps.generate')}</div><p class={['mt-2 text-xs text-muted-foreground', generated && 'break-all']}>{generated ? generated.filename : t('migrations.steps.generateHint')}</p></li>
-      <li class="rounded-lg border bg-card p-4"><div class="flex items-center gap-2 text-sm font-medium"><FolderOpen class="size-4 text-muted-foreground" aria-hidden="true" />{t('migrations.steps.keep')}</div><p class="mt-2 text-xs text-muted-foreground">{t('migrations.steps.keepHint')}</p>{#if generated}<Badge variant="secondary" class="mt-2">{t(data.migrations.some((migration) => migration.version === generated!.version && migration.in_folder === true) ? 'migrations.steps.inFolder' : 'migrations.steps.pending')}</Badge>{/if}</li>
-      <li class="rounded-lg border bg-card p-4"><div class="flex items-center gap-2 text-sm font-medium"><Terminal class="size-4 text-muted-foreground" aria-hidden="true" />{t('migrations.steps.apply')}</div><p class="mt-2 text-xs text-muted-foreground">{t('migrations.steps.applyHint')}</p></li>
+      <li class="rounded-3xl bg-card p-4"><div class="flex items-center gap-2 text-sm font-medium">{#if generated}<CircleCheck class="size-4 text-brand" aria-hidden="true" />{:else}<FilePlus class="size-4 text-muted-foreground" aria-hidden="true" />{/if}{t('migrations.steps.generate')}</div><p class={['mt-2 text-xs text-muted-foreground', generated && 'break-all']}>{generated ? generated.filename : t('migrations.steps.generateHint')}</p></li>
+      <li class="rounded-3xl bg-card p-4"><div class="flex items-center gap-2 text-sm font-medium"><FolderOpen class="size-4 text-muted-foreground" aria-hidden="true" />{t('migrations.steps.keep')}</div><p class="mt-2 text-xs text-muted-foreground">{t('migrations.steps.keepHint')}</p>{#if generated}<Badge variant="secondary" class="mt-2">{t(data.migrations.some((migration) => migration.version === generated!.version && migration.in_folder === true) ? 'migrations.steps.inFolder' : 'migrations.steps.pending')}</Badge>{/if}</li>
+      <li class="rounded-3xl bg-card p-4"><div class="flex items-center gap-2 text-sm font-medium"><Terminal class="size-4 text-muted-foreground" aria-hidden="true" />{t('migrations.steps.apply')}</div><p class="mt-2 text-xs text-muted-foreground">{t('migrations.steps.applyHint')}</p></li>
     </ol>
     <section class="grid gap-3">
       <div class="flex flex-wrap items-end justify-between gap-3">
@@ -134,7 +134,7 @@
           description={t('migrations.nothingPendingHint')}
         />
       {:else}
-        <ol class="divide-y rounded-lg border bg-card">
+        <ol class="divide-y rounded-3xl bg-card">
           {#each data.pending as change (change.id)}
             <li class="px-4 py-3">
               <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
@@ -168,7 +168,7 @@
         <div class="grid gap-3 md:hidden">
           {#each data.migrations as migration (migration.version)}
             {@const situation = status(migration)}
-            <article class="grid min-w-0 gap-3 rounded-lg border bg-card p-4">
+            <article class="grid min-w-0 gap-3 rounded-3xl bg-card p-4">
               <p class="break-words font-mono text-xs"><span class="text-muted-foreground">V{migration.version}</span> · {migration.name}</p>
               <div class="flex flex-wrap items-center gap-2"><Badge variant="outline" class={situation.warn ? 'border-warning/30 text-warning' : 'text-muted-foreground'}>{#if situation.warn}<CircleAlert aria-hidden="true" />{:else}<CircleCheck aria-hidden="true" />{/if}{situation.label}</Badge>{#if migration.from_panel}<span class="text-xs text-muted-foreground">{t('migrations.fromPanel')}</span>{/if}</div>
               <p class="text-xs text-muted-foreground">{t('migrations.columns.appliedOn')}: {date(migration.applied_on)}</p>
@@ -176,7 +176,7 @@
             </article>
           {/each}
         </div>
-        <div class="hidden overflow-hidden rounded-lg border bg-card md:block">
+        <div class="hidden overflow-hidden rounded-3xl bg-card md:block">
           <Table.Root>
             <Table.Header>
               <Table.Row class="hover:bg-transparent">

@@ -100,7 +100,7 @@
 
 </script>
 
-<div class="mx-auto max-w-7xl px-4 pt-6 pb-10 sm:px-6 lg:px-8">
+<div class="px-4 pt-2 pb-12 sm:px-6 lg:px-8">
   <PageHeader title={t('policies.title')} description={t('policies.description')}>
     {#snippet actions()}<TechnicalToggle />{/snippet}
   </PageHeader>
@@ -131,7 +131,7 @@
     {/if}
     <div class="grid gap-4">
       {#each visible as table (table.name)}
-        <section class="@container overflow-hidden rounded-lg border bg-card">
+        <section class="@container overflow-hidden rounded-3xl bg-card">
           <header class="flex flex-wrap items-center gap-3 border-b bg-muted/40 px-4 py-2.5">
             <h2 class="text-sm font-semibold">
               <a href={href(`/tables/${encodeURIComponent(table.name)}`)} class="hover:underline">{table.name}</a>
@@ -209,7 +209,7 @@
     </div>
 
     {#if data.anon_functions.length}
-      <section class="mt-8 rounded-lg border bg-card p-5">
+      <section class="mt-8 rounded-3xl bg-card p-5">
         <h2 class="text-sm font-semibold">{t('policies.anonFunctions')}</h2>
         <p class="mt-2 font-mono text-xs">{data.anon_functions.join(', ')}</p>
         <p class="mt-3 text-sm text-muted-foreground">

@@ -87,7 +87,7 @@
     ]
 </script>
 
-<div class="mx-auto grid max-w-7xl gap-10 px-4 pt-6 pb-10 *:max-w-4xl *:min-w-0 sm:px-6 lg:px-8">
+<div class="grid gap-10 px-4 pt-2 pb-12 *:max-w-4xl *:min-w-0 sm:px-6 lg:px-8">
   <PageHeader title={t('connect.title')} description={t('connect.description')}>
     {#snippet actions()}
       <Button variant="outline" href="/rest/v1/" target="_blank" rel="noopener">
@@ -118,7 +118,7 @@
     <div class="grid gap-3 md:grid-cols-3">
       {#each roles as role (role)}
         {@const Icon = roleIcons[role]}
-        <div class="rounded-lg border bg-card p-4">
+        <div class="rounded-3xl bg-card p-4">
           <p class="flex items-center gap-2 text-sm font-medium"><Icon class="size-4 text-muted-foreground" aria-hidden="true" />{t(`connect.roles.${role}.title`)}</p>
           <code class="text-xs text-muted-foreground">{role}</code>
           <p class="mt-2 text-sm text-muted-foreground">{t(`connect.roles.${role}.text`)}</p>
@@ -217,5 +217,5 @@
       </p>
     {/if}
   </section>
-  <details id="api-token" class="scroll-mt-6 rounded-lg border bg-card p-4"><summary class="flex cursor-pointer items-center gap-2 text-sm font-medium"><KeyRound class="size-4 text-muted-foreground" aria-hidden="true" />{t('connect.token.title')} <code>service_role</code></summary><div class="mt-4"><ServiceTokenCard /></div></details>
+  <details id="api-token" class="scroll-mt-6 rounded-3xl bg-card p-4"><summary class="flex cursor-pointer items-center gap-2 text-sm font-medium"><KeyRound class="size-4 text-muted-foreground" aria-hidden="true" />{t('connect.token.title')} <code>service_role</code></summary><div class="mt-4"><ServiceTokenCard /></div></details>
 </div>

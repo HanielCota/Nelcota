@@ -25,9 +25,9 @@
   })
 </script>
 
-<div class="mx-auto grid max-w-7xl gap-10 px-4 pt-6 pb-10 *:max-w-3xl *:min-w-0 sm:px-6 lg:px-8">
-  <div><PillTabs label={t('shell.pages.users')} current={'/sign-in'} tabs={[{ path: '/users', label: t('shell.pages.users') }, { path: '/sign-in', label: t('shell.pages.userSignIn') }]} /></div>
+<div class="grid gap-8 px-4 pt-2 pb-12 *:max-w-3xl *:min-w-0 sm:px-6 lg:px-8">
   <PageHeader title={t('signIn.title')} description={t('signIn.description')} />
+  <div class="-mt-6"><PillTabs label={t('shell.pages.users')} current={'/sign-in'} tabs={[{ path: '/users', label: t('shell.pages.users') }, { path: '/sign-in', label: t('shell.pages.userSignIn') }]} /></div>
 
   {#if resource.error}
     <LoadError message={errorMessage(resource.error)} onretry={load} busy={resource.loading} />
@@ -36,7 +36,7 @@
   {:else}
     <section class="-mt-6 grid gap-4">
       <p class="text-sm text-muted-foreground">{t('signIn.fromEnv')}</p>
-      <ul class="divide-y rounded-lg border bg-card">
+      <ul class="divide-y rounded-3xl bg-card">
         {#each options as option (option.id)}
           <li class="grid gap-1 px-4 py-3.5">
             <div class="flex items-baseline justify-between gap-4">

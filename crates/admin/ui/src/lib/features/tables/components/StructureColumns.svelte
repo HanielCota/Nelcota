@@ -22,7 +22,7 @@
   const tag = 'rounded-md border border-border-strong bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground'
 </script>
 
-<section class="@container rounded-lg border bg-card">
+<section class="@container rounded-3xl bg-card">
   <header class="flex items-center justify-between gap-4 border-b px-5 py-4">
     <div>
       <h2 class="text-base font-semibold">{t('tables.structure.columnsTitle')}</h2>

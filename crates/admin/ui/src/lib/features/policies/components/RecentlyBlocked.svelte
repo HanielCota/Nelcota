@@ -40,7 +40,7 @@
   }
 </script>
 
-<section class="mb-6 grid gap-3 rounded-lg border bg-card p-4" aria-labelledby="recently-blocked">
+<section class="mb-6 grid gap-3 rounded-3xl bg-card p-4" aria-labelledby="recently-blocked">
   <div class="flex items-start justify-between gap-3">
     <div class="grid gap-0.5">
       <h2 id="recently-blocked" class="text-sm font-medium">{t('policies.blocked.title')}</h2>

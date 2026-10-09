@@ -46,7 +46,7 @@
   const host = (url: string | null) => (url ? url.replace(/^https?:\/\//, '') : '—')
 </script>
 
-<div class="mx-auto max-w-7xl px-4 pt-6 pb-10 sm:px-6 lg:px-8">
+<div class="px-4 pt-2 pb-12 sm:px-6 lg:px-8">
   <PageHeader
     title={t('projects.title')}
     description={projects ? (sso ? t('projects.sso') : t('projects.separateLogin')) : undefined}
@@ -65,7 +65,7 @@
     {#if projects.length === 0}<EmptyState icon={Boxes} title={t('projects.empty')} description={t('projects.emptyDescription')} />{/if}
     <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {#each projects as project (project.name)}
-        <div class={['flex flex-col rounded-lg border bg-card p-5', project.current && 'border-brand/40']}>
+        <div class={['flex flex-col rounded-3xl bg-card p-5', project.current && 'border-brand/40']}>
           <div class="flex items-baseline justify-between gap-3">
             <p class="flex min-w-0 items-center gap-2 font-medium"><Boxes class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" /><span class="truncate">{project.name}</span></p>
             {#if project.current}<span class="shrink-0 text-xs text-muted-foreground">{t('projects.current')}</span>{/if}

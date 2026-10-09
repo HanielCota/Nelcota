@@ -149,8 +149,7 @@
   </DropdownMenu.Root>
 {/snippet}
 
-<div class="mx-auto max-w-7xl px-4 pt-6 pb-10 sm:px-6 lg:px-8">
-  <div class="mb-6"><PillTabs label={t('shell.pages.users')} current={'/users'} tabs={[{ path: '/users', label: t('shell.pages.users') }, { path: '/sign-in', label: t('shell.pages.userSignIn') }]} /></div>
+<div class="px-4 pt-2 pb-12 sm:px-6 lg:px-8">
   <PageHeader
     title={t('users.title')}
     description={users ? t('users.count', { count: total }) : undefined}
@@ -170,6 +169,7 @@
       <Button onclick={() => (createOpen = true)}><UserPlus />{t('users.new')}</Button>
     {/snippet}
   </PageHeader>
+  <div class="-mt-2 mb-6"><PillTabs label={t('shell.pages.users')} current={'/users'} tabs={[{ path: '/users', label: t('shell.pages.users') }, { path: '/sign-in', label: t('shell.pages.userSignIn') }]} /></div>
 
   {#if error}<LoadError message={error} onretry={load} busy={loading} />{/if}
   {#if users === null}
@@ -199,7 +199,7 @@
   {:else}
     <div class="grid gap-3 md:hidden" aria-busy={loading}>
       {#each users as user (user.id)}
-        <article class="min-w-0 rounded-lg border bg-card p-4">
+        <article class="min-w-0 rounded-3xl bg-card p-4">
           <div class="flex min-w-0 items-start justify-between gap-2">
             <div class="min-w-0"><p class="break-all font-medium">{user.email}{@render unconfirmed(user)}</p><p class="mt-1 truncate font-mono text-xs text-muted-foreground" title={user.id}>{user.id}</p></div>
             {@render userActions(user)}
@@ -213,7 +213,7 @@
         </article>
       {/each}
     </div>
-    <div class="hidden overflow-hidden rounded-lg border bg-card md:block" aria-busy={loading}>
+    <div class="hidden overflow-hidden rounded-3xl bg-card md:block" aria-busy={loading}>
       <Table.Root>
         <Table.Header>
           <Table.Row class="hover:bg-transparent">

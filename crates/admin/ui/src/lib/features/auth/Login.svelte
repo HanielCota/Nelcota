@@ -66,7 +66,7 @@
   <div class="relative w-full max-w-[400px]">
     <Mascot {pose} lookAt={caret} class="pointer-events-none absolute -top-[8.6rem] left-1/2 size-36 -translate-x-1/2" />
 
-    <form class="grid gap-5 rounded-lg border bg-card px-6 pt-10 pb-6 sm:px-8 sm:pb-8" onsubmit={submit}>
+    <form class="grid gap-5 rounded-3xl bg-card px-6 pt-10 pb-6 sm:px-8 sm:pb-8" onsubmit={submit}>
       <div class="text-center">
         <h1 class="text-xl font-semibold tracking-tight">{t('login.title')}</h1>
         <p class="mt-1 text-sm text-muted-foreground">

@@ -64,7 +64,7 @@
   }
 </script>
 
-<div class="rounded-lg border bg-card">
+<div class="rounded-3xl bg-card">
   <div class="flex flex-wrap items-center gap-2.5 p-3">
     <Input bind:value={column.name} placeholder={t('tables.columns.name')} class="w-40 font-mono text-xs" aria-label={t('tables.columns.nameLabel')} />
     <Input

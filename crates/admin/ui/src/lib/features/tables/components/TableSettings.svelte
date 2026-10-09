@@ -62,7 +62,7 @@
 </script>
 
 <fieldset class="grid min-w-0 gap-6" disabled={busy !== null} aria-busy={busy !== null}>
-  <section class="rounded-lg border bg-card p-5">
+  <section class="rounded-3xl bg-card p-5">
     <h2 class="text-base font-semibold">{t('tables.settings.table')}</h2>
     <form
       class="mt-3 grid gap-3 sm:grid-cols-[1fr_2fr_auto] sm:items-end"
@@ -83,7 +83,7 @@
     </form>
   </section>
 
-  <section class="flex flex-wrap items-center gap-4 rounded-lg border bg-card p-5">
+  <section class="flex flex-wrap items-center gap-4 rounded-3xl bg-card p-5">
     {#if structure.rls_enabled}
       <div class="flex-1">
         <h2 class="text-base font-semibold">{t('tables.settings.rls')}</h2>
@@ -99,7 +99,7 @@
     {/if}
   </section>
 
-  <section class="grid gap-3 rounded-lg border bg-card p-5">
+  <section class="grid gap-3 rounded-3xl bg-card p-5">
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div>
         <h2 class="text-base font-semibold">{t('tables.settings.grants')}</h2>
