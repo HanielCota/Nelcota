@@ -86,6 +86,34 @@ without policies) and red (table exposed without RLS).
 | **Policies** | each table's policies (`USING`/`WITH CHECK`): create, edit and delete; tables without RLS; functions `anon` can execute |
 | **API** | section navigation, project address, how each role calls the API, curl and JavaScript examples generated from each table's columns, service_role token. Topic, language and table are shareable through the URL |
 
+## Connecting an app and understanding access
+
+- **API → Connect with the SDK**: install command, a **Download database.ts**
+  button (the same file `nelcota types` writes) and the `createClient` lines
+  for this project. The examples switch between the TypeScript SDK (default),
+  curl and plain `fetch`, generated from the chosen table's columns.
+- **User sign-in**: which ways in are on (sign-up, email confirmation,
+  password recovery, magic link, Google, GitHub), and for each one that is off
+  the environment variables that turn it on. With a provider on, it shows the
+  callback address to register with Google or GitHub and the app pages a
+  sign-in may return to. Read-only: these settings live in the server's
+  `.env`.
+- **Tables → View as**: reads the grid as a visitor or as a chosen user, with
+  the same role, claims, grants and RLS the API applies, in a transaction that
+  is rolled back. It is read-only; a role without a GRANT gets a plain
+  explanation instead of rows.
+- **Storage → a bucket → Who reaches the files**: the policies on
+  `storage.objects` that apply to the bucket, in plain language, and templates
+  to add more (anyone or signed-in users download, signed-in users upload,
+  each user only their own folder or their own files). They are created like
+  any panel change, so "Generate migration" includes them. A private bucket
+  without rules is flagged: only the panel and `service_role` reach it.
+- **Policies → Recently blocked**: the last 100 API calls answered with 401,
+  403 or 429, who made them and why, in plain language. They are kept in
+  memory only (gone on restart), with the path but never the query string or
+  the token. Reads that RLS filters are not refusals (they return fewer rows)
+  and do not show here.
+
 ## RLS warnings
 
 - **without RLS**: a regular table with a GRANT to `anon` or `authenticated`
