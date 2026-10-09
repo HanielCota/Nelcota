@@ -9,6 +9,7 @@
   import KeyRound from '@lucide/svelte/icons/key-round'
   import Table2 from '@lucide/svelte/icons/table-2'
   import Plus from '@lucide/svelte/icons/plus'
+  import Download from '@lucide/svelte/icons/download'
   import { Skeleton } from '$lib/components/ui/skeleton'
   import { Button } from '$lib/components/ui/button'
   import PageHeader from '$lib/components/shared/PageHeader.svelte'
@@ -19,7 +20,7 @@
   import { href, navigate, route } from '$lib/router.svelte'
   import { RemoteResource } from '$lib/remote-resource.svelte'
   import { api, enc } from '$lib/api'
-  import { authSnippets, tableSnippets, type Lang, type Snippet } from '$lib/features/api/api-examples'
+  import { authSnippets, sdkSetup, tableSnippets, type Lang, type Snippet } from '$lib/features/api/api-examples'
   import type { TableData, TablesResponse } from '$lib/types'
   import { errorMessage, t } from '$lib/i18n/index.svelte'
 
@@ -30,7 +31,10 @@
   const snippetsResource = new RemoteResource<Snippet[]>()
   const tables = $derived(tablesResource.data?.tables ?? [])
   const table = $derived(tables.find((item) => item.name === route.query.get('table'))?.name ?? tables.find((item) => item.kind === 'table')?.name ?? tables[0]?.name ?? '')
-  const lang = $derived<Lang>(route.query.get('lang') === 'js' ? 'js' : 'curl')
+  // The SDK is the recommended way in; curl and plain fetch stay a click away.
+  const lang = $derived<Lang>(route.query.get('lang') === 'js' ? 'js' : route.query.get('lang') === 'curl' ? 'curl' : 'ts')
+  const setup = sdkSetup(base)
+  const sdkDocs = 'https://github.com/HanielCota/Nelcota/blob/main/sdk/typescript/README.md'
   const topic = $derived(route.query.get('topic') === 'auth' ? 'auth' : 'tables')
   const snippets = $derived(topic === 'auth' ? authSnippets(base) : snippetsResource.data ?? [])
   const tableError = $derived(tablesResource.error ? errorMessage(tablesResource.error) : '')
@@ -92,7 +96,7 @@
     {/snippet}
   </PageHeader>
 
-  <nav class="-mt-6 flex flex-wrap gap-x-5 gap-y-2 text-sm" aria-label={t('connect.navigation')}><a class="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline" href="#api-address">{t('connect.address')}</a><a class="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline" href="#api-roles">{t('connect.caller')}</a><a class="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline" href="#api-examples">{t('connect.examples')}</a><a class="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline" href="#api-token">{t('connect.token.title')}</a></nav>
+  <nav class="-mt-6 flex flex-wrap gap-x-5 gap-y-2 text-sm" aria-label={t('connect.navigation')}><a class="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline" href="#api-address">{t('connect.address')}</a><a class="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline" href="#api-roles">{t('connect.caller')}</a><a class="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline" href="#api-sdk">{t('connect.sdk.title')}</a><a class="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline" href="#api-examples">{t('connect.examples')}</a><a class="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline" href="#api-token">{t('connect.token.title')}</a></nav>
 
   <section id="api-address" class="-mt-2 grid scroll-mt-6 gap-4">
     <h2 class="text-base font-semibold">{t('connect.address')}</h2>
@@ -126,6 +130,33 @@
     </div>
   </section>
 
+  <section id="api-sdk" class="grid scroll-mt-6 gap-4">
+    <div>
+      <h2 class="text-base font-semibold">{t('connect.sdk.title')}</h2>
+      <p class="mt-1 text-sm text-muted-foreground">
+        {t('connect.sdk.text')}
+        <a class="underline underline-offset-4 hover:text-foreground" href={sdkDocs} target="_blank" rel="noopener">{t('connect.sdk.docs')}</a>
+      </p>
+    </div>
+    <ol class="grid gap-5 *:min-w-0">
+      <li class="grid gap-2 *:min-w-0">
+        <h3 class="text-sm font-medium">1. {t('connect.sdk.install')}</h3>
+        <CodeBlock code={setup.install} />
+      </li>
+      <li class="grid gap-2 *:min-w-0">
+        <h3 class="text-sm font-medium">2. {t('connect.sdk.types')}</h3>
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted-foreground">
+          <Button variant="outline" size="sm" href={href('/api/typescript')} download="database.ts"><Download />{t('connect.downloadTypes')}</Button>
+          <span>{t('connect.sdk.orCli')} <code class="text-xs text-foreground">nelcota types -o database.ts</code></span>
+        </div>
+      </li>
+      <li class="grid gap-2 *:min-w-0">
+        <h3 class="text-sm font-medium">3. {t('connect.sdk.client')}</h3>
+        <CodeBlock code={setup.client} />
+      </li>
+    </ol>
+  </section>
+
   <section id="api-examples" class="grid scroll-mt-6 gap-4">
     <h2 class="text-base font-semibold">{t('connect.examples')}</h2>
     <div class="flex flex-wrap items-center gap-3">
@@ -148,6 +179,9 @@
         </Select.Root>
       {/if}
       <nav class="flex h-9 items-center gap-1 rounded-md bg-muted p-1 sm:ml-auto" aria-label={t('connect.language')}>
+        <button type="button" class={tab(lang === 'ts')} aria-pressed={lang === 'ts'} onclick={() => choose({ lang: 'ts' })}
+          >{t('connect.sdkLabel')}</button
+        >
         <button type="button" class={tab(lang === 'curl')} aria-pressed={lang === 'curl'} onclick={() => choose({ lang: 'curl' })}
           >curl</button
         >
@@ -168,16 +202,20 @@
           <article class="grid gap-2 *:min-w-0">
             <div>
               <h3 class="text-sm font-medium">{t(`connect.snippets.${snippet.id}.label`)}</h3>
-              <p class="text-sm text-muted-foreground">{t(`connect.snippets.${snippet.id}.description`, snippet.params)}</p>
+              <p class="text-sm text-muted-foreground">{t(lang === 'ts' ? `connect.snippets.${snippet.id}.sdk` : `connect.snippets.${snippet.id}.description`, snippet.params)}</p>
             </div>
             <CodeBlock code={snippet.code[lang]} />
           </article>
         {/each}
       </div>
     {/if}
-    <p class="text-sm text-muted-foreground">
-      {t('connect.types')} <code class="text-xs text-foreground">nelcota types -o database.ts</code>
-    </p>
+    {#if lang !== 'ts'}
+      <p class="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted-foreground">
+        {t('connect.types')}
+        <Button variant="outline" size="sm" href={href('/api/typescript')} download="database.ts"><Download />{t('connect.downloadTypes')}</Button>
+        <span>{t('connect.sdk.orCli')} <code class="text-xs text-foreground">nelcota types -o database.ts</code></span>
+      </p>
+    {/if}
   </section>
   <details id="api-token" class="scroll-mt-6 rounded-lg border bg-card p-4"><summary class="flex cursor-pointer items-center gap-2 text-sm font-medium"><KeyRound class="size-4 text-muted-foreground" aria-hidden="true" />{t('connect.token.title')} <code>service_role</code></summary><div class="mt-4"><ServiceTokenCard /></div></details>
 </div>
