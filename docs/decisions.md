@@ -762,6 +762,31 @@ request. It is a way to test rules, not a security boundary: the administrator
 can always run anything as the owner, and the SQL may even `RESET ROLE`. The
 choice is not persisted, so a reload goes back to the owner.
 
+## Client SDK
+
+**D95. Nelcota ships its own TypeScript client, a thin layer over HTTP.**
+`@nelcota/client` lives in `sdk/typescript/` so its contract tests run in the
+same CI against the real binary; it borrows no third-party BaaS client.
+Every method is one HTTP request with no hidden cache, and access stays with
+RLS: the client never decides permissions. It has no runtime dependencies
+(only `fetch`, `URL`, Web Crypto, `AbortSignal`, Web Locks and
+`BroadcastChannel`), so it runs in browsers, Node 20+, Deno, Bun and edge
+runtimes, is ESM with subpath exports and side-effect free, and keeps the
+supply chain to the TypeScript compiler. Results are values (`{ data, error }`)
+carrying the server's `code` untouched; only programming mistakes throw.
+Untrusted input never becomes syntax: identifiers are validated, values in
+`or`/`and` groups and `in` lists are always quoted, storage paths are encoded
+per segment with `..` refused, and a `service_role` token in a browser is
+refused because it bypasses RLS. Refresh is single-flight in a process and,
+in browsers, serialized across tabs with a Web Lock, because refresh rotation
+ends a session whose token is reused (D23). Retries only cover idempotent
+requests on 429/503 and honour `Retry-After`. Types come from
+`nelcota types`, which now also emits each table's `Relationships` so a
+`select` string can be typed down to its embeds. The server exposes
+`Retry-After`, `Preference-Applied` and `Last-Modified` through CORS so a
+browser can read them. The SDK follows its own semver and states the minimum
+server version it needs.
+
 ### Known pending items
 
 - Filtering parent rows by their embeds (`!inner`) and self-referencing embeds.
