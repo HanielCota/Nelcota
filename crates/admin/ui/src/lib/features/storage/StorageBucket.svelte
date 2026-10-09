@@ -20,6 +20,7 @@
   import LoaderCircle from '@lucide/svelte/icons/loader-circle'
   import { toast } from 'svelte-sonner'
   import PageHeader from '$lib/components/shared/PageHeader.svelte'
+  import BucketAccess from '$lib/features/storage/components/BucketAccess.svelte'
   import EmptyState from '$lib/components/shared/EmptyState.svelte'
   import ConfirmDialog from '$lib/components/shared/ConfirmDialog.svelte'
   import LoadError from '$lib/components/shared/LoadError.svelte'
@@ -138,6 +139,7 @@
   {#if infoError}<LoadError message={infoError} onretry={loadInfo} busy={infoLoading} />{/if}
   {#if error}<LoadError message={error} onretry={() => load()} busy={loading} />{/if}
   {#if info}
+    <BucketAccess {bucket} />
     <button type="button" disabled={uploading !== null} class={['mb-4 flex w-full cursor-pointer flex-col items-center gap-2 rounded-lg border border-dashed px-4 py-5 text-sm text-muted-foreground transition-colors hover:border-brand/50 hover:bg-muted/30 disabled:cursor-wait', dragging && 'border-brand bg-brand/5 text-brand']} onclick={() => picker?.click()}><Upload class="size-5" aria-hidden="true" />{t('storage.browser.dropHint')}</button>
   {/if}
   {#if queue.length}
