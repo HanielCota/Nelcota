@@ -114,7 +114,8 @@ export function translate(locale: Locale, key: string, params?: Params): string 
   if (entry === undefined) return key
   if (typeof entry === 'string') return interpolate(entry, params)
   const count = Number(params?.count ?? 0)
-  const form = new Intl.PluralRules(locale).select(count) === 'one' ? 'one' : 'other'
+  // CLDR files 0 under `one` in Portuguese, but people write "0 usuários".
+  const form = count !== 0 && new Intl.PluralRules(locale).select(count) === 'one' ? 'one' : 'other'
   return interpolate(entry[form], params)
 }
 
