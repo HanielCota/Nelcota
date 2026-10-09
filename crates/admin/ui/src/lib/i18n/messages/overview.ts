@@ -23,8 +23,7 @@ const ptBR = {
   blocked: { title: 'Bloqueios recentes', who: 'Quem', where: 'Onde', when: 'Quando', none: 'Nenhuma chamada recusada.' },
   needs: {
     title: 'Precisa de você',
-    allGood: 'Tudo em dia',
-    allGoodText: 'Nenhuma tabela exposta ou travada, e os primeiros passos estão feitos.',
+    allGood: 'Nenhuma tabela exposta ou travada',
   },
   hero: {
     requests: 'Requisições no período',
@@ -32,7 +31,10 @@ const ptBR = {
     errors: 'Erros do servidor',
   },
   cards: {
-    now: 'Agora',
+    database: 'Banco de dados',
+    auth: 'Autenticação',
+    tablesCaption: { one: '{count} protegida', other: '{count} protegidas' },
+    usersCaption: { one: '{count} já entrou pelo app', other: '{count} já entraram pelo app' },
     tables: 'Tabelas',
     tablesRing: '{percent}% das tabelas protegidas',
     users: 'Usuários',
@@ -121,8 +123,7 @@ const en: Messages<typeof ptBR> = {
   blocked: { title: 'Recently blocked', who: 'Who', where: 'Where', when: 'When', none: 'No call refused.' },
   needs: {
     title: 'Needs you',
-    allGood: 'All good',
-    allGoodText: 'No table is exposed or locked, and the first steps are done.',
+    allGood: 'No table is exposed or locked',
   },
   hero: {
     requests: 'Requests in the period',
@@ -130,7 +131,10 @@ const en: Messages<typeof ptBR> = {
     errors: 'Server errors',
   },
   cards: {
-    now: 'Now',
+    database: 'Database',
+    auth: 'Authentication',
+    tablesCaption: { one: '{count} protected', other: '{count} protected' },
+    usersCaption: { one: '{count} signed in from the app', other: '{count} signed in from the app' },
     tables: 'Tables',
     tablesRing: '{percent}% of tables protected',
     users: 'Users',

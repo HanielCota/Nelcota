@@ -13,6 +13,7 @@
   import Download from '@lucide/svelte/icons/download'
   import CircleCheck from '@lucide/svelte/icons/circle-check'
   import CircleAlert from '@lucide/svelte/icons/circle-alert'
+  import Check from '@lucide/svelte/icons/check'
   import { RemoteResource } from '$lib/remote-resource.svelte'
   import { api } from '$lib/api'
   import { href } from '$lib/router.svelte'
@@ -38,8 +39,16 @@
   async function loadOverview() {
     await overview.load((signal) => api.get<Overview>('/overview', { signal }))
   }
+  // Until the person picks a period, a server counting for under two hours
+  // opens on the last hour: a day of it would be two points and a ramp.
+  let picked = false
   async function loadMetrics() {
     await metrics.load((signal) => api.get<MetricsResponse>(`/metrics?range=${range}`, { signal }))
+    const counted = metrics.data ? Date.now() - new Date(metrics.data.since).getTime() : Infinity
+    if (!picked && range === '24h' && counted < 2 * 3_600_000) {
+      range = '1h'
+      await metrics.load((signal) => api.get<MetricsResponse>('/metrics?range=1h', { signal }))
+    }
   }
   async function loadDenied() {
     await denied.load((signal) => api.get<DeniedRequests>('/denied', { signal }))
@@ -64,6 +73,7 @@
   })
 
   function choose(next: '1h' | '24h') {
+    picked = true
     if (range === next) return
     range = next
     void loadMetrics()
@@ -76,7 +86,17 @@
   const periodText = $derived(range === '1h' ? t('overview.period.textHour') : t('overview.period.textDay'))
   const since = $derived(traffic ? stamp.format(new Date(traffic.since)) : '')
 
+  // The chart starts when counting started: a server up for ten minutes shows
+  // ten minutes, not a flat day with a spike at the end.
+  const chartPoints = $derived.by(() => {
+    if (!traffic) return []
+    const start = new Date(traffic.since).getTime() - 60_000
+    const counted = traffic.points.filter((point) => new Date(point.at).getTime() >= start)
+    return counted.length >= 2 ? counted : traffic.points
+  })
+
   const tables = $derived(data ? data.tables.filter((table) => table.kind === 'table') : [])
+  const protectedCount = $derived(tables.filter((table) => table.rls.state === 'ok').length)
   const protectedShare = $derived(percent(tables.filter((table) => table.rls.state === 'ok').length, tables.length))
   const signedInShare = $derived(data ? percent(data.counts.signed_in_users, data.counts.users) : 0)
   // Twelve bars across the period, the current one in the accent.
@@ -87,12 +107,12 @@
 
   const totalRows = $derived(data ? data.tables.reduce((sum, table) => sum + (table.rows ?? 0), 0) : 0)
   const byRows = $derived(data ? [...data.tables].sort((a, b) => (b.rows ?? 0) - (a.rows ?? 0)).slice(0, 4) : [])
-  const steps = $derived(data ? nextSteps(data).filter((step) => !step.done) : [])
+  const allSteps = $derived(data ? nextSteps(data) : [])
+  const steps = $derived(allSteps.filter((step) => !step.done))
   const alerts = $derived(data ? attention(data) : { exposed: [], locked: [] })
   const needs = $derived([
     ...alerts.exposed.map((table) => ({ key: `e-${table}`, title: t('overview.attention.exposed', { table }), text: t('overview.attention.exposedHint'), path: `/policies?table=${encodeURIComponent(table)}` })),
     ...alerts.locked.map((table) => ({ key: `l-${table}`, title: t('overview.attention.blocked', { table }), text: t('overview.attention.blockedHint'), path: `/policies?table=${encodeURIComponent(table)}` })),
-    ...steps.map((step) => ({ key: `s-${step.id}`, title: t(`overview.steps.${step.id}.label`), text: t(`overview.steps.${step.id}.hint`), path: step.path })),
   ])
   const recentBlocks = $derived(denied.data ? denied.data.requests.slice(0, 5) : [])
 
@@ -107,7 +127,7 @@
     on ? 'bg-secondary font-medium text-foreground' : 'text-muted-foreground hover:text-foreground',
   ]
   const filter = (on: boolean) => [
-    'h-10 cursor-pointer rounded-full border px-4 text-sm transition-colors',
+    'h-10 shrink-0 cursor-pointer rounded-full border px-4 text-sm whitespace-nowrap transition-colors',
     on ? 'border-transparent bg-nav-active font-medium text-nav-active-foreground' : 'border-border-strong text-muted-foreground hover:text-foreground',
   ]
   const card = 'rounded-3xl bg-card p-5'
@@ -163,26 +183,28 @@
       {#if data}
         <article class={card}>
           <div class="flex items-center justify-between text-xs text-muted-foreground">
-            <span>{t('overview.cards.now')}</span>
+            <span>{t('overview.cards.database')}</span>
             <a href={href('/tables')} class={statLink} aria-label={t('overview.cards.tables')}><ArrowUpRight class="size-4" aria-hidden="true" /></a>
           </div>
           <div class="mt-4 flex items-end justify-between gap-4">
             <div class="grid gap-1">
               <p class="text-sm text-muted-foreground">{t('overview.cards.tables')}</p>
               <p class="text-3xl leading-none font-semibold tracking-[-0.03em]">{fmt.format(data.counts.tables)}</p>
+              <p class="text-xs text-muted-foreground">{t('overview.cards.tablesCaption', { count: protectedCount })}</p>
             </div>
             <Ring value={protectedShare} label={t('overview.cards.tablesRing', { percent: protectedShare })} />
           </div>
         </article>
         <article class={card}>
           <div class="flex items-center justify-between text-xs text-muted-foreground">
-            <span>{t('overview.cards.now')}</span>
+            <span>{t('overview.cards.auth')}</span>
             <a href={href('/users')} class={statLink} aria-label={t('overview.cards.users')}><ArrowUpRight class="size-4" aria-hidden="true" /></a>
           </div>
           <div class="mt-4 flex items-end justify-between gap-4">
             <div class="grid gap-1">
               <p class="text-sm text-muted-foreground">{t('overview.cards.users')}</p>
               <p class="text-3xl leading-none font-semibold tracking-[-0.03em]">{fmt.format(data.counts.users)}</p>
+              <p class="text-xs text-muted-foreground">{t('overview.cards.usersCaption', { count: data.counts.signed_in_users })}</p>
             </div>
             <Ring value={signedInShare} label={t('overview.cards.usersRing', { percent: signedInShare })} />
           </div>
@@ -212,7 +234,7 @@
 
     <article class={['grid min-w-0 content-start gap-4', card]}>
       <div class="flex flex-wrap items-center gap-2">
-        <div class="flex flex-wrap items-center gap-2" role="group" aria-label={t('overview.filters.label')}>
+        <div class="flex max-w-full items-center gap-2 overflow-x-auto" role="group" aria-label={t('overview.filters.label')}>
           <button type="button" class={filter(show === 'all')} aria-pressed={show === 'all'} onclick={() => (show = 'all')}>{t('overview.filters.all')}</button>
           <button type="button" class={filter(show === 'requests')} aria-pressed={show === 'requests'} onclick={() => (show = 'requests')}>
             <span class="mr-1.5 inline-block size-2 rounded-full bg-chart-1 align-middle" aria-hidden="true"></span>{t('overview.filters.requests')}
@@ -243,7 +265,7 @@
       {:else if traffic}
         <!-- A refetch keeps the previous frame, dimmed. -->
         <div class={['transition-opacity', metrics.loading && 'opacity-60']}>
-          <TrafficChart points={traffic.points} hourly={range === '1h'} {show} />
+          <TrafficChart points={chartPoints} hourly={range === '1h'} {show} />
         </div>
         <div class="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
           <span>{traffic.totals.requests === 0 ? t('overview.traffic.empty') : t('overview.traffic.since', { date: since })}</span>
@@ -339,28 +361,47 @@
       <h2 class="text-sm font-medium text-muted-foreground">{t('overview.needs.title')}</h2>
       {#if !data}
         <Skeleton class="h-40 rounded-2xl" />
-      {:else if needs.length === 0}
-        <div class="flex gap-3">
-          <CircleCheck class="mt-0.5 size-5 shrink-0 text-brand" aria-hidden="true" />
-          <div>
-            <p class="font-medium">{t('overview.needs.allGood')}</p>
-            <p class="text-sm text-muted-foreground">{t('overview.needs.allGoodText')}</p>
-          </div>
-        </div>
       {:else}
-        <ul class="grid gap-4">
-          {#each needs.slice(0, 4) as item (item.key)}
-            <li>
-              <a href={href(item.path)} class="group flex gap-3">
-                <CircleAlert class="mt-0.5 size-5 shrink-0 text-warning" aria-hidden="true" />
-                <span class="grid gap-0.5">
-                  <span class="font-medium group-hover:text-brand">{item.title}</span>
-                  <span class="text-sm text-muted-foreground">{item.text}</span>
-                </span>
-              </a>
-            </li>
-          {/each}
-        </ul>
+        {#if needs.length}
+          <ul class="grid gap-3">
+            {#each needs.slice(0, 3) as item (item.key)}
+              <li>
+                <a href={href(item.path)} class="group flex gap-3 rounded-2xl bg-warning/10 px-4 py-3">
+                  <CircleAlert class="mt-0.5 size-5 shrink-0 text-warning" aria-hidden="true" />
+                  <span class="grid gap-0.5">
+                    <span class="font-medium group-hover:underline">{item.title}</span>
+                    <span class="text-sm text-muted-foreground">{item.text}</span>
+                  </span>
+                </a>
+              </li>
+            {/each}
+          </ul>
+        {:else}
+          <p class="flex items-center gap-2 text-sm font-medium"><CircleCheck class="size-5 shrink-0 text-brand" aria-hidden="true" />{t('overview.needs.allGood')}</p>
+        {/if}
+        <!-- The first steps, always in view: each is ticked by what the project
+             shows, so the list doubles as a health check. -->
+        <div class="grid gap-2">
+          <p class="flex items-baseline justify-between text-xs text-muted-foreground">
+            {t('overview.steps.title')}<span class="tabular-nums">{t('overview.steps.progress', { done: allSteps.length - steps.length, total: allSteps.length })}</span>
+          </p>
+          <ol class="grid gap-1">
+            {#each allSteps as step (step.id)}
+              <li>
+                <a href={href(step.path)} class="group flex items-center gap-3 rounded-2xl px-2 py-2 transition-colors hover:bg-well">
+                  {#if step.done}
+                    <span class="grid size-6 shrink-0 place-items-center rounded-full bg-brand/15 text-brand"><Check class="size-3.5" aria-hidden="true" /></span>
+                  {:else}
+                    <span class="size-6 shrink-0 rounded-full border-2 border-dashed border-muted-foreground/40" aria-hidden="true"></span>
+                  {/if}
+                  <span class={['min-w-0 flex-1 text-sm', step.done ? 'text-muted-foreground line-through decoration-muted-foreground/40' : 'font-medium']}>{t(`overview.steps.${step.id}.label`)}</span>
+                  <span class="sr-only">{step.done ? t('overview.steps.done') : ''}</span>
+                  {#if !step.done}<ArrowUpRight class="size-4 shrink-0 text-muted-foreground group-hover:text-foreground" aria-hidden="true" />{/if}
+                </a>
+              </li>
+            {/each}
+          </ol>
+        </div>
       {/if}
     </article>
   </section>
