@@ -19,10 +19,13 @@
   import EmptyState from '$lib/components/shared/EmptyState.svelte'
   import LoadError from '$lib/components/shared/LoadError.svelte'
   import CodeBlock from '$lib/components/shared/CodeBlock.svelte'
+  import TechnicalToggle from '$lib/shared/schema/components/TechnicalToggle.svelte'
+  import { technical } from '$lib/shared/schema/technical.svelte'
+  import { describePolicy, type PolicyMeaning } from '$lib/shared/schema/plain'
   import { RemoteResource } from '$lib/remote-resource.svelte'
   import { api } from '$lib/api'
   import { ddl, toPolicyDef, type PolicyDef } from '$lib/shared/schema/ddl'
-  import { href } from '$lib/router.svelte'
+  import { href, route } from '$lib/router.svelte'
   import type { PoliciesData } from '$lib/types'
   import { errorMessage, t } from '$lib/i18n/index.svelte'
 
@@ -30,10 +33,24 @@
   const data = $derived(resource.data)
   const error = $derived(resource.error ? errorMessage(resource.error) : '')
   const loading = $derived(resource.loading)
-  let search = $state('')
+  // Arriving from an overview warning (`?table=`) opens that table.
+  let search = $state(route.query.get('table') ?? '')
   let rlsFilter = $state('all')
   let enabling = $state<string | null>(null)
   const visible = $derived(data?.tables.filter((table) => table.name.toLowerCase().includes(search.trim().toLowerCase()) && (rlsFilter === 'all' || rlsFilter === 'enabled' && table.rls.enabled || rlsFilter === 'disabled' && !table.rls.enabled && table.rls.state !== 'view' || rlsFilter === 'attention' && ['danger', 'warn'].includes(table.rls.state))) ?? [])
+
+  /** A policy in words; custom rules are named as such and keep their SQL in view. */
+  function sentence(meaning: PolicyMeaning): string {
+    switch (meaning.kind) {
+      case 'everyoneReads':
+      case 'signedInReads':
+        return t(`policies.plain.rule.${meaning.kind}`)
+      case 'owner':
+        return t(`policies.plain.rule.owner.${meaning.command}`)
+      default:
+        return t('policies.plain.rule.custom')
+    }
+  }
 
   async function load() {
     await resource.load(signal => api.get<PoliciesData>('/policies', { signal }))
@@ -83,7 +100,9 @@
 </script>
 
 <div class="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-10 lg:py-10">
-  <PageHeader title={t('policies.title')} description={t('policies.description')} />
+  <PageHeader title={t('policies.title')} description={t('policies.description')}>
+    {#snippet actions()}<TechnicalToggle />{/snippet}
+  </PageHeader>
 
   {#if error}<LoadError message={error} onretry={load} busy={loading} />{/if}
   {#if !data && loading}
@@ -133,11 +152,19 @@
           {:else}
             <div class="divide-y">
               {#each table.policies as policy (policy.name)}
-                <div class="grid grid-cols-[minmax(0,1fr)_auto] gap-3 px-4 py-3.5 text-sm @4xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,2fr)_auto] @4xl:items-start">
-                  <p class="break-words font-medium">
-                    {policy.name}
-                    {#if !policy.permissive}<span class="ml-1 text-xs font-normal text-muted-foreground">{t('policies.restrictiveTag')}</span>{/if}
-                  </p>
+                {@const meaning = describePolicy(policy)}
+                {@const showSql = technical.on || meaning.kind === 'custom'}
+                <div class={['grid grid-cols-[minmax(0,1fr)_auto] gap-3 px-4 py-3.5 text-sm', showSql && '@4xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,2fr)_auto] @4xl:items-start']}>
+                  <div class="min-w-0">
+                    <p class="break-words font-medium">
+                      {sentence(meaning)}
+                      {#if !policy.permissive}<span class="ml-1 text-xs font-normal text-muted-foreground">{t('policies.restrictiveTag')}</span>{/if}
+                    </p>
+                    <p class="mt-0.5 break-words text-xs text-muted-foreground">
+                      {policy.name}{#if meaning.kind === 'owner'}{' · '}{t('policies.plain.rule.ownerColumn', { column: meaning.column })}{/if}
+                    </p>
+                  </div>
+                  {#if showSql}
                   <p class="col-start-1 break-words text-xs text-muted-foreground @4xl:col-start-auto">
                     <span class="mr-1.5 rounded border px-1.5 py-px font-mono text-foreground">{policy.command}</span>
                     {policy.roles.join(', ')}
@@ -150,7 +177,8 @@
                       {#if policy.check.length > 160}<details><summary class="cursor-pointer text-muted-foreground">WITH CHECK · {t('common.details')}</summary><CodeBlock code={policy.check} wrap /></details>{:else}<p class="break-all"><span class="text-muted-foreground">with check</span> {policy.check}</p>{/if}
                     {/if}
                   </div>
-                  <div class="col-start-2 row-start-1 row-span-3 flex items-start justify-end gap-1 @4xl:col-start-auto @4xl:row-start-auto @4xl:row-span-1">
+                  {/if}
+                  <div class={['col-start-2 row-start-1 flex items-start justify-end gap-1', showSql && 'row-span-3 @4xl:col-start-auto @4xl:row-start-auto @4xl:row-span-1']}>
                     <Button
                       variant="ghost"
                       size="icon-sm"
