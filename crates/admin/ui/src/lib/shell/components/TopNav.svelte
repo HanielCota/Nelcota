@@ -27,12 +27,11 @@
   <button
     type="button"
     onclick={() => (palette.open = true)}
-    class="flex h-14 shrink-0 cursor-pointer items-center gap-2.5 rounded-full bg-nav px-4 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground 2xl:pr-2"
+    class="grid size-14 shrink-0 cursor-pointer place-items-center rounded-full bg-nav text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
     aria-label={`${t('shell.topbar.searchLabel')} (${isMac ? '⌘' : 'Ctrl'} K)`}
+    title={`${t('shell.topbar.searchLabel')} (${isMac ? '⌘' : 'Ctrl'} K)`}
   >
-    <Search class="size-[18px]" aria-hidden="true" />
-    <span class="hidden 2xl:inline">{t('shell.topbar.searchLabel')}</span>
-    <kbd class="hidden h-9 items-center rounded-full bg-well px-3 font-sans text-xs 2xl:flex">{isMac ? '⌘' : 'Ctrl'} K</kbd>
+    <Search class="size-5" aria-hidden="true" />
   </button>
 {/snippet}
 
@@ -45,7 +44,7 @@
 
 <header class="shrink-0 bg-background/85 backdrop-blur">
   <div class="mx-auto w-full max-w-page px-4 py-4 sm:px-6 lg:px-8">
-  <div class="grid grid-cols-[1fr_auto] items-center gap-3 lg:grid-cols-[1fr_auto_1fr] lg:gap-8">
+  <div class="grid grid-cols-[1fr_auto] items-center gap-3 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:gap-8">
     <div class="flex min-w-0 items-center gap-2">
       <button
         type="button"
@@ -55,7 +54,7 @@
       >
         <Menu class="size-5" />
       </button>
-      <div class="min-w-0 max-w-64"><ProjectSwitcher /></div>
+      <div class="min-w-0 max-w-64 lg:w-[7.5rem] xl:w-[19rem] lg:max-w-none"><ProjectSwitcher /></div>
     </div>
 
     <nav aria-label={t('shell.nav.main')} class="hidden items-center gap-1 rounded-full bg-nav p-1.5 lg:flex">

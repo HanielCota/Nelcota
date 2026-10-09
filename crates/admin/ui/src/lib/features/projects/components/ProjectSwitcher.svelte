@@ -47,14 +47,14 @@
   <button
     {...props}
     type="button"
-    class="flex h-14 w-full min-w-0 cursor-pointer items-center gap-3 rounded-full bg-nav p-1.5 sm:pr-4 lg:pr-1.5 xl:pr-4 text-left whitespace-nowrap transition-colors hover:bg-accent aria-expanded:bg-accent"
+    class="flex h-14 w-full min-w-0 cursor-pointer items-center gap-3 rounded-full bg-nav p-1.5 sm:pr-4 text-left whitespace-nowrap transition-colors hover:bg-accent aria-expanded:bg-accent"
     title={`${t('shell.projects.switch')} · ${status}`}
   >
-    <span class="relative grid size-11 shrink-0 place-items-center rounded-full bg-well">
-      <img src={mascot} alt="" class="size-8 select-none" draggable="false" />
+    <span class="relative grid size-11 shrink-0 place-items-center">
+      <img src={mascot} alt="" class="size-10 select-none" draggable="false" />
       <span
         class={[
-          'absolute right-0 bottom-0 size-3 rounded-full ring-2 ring-nav',
+          'absolute right-0 bottom-0 size-3 rounded-full ring-[3px] ring-nav',
           health.status === 'online' ? 'bg-brand' : health.status === 'offline' ? 'bg-destructive' : 'bg-muted-foreground',
         ]}
         role="img"
@@ -65,7 +65,7 @@
       <span class="truncate text-sm font-semibold">{data?.current ?? 'Nelcota'}</span>
       <span class={['truncate text-xs', health.status === 'offline' ? 'text-destructive' : 'text-muted-foreground']}>{health.status === 'offline' ? status : where}</span>
     </span>
-    <ChevronsUpDown class="hidden size-4 shrink-0 text-muted-foreground sm:block lg:hidden xl:block" aria-hidden="true" />
+    <ChevronsUpDown class="ml-auto hidden size-4 shrink-0 text-muted-foreground sm:block" aria-hidden="true" />
   </button>
 {/snippet}
 
