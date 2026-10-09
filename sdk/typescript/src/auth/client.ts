@@ -274,7 +274,7 @@ export class AuthClient {
    * browser's storage; the app finishes on `redirectTo` with `handleRedirect()`.
    */
   async signInWithOAuth(input: OAuthInput): Promise<Result<{ url: string }>> {
-    const redirectTo = new URL(input.redirectTo).href;
+    const redirectTo = absoluteUrl(input.redirectTo, 'redirectTo').href;
     const verifier = createVerifier();
     await this.#storage.setItem(`${this.#key}.pkce`, verifier);
     const query = new URLSearchParams({
@@ -308,7 +308,8 @@ export class AuthClient {
    * Returns `null` data when the URL carries neither.
    */
   async handleRedirect(href: string = globalThis.location?.href ?? ''): Promise<Result<Session | null>> {
-    const url = new URL(href);
+    if (href === '') return ok(null);
+    const url = absoluteUrl(href, 'URL');
     const code = url.searchParams.get('code');
     const error = url.searchParams.get('error');
     if (code === null && error === null) return ok(null);
@@ -327,7 +328,8 @@ export class AuthClient {
    * Then call `verifyEmailLink` or, for `recovery`, `resetPassword`.
    */
   readEmailLink(href: string = globalThis.location?.href ?? ''): EmailLink | null {
-    const url = new URL(href);
+    if (href === '') return null;
+    const url = absoluteUrl(href, 'URL');
     const params = new URLSearchParams(url.hash.slice(1));
     const type = params.get('type');
     const token = params.get('token');
@@ -406,6 +408,14 @@ export class AuthClient {
     }
     await this.#clear();
     return error ? fail(error) : ok(null);
+  }
+}
+
+function absoluteUrl(value: string, what: string): URL {
+  try {
+    return new URL(value);
+  } catch {
+    throw new NelcotaUsageError(`Invalid ${what}: ${JSON.stringify(value)} is not an absolute URL`);
   }
 }
 

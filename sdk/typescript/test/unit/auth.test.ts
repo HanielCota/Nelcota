@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createClient, memoryStorage, type AuthEvent, type SessionStorage } from '../../src/index.js';
+import { createClient, memoryStorage, NelcotaUsageError, type AuthEvent, type SessionStorage } from '../../src/index.js';
 import { challengeFor } from '../../src/auth/pkce.js';
 import { empty, json, mockFetch, session } from './helpers.js';
 
@@ -204,6 +204,14 @@ describe('OAuth with PKCE', () => {
     expect(JSON.parse(calls[0]!.body!)).toEqual({ auth_code: 'abc', code_verifier: 'v'.repeat(64) });
     expect(await storage.getItem(`${KEY}.pkce`)).toBeNull();
     expect((await nelcota.auth.exchangeCode('abc')).error?.code).toBe('pkce_missing');
+  });
+
+  it('refuses a relative redirectTo and tolerates a missing page URL', async () => {
+    const { nelcota } = setup();
+    await expect(nelcota.auth.signInWithOAuth({ provider: 'google', redirectTo: '/back' })).rejects.toThrow(NelcotaUsageError);
+    // Outside a browser there is no location: nothing to handle.
+    expect(await nelcota.auth.handleRedirect()).toEqual({ data: null, error: null });
+    expect(nelcota.auth.readEmailLink()).toBeNull();
   });
 
   it('reports provider errors and ignores unrelated URLs', async () => {
