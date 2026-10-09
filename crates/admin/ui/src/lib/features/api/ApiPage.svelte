@@ -6,10 +6,10 @@
   import Globe from '@lucide/svelte/icons/globe'
   import UserRound from '@lucide/svelte/icons/user-round'
   import Server from '@lucide/svelte/icons/server'
-  import KeyRound from '@lucide/svelte/icons/key-round'
   import Rows3 from '@lucide/svelte/icons/rows-3'
   import Plus from '@lucide/svelte/icons/plus'
   import Download from '@lucide/svelte/icons/download'
+  import TriangleAlert from '@lucide/svelte/icons/triangle-alert'
   import { Skeleton } from '$lib/components/ui/skeleton'
   import { Button } from '$lib/components/ui/button'
   import PageHeader from '$lib/components/shared/PageHeader.svelte'
@@ -77,6 +77,14 @@
     { id: 'jwks', label: 'JWKS', path: '/auth/v1/.well-known/jwks.json' },
   ] as const
 
+  const sections = $derived([
+    { id: 'api-address', label: t('connect.address') },
+    { id: 'api-roles', label: t('connect.caller') },
+    { id: 'api-sdk', label: t('connect.sdk.title') },
+    { id: 'api-examples', label: t('connect.examples') },
+    { id: 'api-token', label: t('connect.token.title') },
+  ])
+
   const roles = ['anon', 'authenticated', 'service_role'] as const
   const roleIcons = { anon: Globe, authenticated: UserRound, service_role: Server }
 
@@ -87,7 +95,7 @@
     ]
 </script>
 
-<div class="mx-auto grid w-full max-w-page gap-10 px-4 pt-2 pb-12 *:max-w-4xl *:min-w-0 sm:px-6 lg:px-8">
+<div class="mx-auto grid w-full max-w-page gap-6 px-4 pt-2 pb-12 sm:px-6 lg:px-8 [&>:first-child]:mb-0">
   <PageHeader title={t('connect.title')} description={t('connect.description')}>
     {#snippet actions()}
       <Button variant="outline" href="/rest/v1/" target="_blank" rel="noopener">
@@ -96,126 +104,151 @@
     {/snippet}
   </PageHeader>
 
-  <nav class="-mt-6 flex flex-wrap gap-x-5 gap-y-2 text-sm" aria-label={t('connect.navigation')}><a class="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline" href="#api-address">{t('connect.address')}</a><a class="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline" href="#api-roles">{t('connect.caller')}</a><a class="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline" href="#api-sdk">{t('connect.sdk.title')}</a><a class="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline" href="#api-examples">{t('connect.examples')}</a><a class="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline" href="#api-token">{t('connect.token.title')}</a></nav>
-
-  <section id="api-address" class="-mt-2 grid scroll-mt-6 gap-4">
-    <h2 class="text-base font-semibold">{t('connect.address')}</h2>
-    <CodeBlock code={base} label={t('connect.copyAddress')} />
-    <dl class="grid gap-2 text-sm sm:grid-cols-[6rem_auto_1fr] sm:gap-x-4">
-      {#each endpoints as endpoint (endpoint.path)}
-        <dt class="font-medium">{endpoint.label}</dt>
-        <dd><code class="text-xs">{endpoint.path}</code></dd>
-        <dd class="text-muted-foreground max-sm:mb-2">{t(`connect.endpoints.${endpoint.id}`)}</dd>
+  <div class="grid gap-6 lg:grid-cols-[13rem_minmax(0,1fr)] lg:items-start">
+    <!-- Sections, beside the content on wide screens and as pills above it otherwise. -->
+    <nav class="flex gap-1 overflow-x-auto rounded-full bg-card p-1 lg:sticky lg:top-24 lg:grid lg:rounded-3xl lg:p-2" aria-label={t('connect.navigation')}>
+      {#each sections as section (section.id)}
+        <a class="shrink-0 rounded-full px-4 py-2 text-sm whitespace-nowrap text-muted-foreground transition-colors hover:bg-accent hover:text-foreground" href={`#${section.id}`}>{section.label}</a>
       {/each}
-    </dl>
-  </section>
+    </nav>
 
-  <section id="api-roles" class="grid scroll-mt-6 gap-4">
-    <div>
-      <h2 class="text-base font-semibold">{t('connect.caller')}</h2>
-      <p class="mt-1 text-sm text-muted-foreground">{t('connect.callerHint')}</p>
-    </div>
-    <div class="grid gap-3 md:grid-cols-3">
-      {#each roles as role (role)}
-        {@const Icon = roleIcons[role]}
-        <div class="rounded-3xl bg-card p-4">
-          <p class="flex items-center gap-2 text-sm font-medium"><Icon class="size-4 text-muted-foreground" aria-hidden="true" />{t(`connect.roles.${role}.title`)}</p>
-          <code class="text-xs text-muted-foreground">{role}</code>
-          <p class="mt-2 text-sm text-muted-foreground">{t(`connect.roles.${role}.text`)}</p>
-          {#if role === 'service_role'}
-            <p class="mt-2 text-sm text-warning">{t('connect.neverInBrowser')}</p>
-          {/if}
+    <div class="grid min-w-0 gap-6">
+      <section id="api-address" class="grid scroll-mt-24 gap-5 rounded-3xl bg-card p-6">
+        <div class="grid gap-3">
+          <h2 class="text-lg font-semibold">{t('connect.address')}</h2>
+          <CodeBlock code={base} label={t('connect.copyAddress')} />
         </div>
-      {/each}
-    </div>
-  </section>
+        <ul class="grid gap-3 md:grid-cols-3">
+          {#each endpoints as endpoint (endpoint.path)}
+            <li class="grid content-start gap-1.5 rounded-2xl bg-field p-4">
+              <p class="text-sm font-semibold">{endpoint.label}</p>
+              <code class="text-xs break-all">{endpoint.path}</code>
+              <p class="text-sm text-muted-foreground">{t(`connect.endpoints.${endpoint.id}`)}</p>
+            </li>
+          {/each}
+        </ul>
+      </section>
 
-  <section id="api-sdk" class="grid scroll-mt-6 gap-4">
-    <div>
-      <h2 class="text-base font-semibold">{t('connect.sdk.title')}</h2>
-      <p class="mt-1 text-sm text-muted-foreground">
-        {t('connect.sdk.text')}
-        <a class="underline underline-offset-4 hover:text-foreground" href={sdkDocs} target="_blank" rel="noopener">{t('connect.sdk.docs')}</a>
-      </p>
-    </div>
-    <ol class="grid gap-5 *:min-w-0">
-      <li class="grid gap-2 *:min-w-0">
-        <h3 class="text-sm font-medium">1. {t('connect.sdk.install')}</h3>
-        <CodeBlock code={setup.install} />
-      </li>
-      <li class="grid gap-2 *:min-w-0">
-        <h3 class="text-sm font-medium">2. {t('connect.sdk.types')}</h3>
-        <div class="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted-foreground">
-          <Button variant="outline" size="sm" href={href('/api/typescript')} download="database.ts"><Download />{t('connect.downloadTypes')}</Button>
-          <span>{t('connect.sdk.orCli')} <code class="text-xs text-foreground">nelcota types -o database.ts</code></span>
+      <section id="api-roles" class="grid scroll-mt-24 gap-5 rounded-3xl bg-card p-6">
+        <div class="grid gap-1">
+          <h2 class="text-lg font-semibold">{t('connect.caller')}</h2>
+          <p class="text-sm text-muted-foreground">{t('connect.callerHint')}</p>
         </div>
-      </li>
-      <li class="grid gap-2 *:min-w-0">
-        <h3 class="text-sm font-medium">3. {t('connect.sdk.client')}</h3>
-        <CodeBlock code={setup.client} />
-      </li>
-    </ol>
-  </section>
+        <ul class="grid gap-3 md:grid-cols-3">
+          {#each roles as role (role)}
+            {@const Icon = roleIcons[role]}
+            <li class="flex flex-col gap-3 rounded-2xl bg-field p-4">
+              <div class="flex items-center gap-3">
+                <span class="grid size-10 shrink-0 place-items-center rounded-full bg-card text-muted-foreground"><Icon class="size-[18px]" aria-hidden="true" /></span>
+                <div class="grid min-w-0">
+                  <p class="text-sm font-semibold">{t(`connect.roles.${role}.title`)}</p>
+                  <code class="text-xs text-muted-foreground">{role}</code>
+                </div>
+              </div>
+              <p class="text-sm text-muted-foreground">{t(`connect.roles.${role}.text`)}</p>
+              {#if role === 'service_role'}
+                <p class="mt-auto flex w-fit items-center gap-1.5 rounded-full bg-warning/15 px-2.5 py-1 text-xs font-medium text-warning">
+                  <TriangleAlert class="size-3.5" aria-hidden="true" />{t('connect.neverInBrowser')}
+                </p>
+              {/if}
+            </li>
+          {/each}
+        </ul>
+      </section>
 
-  <section id="api-examples" class="grid scroll-mt-6 gap-4">
-    <h2 class="text-base font-semibold">{t('connect.examples')}</h2>
-    <div class="flex flex-wrap items-center gap-3">
-      <nav class="flex h-10 items-center gap-1 rounded-full bg-secondary p-1" aria-label={t('connect.topic')}>
-        <button type="button" class={tab(topic === 'tables')} aria-pressed={topic === 'tables'} onclick={() => choose({ topic: 'tables' })}
-          >{t('connect.topics.tables')}</button
-        >
-        <button type="button" class={tab(topic === 'auth')} aria-pressed={topic === 'auth'} onclick={() => choose({ topic: 'auth' })}
-          >{t('connect.topics.auth')}</button
-        >
-      </nav>
-      {#if topic === 'tables' && tables.length}
-        <Select.Root type="single" value={table} onValueChange={(table) => choose({ table })}>
-          <Select.Trigger class="w-52 font-mono text-xs" aria-label={t('connect.table')}>{table}</Select.Trigger>
-          <Select.Content>
-            {#each tables as t (t.name)}
-              <Select.Item value={t.name} class="font-mono text-xs">{t.name}</Select.Item>
-            {/each}
-          </Select.Content>
-        </Select.Root>
-      {/if}
-      <nav class="flex h-10 items-center gap-1 rounded-full bg-secondary p-1 sm:ml-auto" aria-label={t('connect.language')}>
-        <button type="button" class={tab(lang === 'ts')} aria-pressed={lang === 'ts'} onclick={() => choose({ lang: 'ts' })}
-          >{t('connect.sdkLabel')}</button
-        >
-        <button type="button" class={tab(lang === 'curl')} aria-pressed={lang === 'curl'} onclick={() => choose({ lang: 'curl' })}
-          >curl</button
-        >
-        <button type="button" class={tab(lang === 'js')} aria-pressed={lang === 'js'} onclick={() => choose({ lang: 'js' })}
-          >JavaScript</button
-        >
-      </nav>
-    </div>
-
-    {#if topic === 'tables' && tableError}<LoadError message={tableError} onretry={loadTables} busy={tablesLoading} />{/if}
-    {#if snippetsError}<LoadError message={snippetsError} onretry={loadSnippets} busy={snippetsLoading} />{/if}
-    {#if topic === 'tables' && (tablesLoading || snippetsLoading)}<Skeleton class="h-48" />
-    {:else if topic === 'tables' && !tables.length && !tableError}
-      <EmptyState icon={Rows3} title={t('connect.noTables')}>{#snippet actions()}<Button href={href('/tables?create=true')}><Plus data-icon="inline-start" aria-hidden="true" />{t('tables.editor.newTable')}</Button>{/snippet}</EmptyState>
-    {:else}
-      <div class="grid gap-6 *:min-w-0">
-        {#each snippets as snippet (snippet.id)}
-          <article class="grid gap-2 *:min-w-0">
-            <div>
-              <h3 class="text-sm font-medium">{t(`connect.snippets.${snippet.id}.label`)}</h3>
-              <p class="text-sm text-muted-foreground">{t(lang === 'ts' ? `connect.snippets.${snippet.id}.sdk` : `connect.snippets.${snippet.id}.description`, snippet.params)}</p>
+      <section id="api-sdk" class="grid scroll-mt-24 gap-5 rounded-3xl bg-card p-6">
+        <div class="grid gap-1">
+          <h2 class="text-lg font-semibold">{t('connect.sdk.title')}</h2>
+          <p class="text-sm text-muted-foreground">
+            {t('connect.sdk.text')}
+            <a class="underline underline-offset-4 hover:text-foreground" href={sdkDocs} target="_blank" rel="noopener">{t('connect.sdk.docs')}</a>
+          </p>
+        </div>
+        <ol class="grid gap-5">
+          {#snippet step(n: number, title: string)}
+            <span class="grid size-7 shrink-0 place-items-center rounded-full bg-field text-xs font-semibold tabular-nums">{n}</span>
+            <h3 class="text-sm font-medium">{title}</h3>
+          {/snippet}
+          <li class="grid grid-cols-[1.75rem_minmax(0,1fr)] items-center gap-x-3 gap-y-2">
+            {@render step(1, t('connect.sdk.install'))}
+            <div class="col-start-2"><CodeBlock code={setup.install} /></div>
+          </li>
+          <li class="grid grid-cols-[1.75rem_minmax(0,1fr)] items-center gap-x-3 gap-y-2">
+            {@render step(2, t('connect.sdk.types'))}
+            <div class="col-start-2 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted-foreground">
+              <Button variant="outline" size="sm" href={href('/api/typescript')} download="database.ts"><Download />{t('connect.downloadTypes')}</Button>
+              <span>{t('connect.sdk.orCli')} <code class="text-xs text-foreground">nelcota types -o database.ts</code></span>
             </div>
-            <CodeBlock code={snippet.code[lang]} />
-          </article>
-        {/each}
-      </div>
-    {/if}
-    {#if lang !== 'ts'}
-      <p class="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted-foreground">
-        {t('connect.types')}
-        <Button variant="outline" size="sm" href={href('/api/typescript')} download="database.ts"><Download />{t('connect.downloadTypes')}</Button>
-        <span>{t('connect.sdk.orCli')} <code class="text-xs text-foreground">nelcota types -o database.ts</code></span>
-      </p>
-    {/if}
-  </section>
-  <details id="api-token" class="scroll-mt-6 rounded-3xl bg-card p-4"><summary class="flex cursor-pointer items-center gap-2 text-sm font-medium"><KeyRound class="size-4 text-muted-foreground" aria-hidden="true" />{t('connect.token.title')} <code>service_role</code></summary><div class="mt-4"><ServiceTokenCard /></div></details>
+          </li>
+          <li class="grid grid-cols-[1.75rem_minmax(0,1fr)] items-center gap-x-3 gap-y-2">
+            {@render step(3, t('connect.sdk.client'))}
+            <div class="col-start-2"><CodeBlock code={setup.client} /></div>
+          </li>
+        </ol>
+      </section>
+
+      <section id="api-examples" class="grid scroll-mt-24 gap-5 rounded-3xl bg-card p-6">
+        <h2 class="text-lg font-semibold">{t('connect.examples')}</h2>
+        <div class="flex flex-wrap items-center gap-3">
+          <nav class="flex h-10 items-center gap-1 rounded-full bg-field p-1" aria-label={t('connect.topic')}>
+            <button type="button" class={tab(topic === 'tables')} aria-pressed={topic === 'tables'} onclick={() => choose({ topic: 'tables' })}
+              >{t('connect.topics.tables')}</button
+            >
+            <button type="button" class={tab(topic === 'auth')} aria-pressed={topic === 'auth'} onclick={() => choose({ topic: 'auth' })}
+              >{t('connect.topics.auth')}</button
+            >
+          </nav>
+          {#if topic === 'tables' && tables.length}
+            <Select.Root type="single" value={table} onValueChange={(table) => choose({ table })}>
+              <Select.Trigger class="w-52 rounded-full font-mono text-xs" aria-label={t('connect.table')}>{table}</Select.Trigger>
+              <Select.Content>
+                {#each tables as t (t.name)}
+                  <Select.Item value={t.name} class="font-mono text-xs">{t.name}</Select.Item>
+                {/each}
+              </Select.Content>
+            </Select.Root>
+          {/if}
+          <nav class="flex h-10 items-center gap-1 rounded-full bg-field p-1 sm:ml-auto" aria-label={t('connect.language')}>
+            <button type="button" class={tab(lang === 'ts')} aria-pressed={lang === 'ts'} onclick={() => choose({ lang: 'ts' })}
+              >{t('connect.sdkLabel')}</button
+            >
+            <button type="button" class={tab(lang === 'curl')} aria-pressed={lang === 'curl'} onclick={() => choose({ lang: 'curl' })}
+              >curl</button
+            >
+            <button type="button" class={tab(lang === 'js')} aria-pressed={lang === 'js'} onclick={() => choose({ lang: 'js' })}
+              >JavaScript</button
+            >
+          </nav>
+        </div>
+
+        {#if topic === 'tables' && tableError}<LoadError message={tableError} onretry={loadTables} busy={tablesLoading} />{/if}
+        {#if snippetsError}<LoadError message={snippetsError} onretry={loadSnippets} busy={snippetsLoading} />{/if}
+        {#if topic === 'tables' && (tablesLoading || snippetsLoading)}<Skeleton class="h-48 rounded-2xl" />
+        {:else if topic === 'tables' && !tables.length && !tableError}
+          <EmptyState icon={Rows3} title={t('connect.noTables')}>{#snippet actions()}<Button href={href('/tables?create=true')}><Plus data-icon="inline-start" aria-hidden="true" />{t('tables.editor.newTable')}</Button>{/snippet}</EmptyState>
+        {:else}
+          <div class="grid gap-6 *:min-w-0">
+            {#each snippets as snippet (snippet.id)}
+              <article class="grid gap-2 *:min-w-0">
+                <div>
+                  <h3 class="text-sm font-medium">{t(`connect.snippets.${snippet.id}.label`)}</h3>
+                  <p class="text-sm text-muted-foreground">{t(lang === 'ts' ? `connect.snippets.${snippet.id}.sdk` : `connect.snippets.${snippet.id}.description`, snippet.params)}</p>
+                </div>
+                <CodeBlock code={snippet.code[lang]} />
+              </article>
+            {/each}
+          </div>
+        {/if}
+        {#if lang !== 'ts'}
+          <p class="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted-foreground">
+            {t('connect.types')}
+            <Button variant="outline" size="sm" href={href('/api/typescript')} download="database.ts"><Download />{t('connect.downloadTypes')}</Button>
+            <span>{t('connect.sdk.orCli')} <code class="text-xs text-foreground">nelcota types -o database.ts</code></span>
+          </p>
+        {/if}
+      </section>
+
+      <div id="api-token" class="scroll-mt-24"><ServiceTokenCard /></div>
+    </div>
+  </div>
 </div>

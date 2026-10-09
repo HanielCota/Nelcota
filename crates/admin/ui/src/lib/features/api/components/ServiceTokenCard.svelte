@@ -33,9 +33,9 @@
 </script>
 
 <!-- The token is not stored: it shows once, here, to be copied. -->
-<section class="grid gap-4 rounded-3xl bg-card p-5">
+<section class="grid gap-4 rounded-3xl bg-card p-6">
   <div>
-    <h2 class="text-base font-semibold">{t('connect.token.title')} <code class="font-mono">service_role</code></h2>
+    <h2 class="text-lg font-semibold">{t('connect.token.title')} <code class="font-mono">service_role</code></h2>
     <p class="mt-1 text-sm text-muted-foreground">
       {t('connect.token.introBefore')} <span class="text-warning">{t('connect.token.introWarning')}</span>{t('connect.token.introAfter')}
     </p>
