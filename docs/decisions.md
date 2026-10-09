@@ -787,6 +787,21 @@ requests on 429/503 and honour `Retry-After`. Types come from
 browser can read them. The SDK follows its own semver and states the minimum
 server version it needs.
 
+## Tooling
+
+**D96. Tooling follows the newest stable releases.** The MSRV moves from
+1.88 (D19) to 1.99, the stable toolchain CI, the Docker image and the
+release build already use, so `cargo update` picks the newest crates
+instead of the newest that build on an old compiler. TypeScript is 7, the
+native compiler: the SDK and the panel's plain TypeScript projects check
+with it. svelte-check still needs the TypeScript 6 compiler API (TS 7 has
+no stable JS API yet), so the panel keeps it as `typescript`, from
+`@typescript/typescript6`, while `tsc` comes from `typescript-7` and the
+scripts call it by path, since both packages ship a `tsc` binary. Drop the
+TS 6 package once svelte-check supports 7. Updates still wait seven days
+after release (Dependabot cooldown), so "newest" means newest that has
+been out for a week.
+
 ### Known pending items
 
 - Filtering parent rows by their embeds (`!inner`) and self-referencing embeds.
