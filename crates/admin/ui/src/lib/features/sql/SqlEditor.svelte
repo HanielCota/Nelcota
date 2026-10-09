@@ -14,7 +14,12 @@
   import Maximize2 from '@lucide/svelte/icons/maximize-2'
   import * as Resizable from '$lib/components/ui/resizable'
   import { toast } from 'svelte-sonner'
-  import CodeEditor from '$lib/features/sql/components/CodeEditor.svelte'
+  import CodeEditor, { type Cursor } from '$lib/features/sql/components/CodeEditor.svelte'
+  import QueryTitle from '$lib/features/sql/components/QueryTitle.svelte'
+  import RunAsNotice from '$lib/features/sql/components/RunAsNotice.svelte'
+  import EditorStatus from '$lib/features/sql/components/EditorStatus.svelte'
+  import { draftName } from '$lib/features/sql/query-name'
+  import type { Pane } from 'paneforge'
   import EmptyState from '$lib/components/shared/EmptyState.svelte'
   import ConfirmDialog from '$lib/components/shared/ConfirmDialog.svelte'
   import SaveQueryDialog from '$lib/features/sql/components/SaveQueryDialog.svelte'
@@ -49,10 +54,32 @@
   let detail = $state<{ title: string; value: string | null } | null>(null)
   let detailOpen = $state(false)
 
+  // Cursor and selection, for the status bar and to run only what is selected.
+  let cursor = $state<Cursor>({ line: 1, column: 1, from: 0, to: 0 })
+  const selection = $derived(cursor.from !== cursor.to ? sqlStore.draft.slice(cursor.from, cursor.to) : '')
+  const runsSelection = $derived(selection.trim() !== '')
+  /** Where the last run failed, as an offset in the editor text. */
+  let errorAt = $state<number | null>(null)
+  // The results pane stays folded until there is something to show.
+  let resultsPane = $state<Pane>()
+  $effect(() => {
+    if (resultsPane && !execution.response && !execution.error && !execution.running) resultsPane.collapse()
+  })
+
   async function run() {
-    const code = sqlStore.draft
+    const code = runsSelection ? selection : sqlStore.draft
+    const offset = runsSelection ? cursor.from : 0
+    errorAt = null
+    resultsPane?.expand()
     if (await execution.run(code)) sqlStore.remember(code)
+    const result = execution.response
+    // Postgres counts from 1 within the text it received.
+    const position = !execution.error && result && 'error' in result ? result.error.position : null
+    errorAt = position ? offset + position - 1 : null
   }
+
+  /** Line of the editor text where the last run failed. */
+  const errorLine = $derived(errorAt === null ? null : sqlStore.draft.slice(0, errorAt).split('\n').length)
 
   /** Saves the open query; with none open, asks for a name. */
   function save() {
@@ -110,21 +137,18 @@
   <SqlSidebar onrename={(query) => openDialog({ mode: 'rename', query })} ondelete={askDelete} ondeleteDraft={(draft) => { toDeleteDraft = draft; deleteDraftOpen = true }} />
 
   <div class="flex min-w-0 flex-1 flex-col">
-    <div class="flex min-h-14 shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b px-4 py-2.5">
-      <div class="flex min-w-0 items-center gap-2">
-        <h1 class="truncate text-sm font-semibold">
-          {sqlStore.current?.name ?? t('sql.editor.newQuery')}
-        </h1>
-        {#if sqlStore.dirty}
-          <span class="shrink-0 text-xs text-muted-foreground" title={t('sql.editor.unsavedTitle')}>{t('sql.editor.unsaved')}</span>
-        {/if}
+    <div class="flex min-h-14 shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b px-4 py-2.5 xl:flex-nowrap">
+      <div class="min-w-0 flex-1 basis-48">
+      <QueryTitle
+        name={sqlStore.current?.name ?? null}
+        fallback={sqlStore.draft.trim() ? draftName(sqlStore.draft) : t('sql.editor.newQuery')}
+        dirty={sqlStore.dirty}
+        onrename={(name) => sqlStore.current && sqlStore.rename(sqlStore.current.id, name)}
+        onsave={() => openDialog({ mode: 'save' })}
+      />
       </div>
-      <span
-        class="hidden text-xs text-muted-foreground md:inline"
-        title={t('sql.editor.ownerNoteTitle')}
-        >{t('sql.editor.ownerNote')}</span
-      >
-      <div class="ml-auto flex flex-wrap items-center gap-2">
+      <RunAsNotice />
+      <div class="ml-auto flex shrink-0 flex-wrap items-center gap-2">
         <!-- On screens without the sidebar, templates and saved queries live in a menu. -->
         <DropdownMenu.Root>
           <DropdownMenu.Trigger>
@@ -143,7 +167,7 @@
             {#if sqlStore.looseDrafts.length}
               <DropdownMenu.Label class="text-xs text-muted-foreground">{t('sql.editor.drafts')}</DropdownMenu.Label>
               {#each sqlStore.looseDrafts as draft (draft.id)}
-                <DropdownMenu.Item onclick={() => sqlStore.openDraft(draft.id)}><FileCode aria-hidden="true" /><span class="truncate">{firstLine(draft.sql)}</span></DropdownMenu.Item>
+                <DropdownMenu.Item onclick={() => sqlStore.openDraft(draft.id)}><FileCode aria-hidden="true" /><span class="truncate">{draftName(draft.sql)}</span></DropdownMenu.Item>
               {/each}
               <DropdownMenu.Separator />
             {/if}
@@ -157,7 +181,7 @@
         <DropdownMenu.Root>
           <DropdownMenu.Trigger>
             {#snippet child({ props })}
-              <Button variant="ghost" size="sm" disabled={sqlStore.history.length === 0} {...props}><History data-icon="inline-start" aria-hidden="true" />{t('sql.editor.history')}</Button>
+              <Button variant="ghost" size="sm" disabled={sqlStore.history.length === 0} title={t('sql.editor.history')} aria-label={t('sql.editor.history')} {...props}><History data-icon="inline-start" aria-hidden="true" /><span class="hidden 2xl:inline">{t('sql.editor.history')}</span></Button>
             {/snippet}
           </DropdownMenu.Trigger>
           <DropdownMenu.Content align="end" class="w-96">
@@ -199,25 +223,29 @@
         </div>
 
         <Button onclick={run} disabled={running} title={t('sql.editor.runTitle', { shortcut: `${mod}+Enter` })} class="min-w-28">
-          {#if running}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{:else}<Play data-icon="inline-start" aria-hidden="true" />{/if}{running ? t('sql.editor.running') : t('sql.editor.run')}
+          {#if running}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{:else}<Play data-icon="inline-start" aria-hidden="true" />{/if}{running ? t('sql.editor.running') : runsSelection ? t('sql.editor.runSelection') : t('sql.editor.run')}
         </Button>
       </div>
     </div>
 
-    <p class="border-b px-4 py-1.5 text-xs text-muted-foreground lg:hidden">{t('sql.editor.localOnly')}</p>
     <Resizable.PaneGroup direction="vertical" class="min-h-0 flex-1" autoSaveId="nelcota-sql-layout">
     <Resizable.Pane defaultSize={42} minSize={20}>
-    <div class="h-full min-h-0">
-      <CodeEditor
-        bind:value={() => sqlStore.draft, (sql) => sqlStore.setDraft(sql)}
-        {schema}
-        {defaultSchema}
-        onrun={run}
-      />
+    <div class="flex h-full min-h-0 flex-col">
+      <div class="min-h-0 flex-1">
+        <CodeEditor
+          bind:value={() => sqlStore.draft, (sql) => sqlStore.setDraft(sql)}
+          {schema}
+          {defaultSchema}
+          {errorAt}
+          onrun={run}
+          oncursor={(next) => (cursor = next)}
+        />
+      </div>
+      <EditorStatus {cursor} shortcut={`${mod}+Enter`} />
     </div>
     </Resizable.Pane>
     <Resizable.Handle withHandle aria-label={t('sql.editor.resize')} />
-    <Resizable.Pane defaultSize={58} minSize={20}>
+    <Resizable.Pane bind:this={resultsPane} defaultSize={58} minSize={20} collapsible collapsedSize={0}>
 
     <div class="relative h-full min-h-0 overflow-auto bg-background" aria-busy={running}>
       {#if running}
@@ -235,9 +263,9 @@
         <div class="p-4" role="alert">
           <div class="rounded-md border border-destructive/30 px-4 py-3 text-sm">
             <p class="font-mono text-xs leading-relaxed text-destructive">
-              {#if response.error.code}{response.error.code}: {/if}{response.error.message}
+              {#if response.error.code}{response.error.code}:{' '}{/if}{response.error.message}
             </p>
-            {#if response.error.position}<p class="mt-2 text-muted-foreground">{t('sql.results.position', { position: response.error.position })}</p>{/if}
+            {#if errorLine !== null}<p class="mt-2 text-muted-foreground">{t('sql.editor.errorHere', { line: errorLine })}</p>{:else if response.error.position}<p class="mt-2 text-muted-foreground">{t('sql.results.position', { position: response.error.position })}</p>{/if}
             {#if response.error.detail}<p class="mt-2 text-muted-foreground">{response.error.detail}</p>{/if}
             {#if response.error.hint}<p class="mt-2 text-muted-foreground">{t('sql.results.hint', { hint: response.error.hint })}</p>{/if}
           </div>
