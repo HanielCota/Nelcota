@@ -842,6 +842,25 @@ through the series filters, the tooltip, a keyboard crosshair (a slider for
 assistive technology) and a table view. The mascot and the syntax colours
 (D62, D92) stay; plain language first (D93) stays.
 
+Later passes settled the rules new screens follow:
+
+- **Surfaces, darkest to lightest in dark mode:** page (graphite, a step
+  lighter than the reference at the user's request), card (rounded-3xl),
+  well (rounded-2xl insets inside a card: code, tiles, rows, empty states),
+  field (inputs, a step above the well). In light mode the page is grey,
+  cards and fields white, wells light grey. Boxes are filled, not outlined;
+  a dashed border marks only drop zones and "add" tiles, and a tinted fill
+  (destructive or warning at 10%) marks danger and alerts.
+- **Top bar:** a project chip (mascot, project, environment, a dot for
+  whether the server answers) and the account chip balance the six centred
+  pills; search is a round button. Tables, SQL and Migrations share the
+  Database pill, with tabs between them inside.
+- **Page grid:** pages cap at 1440px. Figures lead pages that have them, on
+  the same tracks as the columns below; side columns are 24rem. Grids start
+  at the container's width, so nothing scrolls sideways on phones.
+- **Contrast:** text tones are checked against every surface in both themes
+  (4.5:1 or more for body text), not eyeballed.
+
 ### Known pending items
 
 - Filtering parent rows by their embeds (`!inner`) and self-referencing embeds.
