@@ -289,6 +289,7 @@ impl TestApp {
                 rate_limit_per_minute: options.rate_limit_per_minute,
             }),
             denied: Arc::default(),
+            metrics: Arc::default(),
         };
         let outbox = Arc::new(Outbox::default());
         let auth = AuthState {

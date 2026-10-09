@@ -1,5 +1,5 @@
 //! Dependencies shared by the panel workflows.
-use crate::{Credentials, DeniedLog, HostLink, Sessions, SqlExecutor, TokenIssuer};
+use crate::{Credentials, DeniedLog, HostLink, Metrics, Sessions, SqlExecutor, TokenIssuer};
 use deadpool_postgres::Pool;
 use nelcota_api::CatalogHandle;
 use nelcota_auth::RateLimiter;
@@ -31,4 +31,6 @@ pub struct AdminState {
     pub sign_in: Arc<crate::contracts::SignIn>,
     /// API requests refused recently; the server records into it.
     pub denied: Arc<DeniedLog>,
+    /// API traffic per minute (last 24 h); the server records into it.
+    pub metrics: Arc<Metrics>,
 }

@@ -18,3 +18,4 @@ export function DdlResult(value: unknown): boolean;
 export function StorageAccess(value: unknown): boolean;
 export function DeniedRequests(value: unknown): boolean;
 export function SignIn(value: unknown): boolean;
+export function MetricsResponse(value: unknown): boolean;

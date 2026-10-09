@@ -161,6 +161,7 @@ async fn serve(config: Config) -> anyhow::Result<()> {
                 storage: storage.clone(),
                 sign_in: Arc::new(sign_in(&config)?),
                 denied: Arc::default(),
+                metrics: Arc::default(),
             })
         }
         _ => {

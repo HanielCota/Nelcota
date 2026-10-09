@@ -1263,6 +1263,226 @@
     "title": "Grants",
     "type": "object"
   },
+  "MetricsPoint": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "at": {
+        "type": "string"
+      },
+      "errors": {
+        "format": "uint32",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "p95_ms": {
+        "format": "uint32",
+        "minimum": 0,
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "refused": {
+        "format": "uint32",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "requests": {
+        "format": "uint32",
+        "minimum": 0,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "at",
+      "requests",
+      "refused",
+      "errors",
+      "p95_ms"
+    ],
+    "title": "MetricsPoint",
+    "type": "object"
+  },
+  "MetricsResponse": {
+    "$defs": {
+      "MetricsPoint": {
+        "properties": {
+          "at": {
+            "type": "string"
+          },
+          "errors": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "p95_ms": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "refused": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "requests": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "at",
+          "requests",
+          "refused",
+          "errors",
+          "p95_ms"
+        ],
+        "type": "object"
+      },
+      "MetricsTotals": {
+        "properties": {
+          "auth": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "errors": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "p95_ms": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "refused": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "requests": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "rest": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "storage": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "requests",
+          "refused",
+          "errors",
+          "rest",
+          "auth",
+          "storage",
+          "p95_ms"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "points": {
+        "items": {
+          "$ref": "#/$defs/MetricsPoint"
+        },
+        "type": "array"
+      },
+      "range": {
+        "type": "string"
+      },
+      "since": {
+        "type": "string"
+      },
+      "step_secs": {
+        "format": "uint64",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "totals": {
+        "$ref": "#/$defs/MetricsTotals"
+      }
+    },
+    "required": [
+      "range",
+      "step_secs",
+      "since",
+      "points",
+      "totals"
+    ],
+    "title": "MetricsResponse",
+    "type": "object"
+  },
+  "MetricsTotals": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "auth": {
+        "format": "uint32",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "errors": {
+        "format": "uint32",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "p95_ms": {
+        "format": "uint32",
+        "minimum": 0,
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "refused": {
+        "format": "uint32",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "requests": {
+        "format": "uint32",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "rest": {
+        "format": "uint32",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "storage": {
+        "format": "uint32",
+        "minimum": 0,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "requests",
+      "refused",
+      "errors",
+      "rest",
+      "auth",
+      "storage",
+      "p95_ms"
+    ],
+    "title": "MetricsTotals",
+    "type": "object"
+  },
   "Migration": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "properties": {

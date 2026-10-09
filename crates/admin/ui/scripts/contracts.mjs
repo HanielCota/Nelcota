@@ -8,7 +8,7 @@ const ajv = new Ajv({ code: { source: true, esm: true }, strict: false, validate
 const refs = {}
 const names = ['Overview', 'TablesResponse', 'SchemaResponse', 'UsersResponse', 'PoliciesData', 'ProjectsData',
   'ProjectsStatusData', 'MigrationsData', 'StorageOverview', 'TypesResponse', 'Structure', 'TableData', 'StorageListing',
-  'SqlResponse', 'ExportedMigration', 'DdlResult', 'StorageAccess', 'DeniedRequests', 'SignIn']
+  'SqlResponse', 'ExportedMigration', 'DdlResult', 'StorageAccess', 'DeniedRequests', 'SignIn', 'MetricsResponse']
 for (const name of names) {
   const schema = schemas[name]
   ajv.addSchema(schema, name)

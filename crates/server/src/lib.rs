@@ -90,7 +90,10 @@ pub fn app(
         .merge(nelcota_api::router())
         .with_state(state)
         .merge(nelcota_auth::router(auth));
-    let admin_log = admin.as_ref().map(|admin| admin.denied.clone());
+    let observed = admin.as_ref().map(|admin| Observed {
+        denied: admin.denied.clone(),
+        metrics: admin.metrics.clone(),
+    });
     if let Some(admin) = admin.clone() {
         router = router.merge(nelcota_admin::router(admin));
     }
@@ -108,11 +111,12 @@ pub fn app(
             router = router.merge(nelcota_admin::upload_router(admin));
         }
     }
-    // Refused API calls feed the panel's "Recently blocked" list.
-    if let Some(admin) = &admin_log {
+    // API traffic feeds the panel's overview charts and its "Recently
+    // blocked" list.
+    if let Some(observed) = observed {
         router = router.layer(middleware::from_fn_with_state(
-            (admin.clone(), verifier),
-            record_denied,
+            (observed, verifier),
+            observe,
         ));
     }
     router
@@ -121,11 +125,19 @@ pub fn app(
         .layer(TraceLayer::new_for_http())
 }
 
-/// Records API requests answered with 401, 403 or 429 (not the panel's own
-/// routes). The role comes from verifying the token again, only for refused
-/// requests; the token itself and the query string are never kept.
-async fn record_denied(
-    State((log, verifier)): State<(Arc<nelcota_admin::DeniedLog>, SharedVerifier)>,
+/// Where API traffic is recorded for the panel.
+#[derive(Clone)]
+struct Observed {
+    denied: Arc<nelcota_admin::DeniedLog>,
+    metrics: Arc<nelcota_admin::Metrics>,
+}
+
+/// Counts every API request (not the panel's own routes) per minute, and
+/// records those answered with 401, 403 or 429. The role comes from verifying
+/// the token again, only for refused requests; the token itself and the
+/// query string are never kept. Latency is time to the response head.
+async fn observe(
+    State((observed, verifier)): State<(Observed, SharedVerifier)>,
     request: Request,
     next: Next,
 ) -> Response {
@@ -133,6 +145,7 @@ async fn record_denied(
     if path.starts_with("/admin") || path == "/health" {
         return next.run(request).await;
     }
+    let started = std::time::Instant::now();
     let method = request.method().to_string();
     let bearer = request
         .headers()
@@ -141,6 +154,11 @@ async fn record_denied(
         .map(|v| v.strip_prefix("Bearer ").unwrap_or(v).to_owned());
     let response = next.run(request).await;
     let status = response.status();
+    observed.metrics.record(
+        nelcota_admin::Area::of(&path),
+        status.as_u16(),
+        started.elapsed(),
+    );
     if !matches!(status.as_u16(), 401 | 403 | 429) {
         return response;
     }
@@ -157,20 +175,22 @@ async fn record_denied(
         Some(Err(_)) => ("invalid_token".to_owned(), None, None),
     };
     let info = response.extensions().get::<nelcota_core::ErrorInfo>();
-    log.record(nelcota_admin::contracts::DeniedRequest {
-        at: nelcota_admin::now_rfc3339(),
-        method,
-        path,
-        status: status.as_u16(),
-        code: info.map_or_else(
-            || format!("http_{}", status.as_u16()),
-            |i| i.code.to_owned(),
-        ),
-        message: info.map_or_else(String::new, |i| i.message.clone()),
-        role,
-        user_id,
-        email,
-    });
+    observed
+        .denied
+        .record(nelcota_admin::contracts::DeniedRequest {
+            at: nelcota_admin::now_rfc3339(),
+            method,
+            path,
+            status: status.as_u16(),
+            code: info.map_or_else(
+                || format!("http_{}", status.as_u16()),
+                |i| i.code.to_owned(),
+            ),
+            message: info.map_or_else(String::new, |i| i.message.clone()),
+            role,
+            user_id,
+            email,
+        });
     response
 }
 
