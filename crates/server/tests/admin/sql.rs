@@ -68,3 +68,85 @@ async fn sql_editor_is_isolated_and_has_readable_errors() {
             .contains(&json!("email"))
     );
 }
+
+async fn run_as(app: &TestApp, cookie: &str, query: &str, run_as: serde_json::Value) -> Reply {
+    crate::common::panel::send(
+        app,
+        Method::POST,
+        "/admin/api/sql",
+        cookie,
+        json!({ "sql": query, "run_as": run_as }),
+    )
+    .await
+}
+
+fn first_cell(reply: &Reply) -> serde_json::Value {
+    reply.body["results"][0]["rows"][0][0].clone()
+}
+
+#[tokio::test]
+async fn sql_runs_as_a_visitor_or_a_signed_in_user_under_the_access_rules() {
+    let app = TestApp::spawn().await;
+    let cookie = login(&app).await;
+    let signup = app
+        .post(
+            "/auth/v1/signup",
+            None,
+            json!({ "email": "tester@example.com", "password": "strong-password-123" }),
+        )
+        .await;
+    let id = signup.body["user"]["id"].as_str().unwrap().to_owned();
+    app.admin_client
+        .execute(
+            "INSERT INTO public.todos (user_id, title) VALUES ($1::text::uuid, 'task of the tester')",
+            &[&id],
+        )
+        .await
+        .unwrap();
+    let count = "select count(*) from public.todos";
+
+    // The owner sees every row (no RLS); so does an explicit owner run.
+    let owner = run_as(&app, &cookie, count, json!({ "role": "owner" })).await;
+    assert_eq!(first_cell(&owner), "3", "{}", owner.text);
+
+    // A signed-in user sees only their rows, and auth.uid() is theirs.
+    let user = json!({ "role": "authenticated", "user_id": id });
+    let mine = run_as(&app, &cookie, count, user.clone()).await;
+    assert_eq!(first_cell(&mine), "1", "{}", mine.text);
+    let who = run_as(
+        &app,
+        &cookie,
+        "select auth.uid()::text, auth.jwt() ->> 'email'",
+        user.clone(),
+    )
+    .await;
+    assert_eq!(
+        who.body["results"][0]["rows"][0],
+        json!([id, "tester@example.com"])
+    );
+    // Writes follow the policies too: a row for someone else is refused.
+    let foreign = run_as(
+        &app,
+        &cookie,
+        "insert into public.todos (user_id, title) values (gen_random_uuid(), 'not mine')",
+        user,
+    )
+    .await;
+    assert_eq!(foreign.body["error"]["code"], "42501", "{}", foreign.text);
+
+    // A visitor has no grant on todos at all.
+    let anon = run_as(&app, &cookie, count, json!({ "role": "anon" })).await;
+    assert_eq!(anon.body["error"]["code"], "42501", "{}", anon.text);
+
+    for user_id in ["054f8cd2-decb-4c78-91a1-f351bd8f5b92", "not-a-uuid"] {
+        let missing = run_as(
+            &app,
+            &cookie,
+            count,
+            json!({ "role": "authenticated", "user_id": user_id }),
+        )
+        .await;
+        assert_eq!(missing.status, StatusCode::NOT_FOUND, "{user_id}");
+        assert_eq!(missing.body["code"], "user_not_found");
+    }
+}

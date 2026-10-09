@@ -1,6 +1,7 @@
 //! Dedicated SQL execution, result budgets and cancellation.
 use crate::contracts::{SqlError, SqlResponse, SqlResult};
 use futures_util::{StreamExt, pin_mut};
+use nelcota_core::Claims;
 use tokio::sync::Semaphore;
 use tokio_postgres::{NoTls, SimpleQueryMessage};
 
@@ -104,9 +105,11 @@ impl SqlExecutor {
         &self,
         config: &tokio_postgres::Config,
         sql: &str,
+        claims: Option<&Claims>,
     ) -> Result<SqlResponse, SqlBusy> {
         let _slot = self.slots.try_acquire().map_err(|_| SqlBusy)?;
-        tracing::info!(bytes = sql.len(), "panel SQL editor run");
+        let role = claims.map_or("owner", |claims| claims.role().as_str());
+        tracing::info!(bytes = sql.len(), role, "panel SQL editor run");
         let mut config = config.clone();
         config
             .application_name("nelcota-admin-sql")
@@ -120,6 +123,19 @@ impl SqlExecutor {
             cancel: client.cancel_token(),
             completed: false,
         };
+        // The connection is this run's alone, so session settings are enough:
+        // the same role and claims the API sets for a request (D94).
+        if let Some(claims) = claims
+            && let Err(err) = client
+                .execute(
+                    "SELECT set_config('role', $1, false), set_config('request.jwt.claims', $2, false)",
+                    &[&claims.role().as_str(), &claims.as_json()],
+                )
+                .await
+        {
+            driver.completed = true;
+            return Ok(query_error(err));
+        }
         let stream = match client.simple_query_raw(sql).await {
             Ok(stream) => stream,
             Err(err) => {
