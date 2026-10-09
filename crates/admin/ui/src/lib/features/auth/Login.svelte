@@ -6,11 +6,18 @@
   import Eye from '@lucide/svelte/icons/eye'
   import EyeOff from '@lucide/svelte/icons/eye-off'
   import LoaderCircle from '@lucide/svelte/icons/loader-circle'
+  import Sun from '@lucide/svelte/icons/sun'
+  import Moon from '@lucide/svelte/icons/moon'
+  import { mode, toggleMode } from 'mode-watcher'
   import { api } from '$lib/api'
   import { session } from '$lib/features/auth/session.svelte'
   import Mascot, { type Pose } from '$lib/shell/components/Mascot.svelte'
   import type { Point } from '$lib/shell/mascot'
-  import { errorMessage, i18n, setLocale, t } from '$lib/i18n/index.svelte'
+  import { LOCALES, errorMessage, i18n, setLocale, t, type Locale } from '$lib/i18n/index.svelte'
+
+  // Short codes on the switch; each option names its language in full for
+  // screen readers and on hover, in that language.
+  const CODES: Record<Locale, string> = { 'pt-BR': 'PT', en: 'EN' }
 
   let project = $state('')
   // The mascot waves when the page opens, then stands still.
@@ -62,7 +69,37 @@
   }
 </script>
 
-<main class="flex min-h-screen flex-col items-center bg-background px-4 pt-[max(10rem,27vh)] pb-12">
+<main class="relative flex min-h-screen flex-col items-center bg-background px-4 pt-[max(10rem,27vh)] pb-12">
+  <!-- Language and theme, in the corner (the account menu is not there yet). -->
+  <div class="absolute top-4 right-4 flex items-center gap-2 sm:top-6 sm:right-6">
+    <div class="flex items-center gap-1 rounded-full bg-card p-1" role="group" aria-label={t('shell.account.language')}>
+      {#each LOCALES as locale (locale)}
+        {@const current = i18n.locale === locale}
+        <button
+          type="button"
+          lang={locale}
+          aria-pressed={current}
+          aria-label={t(`shell.languages.${locale}`)}
+          title={t(`shell.languages.${locale}`)}
+          class={[
+            'h-8 cursor-pointer rounded-full px-3 text-xs font-medium transition-colors',
+            current ? 'bg-nav-active text-nav-active-foreground' : 'text-muted-foreground hover:text-foreground',
+          ]}
+          onclick={() => setLocale(locale)}>{CODES[locale]}</button
+        >
+      {/each}
+    </div>
+    <button
+      type="button"
+      class="grid size-10 cursor-pointer place-items-center rounded-full bg-card text-muted-foreground transition-colors hover:text-foreground"
+      onclick={toggleMode}
+      aria-label={mode.current === 'dark' ? t('shell.account.lightTheme') : t('shell.account.darkTheme')}
+      title={mode.current === 'dark' ? t('shell.account.lightTheme') : t('shell.account.darkTheme')}
+    >
+      {#if mode.current === 'dark'}<Sun class="size-[18px]" aria-hidden="true" />{:else}<Moon class="size-[18px]" aria-hidden="true" />{/if}
+    </button>
+  </div>
+
   <div class="relative w-full max-w-[400px]">
     <Mascot {pose} lookAt={caret} class="pointer-events-none absolute -top-[8.6rem] left-1/2 size-36 -translate-x-1/2" />
 
@@ -121,13 +158,5 @@
     </form>
 
     <p class="mt-6 text-center text-sm text-muted-foreground">{t('login.restricted')}</p>
-    <!-- Each language names itself, so it can be found from either one. -->
-    <p class="mt-3 text-center text-sm">
-      {#if i18n.locale === 'pt-BR'}
-        <button type="button" lang="en" class="cursor-pointer text-muted-foreground underline-offset-4 hover:text-foreground hover:underline" onclick={() => setLocale('en')}>English</button>
-      {:else}
-        <button type="button" lang="pt-BR" class="cursor-pointer text-muted-foreground underline-offset-4 hover:text-foreground hover:underline" onclick={() => setLocale('pt-BR')}>Português</button>
-      {/if}
-    </p>
   </div>
 </main>
