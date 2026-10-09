@@ -135,7 +135,8 @@
     {/if}
 
     <!-- The page at a glance, in the overview's figure style. -->
-    <div class="grid gap-4 sm:grid-cols-3">
+    <!-- Same columns as below: the last figure sits over the side column. -->
+    <div class="grid gap-4 sm:grid-cols-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_24rem] xl:gap-6">
       <div class="grid gap-1 rounded-3xl bg-card p-5">
         <p class="text-sm text-muted-foreground">{t('policies.stats.protected')}</p>
         <p class="text-3xl font-semibold tracking-tight tabular-nums">{stats.protected}<span class="ml-1.5 text-base font-medium text-muted-foreground">{t('policies.stats.of', { count: stats.tables })}</span></p>
