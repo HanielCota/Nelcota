@@ -6,15 +6,15 @@
   const clamped = $derived(Math.min(100, Math.max(0, value)))
 </script>
 
-<svg viewBox="0 0 56 56" class="size-14 shrink-0" role="img" aria-label={label}>
-  <circle cx="28" cy="28" r={R} fill="none" class="stroke-brand/15" stroke-width="5" />
+<svg viewBox="0 0 56 56" class="size-12 shrink-0" role="img" aria-label={label}>
+  <circle cx="28" cy="28" r={R} fill="none" class="stroke-brand/15" stroke-width="3.5" />
   <circle
     cx="28"
     cy="28"
     r={R}
     fill="none"
     class="stroke-brand"
-    stroke-width="5"
+    stroke-width="3.5"
     stroke-linecap="round"
     stroke-dasharray={`${(clamped / 100) * C} ${C}`}
     transform="rotate(-90 28 28)"

@@ -3,20 +3,26 @@
   import type { MetricsPoint } from '$lib/types'
   import { intlLocale, t } from '$lib/i18n/index.svelte'
 
-  // API traffic over time: requests as an area, refused calls as a line, one
-  // y axis (D98). A crosshair finds the nearest time on hover or with the
-  // arrow keys; the tooltip lists both series there. Colours are the
-  // validated --chart-1 / --chart-2 pair.
-  let { points, hourly }: { points: MetricsPoint[]; hourly: boolean } = $props()
+  // API traffic over time (D98): requests as a green area, refused calls as a
+  // grey one, on one scale. Values come from the crosshair (pointer or arrow
+  // keys, exposed as a slider), the tooltip and the table view below.
+  let {
+    points,
+    hourly,
+    show = 'all',
+  }: { points: MetricsPoint[]; hourly: boolean; show?: 'all' | 'requests' | 'refused' } = $props()
 
-  const HEIGHT = 300
-  const PAD = { top: 16, right: 16, bottom: 32, left: 48 }
+  const HEIGHT = 340
+  const PAD = { top: 12, right: 4, bottom: 30, left: 4 }
+  const id = `traffic-${Math.random().toString(36).slice(2, 8)}`
   let width = $state(0)
   let active = $state<number | null>(null)
 
+  const showRequests = $derived(show !== 'refused')
+  const showRefused = $derived(show !== 'requests')
   const plotWidth = $derived(Math.max(0, width - PAD.left - PAD.right))
   const plotHeight = HEIGHT - PAD.top - PAD.bottom
-  const max = $derived(Math.max(1, ...points.map((p) => Math.max(p.requests, p.refused))))
+  const max = $derived(Math.max(1, ...points.map((p) => Math.max(showRequests ? p.requests : 0, showRefused ? p.refused : 0))))
   const ticks = $derived(niceTicks(max))
   const top = $derived(ticks[ticks.length - 1] ?? 1)
   const x = (i: number) => PAD.left + (points.length > 1 ? (i / (points.length - 1)) * plotWidth : 0)
@@ -31,7 +37,7 @@
   // further apart when the chart is too narrow for them to fit.
   const every = $derived.by(() => {
     const base = hourly ? 10 : 12
-    const fit = Math.max(1, Math.floor(plotWidth / 56))
+    const fit = Math.max(1, Math.floor(plotWidth / 64))
     return base * Math.max(1, Math.ceil(points.length / base / fit))
   })
   const labels = $derived(points.map((p, i) => ({ i, text: time.format(new Date(p.at)) })).filter(({ i }) => (points.length - 1 - i) % every === 0))
@@ -69,14 +75,7 @@
 </script>
 
 <div class="relative" bind:clientWidth={width}>
-  <ul class="mb-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted-foreground">
-    <li class="flex items-center gap-2"><span class="h-3 w-3 rounded-sm bg-chart-1" aria-hidden="true"></span>{t('overview.traffic.requests')}</li>
-    <li class="flex items-center gap-2"><span class="h-0.5 w-3 rounded-full bg-chart-2" aria-hidden="true"></span>{t('overview.traffic.refused')}</li>
-  </ul>
-
   {#if width > 0}
-    <!-- The crosshair is a position in time: a slider for keyboards and
-         screen readers, which hear the time and both values. -->
     <svg
       {width}
       height={HEIGHT}
@@ -87,49 +86,64 @@
       aria-valuemax={Math.max(0, points.length - 1)}
       aria-valuenow={active ?? points.length - 1}
       aria-valuetext={valueText}
-      class="block touch-none outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
+      class="block touch-none rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
       onpointermove={move}
       onpointerleave={() => (active = null)}
       onkeydown={key}
       onblur={() => (active = null)}
     >
+      <defs>
+        <linearGradient id={`${id}-requests`} x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" style="stop-color: var(--chart-1)" stop-opacity="0.45" />
+          <stop offset="100%" style="stop-color: var(--chart-1)" stop-opacity="0.02" />
+        </linearGradient>
+        <linearGradient id={`${id}-refused`} x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" style="stop-color: var(--chart-2)" stop-opacity="0.3" />
+          <stop offset="100%" style="stop-color: var(--chart-2)" stop-opacity="0.02" />
+        </linearGradient>
+      </defs>
+
       {#each ticks as tick (tick)}
         <line x1={PAD.left} x2={width - PAD.right} y1={y(tick)} y2={y(tick)} class="stroke-border" stroke-width="1" />
-        <text x={PAD.left - 10} y={y(tick)} dy="0.32em" text-anchor="end" class="fill-muted-foreground text-3xs tabular-nums">{fmt.format(tick)}</text>
       {/each}
       {#each labels as label (label.i)}
-        <text x={x(label.i)} y={HEIGHT - 8} text-anchor="middle" class="fill-muted-foreground text-3xs tabular-nums">{label.text}</text>
+        <text x={x(label.i)} y={HEIGHT - 6} text-anchor={label.i === points.length - 1 ? 'end' : 'middle'} class="fill-muted-foreground text-3xs tabular-nums">{label.text}</text>
       {/each}
 
-      <path d={areaPath(requests, y(0))} class="fill-chart-1" fill-opacity="0.12" />
-      <path d={monotonePath(requests)} class="stroke-chart-1" fill="none" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
-      <path d={monotonePath(refused)} class="stroke-chart-2" fill="none" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
+      {#if showRequests}
+        <path d={areaPath(requests, y(0))} fill={`url(#${id}-requests)`} />
+        <path d={monotonePath(requests)} class="stroke-chart-1" fill="none" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
+      {/if}
+      {#if showRefused}
+        <path d={areaPath(refused, y(0))} fill={`url(#${id}-refused)`} />
+        <path d={monotonePath(refused)} class="stroke-chart-2" fill="none" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" />
+      {/if}
 
       {#if active !== null && current}
-        <line x1={x(active)} x2={x(active)} y1={PAD.top} y2={PAD.top + plotHeight} class="stroke-ring" stroke-width="1" />
-        <circle cx={x(active)} cy={y(current.requests)} r="4.5" class="fill-chart-1 stroke-card" stroke-width="2" />
-        <circle cx={x(active)} cy={y(current.refused)} r="4.5" class="fill-chart-2 stroke-card" stroke-width="2" />
+        <line x1={x(active)} x2={x(active)} y1={PAD.top} y2={PAD.top + plotHeight} class="stroke-muted-foreground/50" stroke-width="1" stroke-dasharray="3 3" />
+        {#if showRequests}<circle cx={x(active)} cy={y(current.requests)} r="4.5" class="fill-chart-1 stroke-card" stroke-width="2" />{/if}
+        {#if showRefused}<circle cx={x(active)} cy={y(current.refused)} r="4.5" class="fill-chart-2 stroke-card" stroke-width="2" />{/if}
       {/if}
     </svg>
   {/if}
 
   {#if active !== null && current}
-    <div
-      class="pointer-events-none absolute top-8 z-10 w-44 rounded-2xl border bg-popover p-3 text-xs shadow-raised"
-      style:left={`${tooltipLeft}px`}
-      role="status"
-    >
+    <div class="pointer-events-none absolute top-4 z-10 w-44 rounded-2xl bg-popover p-3 text-xs shadow-raised" style:left={`${tooltipLeft}px`} role="status">
       <p class="mb-2 text-muted-foreground">{time.format(new Date(current.at))}</p>
-      <p class="flex items-center gap-2">
-        <span class="h-0.5 w-3 rounded-full bg-chart-1" aria-hidden="true"></span>
-        <span class="text-sm font-semibold text-foreground tabular-nums">{fmt.format(current.requests)}</span>
-        <span class="text-muted-foreground">{t('overview.traffic.requests')}</span>
-      </p>
-      <p class="mt-1 flex items-center gap-2">
-        <span class="h-0.5 w-3 rounded-full bg-chart-2" aria-hidden="true"></span>
-        <span class="text-sm font-semibold text-foreground tabular-nums">{fmt.format(current.refused)}</span>
-        <span class="text-muted-foreground">{t('overview.traffic.refused')}</span>
-      </p>
+      {#if showRequests}
+        <p class="flex items-center gap-2">
+          <span class="h-0.5 w-3 rounded-full bg-chart-1" aria-hidden="true"></span>
+          <span class="text-sm font-semibold text-foreground tabular-nums">{fmt.format(current.requests)}</span>
+          <span class="text-muted-foreground">{t('overview.traffic.requests')}</span>
+        </p>
+      {/if}
+      {#if showRefused}
+        <p class="mt-1 flex items-center gap-2">
+          <span class="h-0.5 w-3 rounded-full bg-chart-2" aria-hidden="true"></span>
+          <span class="text-sm font-semibold text-foreground tabular-nums">{fmt.format(current.refused)}</span>
+          <span class="text-muted-foreground">{t('overview.traffic.refused')}</span>
+        </p>
+      {/if}
       {#if current.p95_ms !== null}
         <p class="mt-2 text-muted-foreground">{t('overview.traffic.p95', { ms: fmt.format(current.p95_ms) })}</p>
       {/if}
