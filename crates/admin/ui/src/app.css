@@ -12,54 +12,55 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Light: soft grey page, white cards, deep green actions and an inverted
-   (near-black) pill for the current page. Text colours keep WCAG AA (4.5:1)
-   on the background and on tinted badges (the colour at 10% opacity). */
+/* Tokens follow the user's reference dashboard (D98): a cool near-white page
+   with white cards in light, a cool graphite page with lifted cards in dark,
+   a bright green for actions, an inverted pill for the current page. */
 :root {
-	--background: #f1f2f1;
-	--foreground: #111211;
-	--card: #ffffff;
-	--card-foreground: #111211;
-	--popover: #ffffff;
-	--popover-foreground: #111211;
-	--primary: #137a4b;
-	--primary-foreground: #ffffff;
-	--primary-border: #0f6b3e;
-	--primary-hover: #10693f;
-	--brand: #137a4b;
-	--brand-soft: #e3f3ea;
-	--secondary: #f1f2f1;
-	--secondary-foreground: #111211;
-	--muted: #f3f4f3;
-	--muted-foreground: #5f625f;
-	--accent: #e7e9e7;
-	--accent-foreground: #111211;
-	--destructive: #dc2626;
-	--border: #e3e5e3;
-	--border-strong: #d2d5d2;
-	--input: #dfe1df;
-	--ring: #a3a6a3;
-	/* Chart series, validated for colour-vision deficiency on the card. */
-	--chart-1: #16834f;
-	--chart-2: #7457e0;
-	--chart-3: #a3a6a3;
-	--chart-4: #c9ccc9;
-	--chart-5: #e3e5e3;
-	--radius: 1.125rem;
-	/* The current page in the top navigation: an inverted pill. */
-	--nav: #ffffff;
-	--nav-active: #111211;
-	--nav-active-foreground: #ffffff;
-	--sidebar: #ffffff;
-	--sidebar-foreground: #5f625f;
-	--sidebar-primary: #137a4b;
-	--sidebar-primary-foreground: #ffffff;
-	--sidebar-accent: #eceeec;
-	--sidebar-accent-foreground: #111211;
-	--sidebar-border: #e3e5e3;
-	--sidebar-ring: #a3a6a3;
+	--background: oklch(0.97 0.002 260);
+	--foreground: oklch(0.145 0 0);
+	--card: oklch(1 0 0);
+	--card-foreground: oklch(0.145 0 0);
+	--popover: oklch(1 0 0);
+	--popover-foreground: oklch(0.145 0 0);
+	--primary: oklch(0.74 0.19 153);
+	--primary-foreground: oklch(0.2 0.015 250);
+	--primary-border: oklch(0.74 0.19 153);
+	--primary-hover: oklch(0.7 0.19 153);
+	/* Text and icons in the brand colour: the stronger step keeps AA on white. */
+	--brand: oklch(0.55 0.15 152);
+	--brand-soft: oklch(0.74 0.19 153 / 14%);
+	--secondary: oklch(0.94 0.003 260);
+	--secondary-foreground: oklch(0.205 0 0);
+	--muted: oklch(0.945 0.003 260);
+	--muted-foreground: oklch(0.52 0.008 260);
+	--accent: oklch(0.94 0.003 260);
+	--accent-foreground: oklch(0.205 0 0);
+	--destructive: oklch(0.577 0.245 27.325);
+	--border: oklch(0 0 0 / 8%);
+	--border-strong: oklch(0 0 0 / 12%);
+	--input: oklch(0 0 0 / 12%);
+	--field: oklch(1 0 0);
+	--ring: oklch(0.74 0.19 153);
+	/* Chart series: the brand green and a neutral grey. */
+	--chart-1: oklch(0.62 0.16 152);
+	--chart-2: oklch(0.556 0 0);
+	--chart-3: oklch(0.439 0 0);
+	--chart-4: oklch(0.371 0 0);
+	--chart-5: oklch(0.269 0 0);
+	--radius: 0.75rem;
+	--nav: oklch(1 0 0);
+	--nav-active: oklch(0.145 0 0);
+	--nav-active-foreground: oklch(0.985 0 0);
+	--sidebar: oklch(0.985 0.0015 260);
+	--sidebar-foreground: oklch(0.145 0 0);
+	--sidebar-primary: oklch(0.74 0.19 153);
+	--sidebar-primary-foreground: oklch(0.2 0.015 250);
+	--sidebar-accent: oklch(0.94 0.004 260);
+	--sidebar-accent-foreground: oklch(0.205 0 0);
+	--sidebar-border: oklch(0 0 0 / 8%);
+	--sidebar-ring: oklch(0.708 0 0);
 	--warning: #9a4708;
-	--success: #137a4b;
+	--success: oklch(0.55 0.15 152);
 	/* Code syntax (SQL editor), after GitHub's light palette. */
 	--syntax-keyword: #cf222e;
 	--syntax-function: #8250df;
@@ -67,56 +68,54 @@
 	--syntax-string: #0a3069;
 	--syntax-number: #0550ae;
 	--syntax-comment: #6e7781;
-	/* Cards sit on tone, not shadow; overlays keep a soft spread. */
-	--elev-card: 0 1px 2px rgb(0 0 0 / 0.03);
+	--elev-card: none;
 	--elev-raised: 0 4px 12px -2px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.04);
 	--elev-overlay: 0 24px 48px -12px rgb(0 0 0 / 0.18), 0 8px 16px -8px rgb(0 0 0 / 0.08);
 }
 
-/* Dark (default): near-black page, graphite cards layered by tone, a bright
-   green for actions and highlights, a white pill for the current page. */
 .dark {
-	--background: #0c0c0d;
-	--foreground: #f2f2f3;
-	--card: #161618;
-	--card-foreground: #f2f2f3;
-	--popover: #1c1c1f;
-	--popover-foreground: #f2f2f3;
-	--primary: #73e391;
-	--primary-foreground: #06140b;
-	--primary-border: #73e391;
-	--primary-hover: #8deaa6;
-	--brand: #73e391;
-	--brand-soft: #13261a;
-	--secondary: #1f1f22;
-	--secondary-foreground: #f2f2f3;
-	--muted: #1b1b1e;
-	--muted-foreground: #9c9ca3;
-	--accent: #26262a;
-	--accent-foreground: #fafafa;
-	--destructive: #f2555a;
-	--border: #222226;
-	--border-strong: #2f2f34;
-	--input: #2a2a2e;
-	--ring: #5c5c63;
-	--chart-1: #2ea85c;
-	--chart-2: #8f7cf0;
-	--chart-3: #5c5c63;
-	--chart-4: #2f2f34;
-	--chart-5: #222226;
-	--nav: #161618;
-	--nav-active: #f5f5f6;
-	--nav-active-foreground: #0c0c0d;
-	--sidebar: #0c0c0d;
-	--sidebar-foreground: #a3a3aa;
-	--sidebar-primary: #73e391;
-	--sidebar-primary-foreground: #06140b;
-	--sidebar-accent: #1f1f22;
-	--sidebar-accent-foreground: #fafafa;
-	--sidebar-border: #1f1f22;
-	--sidebar-ring: #5c5c63;
+	--background: oklch(0.165 0.003 260);
+	--foreground: oklch(0.97 0 0);
+	--card: oklch(0.215 0.004 260);
+	--card-foreground: oklch(0.97 0 0);
+	--popover: oklch(0.24 0.004 260);
+	--popover-foreground: oklch(0.97 0 0);
+	--primary: oklch(0.87 0.16 152);
+	--primary-foreground: oklch(0.18 0.02 160);
+	--primary-border: oklch(0.87 0.16 152);
+	--primary-hover: oklch(0.91 0.13 152);
+	--brand: oklch(0.87 0.16 152);
+	--brand-soft: oklch(0.87 0.16 152 / 12%);
+	--secondary: oklch(0.27 0.004 260);
+	--secondary-foreground: oklch(0.97 0 0);
+	--muted: oklch(0.27 0.004 260);
+	--muted-foreground: oklch(0.72 0.005 260);
+	--accent: oklch(0.27 0.004 260);
+	--accent-foreground: oklch(0.97 0 0);
+	--destructive: oklch(0.704 0.191 22.216);
+	--border: oklch(1 0 0 / 7%);
+	--border-strong: oklch(1 0 0 / 12%);
+	--input: oklch(1 0 0 / 12%);
+	--field: oklch(0.245 0.004 260);
+	--ring: oklch(0.87 0.16 152);
+	--chart-1: oklch(0.76 0.17 150);
+	--chart-2: oklch(0.78 0 0);
+	--chart-3: oklch(0.439 0 0);
+	--chart-4: oklch(0.371 0 0);
+	--chart-5: oklch(0.269 0 0);
+	--nav: oklch(0.215 0.004 260);
+	--nav-active: oklch(0.97 0 0);
+	--nav-active-foreground: oklch(0.165 0.003 260);
+	--sidebar: oklch(0.165 0.003 260);
+	--sidebar-foreground: oklch(0.97 0 0);
+	--sidebar-primary: oklch(0.87 0.16 152);
+	--sidebar-primary-foreground: oklch(0.18 0.02 160);
+	--sidebar-accent: oklch(0.27 0.004 260);
+	--sidebar-accent-foreground: oklch(0.97 0 0);
+	--sidebar-border: oklch(1 0 0 / 7%);
+	--sidebar-ring: oklch(0.556 0 0);
 	--warning: #f5a524;
-	--success: #73e391;
+	--success: oklch(0.87 0.16 152);
 	/* Code syntax (SQL editor), after GitHub's dark palette. */
 	--syntax-keyword: #ff7b72;
 	--syntax-function: #d2a8ff;
@@ -157,6 +156,7 @@
 	--color-brand: var(--brand);
 	--color-brand-soft: var(--brand-soft);
 	--color-nav: var(--nav);
+	--color-field: var(--field);
 	--color-nav-active: var(--nav-active);
 	--color-nav-active-foreground: var(--nav-active-foreground);
 	--color-primary-hover: var(--primary-hover);
