@@ -2,7 +2,7 @@
 mod executor;
 mod run_as;
 pub use executor::{SqlBusy, SqlExecutor};
-use run_as::RunAs;
+pub(crate) use run_as::RunAs;
 
 use crate::{AdminState, ApiError};
 use axum::{

@@ -1,6 +1,6 @@
 //! Table listing, row reads and writes through the validated query compiler.
 use super::catalog::{estimates, kind, policy_counts, rls_json, row_count, table_or_404};
-use crate::{AdminState, ApiError, error::user_query_error};
+use crate::{AdminState, ApiError, error::user_query_error, sql::RunAs};
 use axum::{
     Json,
     extract::{Path, Query, State},
@@ -206,6 +206,71 @@ pub struct TableQuery {
     #[serde(default)]
     desc: bool,
     filters: Option<String>,
+    /// View as `anon` or as `authenticated` (with `user`): rows come back
+    /// as the API would return them to that caller, read-only.
+    #[serde(rename = "as")]
+    view_as: Option<String>,
+    user: Option<String>,
+}
+
+impl TableQuery {
+    fn run_as(&self) -> Result<RunAs, ApiError> {
+        match (self.view_as.as_deref(), &self.user) {
+            (None | Some("owner"), _) => Ok(RunAs::Owner),
+            (Some("anon"), _) => Ok(RunAs::Anon),
+            (Some("authenticated"), Some(user)) => Ok(RunAs::Authenticated {
+                user_id: user.clone(),
+            }),
+            _ => Err(ApiError::bad_request(
+                "invalid_view_as",
+                "view as owner, anon, or authenticated with a user",
+            )),
+        }
+    }
+}
+
+/// Rows and their count as `claims` would get them through the API (role,
+/// grants and RLS), in a transaction that is rolled back.
+async fn read_as(
+    state: &AdminState,
+    claims: &nelcota_core::Claims,
+    sql: &query::Sql,
+    count: &query::Sql,
+) -> Result<(String, Option<i64>), ApiError> {
+    let mut client = state.db.get().await?;
+    let tx = nelcota_core::db::begin_request(&mut client, claims).await?;
+    tx.batch_execute("SET LOCAL statement_timeout = '5s'")
+        .await?;
+    let rows: String = tx
+        .query_one(sql.text.as_str(), &sql.param_refs())
+        .await
+        .map_err(|err| view_error(err, claims))?
+        .get(0);
+    let total = tx
+        .query_one(count.text.as_str(), &count.param_refs())
+        .await
+        .ok()
+        .map(|row| row.get(0));
+    Ok((rows, total))
+}
+
+/// A refusal while viewing as someone is the answer, not a failure: it says
+/// that role has no access (no GRANT) to the table.
+fn view_error(err: tokio_postgres::Error, claims: &nelcota_core::Claims) -> ApiError {
+    let denied = err
+        .as_db_error()
+        .is_some_and(|db| *db.code() == tokio_postgres::error::SqlState::INSUFFICIENT_PRIVILEGE);
+    if denied {
+        let role = claims.role().as_str();
+        ApiError::new(
+            axum::http::StatusCode::FORBIDDEN,
+            "view_denied",
+            format!("{role} has no access to this table (no GRANT)"),
+        )
+        .params(json!({ "role": role }))
+    } else {
+        user_query_error(err)
+    }
 }
 
 pub async fn table(
@@ -215,6 +280,7 @@ pub async fn table(
 ) -> ApiResult<crate::contracts::TableData> {
     let table = table_or_404(&state, &name)?;
     let catalog = state.catalog.get();
+    let viewer = params.run_as()?.claims(&state.db).await?;
     let page = params.page.max(0);
     let size = params.size.unwrap_or(50).clamp(1, MAX_PAGE_SIZE);
     let rows_query = RowsQuery {
@@ -226,23 +292,38 @@ pub async fn table(
     let filtered = !request.filters.is_empty();
     let sql = query::select(&catalog.schema, &table, &request, None);
 
-    // Rows, estimates and policies pipelined on the same connection.
     let mut client = state.db.get().await?;
-    let (row, (estimates, policies)) = try_join(
-        async {
-            client
-                .query_one(sql.text.as_str(), &sql.param_refs())
-                .await
-                .map_err(user_query_error)
-        },
-        try_join(
-            estimates(&client, &catalog.schema),
-            policy_counts(&client, &catalog.schema),
-        ),
-    )
-    .await?;
+    let (json_rows, (estimates, policies), viewed_total) = match &viewer {
+        Some(claims) => {
+            let count = query::count(&catalog.schema, &table, &request);
+            let (rows, total) = read_as(&state, claims, &sql, &count).await?;
+            let meta = try_join(
+                estimates(&client, &catalog.schema),
+                policy_counts(&client, &catalog.schema),
+            )
+            .await?;
+            (rows, meta, Some(total))
+        }
+        None => {
+            // Rows, estimates and policies pipelined on the same connection.
+            let (row, meta) = try_join(
+                async {
+                    client
+                        .query_one(sql.text.as_str(), &sql.param_refs())
+                        .await
+                        .map_err(user_query_error)
+                },
+                try_join(
+                    estimates(&client, &catalog.schema),
+                    policy_counts(&client, &catalog.schema),
+                ),
+            )
+            .await?;
+            (row.get::<_, String>(0), meta, None)
+        }
+    };
 
-    let raw_rows: Vec<Row> = serde_json::from_str(&row.get::<_, String>(0))?;
+    let raw_rows: Vec<Row> = serde_json::from_str(&json_rows)?;
     let has_next = raw_rows.len() as i64 > size;
     let rows: Vec<Value> = raw_rows
         .iter()
@@ -261,7 +342,9 @@ pub async fn table(
         .collect();
 
     let estimate = estimates.get(&table.name).copied().unwrap_or(-1);
-    let (total, exact) = if filtered {
+    let (total, exact) = if let Some(total) = viewed_total {
+        (total, total.is_some())
+    } else if filtered {
         let count = query::count(&catalog.schema, &table, &request);
         let total = bounded_count(&mut client, &count).await;
         (total, total.is_some())
@@ -294,8 +377,9 @@ pub async fn table(
             "kind": kind(&table),
             "comment": table.comment,
             "primary_key": table.primary_key,
-            "editable": !table.primary_key.is_empty() && table.kind != TableKind::MaterializedView,
-            "insertable": table.kind != TableKind::MaterializedView,
+            // Viewing as someone is read-only: edits always run as the owner.
+            "editable": viewer.is_none() && !table.primary_key.is_empty() && table.kind != TableKind::MaterializedView,
+            "insertable": viewer.is_none() && table.kind != TableKind::MaterializedView,
             "exposed_without_rls": table.exposed_without_rls(),
             "rls": rls_json(&table, policies.get(&table.name).copied().unwrap_or(0)),
             "columns": columns,

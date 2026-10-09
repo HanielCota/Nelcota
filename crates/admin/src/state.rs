@@ -1,5 +1,5 @@
 //! Dependencies shared by the panel workflows.
-use crate::{Credentials, HostLink, Sessions, SqlExecutor, TokenIssuer};
+use crate::{Credentials, DeniedLog, HostLink, Sessions, SqlExecutor, TokenIssuer};
 use deadpool_postgres::Pool;
 use nelcota_api::CatalogHandle;
 use nelcota_auth::RateLimiter;
@@ -27,4 +27,8 @@ pub struct AdminState {
     pub migrations_dir: Option<std::path::PathBuf>,
     /// File storage, when a backend is configured.
     pub storage: Option<nelcota_storage::StorageState>,
+    /// How the app's users can sign in (from the environment, read-only).
+    pub sign_in: Arc<crate::contracts::SignIn>,
+    /// API requests refused recently; the server records into it.
+    pub denied: Arc<DeniedLog>,
 }

@@ -159,6 +159,8 @@ async fn serve(config: Config) -> anyhow::Result<()> {
                     config.migrations_dir.clone(),
                 ),
                 storage: storage.clone(),
+                sign_in: Arc::new(sign_in(&config)?),
+                denied: Arc::default(),
             })
         }
         _ => {
@@ -187,6 +189,33 @@ async fn serve(config: Config) -> anyhow::Result<()> {
     .with_graceful_shutdown(shutdown_signal())
     .await?;
     Ok(())
+}
+
+/// How the app's users can sign in, for the panel's read-only summary.
+fn sign_in(config: &Config) -> anyhow::Result<nelcota_admin::contracts::SignIn> {
+    let mail = config.mail()?;
+    let oauth = config.oauth()?;
+    Ok(nelcota_admin::contracts::SignIn {
+        signup_enabled: config.signup_enabled,
+        email: mail.is_some(),
+        email_confirmation: mail.as_ref().is_some_and(|m| m.confirmation_url.is_some()),
+        password_recovery: mail.is_some(),
+        magic_link: mail.as_ref().is_some_and(|m| m.magic_link_url.is_some()),
+        providers: nelcota_admin::contracts::SignInProviders {
+            google: oauth.as_ref().is_some_and(|o| o.google.is_some()),
+            github: oauth.as_ref().is_some_and(|o| o.github.is_some()),
+        },
+        redirect_urls: oauth
+            .as_ref()
+            .map(|o| o.redirect_urls.iter().map(|u| (*u).to_owned()).collect())
+            .unwrap_or_default(),
+        callback_url: oauth
+            .as_ref()
+            .map(|o| format!("{}/auth/v1/callback", o.api_url.trim_end_matches('/'))),
+        access_ttl_secs: config.jwt_expiry_secs,
+        refresh_ttl_days: config.refresh_token_ttl_days,
+        rate_limit_per_minute: config.auth_rate_limit_per_minute,
+    })
 }
 
 /// Current project, the host's list and single sign-on (if there is a shared secret).

@@ -997,6 +997,136 @@
     "title": "DdlResult",
     "type": "object"
   },
+  "DeniedRequest": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "at": {
+        "type": "string"
+      },
+      "code": {
+        "type": "string"
+      },
+      "email": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "message": {
+        "type": "string"
+      },
+      "method": {
+        "type": "string"
+      },
+      "path": {
+        "type": "string"
+      },
+      "role": {
+        "type": "string"
+      },
+      "status": {
+        "format": "uint16",
+        "maximum": 65535,
+        "minimum": 0,
+        "type": "integer"
+      },
+      "user_id": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "required": [
+      "at",
+      "method",
+      "path",
+      "status",
+      "code",
+      "message",
+      "role",
+      "user_id",
+      "email"
+    ],
+    "title": "DeniedRequest",
+    "type": "object"
+  },
+  "DeniedRequests": {
+    "$defs": {
+      "DeniedRequest": {
+        "properties": {
+          "at": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "status": {
+            "format": "uint16",
+            "maximum": 65535,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "user_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "at",
+          "method",
+          "path",
+          "status",
+          "code",
+          "message",
+          "role",
+          "user_id",
+          "email"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "capacity": {
+        "format": "uint",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "requests": {
+        "items": {
+          "$ref": "#/$defs/DeniedRequest"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "capacity",
+      "requests"
+    ],
+    "title": "DeniedRequests",
+    "type": "object"
+  },
   "ExportedMigration": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "properties": {
@@ -2286,6 +2416,105 @@
     "title": "SchemaResponse",
     "type": "object"
   },
+  "SignIn": {
+    "$defs": {
+      "SignInProviders": {
+        "properties": {
+          "github": {
+            "type": "boolean"
+          },
+          "google": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "google",
+          "github"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "access_ttl_secs": {
+        "format": "uint64",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "callback_url": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "email": {
+        "type": "boolean"
+      },
+      "email_confirmation": {
+        "type": "boolean"
+      },
+      "magic_link": {
+        "type": "boolean"
+      },
+      "password_recovery": {
+        "type": "boolean"
+      },
+      "providers": {
+        "$ref": "#/$defs/SignInProviders"
+      },
+      "rate_limit_per_minute": {
+        "format": "uint32",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "redirect_urls": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "refresh_ttl_days": {
+        "format": "uint32",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "signup_enabled": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "signup_enabled",
+      "email",
+      "email_confirmation",
+      "password_recovery",
+      "magic_link",
+      "providers",
+      "redirect_urls",
+      "callback_url",
+      "access_ttl_secs",
+      "refresh_ttl_days",
+      "rate_limit_per_minute"
+    ],
+    "title": "SignIn",
+    "type": "object"
+  },
+  "SignInProviders": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "github": {
+        "type": "boolean"
+      },
+      "google": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "google",
+      "github"
+    ],
+    "title": "SignInProviders",
+    "type": "object"
+  },
   "SqlError": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "properties": {
@@ -2481,6 +2710,72 @@
       "truncated"
     ],
     "title": "SqlResult",
+    "type": "object"
+  },
+  "StorageAccess": {
+    "$defs": {
+      "StoragePolicy": {
+        "properties": {
+          "all_buckets": {
+            "type": "boolean"
+          },
+          "check": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "command": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "using": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "command",
+          "roles",
+          "using",
+          "check",
+          "all_buckets"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "bucket": {
+        "type": "string"
+      },
+      "policies": {
+        "items": {
+          "$ref": "#/$defs/StoragePolicy"
+        },
+        "type": "array"
+      },
+      "public": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "bucket",
+      "public",
+      "policies"
+    ],
+    "title": "StorageAccess",
     "type": "object"
   },
   "StorageBackend": {
@@ -2781,6 +3076,48 @@
       }
     ],
     "title": "StorageOverview"
+  },
+  "StoragePolicy": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "all_buckets": {
+        "type": "boolean"
+      },
+      "check": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "command": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "roles": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "using": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "required": [
+      "name",
+      "command",
+      "roles",
+      "using",
+      "check",
+      "all_buckets"
+    ],
+    "title": "StoragePolicy",
+    "type": "object"
   },
   "StoredFile": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
