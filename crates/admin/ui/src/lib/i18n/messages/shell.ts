@@ -13,12 +13,14 @@ const ptBR = {
     policies: 'Políticas de acesso',
     connect: 'API',
     projects: 'Projetos',
+    database: 'Banco de dados',
     notFound: 'Página não encontrada',
     signIn: 'Entrar',
     userSignIn: 'Login dos usuários',
   },
   // Short page names for the top pills; page titles keep the full names.
   pills: {
+    database: 'Banco',
     overview: 'Visão geral',
     tables: 'Tabelas',
     sql: 'SQL',
@@ -55,6 +57,9 @@ const ptBR = {
     heading: 'Projetos',
     separateLogin: 'Projetos (cada um pede o próprio login)',
     all: 'Todos os projetos',
+    environment: { local: 'Ambiente local', remote: 'Em {host}' },
+    server: { online: 'Servidor no ar', offline: 'Servidor sem resposta', checking: 'Verificando o servidor' },
+    databaseTabs: 'Seções do banco de dados',
   },
   app: {
     loading: 'Carregando painel…',
@@ -74,11 +79,13 @@ const en: Messages<typeof ptBR> = {
     policies: 'Policies',
     connect: 'API',
     projects: 'Projects',
+    database: 'Database',
     notFound: 'Page not found',
     signIn: 'Sign in',
     userSignIn: 'User sign-in',
   },
   pills: {
+    database: 'Database',
     overview: 'Overview',
     tables: 'Tables',
     sql: 'SQL',
@@ -115,6 +122,9 @@ const en: Messages<typeof ptBR> = {
     heading: 'Projects',
     separateLogin: 'Projects (each asks for its own login)',
     all: 'All projects',
+    environment: { local: 'Local environment', remote: 'On {host}' },
+    server: { online: 'Server is up', offline: 'Server is not answering', checking: 'Checking the server' },
+    databaseTabs: 'Database sections',
   },
   app: {
     loading: 'Loading panel…',
