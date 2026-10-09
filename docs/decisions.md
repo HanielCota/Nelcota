@@ -821,6 +821,23 @@ for refused calls. The sign-in page is read-only because those settings come
 from the environment. Pages off the main path (policies, a bucket, sign-in)
 load on demand so the main chunk stays inside its 900 kB budget.
 
+## Panel redesign
+
+**D98. A dashboard look with real traffic, replacing D55's restraint and
+D63's sidebar.** Asked for a layout like a modern dashboard, the panel moves
+to pills across the top (the current page an inverted pill), large page
+titles and headline numbers, rounded cards layered by tone instead of
+borders, pill-shaped controls and the green accent filling primary actions.
+Workspaces (tables, SQL) become two cards side by side. Light and dark keep
+the same language. The overview's charts need data over time, so the server
+now counts API requests per minute (refused, server errors, a latency
+histogram for p95) for 24 hours in memory, alongside the D97 log: no write
+per request, gone on restart, which the overview says. Chart colours follow
+a validated pair per theme (green requests, violet refusals), checked for
+colour-vision deficiency, with a legend, a keyboard crosshair (a slider for
+assistive technology) and a table view. The mascot and the syntax colours
+(D62, D92) stay; plain language first (D93) stays.
+
 ### Known pending items
 
 - Filtering parent rows by their embeds (`!inner`) and self-referencing embeds.
