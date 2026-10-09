@@ -47,6 +47,23 @@
   }
   onMount(() => { void loadTables(); return () => tablesResource.cancel() })
 
+  // The section nearest the top of the screen, for the pill row.
+  let current = $state('api-address')
+  onMount(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const top = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0]
+        if (top) current = top.target.id
+      },
+      { rootMargin: '-160px 0px -55% 0px' },
+    )
+    for (const { id } of sections) {
+      const element = document.getElementById(id)
+      if (element) observer.observe(element)
+    }
+    return () => observer.disconnect()
+  })
+
   function choose(patch: { table?: string; lang?: Lang; topic?: 'tables' | 'auth' }) {
     const query = new URLSearchParams(route.query)
     for (const [key, value] of Object.entries(patch)) query.set(key, value)
@@ -105,16 +122,24 @@
     {/snippet}
   </PageHeader>
 
-  <div class="grid gap-6 lg:grid-cols-[13rem_minmax(0,1fr)] lg:items-start">
-    <!-- Sections, beside the content on wide screens and as pills above it otherwise. -->
-    <nav class="flex gap-1 overflow-x-auto rounded-full bg-card p-1 lg:sticky lg:top-24 lg:grid lg:rounded-3xl lg:p-2" aria-label={t('connect.navigation')}>
+  <div class="grid gap-6">
+    <!-- Sections as pills under the title, like the other pages' tabs; the one
+         in view is lit while scrolling. -->
+    <nav class="sticky top-24 z-10 flex w-fit max-w-full gap-1 overflow-x-auto rounded-full bg-card p-1 shadow-sm" aria-label={t('connect.navigation')}>
       {#each sections as section (section.id)}
-        <a class="shrink-0 rounded-full px-4 py-2 text-sm whitespace-nowrap text-muted-foreground transition-colors hover:bg-accent hover:text-foreground" href={`#${section.id}`}>{section.label}</a>
+        <a
+          class={[
+            'shrink-0 rounded-full px-4 py-2 text-sm whitespace-nowrap transition-colors',
+            current === section.id ? 'bg-nav-active font-medium text-nav-active-foreground' : 'text-muted-foreground hover:text-foreground',
+          ]}
+          aria-current={current === section.id ? 'location' : undefined}
+          href={`#${section.id}`}>{section.label}</a
+        >
       {/each}
     </nav>
 
     <div class="grid min-w-0 gap-6">
-      <section id="api-address" class="grid scroll-mt-24 gap-5 rounded-3xl bg-card p-6">
+      <section id="api-address" class="grid scroll-mt-40 gap-5 rounded-3xl bg-card p-6">
         <div class="grid gap-3">
           <h2 class="text-lg font-semibold">{t('connect.address')}</h2>
           <CodeBlock code={base} label={t('connect.copyAddress')} />
@@ -130,7 +155,7 @@
         </ul>
       </section>
 
-      <section id="api-roles" class="grid scroll-mt-24 gap-5 rounded-3xl bg-card p-6">
+      <section id="api-roles" class="grid scroll-mt-40 gap-5 rounded-3xl bg-card p-6">
         <div class="grid gap-1">
           <h2 class="text-lg font-semibold">{t('connect.caller')}</h2>
           <p class="text-sm text-muted-foreground">{t('connect.callerHint')}</p>
@@ -157,7 +182,7 @@
         </ul>
       </section>
 
-      <section id="api-sdk" class="grid scroll-mt-24 gap-5 rounded-3xl bg-card p-6">
+      <section id="api-sdk" class="grid scroll-mt-40 gap-5 rounded-3xl bg-card p-6">
         <div class="grid gap-1">
           <h2 class="text-lg font-semibold">{t('connect.sdk.title')}</h2>
           <p class="text-sm text-muted-foreground">
@@ -188,7 +213,7 @@
         </ol>
       </section>
 
-      <section id="api-examples" class="grid scroll-mt-24 gap-5 rounded-3xl bg-card p-6">
+      <section id="api-examples" class="grid scroll-mt-40 gap-5 rounded-3xl bg-card p-6">
         <h2 class="text-lg font-semibold">{t('connect.examples')}</h2>
         <div class="flex flex-wrap items-center gap-3">
           <nav class="flex h-10 items-center gap-1 rounded-full bg-well p-1" aria-label={t('connect.topic')}>
@@ -249,7 +274,7 @@
         {/if}
       </section>
 
-      <div id="api-token" class="scroll-mt-24"><ServiceTokenCard /></div>
+      <div id="api-token" class="scroll-mt-40"><ServiceTokenCard /></div>
     </div>
   </div>
 </div>
