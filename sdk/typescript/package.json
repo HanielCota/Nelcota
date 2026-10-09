@@ -1,0 +1,65 @@
+{
+  "name": "@nelcota/client",
+  "version": "0.1.0",
+  "description": "TypeScript client for Nelcota: REST under RLS, auth and storage.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HanielCota/Nelcota.git",
+    "directory": "sdk/typescript"
+  },
+  "homepage": "https://github.com/HanielCota/Nelcota/blob/main/sdk/typescript/README.md",
+  "keywords": [
+    "nelcota",
+    "postgres",
+    "rls",
+    "rest",
+    "auth",
+    "storage",
+    "baas"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./rest": {
+      "types": "./dist/rest/index.d.ts",
+      "default": "./dist/rest/index.js"
+    },
+    "./auth": {
+      "types": "./dist/auth/index.d.ts",
+      "default": "./dist/auth/index.js"
+    },
+    "./storage": {
+      "types": "./dist/storage/index.d.ts",
+      "default": "./dist/storage/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "node scripts/clean.mjs && tsc -p tsconfig.build.json",
+    "check": "tsc -p tsconfig.json",
+    "test": "vitest run --project unit",
+    "test:types": "vitest run --project types",
+    "test:contract": "node scripts/contract.mjs",
+    "size": "node scripts/size.mjs",
+    "prepublishOnly": "npm run check && npm test && npm run build && npm run size"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "fast-check": "^4.10.2",
+    "playwright-core": "^1.64.0",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.3"
+  }
+}

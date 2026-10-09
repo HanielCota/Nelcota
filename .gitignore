@@ -7,3 +7,6 @@ nelcota.toml
 backups/
 crates/admin/ui/node_modules/
 /dist
+sdk/typescript/node_modules/
+sdk/typescript/dist/
+sdk/typescript/test/contract/generated/
