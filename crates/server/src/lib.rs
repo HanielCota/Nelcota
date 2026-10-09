@@ -72,10 +72,15 @@ pub fn app(
             header::IF_RANGE,
             HeaderName::from_static("prefer"),
         ])
+        // What a browser client needs to read: paging totals, file metadata,
+        // the applied preferences and how long to wait after a 429.
         .expose_headers([
             header::CONTENT_RANGE,
             header::CONTENT_DISPOSITION,
             header::ETAG,
+            header::LAST_MODIFIED,
+            header::RETRY_AFTER,
+            HeaderName::from_static("preference-applied"),
         ]);
 
     let mut router = Router::new()
