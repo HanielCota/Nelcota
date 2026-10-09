@@ -2,6 +2,7 @@
   import { onMount } from 'svelte'
   import { Skeleton } from '$lib/components/ui/skeleton'
   import PageHeader from '$lib/components/shared/PageHeader.svelte'
+  import PillTabs from '$lib/components/shared/PillTabs.svelte'
   import CodeBlock from '$lib/components/shared/CodeBlock.svelte'
   import LoadError from '$lib/components/shared/LoadError.svelte'
   import { RemoteResource } from '$lib/remote-resource.svelte'
@@ -24,7 +25,8 @@
   })
 </script>
 
-<div class="mx-auto grid max-w-3xl gap-10 px-4 py-8 *:min-w-0 sm:px-6 lg:px-10 lg:py-10">
+<div class="mx-auto grid max-w-7xl gap-10 px-4 pt-6 pb-10 *:max-w-3xl *:min-w-0 sm:px-6 lg:px-8">
+  <div><PillTabs label={t('shell.pages.users')} current={'/sign-in'} tabs={[{ path: '/users', label: t('shell.pages.users') }, { path: '/sign-in', label: t('shell.pages.userSignIn') }]} /></div>
   <PageHeader title={t('signIn.title')} description={t('signIn.description')} />
 
   {#if resource.error}

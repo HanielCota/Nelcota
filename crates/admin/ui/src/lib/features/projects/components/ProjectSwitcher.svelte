@@ -40,7 +40,7 @@
       {#snippet child({ props })}
         <button
           {...props}
-          class="flex h-9 w-full min-w-0 cursor-pointer items-center justify-between gap-2 rounded-md px-2.5 text-sm font-medium whitespace-nowrap transition-colors hover:bg-sidebar-accent/60 aria-expanded:bg-sidebar-accent/60"
+          class="flex h-10 w-full min-w-0 cursor-pointer items-center justify-between gap-2 rounded-full px-3 text-sm font-medium whitespace-nowrap transition-colors hover:bg-accent aria-expanded:bg-accent"
           title={t('shell.projects.switch')}
         >
           <span class="truncate">{data!.current}</span>

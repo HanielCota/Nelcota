@@ -17,23 +17,12 @@ const ptBR = {
     signIn: 'Entrar',
     userSignIn: 'Login dos usuários',
   },
-  groups: {
-    database: 'Banco de dados',
-    access: 'Acesso',
-    integration: 'Integração',
-  },
   nav: {
     main: 'Navegação principal',
-    breadcrumb: 'Trilha',
     menu: 'Menu',
-    docs: 'Docs (OpenAPI)',
-    collapse: 'Recolher barra lateral',
-    pin: 'Fixar barra lateral aberta',
   },
   topbar: {
-    search: 'Buscar…',
     searchLabel: 'Buscar',
-    connect: 'Conectar',
   },
   account: {
     label: 'Conta',
@@ -77,23 +66,12 @@ const en: Messages<typeof ptBR> = {
     signIn: 'Sign in',
     userSignIn: 'User sign-in',
   },
-  groups: {
-    database: 'Database',
-    access: 'Access',
-    integration: 'Integration',
-  },
   nav: {
     main: 'Main navigation',
-    breadcrumb: 'Breadcrumb',
     menu: 'Menu',
-    docs: 'Docs (OpenAPI)',
-    collapse: 'Collapse sidebar',
-    pin: 'Keep sidebar open',
   },
   topbar: {
-    search: 'Search…',
     searchLabel: 'Search',
-    connect: 'Connect',
   },
   account: {
     label: 'Account',

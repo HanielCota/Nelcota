@@ -3,8 +3,7 @@
   import { ModeWatcher } from 'mode-watcher'
   import { Toaster } from '$lib/components/ui/sonner'
   import * as Tooltip from '$lib/components/ui/tooltip'
-  import AppSidebar from '$lib/shell/components/AppSidebar.svelte'
-  import Topbar from '$lib/shell/components/Topbar.svelte'
+  import TopNav from '$lib/shell/components/TopNav.svelte'
   import CommandPalette from '$lib/shell/components/CommandPalette.svelte'
   import Login from '$lib/features/auth/Login.svelte'
   import Overview from '$lib/features/overview/Overview.svelte'
@@ -77,11 +76,10 @@
       class="sr-only z-50 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-raised focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
       >{t('shell.app.skipToContent')}</a
     >
-    <!-- Full-height sidebar on the left; topbar and page on the right. -->
-    <div class="flex h-screen overflow-hidden bg-background">
-      <AppSidebar />
-      <div class="flex min-w-0 flex-1 flex-col">
-        <Topbar />
+    <!-- Navigation across the top (D98); the page fills the rest. -->
+    <div class="flex h-screen flex-col overflow-hidden bg-background">
+      <TopNav />
+      <div class="flex min-h-0 min-w-0 flex-1 flex-col">
         <main id="conteudo" tabindex="-1" class="min-h-0 min-w-0 flex-1 overflow-auto outline-none">
           {#key pageKey}
             {#if path === '/'}

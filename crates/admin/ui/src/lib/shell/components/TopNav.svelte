@@ -1,0 +1,87 @@
+<script lang="ts">
+  import * as Sheet from '$lib/components/ui/sheet'
+  import Menu from '@lucide/svelte/icons/menu'
+  import Search from '@lucide/svelte/icons/search'
+  import Logo from './Logo.svelte'
+  import ProjectSwitcher from '$lib/features/projects/components/ProjectSwitcher.svelte'
+  import AccountMenu from './AccountMenu.svelte'
+  import { palette } from '$lib/shell/palette.svelte'
+  import { href } from '$lib/router.svelte'
+  import { isActive, navPills } from '$lib/shell/nav'
+  import { t } from '$lib/i18n/index.svelte'
+
+  // The panel's frame (D98): mascot and project on the left, the pages as
+  // pills in the middle, search and account on the right. Below xl the pills
+  // move to their own scrolling row; on phones they live in a sheet.
+  let mobileOpen = $state(false)
+  const isMac = /Mac|iPhone|iPad/.test(navigator.platform)
+
+  const pill = (active: boolean) => [
+    'flex h-10 shrink-0 items-center rounded-full px-4 text-sm whitespace-nowrap transition-colors',
+    active ? 'bg-nav-active font-medium text-nav-active-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+  ]
+</script>
+
+{#snippet pills()}
+  {#each navPills as item (item.path)}
+    {@const active = isActive(item.path, item.also)}
+    <a href={href(item.path)} aria-current={active ? 'page' : undefined} class={pill(active)}>{t(item.title)}</a>
+  {/each}
+{/snippet}
+
+<header class="shrink-0 bg-background px-3 pt-3 pb-2 sm:px-5 lg:px-6">
+  <div class="flex items-center gap-2 sm:gap-3">
+    <button
+      type="button"
+      class="grid size-10 shrink-0 cursor-pointer place-items-center rounded-full bg-nav text-muted-foreground hover:text-foreground md:hidden"
+      onclick={() => (mobileOpen = true)}
+      aria-label={t('shell.nav.menu')}
+    >
+      <Menu class="size-5" />
+    </button>
+    <a href={href('/')} class="shrink-0" aria-label={t('shell.pages.overview')}><Logo mark size="lg" /></a>
+    <div class="min-w-0 max-w-56 shrink">
+      <ProjectSwitcher />
+    </div>
+
+    <nav aria-label={t('shell.nav.main')} class="mx-auto hidden items-center gap-1 rounded-full bg-nav p-1.5 xl:flex">
+      {@render pills()}
+    </nav>
+
+    <div class="ml-auto flex shrink-0 items-center gap-2 xl:ml-0">
+      <button
+        type="button"
+        onclick={() => (palette.open = true)}
+        class="grid size-12 cursor-pointer place-items-center rounded-full bg-nav text-muted-foreground transition-colors hover:text-foreground"
+        aria-label={t('shell.topbar.searchLabel')}
+        title={`${t('shell.topbar.searchLabel')} (${isMac ? '⌘' : 'Ctrl'} K)`}
+      >
+        <Search class="size-[18px]" />
+      </button>
+      <AccountMenu />
+    </div>
+  </div>
+
+  <!-- Below xl: the pills get a row of their own. -->
+  <nav aria-label={t('shell.nav.main')} class="mt-2 hidden overflow-x-auto md:block xl:hidden">
+    <div class="flex w-max items-center gap-1 rounded-full bg-nav p-1.5">{@render pills()}</div>
+  </nav>
+</header>
+
+<Sheet.Root bind:open={mobileOpen}>
+  <Sheet.Content side="left" class="w-72 gap-0 p-0">
+    <Sheet.Title class="sr-only">{t('shell.nav.main')}</Sheet.Title>
+    <div class="flex h-16 shrink-0 items-center gap-2 px-4">
+      <Logo mark />
+      <div class="min-w-0 flex-1 pr-8"><ProjectSwitcher /></div>
+    </div>
+    <nav class="grid content-start gap-1 overflow-y-auto p-3" aria-label={t('shell.nav.main')}>
+      {#each navPills as item (item.path)}
+        {@const active = isActive(item.path, item.also)}
+        <a href={href(item.path)} onclick={() => (mobileOpen = false)} aria-current={active ? 'page' : undefined} class={[...pill(active), 'gap-3']}>
+          <item.icon class="size-[18px]" strokeWidth={1.6} />{t(item.title)}
+        </a>
+      {/each}
+    </nav>
+  </Sheet.Content>
+</Sheet.Root>

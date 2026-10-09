@@ -14,18 +14,11 @@
   import { session } from '$lib/features/auth/session.svelte'
   import { LOCALES, i18n, setLocale, t, type Locale } from '$lib/i18n/index.svelte'
 
-  let {
-    open = $bindable(false),
-    reveal = '',
-  }: {
-    open?: boolean
-    /** Classes that reveal the text (in the collapsed rail only the avatar shows). */
-    reveal?: string
-  } = $props()
+  let { open = $bindable(false) }: { open?: boolean } = $props()
 
   let photoOpen = $state(false)
 
-  // One load per session (the menu shows in the sidebar and in the phone menu).
+  // One load per session.
   $effect(() => {
     if (session.email && !profile.loaded) loadProfile()
   })
@@ -36,18 +29,18 @@
     {#snippet child({ props })}
       <button
         {...props}
-        class="flex h-11 w-full min-w-0 cursor-pointer items-center gap-3 overflow-hidden rounded-md px-[7px] text-left whitespace-nowrap transition-colors hover:bg-sidebar-accent/60 aria-expanded:bg-sidebar-accent/60"
+        class="flex h-12 max-w-64 min-w-0 cursor-pointer items-center gap-2.5 overflow-hidden rounded-full bg-nav py-1.5 pr-3.5 pl-1.5 text-left whitespace-nowrap transition-colors hover:bg-accent aria-expanded:bg-accent"
         aria-label={t('shell.account.label')}
       >
-        <Avatar class="size-[26px] text-xs" />
-        <span class={['flex min-w-0 flex-1 items-center gap-2 transition-opacity duration-150', reveal]}>
-          <span class="min-w-0 flex-1 truncate text-sm">{session.email}</span>
+        <Avatar class="size-9 text-sm" />
+        <span class="hidden min-w-0 flex-1 items-center gap-2 sm:flex">
+          <span class="min-w-0 flex-1 truncate text-sm font-medium">{session.email}</span>
           <ChevronsUpDown class="size-4 shrink-0 text-muted-foreground" />
         </span>
       </button>
     {/snippet}
   </DropdownMenu.Trigger>
-  <DropdownMenu.Content side="top" align="start" class="w-(--bits-dropdown-menu-anchor-width) min-w-56">
+  <DropdownMenu.Content side="bottom" align="end" class="min-w-64">
     <div class="flex items-center gap-3 px-2 py-2">
       <Avatar class="size-9 text-sm" />
       <div class="min-w-0">
