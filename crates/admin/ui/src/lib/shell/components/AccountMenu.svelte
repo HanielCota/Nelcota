@@ -30,7 +30,7 @@
       <!-- The account chip (D98): photo or initials, who is signed in, settings. -->
       <button
         {...props}
-        class="flex h-14 max-w-72 min-w-0 cursor-pointer items-center gap-3 overflow-hidden rounded-full bg-nav p-1.5 text-left whitespace-nowrap transition-colors hover:bg-accent aria-expanded:bg-accent"
+        class="flex h-14 max-w-60 min-w-0 cursor-pointer items-center gap-3 overflow-hidden rounded-full bg-nav p-1.5 text-left whitespace-nowrap transition-colors hover:bg-accent aria-expanded:bg-accent"
         aria-label={t('shell.account.label')}
       >
         <Avatar class="size-11 text-sm" />

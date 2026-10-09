@@ -22,6 +22,18 @@
   ]
 </script>
 
+{#snippet search()}
+  <button
+    type="button"
+    onclick={() => (palette.open = true)}
+    class="grid size-10 shrink-0 cursor-pointer place-items-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+    aria-label={t('shell.topbar.searchLabel')}
+    title={`${t('shell.topbar.searchLabel')} (${isMac ? '⌘' : 'Ctrl'} K)`}
+  >
+    <Search class="size-[18px]" />
+  </button>
+{/snippet}
+
 {#snippet pills()}
   {#each navPills as item (item.path)}
     {@const active = isActive(item.path, item.also)}
@@ -31,7 +43,7 @@
 
 <header class="shrink-0 bg-background/85 backdrop-blur">
   <div class="mx-auto w-full max-w-page px-4 py-4 sm:px-6 lg:px-8">
-  <div class="grid grid-cols-[1fr_auto] items-center gap-3 lg:grid-cols-[1fr_auto_1fr]">
+  <div class="grid grid-cols-[1fr_auto] items-center gap-3 lg:grid-cols-[1fr_auto_1fr] lg:gap-8">
     <div class="flex min-w-0 items-center gap-2">
       <button
         type="button"
@@ -47,18 +59,12 @@
 
     <nav aria-label={t('shell.nav.main')} class="hidden items-center gap-1 rounded-full bg-nav p-1.5 lg:flex">
       {@render pills()}
+      {@render search()}
     </nav>
 
     <div class="flex min-w-0 items-center justify-end gap-2">
-      <button
-        type="button"
-        onclick={() => (palette.open = true)}
-        class="grid size-11 shrink-0 cursor-pointer place-items-center rounded-full bg-nav text-muted-foreground transition-colors hover:text-foreground"
-        aria-label={t('shell.topbar.searchLabel')}
-        title={`${t('shell.topbar.searchLabel')} (${isMac ? '⌘' : 'Ctrl'} K)`}
-      >
-        <Search class="size-[18px]" />
-      </button>
+      <!-- Below lg the pill bar moves down, so search stays up here. -->
+      <div class="lg:hidden">{@render search()}</div>
       <AccountMenu />
     </div>
   </div>
