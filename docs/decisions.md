@@ -750,6 +750,18 @@ state: a first table, every API table protected, a user, and a first sign-in
 through the API (`signed_in_users`), which means an app is connected. Counts
 shrink to one line. Navigation and the accent colour stay (D55, D63).
 
+**D94. The SQL editor can run as a visitor or a signed-in user.** By default
+it still runs as the database owner, without RLS, which the toolbar shows as an
+amber "Full access" notice. The notice is also the picker: "Visitor" runs as
+`anon`, and "Signed-in user..." runs as `authenticated` with the claims of a
+real account chosen by email (`sub`, `email`), so `auth.uid()`, `auth.jwt()`,
+grants and policies behave as they do for that person through the API. The
+editor's connection is dedicated to one run, so the executor sets the role and
+`request.jwt.claims` for the session before the SQL, as the API does per
+request. It is a way to test rules, not a security boundary: the administrator
+can always run anything as the owner, and the SQL may even `RESET ROLE`. The
+choice is not persisted, so a reload goes back to the owner.
+
 ### Known pending items
 
 - Filtering parent rows by their embeds (`!inner`) and self-referencing embeds.
