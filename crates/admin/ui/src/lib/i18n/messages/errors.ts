@@ -4,6 +4,7 @@
 import type { Messages } from '../index.svelte'
 
 const ptBR = {
+  network: 'Sem resposta do servidor. Confira se ele está rodando e tente de novo.',
   sql_busy: "Todas as conexões do editor estão ocupadas. Aguarde uma consulta terminar.",
 
   // Session and access
@@ -90,6 +91,7 @@ const ptBR = {
 }
 
 const en: Messages<typeof ptBR> = {
+  network: 'No answer from the server. Check that it is running and try again.',
   sql_busy: 'All SQL editor connections are busy. Wait for a query to finish.',
   route_not_found: 'Route not found.',
   session_expired: 'Session expired: sign in again.',
