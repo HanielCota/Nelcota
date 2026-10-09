@@ -770,7 +770,7 @@ same CI against the real binary; it borrows no third-party BaaS client.
 Every method is one HTTP request with no hidden cache, and access stays with
 RLS: the client never decides permissions. It has no runtime dependencies
 (only `fetch`, `URL`, Web Crypto, `AbortSignal`, Web Locks and
-`BroadcastChannel`), so it runs in browsers, Node 20+, Deno, Bun and edge
+`BroadcastChannel`), so it runs in browsers, Node 22+, Deno, Bun and edge
 runtimes, is ESM with subpath exports and side-effect free, and keeps the
 supply chain to the TypeScript compiler. Results are values (`{ data, error }`)
 carrying the server's `code` untouched; only programming mistakes throw.

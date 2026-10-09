@@ -74,6 +74,8 @@ curl -X POST https://api.yourdomain.com/storage/v1/object/avatars/$USER_ID/me.pn
 ```
 
 Frontend types: `nelcota types -o database.ts`. OpenAPI at `/rest/v1/`.
+TypeScript client: [`@nelcota/client`](sdk/typescript/README.md), typed from
+those types, with sessions, OAuth and storage.
 Panel at `/admin/`: table editor with inline editing, SQL editor with
 autocomplete, users, RLS policies and migrations generated from panel changes.
 The panel is available in Portuguese and English (picked from the browser,
