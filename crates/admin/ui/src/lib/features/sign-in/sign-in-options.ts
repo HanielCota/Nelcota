@@ -30,5 +30,8 @@ export function signInOptions(settings: SignIn): SignInOption[] {
   ]
 }
 
+/** The variables as .env lines, ready to fill in: `NAME=` unless a value is given. */
+export const envSnippet = (variables: string[]) => variables.map((v) => (v.includes('=') ? v : `${v}=`)).join('\n')
+
 /** Seconds as whole minutes, at least one. */
 export const minutes = (seconds: number) => Math.max(1, Math.round(seconds / 60))
