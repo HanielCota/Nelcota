@@ -91,17 +91,21 @@ function backoff(attempt: number, retryAfter: number | undefined): number {
 export class HttpClient {
   readonly url: URL;
   readonly #options: HttpOptions;
+  /** The base URL without trailing slashes. */
+  readonly #base: string;
 
   constructor(options: HttpOptions) {
     this.url = options.url;
     this.#options = options;
+    let end = options.url.href.length;
+    while (end > 0 && options.url.href[end - 1] === '/') end--;
+    this.#base = options.url.href.slice(0, end);
   }
 
   /** Absolute URL for a path (and query) under the base URL. */
   href(path: string, query?: URLSearchParams): string {
-    const base = this.url.href.replace(/\/+$/, '');
     const search = query && query.size > 0 ? `?${query.toString()}` : '';
-    return `${base}${path}${search}`;
+    return `${this.#base}${path}${search}`;
   }
 
   /**
