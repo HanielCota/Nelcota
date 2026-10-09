@@ -1,6 +1,7 @@
 //! Panel overview integration scenarios.
-use crate::common::panel::{get, login};
+use crate::common::panel::{get, login, send};
 use crate::common::*;
+use axum::http::Method;
 use serde_json::json;
 
 #[tokio::test]
@@ -83,4 +84,39 @@ async fn warning_for_a_table_without_rls() {
         );
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
     }
+}
+
+#[tokio::test]
+async fn counts_users_who_signed_in_through_the_api() {
+    let app = TestApp::spawn().await;
+    let cookie = login(&app).await;
+    let counts =
+        || async { get(&app, "/admin/api/overview", &cookie).await.body["counts"].clone() };
+    let before = counts().await;
+
+    // Created in the panel: a user, but nobody signed in through an app yet.
+    send(
+        &app,
+        Method::POST,
+        "/admin/api/users",
+        &cookie,
+        json!({ "email": "staff@example.com", "password": "strong-password-123" }),
+    )
+    .await;
+    let after_panel = counts().await;
+    assert_eq!(after_panel["users"], before["users"].as_i64().unwrap() + 1);
+    assert_eq!(after_panel["signed_in_users"], before["signed_in_users"]);
+
+    // Signing up through the API opens a session: the app is connected.
+    app.post(
+        "/auth/v1/signup",
+        None,
+        json!({ "email": "app@example.com", "password": "strong-password-123" }),
+    )
+    .await;
+    let after_app = counts().await;
+    assert_eq!(
+        after_app["signed_in_users"],
+        before["signed_in_users"].as_i64().unwrap() + 1
+    );
 }

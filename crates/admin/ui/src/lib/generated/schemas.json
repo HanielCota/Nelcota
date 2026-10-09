@@ -774,6 +774,10 @@
         "minimum": 0,
         "type": "integer"
       },
+      "signed_in_users": {
+        "format": "int64",
+        "type": "integer"
+      },
       "tables": {
         "format": "uint",
         "minimum": 0,
@@ -787,6 +791,7 @@
     "required": [
       "tables",
       "users",
+      "signed_in_users",
       "policies",
       "functions"
     ],
@@ -1302,6 +1307,10 @@
             "minimum": 0,
             "type": "integer"
           },
+          "signed_in_users": {
+            "format": "int64",
+            "type": "integer"
+          },
           "tables": {
             "format": "uint",
             "minimum": 0,
@@ -1315,6 +1324,7 @@
         "required": [
           "tables",
           "users",
+          "signed_in_users",
           "policies",
           "functions"
         ],

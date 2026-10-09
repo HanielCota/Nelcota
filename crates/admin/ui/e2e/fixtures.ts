@@ -26,7 +26,7 @@ export async function fixture(page: Page) {
     else if (path === '/whoami') data = { project: 'nelcota-demo' };
     else if (path === '/projects') data = { current: 'nelcota-demo', sso: true, projects };
     else if (path === '/projects/status') data = { current: 'nelcota-demo', projects: projects.map(p => ({ ...p, healthy: true, version: '0.1.0', latency_ms: 18 })) };
-    else if (path === '/overview') data = { schema: 'public', counts: { tables: 3, users: 12, policies: 3, functions: 2 }, exposed_without_rls: [], tables: tables.map(t => ({ ...t, comment: null, rows: 12, rows_exact: true, grants })) };
+    else if (path === '/overview') data = { schema: 'public', counts: { tables: 3, users: 12, signed_in_users: 0, policies: 3, functions: 2 }, exposed_without_rls: [], tables: tables.map(t => ({ ...t, comment: null, rows: 12, rows_exact: true, grants })) };
     else if (path === '/tables' && req.method() === 'GET') data = { schema: 'public', tables };
     else if (path === '/schema') data = { schema: 'public', tables: Object.fromEntries(tables.map(t => [t.name, columns.map(c => c.name)])) };
     else if (path === '/types') data = { base: ['text', 'uuid', 'bigint', 'boolean', 'jsonb', 'timestamptz'], enums: [] };
