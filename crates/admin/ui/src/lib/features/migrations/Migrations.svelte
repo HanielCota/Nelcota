@@ -19,6 +19,7 @@
   import { Skeleton } from '$lib/components/ui/skeleton'
   import { toast } from 'svelte-sonner'
   import PageHeader from '$lib/components/shared/PageHeader.svelte'
+  import DatabaseTabs from '$lib/components/shared/DatabaseTabs.svelte'
   import { RemoteResource } from '$lib/remote-resource.svelte'
   import { api } from '$lib/api'
   import { downloadText } from '$lib/download'
@@ -98,6 +99,7 @@
 
 <div class="mx-auto grid w-full max-w-page gap-6 px-4 pt-2 pb-12 sm:px-6 lg:px-8 [&>:first-child]:mb-0">
   <PageHeader title={t('migrations.title')} description={t('migrations.description')} />
+  <DatabaseTabs />
 
   {#if error}<LoadError message={error} onretry={load} busy={loading} />{/if}
   {#if !data && loading}

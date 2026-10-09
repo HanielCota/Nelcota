@@ -1,4 +1,5 @@
 <script lang="ts">
+  import DatabaseTabs from '$lib/components/shared/DatabaseTabs.svelte'
   import { Button } from '$lib/components/ui/button'
   import { Input } from '$lib/components/ui/input'
   import Search from '@lucide/svelte/icons/search'
@@ -45,6 +46,7 @@
   class={cn('w-full shrink-0 flex-col overflow-hidden rounded-3xl bg-card lg:flex lg:w-64 xl:w-72', current ? 'hidden' : 'flex lg:w-64 xl:w-72')}
 >
   <div class="grid gap-3 border-b p-4">
+    <DatabaseTabs fill />
     <div class="flex items-center justify-between gap-2">
       <svelte:element this={current ? 'p' : 'h1'} class="px-1 text-sm font-semibold">{t('tables.sidebar.title')}</svelte:element>
       <Button variant="outline" size="sm" title={t('tables.sidebar.newTable')} aria-label={t('tables.sidebar.newTable')} onclick={oncreate}>
