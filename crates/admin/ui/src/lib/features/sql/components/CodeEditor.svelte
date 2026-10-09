@@ -1,3 +1,13 @@
+<script module lang="ts">
+  export interface Cursor {
+    line: number
+    column: number
+    /** Selected range; `from === to` when nothing is selected. */
+    from: number
+    to: number
+  }
+</script>
+
 <script lang="ts">
   import { onMount } from 'svelte'
   import { basicSetup } from 'codemirror'
@@ -8,19 +18,27 @@
   import { HighlightStyle, syntaxHighlighting } from '@codemirror/language'
   import { tags as t } from '@lezer/highlight'
   import { functionCalls } from './function-calls'
+  import { errorMarker, setErrorAt } from './error-marker'
 
   let {
     value = $bindable(''),
     schema = {},
     defaultSchema = 'public',
+    errorAt = null,
     onrun,
+    oncursor,
   }: {
     value?: string
     /** `{ "table": ["col", ...], "auth.users": [...] }` for autocomplete. */
     schema?: Record<string, string[]>
     defaultSchema?: string
+    /** Where the last run failed (0-based offset), underlined until the next edit. */
+    errorAt?: number | null
     onrun: () => void
+    /** Cursor line/column and the selected range (empty when nothing is selected). */
+    oncursor?: (cursor: Cursor) => void
   } = $props()
+
 
   let host: HTMLDivElement
   let view: EditorView | undefined
@@ -59,6 +77,8 @@
     '.cm-completionDetail': { color: 'var(--muted-foreground)', fontStyle: 'normal', marginLeft: '8px' },
     // Also over the keyword colour of built-ins such as `count(`.
     '.cm-sql-call, .cm-sql-call *': { color: 'var(--syntax-function)' },
+    '.cm-sql-error': { textDecoration: 'underline wavy var(--destructive)', textUnderlineOffset: '3px' },
+    '.cm-sql-error-line': { backgroundColor: 'color-mix(in oklch, var(--destructive) 8%, transparent)' },
     '.cm-foldPlaceholder': { backgroundColor: 'var(--muted)', border: 'none', color: 'var(--muted-foreground)' },
   })
 
@@ -102,17 +122,35 @@
           language.of(sqlExtension()),
           syntaxHighlighting(highlight),
           functionCalls,
+          errorMarker,
           theme,
           EditorView.lineWrapping,
           EditorView.contentAttributes.of({ 'aria-label': 'Editor SQL' }),
           EditorView.updateListener.of((update) => {
             if (update.docChanged) value = update.state.doc.toString()
+            if (update.docChanged || update.selectionSet) report(update.state)
           }),
         ],
       }),
     })
     view.focus()
+    report(view.state)
     return () => view?.destroy()
+  })
+
+  function report(state: EditorState) {
+    const { from, to, head } = state.selection.main
+    const line = state.doc.lineAt(head)
+    oncursor?.({ line: line.number, column: head - line.from + 1, from, to })
+  }
+
+  // A new failure position underlines it and brings it into view.
+  $effect(() => {
+    const at = errorAt
+    if (!view) return
+    view.dispatch({
+      effects: [setErrorAt.of(at), ...(at === null ? [] : [EditorView.scrollIntoView(Math.min(at, view.state.doc.length), { y: 'center' })])],
+    })
   })
 
   // Schema loaded later (autocomplete) or text replaced from outside (history).

@@ -23,6 +23,30 @@ test('SQL drafts survive navigation and refresh, files preview and uploads compl
   await page.getByRole('textbox', { name: 'Editor SQL', exact: true }).waitFor()
   await draftsAndFiles(page)
 })
+test('the SQL editor runs a selection and underlines where it failed', async ({ page }) => {
+  const query = 'select 1;' + String.fromCharCode(10) + 'select * from notess;'
+  let sent = ''
+  await page.route('**/admin/api/sql', async route => {
+    sent = route.request().postDataJSON().sql
+    // Postgres counts from 1 within the text it received.
+    await route.fulfill({ json: { error: { message: 'relation "notess" does not exist', code: '42P01', detail: null, hint: null, position: sent.indexOf('notess') + 1 } } })
+  })
+  await page.goto('/admin/sql')
+  const editor = page.getByRole('textbox', { name: 'Editor SQL', exact: true })
+  await editor.click()
+  await page.keyboard.press('Control+A')
+  await page.keyboard.insertText(query)
+  await page.keyboard.press('Shift+Home')
+  await page.getByRole('button', { name: 'Executar seleção' }).click()
+  await expect(page.locator('.cm-sql-error')).toHaveText('notess')
+  expect(sent).toBe('select * from notess;')
+  await expect(page.getByText('Destacado no editor, linha 2.')).toBeVisible()
+  // Editing clears the mark: it described the text that ran.
+  await editor.click()
+  await page.keyboard.press('Control+End')
+  await page.keyboard.type(' ')
+  await expect(page.locator('.cm-sql-error')).toHaveCount(0)
+})
 test('upload conflicts keep their original destination and SQL cells show full content', async ({ page }) => { await uploadsAndDetails(page) })
 test('an incompatible API response can be retried without losing the page', async ({ page }) => {
   let failed = true
