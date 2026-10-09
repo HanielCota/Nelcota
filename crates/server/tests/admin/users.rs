@@ -350,3 +350,43 @@ async fn panel_accounts_are_confirmed_and_pending_ones_can_be_confirmed() {
     let invalid = confirm(&app, &cookie, "not-a-uuid").await;
     assert_eq!(invalid.body["code"], "invalid_id");
 }
+
+#[tokio::test]
+async fn users_list_how_each_account_signs_in() {
+    let app = TestApp::spawn().await;
+    let cookie = login(&app).await;
+    send(
+        &app,
+        Method::POST,
+        "/admin/api/users",
+        &cookie,
+        json!({ "email": "with-password@example.com", "password": "strong-password-123" }),
+    )
+    .await;
+    // An account born at providers: no password, two identities.
+    app.admin_client
+        .batch_execute(
+            "WITH u AS (INSERT INTO auth.users (email) VALUES ('octo@example.com') RETURNING id)
+             INSERT INTO auth.identities (user_id, provider, provider_id)
+             SELECT id, provider, '42' FROM u, (VALUES ('google'), ('github')) AS p(provider)",
+        )
+        .await
+        .unwrap();
+
+    let users = get(&app, "/admin/api/users", &cookie).await.body;
+    let user = |email: &str| {
+        users["users"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|u| u["email"] == email)
+            .cloned()
+            .unwrap()
+    };
+    let password = user("with-password@example.com");
+    assert_eq!(password["has_password"], true);
+    assert_eq!(password["providers"], json!([]));
+    let octo = user("octo@example.com");
+    assert_eq!(octo["has_password"], false);
+    assert_eq!(octo["providers"], json!(["github", "google"]));
+}

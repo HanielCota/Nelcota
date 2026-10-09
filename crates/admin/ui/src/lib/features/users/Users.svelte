@@ -28,6 +28,7 @@
   import { RemoteResource } from '$lib/remote-resource.svelte'
   import type { UsersResponse, User } from '$lib/types'
   import { errorMessage, intlLocale, t } from '$lib/i18n/index.svelte'
+  import { signInMethods } from '$lib/features/users/sign-in-methods'
 
   const resource = new RemoteResource<UsersResponse>()
   const users = $derived(resource.data?.users ?? null)
@@ -118,6 +119,13 @@
   {/if}
 {/snippet}
 
+{#snippet methods(user: User)}
+  {@const list = signInMethods(user)}
+  <span class="text-sm" title={list[0].kind === 'linkOnly' ? t('users.methods.linkOnlyHint') : undefined}>
+    {#each list as method, i (i)}{#if i > 0}<span class="text-muted-foreground" aria-hidden="true">{' · '}</span>{/if}{#if method.kind === 'password'}{t('users.methods.password')}{:else if method.kind === 'provider'}{method.name}{:else}<span class="text-muted-foreground">{t('users.methods.linkOnly')}</span>{/if}{/each}
+  </span>
+{/snippet}
+
 {#snippet userActions(user: User)}
   <DropdownMenu.Root>
     <DropdownMenu.Trigger>
@@ -195,6 +203,7 @@
             {@render userActions(user)}
           </div>
           <dl class="mt-4 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2 text-xs">
+            <dt class="text-muted-foreground">{t('users.columns.signIn')}</dt><dd class="text-right">{@render methods(user)}</dd>
             <dt class="text-muted-foreground">{t('users.columns.lastSignIn')}</dt><dd class="text-right">{when(user.last_sign_in_at)}</dd>
             <dt class="text-muted-foreground">{t('users.columns.created')}</dt><dd class="text-right">{when(user.created_at)}</dd>
             <dt class="text-muted-foreground">{t('users.columns.sessions')}</dt><dd class="text-right"><Badge variant="secondary">{user.sessions}</Badge></dd>
@@ -207,6 +216,7 @@
         <Table.Header>
           <Table.Row class="hover:bg-transparent">
             <Table.Head>{t('users.columns.email')}</Table.Head>
+            <Table.Head>{t('users.columns.signIn')}</Table.Head>
             <Table.Head>{t('users.columns.created')}</Table.Head>
             <Table.Head>{t('users.columns.lastSignIn')}</Table.Head>
             <Table.Head class="text-right">{t('users.columns.sessions')}</Table.Head>
@@ -228,6 +238,7 @@
                   </div>
                 </div>
               </Table.Cell>
+              <Table.Cell>{@render methods(user)}</Table.Cell>
               <Table.Cell class="text-muted-foreground">{when(user.created_at)}</Table.Cell>
               <Table.Cell class="text-muted-foreground">{when(user.last_sign_in_at)}</Table.Cell>
               <Table.Cell class="text-right font-mono text-xs tabular-nums">{user.sessions}</Table.Cell>
