@@ -16,6 +16,10 @@
 
   let { open = $bindable(false) }: { open?: boolean } = $props()
 
+  // The chip shows a name, as the reference does: the part of the email
+  // before the @. The full address is in the menu and on hover.
+  const displayName = $derived((session.email ?? '').split('@')[0] ?? '')
+
   let photoOpen = $state(false)
 
   // One load per session.
@@ -35,7 +39,7 @@
       >
         <Avatar class="size-11 text-sm" />
         <span class="hidden min-w-0 flex-1 flex-col leading-tight sm:flex">
-          <span class="truncate text-sm font-semibold">{session.email}</span>
+          <span class="truncate text-sm font-semibold" title={session.email}>{displayName}</span>
           <span class="truncate text-xs text-muted-foreground">{t('shell.account.role')}</span>
         </span>
         <span class="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-muted-foreground" aria-hidden="true">

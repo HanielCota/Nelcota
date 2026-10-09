@@ -1,12 +1,13 @@
 <script lang="ts">
   // A part of a whole as a bar with both numbers under it (D98). The fill is
-  // the brand colour; the track is a lighter step of it.
+  // the brand colour; the track is a lighter step of it. The visible label
+  // sits with the page's other labels; `label` names the meter for assistive
+  // technology.
   let { label, part, whole, format }: { label: string; part: number; whole: number; format: (n: number) => string } = $props()
   const share = $derived(whole > 0 ? Math.min(100, (part / whole) * 100) : 0)
 </script>
 
 <div class="grid min-w-36 gap-2">
-  <p class="text-sm text-muted-foreground">{label}</p>
   <div
     class="h-2 overflow-hidden rounded-full bg-brand/15"
     role="meter"

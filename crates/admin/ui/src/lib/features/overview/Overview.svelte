@@ -128,13 +128,15 @@
   <section class="grid gap-8 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
     <h1 class="max-w-xl text-5xl leading-[1.02] font-semibold tracking-[-0.035em]">{t('overview.title')}</h1>
     {#if traffic}
-      <div class="flex flex-wrap items-end gap-x-12 gap-y-6">
-        <div class="grid gap-1">
-          <p class="text-sm text-muted-foreground">{t('overview.hero.requests')}</p>
-          <p class="text-5xl leading-none font-semibold tracking-[-0.035em]">{fmt.format(traffic.totals.requests)}</p>
-        </div>
-        <div class="w-64"><Meter label={t('overview.hero.refused')} part={traffic.totals.refused} whole={traffic.totals.requests} {format} /></div>
-        <div class="w-64"><Meter label={t('overview.hero.errors')} part={traffic.totals.errors} whole={traffic.totals.requests} {format} /></div>
+      <!-- Labels share the top line and figures share the bottom line; in one
+           column on phones, each label stays above its figure. -->
+      <div class="grid gap-x-12 gap-y-2 sm:grid-cols-[auto_minmax(0,16rem)_minmax(0,16rem)] sm:items-end">
+        <p class="text-sm text-muted-foreground sm:col-start-1 sm:row-start-1">{t('overview.hero.requests')}</p>
+        <p class="mb-4 text-5xl leading-none font-semibold tracking-[-0.035em] sm:col-start-1 sm:row-start-2 sm:mb-0">{fmt.format(traffic.totals.requests)}</p>
+        <p class="text-sm text-muted-foreground sm:col-start-2 sm:row-start-1">{t('overview.hero.refused')}</p>
+        <div class="mb-4 sm:col-start-2 sm:row-start-2 sm:mb-0"><Meter label={t('overview.hero.refused')} part={traffic.totals.refused} whole={traffic.totals.requests} {format} /></div>
+        <p class="text-sm text-muted-foreground sm:col-start-3 sm:row-start-1">{t('overview.hero.errors')}</p>
+        <div class="sm:col-start-3 sm:row-start-2"><Meter label={t('overview.hero.errors')} part={traffic.totals.errors} whole={traffic.totals.requests} {format} /></div>
       </div>
     {:else if metrics.loading}
       <Skeleton class="h-16 w-[40rem] max-w-full rounded-2xl" />
@@ -144,7 +146,7 @@
   <!-- One period for the whole page. -->
   <section class="flex flex-wrap items-center justify-between gap-3">
     <p class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
-      <span>{periodText}{#if since} · {t('overview.period.since', { date: since })}{/if}</span>
+      <span>{since ? `${periodText} · ${t('overview.period.since', { date: since })}` : periodText}</span>
       <TechnicalToggle />
     </p>
     <div class="flex items-center gap-1 rounded-full bg-card p-1" role="group" aria-label={t('overview.period.label')}>
