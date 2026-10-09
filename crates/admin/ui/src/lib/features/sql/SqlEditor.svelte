@@ -16,7 +16,8 @@
   import { toast } from 'svelte-sonner'
   import CodeEditor, { type Cursor } from '$lib/features/sql/components/CodeEditor.svelte'
   import QueryTitle from '$lib/features/sql/components/QueryTitle.svelte'
-  import RunAsNotice from '$lib/features/sql/components/RunAsNotice.svelte'
+  import RunAsPicker from '$lib/features/sql/components/RunAsPicker.svelte'
+  import { runAsRequest } from '$lib/features/sql/run-as.svelte'
   import EditorStatus from '$lib/features/sql/components/EditorStatus.svelte'
   import { draftName } from '$lib/features/sql/query-name'
   import type { Pane } from 'paneforge'
@@ -71,7 +72,7 @@
     const offset = runsSelection ? cursor.from : 0
     errorAt = null
     resultsPane?.expand()
-    if (await execution.run(code)) sqlStore.remember(code)
+    if (await execution.run(code, runAsRequest())) sqlStore.remember(code)
     const result = execution.response
     // Postgres counts from 1 within the text it received.
     const position = !execution.error && result && 'error' in result ? result.error.position : null
@@ -147,7 +148,7 @@
         onsave={() => openDialog({ mode: 'save' })}
       />
       </div>
-      <RunAsNotice />
+      <RunAsPicker />
       <div class="ml-auto flex shrink-0 flex-wrap items-center gap-2">
         <!-- On screens without the sidebar, templates and saved queries live in a menu. -->
         <DropdownMenu.Root>

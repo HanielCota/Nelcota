@@ -1,9 +1,10 @@
 import { RemoteResource } from '$lib/remote-resource.svelte'
 import type { SchemaResponse, SqlResponse } from '$lib/types'
+import type { RunAsRequest } from './run-as.svelte'
 
 export interface SqlAdapter {
   schema(signal: AbortSignal): Promise<SchemaResponse>
-  execute(sql: string, signal: AbortSignal): Promise<SqlResponse>
+  execute(sql: string, signal: AbortSignal, runAs?: RunAsRequest): Promise<SqlResponse>
 }
 
 /** Owns SQL request lifetime, timing and results independently of the page. */
@@ -20,7 +21,7 @@ export class SqlExecution {
 
   loadSchema() { return this.schema.load(signal => this.adapter.schema(signal)) }
 
-  async run(sql: string): Promise<boolean> {
+  async run(sql: string, runAs?: RunAsRequest): Promise<boolean> {
     if (this.running || !sql.trim()) return false
     const generation = ++this.generation
     const controller = this.controller = new AbortController()
@@ -28,7 +29,7 @@ export class SqlExecution {
     this.running = true
     this.error = null
     try {
-      const response = await this.adapter.execute(sql, controller.signal)
+      const response = await this.adapter.execute(sql, controller.signal, runAs)
       if (generation !== this.generation) return false
       this.response = response
       return true
