@@ -7,7 +7,7 @@
   import UserRound from '@lucide/svelte/icons/user-round'
   import Server from '@lucide/svelte/icons/server'
   import KeyRound from '@lucide/svelte/icons/key-round'
-  import Table2 from '@lucide/svelte/icons/table-2'
+  import Rows3 from '@lucide/svelte/icons/rows-3'
   import Plus from '@lucide/svelte/icons/plus'
   import Download from '@lucide/svelte/icons/download'
   import { Skeleton } from '$lib/components/ui/skeleton'
@@ -195,7 +195,7 @@
     {#if snippetsError}<LoadError message={snippetsError} onretry={loadSnippets} busy={snippetsLoading} />{/if}
     {#if topic === 'tables' && (tablesLoading || snippetsLoading)}<Skeleton class="h-48" />
     {:else if topic === 'tables' && !tables.length && !tableError}
-      <EmptyState icon={Table2} title={t('connect.noTables')}>{#snippet actions()}<Button href={href('/tables?create=true')}><Plus data-icon="inline-start" aria-hidden="true" />{t('tables.editor.newTable')}</Button>{/snippet}</EmptyState>
+      <EmptyState icon={Rows3} title={t('connect.noTables')}>{#snippet actions()}<Button href={href('/tables?create=true')}><Plus data-icon="inline-start" aria-hidden="true" />{t('tables.editor.newTable')}</Button>{/snippet}</EmptyState>
     {:else}
       <div class="grid gap-6 *:min-w-0">
         {#each snippets as snippet (snippet.id)}

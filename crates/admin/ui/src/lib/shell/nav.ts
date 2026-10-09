@@ -1,6 +1,6 @@
 import type { Component } from 'svelte'
 import House from '@lucide/svelte/icons/house'
-import Table2 from '@lucide/svelte/icons/table-2'
+import Rows3 from '@lucide/svelte/icons/rows-3'
 import SquareTerminal from '@lucide/svelte/icons/square-terminal'
 import History from '@lucide/svelte/icons/history'
 import Users from '@lucide/svelte/icons/users'
@@ -27,7 +27,7 @@ export type NavItem = {
 // live under Users; /connect, not /api, since /admin/api/* is the panel API.
 export const navPills: NavItem[] = [
   { title: 'shell.pages.overview', pill: 'shell.pills.overview', path: '/', icon: House },
-  { title: 'shell.pages.tables', pill: 'shell.pills.tables', path: '/tables', icon: Table2 },
+  { title: 'shell.pages.tables', pill: 'shell.pills.tables', path: '/tables', icon: Rows3 },
   { title: 'shell.pages.sql', pill: 'shell.pills.sql', path: '/sql', icon: SquareTerminal },
   { title: 'shell.pages.migrations', pill: 'shell.pills.migrations', path: '/migrations', icon: History },
   { title: 'shell.pages.storage', pill: 'shell.pills.storage', path: '/storage', icon: HardDrive },

@@ -1,7 +1,7 @@
 <script lang="ts">
   import * as Command from '$lib/components/ui/command'
   import { toggleMode } from 'mode-watcher'
-  import Table2 from '@lucide/svelte/icons/table-2'
+  import Rows3 from '@lucide/svelte/icons/rows-3'
   import FileCode from '@lucide/svelte/icons/file-code'
   import Sparkles from '@lucide/svelte/icons/sparkles'
   import SunMoon from '@lucide/svelte/icons/sun-moon'
@@ -87,7 +87,7 @@
             value={`${t('palette.keywords.table')} ${table.name}`}
             onSelect={() => run(() => navigate(`/tables/${encodeURIComponent(table.name)}`))}
           >
-            <Table2 /><span class="truncate">{table.name}</span>
+            <Rows3 /><span class="truncate">{table.name}</span>
             {#if table.kind !== 'table'}<Command.Shortcut>view</Command.Shortcut>{/if}
           </Command.Item>
         {/each}

@@ -3,7 +3,7 @@
   import { Input } from '$lib/components/ui/input'
   import Search from '@lucide/svelte/icons/search'
   import Plus from '@lucide/svelte/icons/plus'
-  import Table2 from '@lucide/svelte/icons/table-2'
+  import Rows3 from '@lucide/svelte/icons/rows-3'
   import RlsDot from '$lib/shared/schema/components/RlsDot.svelte'
   import LoadError from '$lib/components/shared/LoadError.svelte'
   import EmptyState from '$lib/components/shared/EmptyState.svelte'
@@ -74,14 +74,14 @@
           table.name === current && 'bg-accent font-medium text-foreground',
         )}
       >
-        <Table2 class={['size-4 shrink-0', table.name === current && 'text-brand']} strokeWidth={1.6} />
+        <Rows3 class={['size-4 shrink-0', table.name === current && 'text-brand']} strokeWidth={1.6} />
         <span class="truncate">{table.name}</span>
         <span class="ml-auto flex"><RlsDot state={table.rls.state} /></span>
         {#if table.kind !== 'table'}<span class="text-2xs text-muted-foreground">{t('tables.sidebar.view')}</span>{/if}
       </a>
     {:else}
       {#if !error}
-        <EmptyState icon={Table2} title={t('tables.sidebar.empty')} class="px-3 py-6">
+        <EmptyState icon={Rows3} title={t('tables.sidebar.empty')} class="px-3 py-6">
           {#snippet actions()}{#if !tables.length}<Button variant="outline" size="sm" onclick={oncreate}><Plus aria-hidden="true" />{t('tables.sidebar.newTable')}</Button>{/if}{/snippet}
         </EmptyState>
       {/if}

@@ -6,7 +6,7 @@
   import ShieldCheck from '@lucide/svelte/icons/shield-check'
   import ShieldAlert from '@lucide/svelte/icons/shield-alert'
   import ShieldOff from '@lucide/svelte/icons/shield-off'
-  import Table2 from '@lucide/svelte/icons/table-2'
+  import Rows3 from '@lucide/svelte/icons/rows-3'
 
   let { rls }: { rls: Rls } = $props()
 
@@ -44,6 +44,6 @@
     (state === 'none' || state === 'view') && 'border-border-strong bg-muted text-muted-foreground',
   ]}
 >
-  {#if state === 'ok'}<ShieldCheck aria-hidden="true" />{:else if state === 'warn' || state === 'danger'}<ShieldAlert aria-hidden="true" />{:else if state === 'view'}<Table2 aria-hidden="true" />{:else}<ShieldOff aria-hidden="true" />{/if}
+  {#if state === 'ok'}<ShieldCheck aria-hidden="true" />{:else if state === 'warn' || state === 'danger'}<ShieldAlert aria-hidden="true" />{:else if state === 'view'}<Rows3 aria-hidden="true" />{:else}<ShieldOff aria-hidden="true" />{/if}
   {label}
 </Badge>
