@@ -16,8 +16,9 @@
   import { toast } from 'svelte-sonner'
   import CodeEditor, { type Cursor } from '$lib/features/sql/components/CodeEditor.svelte'
   import QueryTitle from '$lib/features/sql/components/QueryTitle.svelte'
-  import RunAsPicker from '$lib/features/sql/components/RunAsPicker.svelte'
-  import { runAsRequest } from '$lib/features/sql/run-as.svelte'
+  import RunAsPicker from '$lib/components/shared/RunAsPicker.svelte'
+  import { runAs, runAsRequest, setRunAs } from '$lib/features/sql/run-as.svelte'
+  import type { RunAsLabels, Viewer } from '$lib/shared/run-as'
   import EditorStatus from '$lib/features/sql/components/EditorStatus.svelte'
   import { draftName } from '$lib/features/sql/query-name'
   import type { Pane } from 'paneforge'
@@ -30,6 +31,32 @@
   import { sqlAdapter } from '$lib/features/sql/api'
   import { downloadText, toCsv, toJson } from '$lib/download'
   import { errorMessage, t } from '$lib/i18n/index.svelte'
+
+  // The SQL editor's words for who a run acts as (D94).
+  const runAsLabels: RunAsLabels = $derived({
+    label: t('sql.runAs.label'),
+    owner: t('sql.runAs.owner'),
+    ownerHint: t('sql.runAs.ownerHint'),
+    anon: t('sql.runAs.anon'),
+    anonHint: t('sql.runAs.anonHint'),
+    authenticated: t('sql.runAs.authenticated'),
+    authenticatedHint: t('sql.runAs.authenticatedHint'),
+    asVisitor: t('sql.runAs.asVisitor'),
+    asUser: (email: string) => t('sql.runAs.asUser', { email }),
+    ownerTrigger: t('sql.editor.ownerNote'),
+    ownerTriggerMore: t('sql.editor.ownerNoteMore'),
+    ownerTriggerTitle: t('sql.editor.ownerNoteTitle'),
+    pickTitle: t('sql.runAs.pickTitle'),
+    search: t('sql.runAs.search'),
+    empty: t('sql.runAs.empty'),
+    noUsers: t('sql.runAs.noUsers'),
+    loading: t('sql.runAs.loading'),
+  })
+
+  function chooseRunAs(viewer: Viewer) {
+    if (viewer.mode === 'authenticated' && viewer.user) setRunAs('authenticated', viewer.user)
+    else setRunAs(viewer.mode === 'anon' ? 'anon' : 'owner')
+  }
   import { SQL_SNIPPETS } from '$lib/features/sql/sql-snippets'
   import { sqlStore, type SavedQuery, type SqlDraft } from '$lib/features/sql/sql-store.svelte'
   import type { SqlResult } from '$lib/types'
@@ -148,7 +175,7 @@
         onsave={() => openDialog({ mode: 'save' })}
       />
       </div>
-      <RunAsPicker />
+      <RunAsPicker viewer={runAs} labels={runAsLabels} warnOwner onchange={chooseRunAs} />
       <div class="ml-auto flex shrink-0 flex-wrap items-center gap-2">
         <!-- On screens without the sidebar, templates and saved queries live in a menu. -->
         <DropdownMenu.Root>
