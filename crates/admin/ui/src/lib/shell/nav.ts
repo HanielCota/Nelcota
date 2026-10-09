@@ -15,6 +15,8 @@ import { route } from '$lib/router.svelte'
 /** Titles are translation keys: render them with `t(item.title)`. */
 export type NavItem = {
   title: MessageKey
+  /** Short name on the top pill (defaults to the title). */
+  pill?: MessageKey
   path: string
   icon: Component
   /** Other pages this pill stays lit for (sub-pages reached from it). */
@@ -24,14 +26,14 @@ export type NavItem = {
 // The pills of the top navigation (D98), in reading order. Sign-in settings
 // live under Users; /connect, not /api, since /admin/api/* is the panel API.
 export const navPills: NavItem[] = [
-  { title: 'shell.pages.overview', path: '/', icon: House },
-  { title: 'shell.pages.tables', path: '/tables', icon: Table2 },
-  { title: 'shell.pages.sql', path: '/sql', icon: SquareTerminal },
-  { title: 'shell.pages.migrations', path: '/migrations', icon: History },
-  { title: 'shell.pages.storage', path: '/storage', icon: HardDrive },
-  { title: 'shell.pages.users', path: '/users', icon: Users, also: ['/sign-in'] },
-  { title: 'shell.pages.policies', path: '/policies', icon: ShieldCheck },
-  { title: 'shell.pages.connect', path: '/connect', icon: Plug },
+  { title: 'shell.pages.overview', pill: 'shell.pills.overview', path: '/', icon: House },
+  { title: 'shell.pages.tables', pill: 'shell.pills.tables', path: '/tables', icon: Table2 },
+  { title: 'shell.pages.sql', pill: 'shell.pills.sql', path: '/sql', icon: SquareTerminal },
+  { title: 'shell.pages.migrations', pill: 'shell.pills.migrations', path: '/migrations', icon: History },
+  { title: 'shell.pages.storage', pill: 'shell.pills.storage', path: '/storage', icon: HardDrive },
+  { title: 'shell.pages.users', pill: 'shell.pills.users', path: '/users', icon: Users, also: ['/sign-in'] },
+  { title: 'shell.pages.policies', pill: 'shell.pills.policies', path: '/policies', icon: ShieldCheck },
+  { title: 'shell.pages.connect', pill: 'shell.pills.connect', path: '/connect', icon: Plug },
 ]
 
 // Every page the command palette can open: the pills, plus pages reached

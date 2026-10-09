@@ -4,7 +4,7 @@
   import Sun from '@lucide/svelte/icons/sun'
   import Moon from '@lucide/svelte/icons/moon'
   import LogOut from '@lucide/svelte/icons/log-out'
-  import ChevronsUpDown from '@lucide/svelte/icons/chevrons-up-down'
+  import Settings from '@lucide/svelte/icons/settings'
   import ImageUp from '@lucide/svelte/icons/image-up'
   import Languages from '@lucide/svelte/icons/languages'
   import Avatar from '$lib/features/profile/components/Avatar.svelte'
@@ -27,15 +27,19 @@
 <DropdownMenu.Root bind:open>
   <DropdownMenu.Trigger>
     {#snippet child({ props })}
+      <!-- The account chip (D98): photo or initials, who is signed in, settings. -->
       <button
         {...props}
-        class="flex h-12 max-w-64 min-w-0 cursor-pointer items-center gap-2.5 overflow-hidden rounded-full bg-nav py-1.5 pr-3.5 pl-1.5 text-left whitespace-nowrap transition-colors hover:bg-accent aria-expanded:bg-accent"
+        class="flex h-14 max-w-72 min-w-0 cursor-pointer items-center gap-3 overflow-hidden rounded-full bg-nav p-1.5 text-left whitespace-nowrap transition-colors hover:bg-accent aria-expanded:bg-accent"
         aria-label={t('shell.account.label')}
       >
-        <Avatar class="size-9 text-sm" />
-        <span class="hidden min-w-0 flex-1 items-center gap-2 sm:flex">
-          <span class="min-w-0 flex-1 truncate text-sm font-medium">{session.email}</span>
-          <ChevronsUpDown class="size-4 shrink-0 text-muted-foreground" />
+        <Avatar class="size-11 text-sm" />
+        <span class="hidden min-w-0 flex-1 flex-col leading-tight sm:flex">
+          <span class="truncate text-sm font-semibold">{session.email}</span>
+          <span class="truncate text-xs text-muted-foreground">{t('shell.account.role')}</span>
+        </span>
+        <span class="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-muted-foreground" aria-hidden="true">
+          <Settings class="size-[18px]" />
         </span>
       </button>
     {/snippet}

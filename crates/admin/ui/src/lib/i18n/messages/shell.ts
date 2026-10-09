@@ -17,6 +17,17 @@ const ptBR = {
     signIn: 'Entrar',
     userSignIn: 'Login dos usuários',
   },
+  // Short page names for the top pills; page titles keep the full names.
+  pills: {
+    overview: 'Visão geral',
+    tables: 'Tabelas',
+    sql: 'SQL',
+    migrations: 'Migrações',
+    storage: 'Arquivos',
+    users: 'Usuários',
+    policies: 'Acesso',
+    connect: 'API',
+  },
   nav: {
     main: 'Navegação principal',
     menu: 'Menu',
@@ -26,6 +37,7 @@ const ptBR = {
   },
   account: {
     label: 'Conta',
+    role: 'Administrador',
     signedInAs: 'Conectado como',
     addPhoto: 'Adicionar foto…',
     changePhoto: 'Alterar foto…',
@@ -66,6 +78,16 @@ const en: Messages<typeof ptBR> = {
     signIn: 'Sign in',
     userSignIn: 'User sign-in',
   },
+  pills: {
+    overview: 'Overview',
+    tables: 'Tables',
+    sql: 'SQL',
+    migrations: 'Migrations',
+    storage: 'Files',
+    users: 'Users',
+    policies: 'Access',
+    connect: 'API',
+  },
   nav: {
     main: 'Main navigation',
     menu: 'Menu',
@@ -75,6 +97,7 @@ const en: Messages<typeof ptBR> = {
   },
   account: {
     label: 'Account',
+    role: 'Administrator',
     signedInAs: 'Signed in as',
     addPhoto: 'Add photo…',
     changePhoto: 'Change photo…',
