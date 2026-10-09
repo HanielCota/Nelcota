@@ -24,7 +24,7 @@
 </script>
 
 <!-- min-w-0: inside grid/flex, without it a long line widens the page. -->
-<div class="group relative min-w-0 rounded-md border bg-muted/40">
+<div class="group relative min-w-0 rounded-xl bg-field">
   <!-- A horizontally scrolling block needs focus to scroll with the arrow keys
        (WCAG 2.1.1); hence the tabindex on a non-interactive element. -->
   <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
