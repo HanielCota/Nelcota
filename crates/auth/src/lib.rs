@@ -16,6 +16,7 @@ mod links;
 mod mail;
 mod oauth;
 mod password;
+mod prune;
 mod rate_limit;
 mod recovery;
 mod request;
@@ -38,6 +39,7 @@ pub use keys::{KeyError, Keys, generate_ed25519_private_key};
 pub use mail::{Email, MailError, Mailer, SmtpMailer};
 pub use oauth::{OAuth, Provider, ProviderEndpoints, ProviderKind};
 pub use password::{Passwords, hash_password, verify_password};
+pub use prune::{Pruned, prune, spawn_pruner};
 pub use rate_limit::{RateLimiter, SESSION_RATE_LIMIT_FACTOR};
 pub use state::{AuthSettings, AuthState, EmailLinks};
 

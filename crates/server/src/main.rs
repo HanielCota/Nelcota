@@ -98,6 +98,8 @@ async fn serve(config: Config) -> anyhow::Result<()> {
         }
         None => None,
     };
+    // Expired refresh tokens and dead sessions, once an hour.
+    nelcota_auth::spawn_pruner(pool.clone());
     let passwords = Arc::new(Passwords::new(hash_concurrency()));
     let auth = AuthState {
         mailer,

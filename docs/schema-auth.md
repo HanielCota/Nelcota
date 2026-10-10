@@ -83,6 +83,13 @@ from the original rotation (its `refreshed_at`). Once R2's successor has been
 rotated in turn, or after the window, R1 is reuse again and step 3 applies.
 The client should still serialize refreshes; the window only absorbs retries.
 
+### Cleanup
+
+Once an hour the server deletes refresh tokens past `expires_at` (a rotated
+token stays until then, so reuse is still detected), sessions left without
+any token, and sessions revoked more than 7 days ago (with their tokens).
+Nothing that could still sign anyone in is removed.
+
 ## `auth.one_time_tokens`
 
 Links sent by email: password recovery, signup confirmation and magic link.

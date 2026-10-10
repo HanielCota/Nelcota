@@ -286,6 +286,96 @@ async fn refresh_reuse_after_the_grace_window_revokes_the_session() {
     assert_eq!(refresh(&app, &r2).await.status, StatusCode::BAD_REQUEST);
 }
 
+#[tokio::test]
+async fn pruning_removes_expired_tokens_and_dead_sessions() {
+    let app = TestApp::spawn().await;
+    let live = signup(&app, "live@example.com", "strong-pass-123")
+        .await
+        .body;
+    let expired = login(&app, "live@example.com", "strong-pass-123")
+        .await
+        .body;
+    let logged_out = login(&app, "live@example.com", "strong-pass-123")
+        .await
+        .body;
+    let recent_logout = login(&app, "live@example.com", "strong-pass-123")
+        .await
+        .body;
+    let session = |body: &Value| {
+        let payload = str_field(body, "access_token").split('.').nth(1).unwrap();
+        let bytes =
+            base64::Engine::decode(&base64::engine::general_purpose::URL_SAFE_NO_PAD, payload)
+                .unwrap();
+        let claims: Value = serde_json::from_slice(&bytes).unwrap();
+        Uuid::parse_str(claims["session_id"].as_str().unwrap()).unwrap()
+    };
+    let (live_id, expired_id, old_id, recent_id) = (
+        session(&live),
+        session(&expired),
+        session(&logged_out),
+        session(&recent_logout),
+    );
+    // Rotate once so the live session also holds a revoked (unexpired) token.
+    let rotated = refresh(&app, str_field(&live, "refresh_token")).await;
+    assert_eq!(rotated.status, StatusCode::OK);
+    app.admin_client
+        .execute(
+            "UPDATE auth.refresh_tokens SET expires_at = now() - interval '1 second'
+             WHERE session_id = $1",
+            &[&expired_id],
+        )
+        .await
+        .unwrap();
+    app.admin_client
+        .execute(
+            "UPDATE auth.sessions SET revoked_at = now() - interval '8 days' WHERE id = $1",
+            &[&old_id],
+        )
+        .await
+        .unwrap();
+    app.admin_client
+        .execute(
+            "UPDATE auth.sessions SET revoked_at = now() WHERE id = $1",
+            &[&recent_id],
+        )
+        .await
+        .unwrap();
+
+    let pruned = nelcota_auth::prune(&app.pool).await.unwrap();
+    // The expired session's token, then that session and the old logout
+    // (with its token, by cascade).
+    assert_eq!(pruned.refresh_tokens, 1);
+    assert_eq!(pruned.sessions, 2);
+    let left: Vec<Uuid> = app
+        .admin_client
+        .query("SELECT id FROM auth.sessions ORDER BY created_at", &[])
+        .await
+        .unwrap()
+        .iter()
+        .map(|r| r.get(0))
+        .collect();
+    assert_eq!(left, [live_id, recent_id]);
+    let live_tokens: i64 = app
+        .admin_client
+        .query_one(
+            "SELECT count(*) FROM auth.refresh_tokens WHERE session_id = $1",
+            &[&live_id],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    assert_eq!(
+        live_tokens, 2,
+        "the rotated token stays for reuse detection"
+    );
+    let again = refresh(&app, str_field(&rotated.body, "refresh_token")).await;
+    assert_eq!(again.status, StatusCode::OK);
+    assert_eq!(
+        nelcota_auth::prune(&app.pool).await.unwrap(),
+        nelcota_auth::Pruned::default()
+    );
+}
+
 async fn update_user(app: &TestApp, access_token: &str, body: Value) -> Reply {
     app.request(
         axum::http::Method::PUT,
