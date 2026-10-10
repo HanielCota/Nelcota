@@ -30,7 +30,11 @@
   // Keep the same control while typing, so focus and selection never jump.
   const multiline = $derived(kind === 'json' || kind === 'text')
   const descriptionId = $derived(problem ? `${id}-error` : column.comment ? `${id}-description` : undefined)
-  const placeholder = $derived(inserting && column.has_default ? 'DEFAULT' : column.nullable ? 'NULL' : '')
+  // Only on insert does an empty field mean something (the default, or NULL);
+  // when editing, an empty field is an empty value and a hint would mislead.
+  const placeholder = $derived(
+    !inserting ? '' : column.has_default ? t('tables.row.defaultPlaceholder') : column.nullable ? t('tables.row.nullPlaceholder') : '',
+  )
   const required = $derived(inserting && !column.nullable && !column.has_default)
   const preview = $derived(
     kind === 'temporal' && field.value && !field.isNull ? formatCell(field.value, column.type) : null,

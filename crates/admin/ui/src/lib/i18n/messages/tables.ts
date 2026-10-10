@@ -191,12 +191,14 @@ const ptBR = {
     insert: 'Inserir',
     primaryKey: 'chave primária',
     required: 'obrigatória',
+    defaultPlaceholder: 'Automático (DEFAULT)',
+    nullPlaceholder: 'Vazio (NULL)',
     select: 'Selecione',
     inYourTimeZone: 'no seu fuso',
     formatJson: 'Formatar JSON',
     problems: {
       invalidJson: 'JSON inválido',
-      required: 'obrigatória',
+      required: 'Preencha este campo: ele não tem valor automático e não aceita vazio.',
     },
   },
   create: {
@@ -496,12 +498,14 @@ const en: Messages<typeof ptBR> = {
     insert: 'Insert',
     primaryKey: 'primary key',
     required: 'required',
+    defaultPlaceholder: 'Automatic (DEFAULT)',
+    nullPlaceholder: 'Empty (NULL)',
     select: 'Select',
     inYourTimeZone: 'in your time zone',
     formatJson: 'Format JSON',
     problems: {
       invalidJson: 'Invalid JSON',
-      required: 'required',
+      required: 'Fill in this field: it has no automatic value and cannot be empty.',
     },
   },
   create: {
