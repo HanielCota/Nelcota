@@ -48,9 +48,9 @@
   <div class="grid gap-3 border-b p-4">
     <DatabaseTabs fill />
     <div class="flex items-center justify-between gap-2">
-      <svelte:element this={current ? 'p' : 'h1'} class="px-1 text-sm font-semibold">{t('tables.sidebar.title')}</svelte:element>
+      <svelte:element this={current ? 'p' : 'h1'} class="min-w-0 truncate px-1 text-sm font-semibold">{t('tables.sidebar.title')}</svelte:element>
       <Button variant="outline" size="sm" title={t('tables.sidebar.newTable')} aria-label={t('tables.sidebar.newTable')} onclick={oncreate}>
-        <Plus data-icon="inline-start" aria-hidden="true" />{t('tables.sidebar.newTable')}
+        <Plus data-icon="inline-start" aria-hidden="true" />{t('tables.sidebar.new')}
       </Button>
     </div>
     <SearchField bind:value={search} label={t('tables.sidebar.search')} />
