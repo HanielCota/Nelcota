@@ -17,23 +17,29 @@
 
   let password = $state('')
   let saving = $state(false)
+  // Shown in the dialog, next to the field it is about, like the create dialog.
+  let failure = $state('')
   const guard = new CloseGuard(() => password !== '', () => saving, () => (open = false))
 
   $effect(() => {
-    if (open) password = ''
+    if (open) {
+      password = ''
+      failure = ''
+    }
   })
 
   async function submit(event: SubmitEvent) {
     event.preventDefault()
     if (saving || passwordProblem(password)) return
     saving = true
+    failure = ''
     try {
       await api.put(`/users/${enc(user.id)}/password`, { password })
       toast.success(t('users.setPassword.saved', { email: user.email }))
       open = false
       onsaved()
     } catch (e) {
-      toast.error(errorMessage(e))
+      failure = errorMessage(e)
     } finally {
       saving = false
     }
@@ -55,6 +61,7 @@
           <Label for="reset-password">{t('users.setPassword.newPassword')}</Label>
           <PasswordField id="reset-password" bind:value={password} />
         </div>
+        {#if failure}<p class="text-sm text-destructive" role="alert">{failure}</p>{/if}
         <Dialog.Footer>
           <Button variant="outline" disabled={saving} onclick={guard.request}>{t('common.cancel')}</Button>
           <Button type="submit" disabled={saving || !!passwordProblem(password)}>

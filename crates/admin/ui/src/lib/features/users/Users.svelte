@@ -24,7 +24,7 @@
   import CreateUserDialog from '$lib/features/users/components/CreateUserDialog.svelte'
   import SetPasswordDialog from '$lib/features/users/components/SetPasswordDialog.svelte'
   import { api, enc } from '$lib/api'
-  import { href, navigate, route } from '$lib/router.svelte'
+  import { navigate, route } from '$lib/router.svelte'
   import { copyText } from '$lib/clipboard'
   import { RemoteResource } from '$lib/remote-resource.svelte'
   import type { UsersResponse, User } from '$lib/types'
@@ -129,9 +129,17 @@
   {/if}
 {/snippet}
 
+{#snippet userId(user: User)}
+  <!-- The id is what policies and support tickets use: shown whole on hover, one click to copy. -->
+  <span class="group/id flex min-w-0 items-center gap-1">
+    <span class="min-w-0 truncate font-mono text-xs text-muted-foreground" title={user.id}>{user.id}</span>
+    <button type="button" class="grid size-6 shrink-0 cursor-pointer place-items-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none" aria-label={t('users.copyIdOf', { email: user.email })} title={t('users.copyId')} onclick={() => copyText(user.id, t('users.idCopied'))}><Copy class="size-3.5" aria-hidden="true" /></button>
+  </span>
+{/snippet}
+
 {#snippet methods(user: User)}
   {@const list = signInMethods(user)}
-  <span class="text-sm" title={list[0].kind === 'linkOnly' ? t('users.methods.linkOnlyHint') : undefined}>
+  <span title={list[0].kind === 'linkOnly' ? t('users.methods.linkOnlyHint') : undefined}>
     {#each list as method, i (i)}{#if i > 0}<span class="text-muted-foreground" aria-hidden="true">{' · '}</span>{/if}{#if method.kind === 'password'}{t('users.methods.password')}{:else if method.kind === 'provider'}{method.name}{:else}<span class="text-muted-foreground">{t('users.methods.linkOnly')}</span>{/if}{/each}
   </span>
 {/snippet}
@@ -161,7 +169,7 @@
 <div class="mx-auto w-full max-w-page px-4 pt-2 pb-12 sm:px-6 lg:px-8">
   <PageHeader
     title={t('users.title')}
-    description={users ? t('users.count', { count: total }) : t('users.description')}
+    description={users ? (appliedQuery ? t('users.matchCount', { count: total, query: appliedQuery }) : t('users.count', { count: total })) : t('users.description')}
   >
     {#snippet actions()}
       <div class="w-full sm:w-72"><SearchField bind:value={query} oninput={onSearch} placeholder={t('users.searchPlaceholder')} label={t('users.searchLabel')} /></div>
@@ -200,14 +208,14 @@
       {#each users as user (user.id)}
         <article class="min-w-0 rounded-3xl bg-card p-4">
           <div class="flex min-w-0 items-start justify-between gap-2">
-            <div class="min-w-0"><p class="break-all font-medium">{user.email}{@render unconfirmed(user)}</p><p class="mt-1 truncate font-mono text-xs text-muted-foreground" title={user.id}>{user.id}</p></div>
+            <div class="min-w-0"><p class="break-all font-medium">{user.email}{@render unconfirmed(user)}</p><div class="mt-1">{@render userId(user)}</div></div>
             {@render userActions(user)}
           </div>
           <dl class="mt-4 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2 text-xs">
             <dt class="text-muted-foreground">{t('users.columns.signIn')}</dt><dd class="text-right">{@render methods(user)}</dd>
             <dt class="text-muted-foreground">{t('users.columns.lastSignIn')}</dt><dd class="text-right">{user.last_sign_in_at ? when(user.last_sign_in_at) : t('users.neverSignedIn')}</dd>
             <dt class="text-muted-foreground">{t('users.columns.created')}</dt><dd class="text-right">{when(user.created_at)}</dd>
-            <dt class="text-muted-foreground">{t('users.columns.sessions')}</dt><dd class="text-right"><Badge variant="secondary">{user.sessions}</Badge></dd>
+            <dt class="text-muted-foreground">{t('users.columns.sessions')}</dt><dd class="text-right tabular-nums">{user.sessions}</dd>
           </dl>
         </article>
       {/each}
@@ -235,14 +243,14 @@
                   >
                   <div class="min-w-0">
                     <p class="font-medium">{user.email}{@render unconfirmed(user)}</p>
-                    <p class="max-w-60 truncate font-mono text-xs text-muted-foreground" title={user.id}>{user.id}</p>
+                    <div class="max-w-72">{@render userId(user)}</div>
                   </div>
                 </div>
               </Table.Cell>
               <Table.Cell>{@render methods(user)}</Table.Cell>
               <Table.Cell class="text-muted-foreground">{when(user.created_at)}</Table.Cell>
               <Table.Cell class="text-muted-foreground">{user.last_sign_in_at ? when(user.last_sign_in_at) : t('users.neverSignedIn')}</Table.Cell>
-              <Table.Cell class="text-right font-mono text-xs tabular-nums">{user.sessions}</Table.Cell>
+              <Table.Cell class="text-right tabular-nums">{user.sessions}</Table.Cell>
               <Table.Cell class="text-right">
                 {@render userActions(user)}
               </Table.Cell>
@@ -256,7 +264,7 @@
   {#if page > 0 || hasNext}
     <nav class="mt-4 flex items-center justify-end gap-2" aria-label={t('users.pagination')}>
       <span class="mr-1 text-sm text-muted-foreground">{t('common.page', { page: page + 1 })}</span>
-      <Button variant="outline" size="sm" disabled={loading || page === 0} href={href(`/users?${new URLSearchParams({ page: String(page - 1), ...(appliedQuery && { q: appliedQuery }) })}`)}>{t('common.previous')}</Button>
+      <Button variant="outline" size="sm" disabled={loading || page === 0} onclick={() => go(page - 1)}>{t('common.previous')}</Button>
       <Button variant="outline" size="sm" disabled={loading || !hasNext} onclick={() => go(page + 1)}>{t('common.next')}</Button>
     </nav>
   {/if}
