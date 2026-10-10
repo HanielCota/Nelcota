@@ -65,6 +65,7 @@ const ptBR = {
     noSaved: 'Nenhuma consulta salva.',
     localOnly: 'Guardadas neste navegador',
     actionsFor: 'Ações de {name}',
+    discardDraft: 'Descartar o rascunho {name}',
     rename: 'Renomear',
   },
   title: {
@@ -207,6 +208,7 @@ const en: Messages<typeof ptBR> = {
     noSaved: 'No saved queries.',
     localOnly: 'Kept in this browser',
     actionsFor: 'Actions for {name}',
+    discardDraft: 'Discard the draft {name}',
     rename: 'Rename',
   },
   title: {
