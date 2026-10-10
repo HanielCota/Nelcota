@@ -1,0 +1,1 @@
+import{A as e,S as t,j as n}from"./router.svelte-CRieIwYH.js";var r=new Set([`$$slots`,`$$events`,`$$legacy`]);function i(i,a){let o=e(a,r),s={name:`user-round`,size:24,node:[[`circle`,{cx:`12`,cy:`8`,r:`5`}],[`path`,{d:`M20 21a8 8 0 0 0-16 0`}]],aliases:[`user-2`]};t(i,n(()=>o,{get icon(){return s}}))}export{i as t};

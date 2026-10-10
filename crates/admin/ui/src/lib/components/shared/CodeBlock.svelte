@@ -50,7 +50,7 @@
     ]}>{#if tokens}{#each tokens as token, i (i)}{#if token.kind}<span class={COLOURS[token.kind]}>{token.text}</span>{:else}{token.text}{/if}{/each}{:else}{code}{/if}</pre>
   <button
     type="button"
-    class="absolute top-1.5 right-1.5 grid size-8 cursor-pointer place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+    class="absolute top-1.5 right-1.5 grid size-8 cursor-pointer place-items-center rounded-md bg-well text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
     aria-label={label ?? t('common.copy')}
     onclick={copy}
   >

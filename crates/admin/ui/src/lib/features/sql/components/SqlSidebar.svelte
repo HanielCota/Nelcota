@@ -44,7 +44,7 @@
   </div>
 {/snippet}
 
-<aside class="hidden w-72 shrink-0 flex-col overflow-hidden rounded-3xl bg-card lg:flex" aria-label={t('sql.sidebar.label')}>
+<aside class="hidden shrink-0 flex-col overflow-hidden rounded-3xl bg-card lg:flex lg:w-64 xl:w-72" aria-label={t('sql.sidebar.label')}>
   <div class="shrink-0 border-b p-4 pb-0"><DatabaseTabs fill /></div>
   <div class="flex h-14 shrink-0 items-center justify-between border-b pr-2 pl-5">
     <p class="text-sm font-semibold">{t('sql.sidebar.title')}</p>
