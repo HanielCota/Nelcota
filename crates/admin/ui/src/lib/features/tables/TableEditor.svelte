@@ -254,6 +254,7 @@
         {viewer}
         {viewerLabels}
         onviewer={setViewer}
+        listedRls={tables.find((entry) => entry.name === name)?.rls}
       />
 
       {#if view === 'structure'}

@@ -12,7 +12,7 @@
   import type { RunAsLabels, Viewer } from '$lib/shared/run-as'
   import { enc } from '$lib/api'
   import { href, route } from '$lib/router.svelte'
-  import type { TableData } from '$lib/types'
+  import type { Rls, TableData } from '$lib/types'
   import { t } from '$lib/i18n/index.svelte'
 
   let {
@@ -31,6 +31,7 @@
     viewer,
     viewerLabels,
     onviewer,
+    listedRls,
   }: {
     name: string
     view: 'data' | 'structure'
@@ -47,7 +48,11 @@
     viewer: Viewer
     viewerLabels: RunAsLabels
     onviewer: (viewer: Viewer) => void
+    /** Protection from the table list: the structure view loads no rows. */
+    listedRls?: Rls
   } = $props()
+
+  const rls = $derived(data?.table.rls ?? listedRls)
 
   const tabs = [
     { view: 'data', label: 'tables.toolbar.data', suffix: '' },
@@ -55,15 +60,19 @@
   ] as const
 </script>
 
-<div class="flex min-h-16 shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b bg-card px-5 py-3">
-  <a
-    href={href('/tables')}
-    class="-ml-1 grid size-9 place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground lg:hidden"
-    aria-label={t('tables.toolbar.back')}><ChevronLeft class="size-4" /></a
-  >
-  <h1 class="min-w-0 truncate text-base font-semibold">{name}</h1>
-  {#if data}<RlsBadge rls={data.table.rls} />{/if}
-  <nav class="ml-1 flex h-10 items-center gap-0.5 rounded-full bg-well p-1 text-sm" aria-label={t('tables.toolbar.views')}>
+<!-- Phones: name on top, then the views with "Insert row", then the tools
+     (icon-only) on their own row. Wider screens keep everything on one line. -->
+<div class="flex min-h-16 shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b bg-card px-4 py-3 sm:px-5">
+  <div class="flex min-w-0 items-center gap-2 max-sm:basis-full">
+    <a
+      href={href('/tables')}
+      class="-ml-1 grid size-9 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-accent hover:text-foreground lg:hidden"
+      aria-label={t('tables.toolbar.back')}><ChevronLeft class="size-4" /></a
+    >
+    <h1 class="min-w-0 truncate text-base font-semibold" title={name}>{name}</h1>
+    {#if rls}<RlsBadge {rls} />{/if}
+  </div>
+  <nav class="flex h-10 items-center gap-0.5 rounded-full bg-well p-1 text-sm sm:ml-1" aria-label={t('tables.toolbar.views')}>
     {#each tabs as tab (tab.view)}
       <a
         href={href(`/tables/${enc(name)}${tab.suffix}${route.query.size ? `?${route.query}` : ''}`)}
@@ -76,23 +85,24 @@
     {/each}
   </nav>
   {#if view === 'data'}
-    <div class="ml-auto flex min-w-0 max-w-full flex-wrap items-center justify-end gap-2">
+    <div class="flex min-w-0 items-center gap-2 max-sm:order-last max-sm:basis-full sm:ml-auto">
       <RunAsPicker {viewer} labels={viewerLabels} onchange={onviewer} />
-      <div class="flex h-10 max-w-full items-center gap-0.5 overflow-x-auto rounded-full bg-well p-1">
+      <div class="flex h-10 min-w-0 items-center gap-0.5 overflow-x-auto rounded-full bg-well p-1 max-sm:ml-auto">
       <Button
         variant={filterOpen || filterCount ? 'secondary' : 'ghost'}
         size="sm"
         onclick={() => (filterOpen = !filterOpen)}
         aria-expanded={filterOpen}
+        title={t('tables.toolbar.filter')}
       >
-        <Funnel />{t('tables.toolbar.filter')}{#if filterCount}<span class="text-muted-foreground tabular-nums">{filterCount}</span>{/if}
+        <Funnel /><span class="max-sm:sr-only">{t('tables.toolbar.filter')}</span>{#if filterCount}<span class="text-muted-foreground tabular-nums">{filterCount}</span>{/if}
       </Button>
       {#if data}
         <DropdownMenu.Root>
           <DropdownMenu.Trigger>
             {#snippet child({ props })}
-              <Button variant={hiddenColumns.length ? 'secondary' : 'ghost'} size="sm" {...props}>
-                <Columns3 />{t('tables.toolbar.columns')}{#if hiddenColumns.length}<span
+              <Button variant={hiddenColumns.length ? 'secondary' : 'ghost'} size="sm" title={t('tables.toolbar.columns')} {...props}>
+                <Columns3 /><span class="max-sm:sr-only">{t('tables.toolbar.columns')}</span>{#if hiddenColumns.length}<span
                     class="text-muted-foreground tabular-nums"
                     title={t('tables.toolbar.hidden', { count: hiddenColumns.length })}>{hiddenColumns.length}</span
                   >{/if}
@@ -119,7 +129,7 @@
       <DropdownMenu.Root>
         <DropdownMenu.Trigger>
           {#snippet child({ props })}
-            <Button variant="ghost" size="sm" {...props}><Download />{t('tables.toolbar.export')}</Button>
+            <Button variant="ghost" size="sm" title={t('tables.toolbar.export')} {...props}><Download /><span class="max-sm:sr-only">{t('tables.toolbar.export')}</span></Button>
           {/snippet}
         </DropdownMenu.Trigger>
         <DropdownMenu.Content align="end" class="w-56">
@@ -138,9 +148,9 @@
         <RefreshCw class={loading ? 'animate-spin' : ''} />
       </Button>
       </div>
-      {#if data?.table.insertable}
-        <Button size="sm" disabled={loading} onclick={oninsert}><Plus />{t('tables.toolbar.insertRow')}</Button>
-      {/if}
     </div>
+    {#if data?.table.insertable}
+      <Button size="sm" class="max-sm:ml-auto" disabled={loading} onclick={oninsert}><Plus />{t('tables.toolbar.insertRow')}</Button>
+    {/if}
   {/if}
 </div>
