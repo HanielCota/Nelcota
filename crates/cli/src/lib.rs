@@ -132,6 +132,9 @@ pub enum Command {
         /// Allows a target older than the running version.
         #[arg(long)]
         allow_downgrade: bool,
+        /// Redeploys even when the project is already on the target version.
+        #[arg(long)]
+        reinstall: bool,
         /// Only prints the current → target version of each project.
         #[arg(long)]
         dry_run: bool,
@@ -449,11 +452,13 @@ pub fn run(cli: Cli) -> anyhow::Result<Outcome> {
             all,
             allow_downgrade,
             dry_run,
+            reinstall,
         } => {
             let manifest = host.require()?;
             let options = upgrade::Options {
                 allow_downgrade,
                 dry_run,
+                reinstall,
             };
             let targets = if all {
                 host.projects(&manifest)
@@ -616,7 +621,8 @@ mod cli_tests {
                 all: true,
                 dry_run: true,
                 allow_downgrade: false,
-                version: None
+                version: None,
+                reinstall: false
             })
         ));
         let cli = Cli::try_parse_from([

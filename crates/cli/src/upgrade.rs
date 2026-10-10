@@ -41,8 +41,11 @@ pub fn run(
         return Ok(());
     }
     match direction {
-        Direction::Same => {
-            ok(&format!("{} is already on version {target}", project.name));
+        Direction::Same if !options.reinstall => {
+            ok(&format!(
+                "{} is already on version {target} (--reinstall redeploys it)",
+                project.name
+            ));
             return Ok(());
         }
         Direction::Downgrade if !options.allow_downgrade => {
@@ -67,7 +70,7 @@ pub fn run(
         Direction::Unknown => warn(&format!(
             "cannot compare versions {current} and {target}; continuing"
         )),
-        Direction::Upgrade => {}
+        Direction::Upgrade | Direction::Same => {}
     }
     println!("Upgrading {}: {current} → {target}", project.name);
 
@@ -89,6 +92,8 @@ pub struct Options {
     pub allow_downgrade: bool,
     /// Only print what would change.
     pub dry_run: bool,
+    /// Redeploy even when the project is already on the target version.
+    pub reinstall: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
