@@ -44,7 +44,19 @@ jobs:
             echo "::error::tag $TAG does not match package.json version $version"
             exit 1
           fi
-      - run: npm ci
-      - run: npm run build
+      # A version published by hand (the first one) is not published again.
+      - name: skip a version already on npm
+        id: published
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if npm view "@nelcota/client@$version" version >/dev/null 2>&1; then
+            echo "::notice::@nelcota/client@$version is already on npm"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.published.outputs.skip != 'true'
+        run: npm ci
+      - if: steps.published.outputs.skip != 'true'
+        run: npm run build
       # The complete verification job already checked this tagged commit.
-      - run: npm publish --access public --provenance --ignore-scripts
+      - if: steps.published.outputs.skip != 'true'
+        run: npm publish --access public --provenance --ignore-scripts
