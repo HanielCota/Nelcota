@@ -186,6 +186,13 @@ pub enum Command {
     },
 }
 
+/// Is there a configuration for `serve`: the required database URL in the
+/// environment, or the TOML file `Config::load` reads?
+fn server_configured() -> bool {
+    let file = std::env::var("NELCOTA_CONFIG").unwrap_or_else(|_| "nelcota.toml".into());
+    std::env::var_os("NELCOTA_DATABASE_URL").is_some() || std::path::Path::new(&file).is_file()
+}
+
 /// `--keep 0` would delete the dump that was just written.
 fn at_least_one(value: &str) -> Result<usize, String> {
     match value.parse::<usize>() {
@@ -345,6 +352,15 @@ pub fn run(cli: Cli) -> anyhow::Result<Outcome> {
     let host = host::Host::new(&cli.dir);
     let selection = cli.project.as_deref();
     let done = |r: anyhow::Result<()>| r.map(|()| Outcome::Done);
+
+    // A bare `nelcota` on a machine with no server configuration is someone
+    // looking for the commands, not trying to start the API.
+    if cli.command.is_none() && !server_configured() {
+        use clap::CommandFactory;
+        Cli::command().print_help()?;
+        println!();
+        return Ok(Outcome::Done);
+    }
 
     match cli.command.unwrap_or(Command::Serve) {
         Command::Serve => Ok(Outcome::Serve(Box::new(Config::load()?))),
