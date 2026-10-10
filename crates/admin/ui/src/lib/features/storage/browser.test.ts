@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { StorageListing } from '$lib/types'
-import { StorageBrowser, type StorageBrowserAdapter } from './browser.svelte'
+import { BULK_DELETE_BATCH, StorageBrowser, type StorageBrowserAdapter } from './browser.svelte'
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -16,6 +16,7 @@ function fixture() {
     info: vi.fn(async () => null),
     list: vi.fn(async target => listing(target.prefix + 'first.txt', true)),
     remove: vi.fn(async () => undefined),
+    removeMany: vi.fn(async (_bucket: string, names: string[]) => names.length),
     upload: vi.fn(async () => undefined),
     isConflict: error => error === 'exists',
   }
@@ -94,6 +95,21 @@ describe('storage browser operations', () => {
     vi.mocked(adapter.list).mockClear()
     await browser.send([new File(['x'], 'new.txt')])
     expect(vi.mocked(adapter.list).mock.calls.map(call => call[1])).toEqual([0, 1, 2])
+  })
+
+  it('deletes many files in batches and reloads even when a batch fails', async () => {
+    const { browser, adapter } = fixture()
+    await browser.open({ bucket: 'docs', prefix: '' })
+    const names = Array.from({ length: BULK_DELETE_BATCH * 2 + 1 }, (_, i) => `f${i}`)
+    expect(await browser.removeMany(names)).toBe(names.length)
+    expect(vi.mocked(adapter.removeMany).mock.calls.map(([bucket, batch]) => [bucket, batch.length]))
+      .toEqual([['docs', BULK_DELETE_BATCH], ['docs', BULK_DELETE_BATCH], ['docs', 1]])
+    expect(adapter.list).toHaveBeenCalledTimes(2)
+
+    adapter.removeMany = vi.fn().mockResolvedValueOnce(BULK_DELETE_BATCH).mockRejectedValueOnce(new Error('offline'))
+    await expect(browser.removeMany(names)).rejects.toThrow('offline')
+    expect(adapter.removeMany).toHaveBeenCalledTimes(2)
+    expect(adapter.list).toHaveBeenCalledTimes(3)
   })
 
   it('retains upload conflicts and their destination after navigation', async () => {

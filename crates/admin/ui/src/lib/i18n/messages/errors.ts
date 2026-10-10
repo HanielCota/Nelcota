@@ -95,6 +95,8 @@ const ptBR = {
   upload_timeout: 'O envio demorou demais.',
   upload_interrupted: 'O envio foi interrompido.',
   upload_busy: 'Muitos envios ao mesmo tempo. Tente de novo em instantes.',
+  no_files_selected: 'Nenhum arquivo selecionado.',
+  too_many_files: 'No máximo {max} arquivos por vez.',
 }
 
 const en: Messages<typeof ptBR> = {
@@ -180,6 +182,8 @@ const en: Messages<typeof ptBR> = {
   upload_timeout: 'The upload took too long.',
   upload_interrupted: 'The upload was interrupted.',
   upload_busy: 'Too many uploads at once. Try again in a moment.',
+  no_files_selected: 'No files selected.',
+  too_many_files: 'At most {max} files at a time.',
 }
 
 export default { 'pt-BR': ptBR, en }

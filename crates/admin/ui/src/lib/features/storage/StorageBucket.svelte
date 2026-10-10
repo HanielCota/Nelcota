@@ -20,6 +20,8 @@
   import LoaderCircle from '@lucide/svelte/icons/loader-circle'
   import ChevronRight from '@lucide/svelte/icons/chevron-right'
   import ShieldCheck from '@lucide/svelte/icons/shield-check'
+  import X from '@lucide/svelte/icons/x'
+  import { Checkbox } from '$lib/components/ui/checkbox'
   import { toast } from 'svelte-sonner'
   import PageHeader from '$lib/components/shared/PageHeader.svelte'
   import BucketAccess from '$lib/features/storage/components/BucketAccess.svelte'
@@ -76,8 +78,38 @@
   const load = async (more = false) => { await browser.load(more) }
   $effect(() => {
     const target = { bucket, prefix }
-    untrack(() => { void browser.open(target) })
+    untrack(() => {
+      selected = new Set()
+      void browser.open(target)
+    })
   })
+
+  // Ticked files (by name), for bulk deletion. Only names still listed count.
+  let selected = $state<Set<string>>(new Set())
+  let removeManyOpen = $state(false)
+  // Count shown by the dialog, fixed when it opens (the selection clears on success).
+  let removeManyCount = $state(0)
+  const selectedNames = $derived(files?.filter((file) => selected.has(file.name)).map((file) => file.name) ?? [])
+  const allSelected = $derived(!!files?.length && selectedNames.length === files.length)
+
+  function toggleFile(name: string, on: boolean) {
+    const next = new Set(selected)
+    if (on) next.add(name)
+    else next.delete(name)
+    selected = next
+  }
+
+  async function removeSelected() {
+    const names = selectedNames
+    try {
+      const count = await browser.removeMany(names)
+      selected = new Set()
+      toast.success(t('storage.browser.deletedMany', { count }))
+    } catch (e) {
+      toast.error(errorMessage(e))
+      throw e
+    }
+  }
 
   async function send(list: File[], replace: boolean, target?: UploadTarget) {
     if (!info && !target) return
@@ -185,9 +217,27 @@
       >{#snippet actions()}<Button variant="outline" disabled={!info || uploading !== null} onclick={() => picker?.click()}><Upload data-icon="inline-start" aria-hidden="true" />{t('storage.browser.upload')}</Button>{/snippet}</EmptyState>
     {:else}
       <div class="overflow-hidden rounded-3xl bg-card">
+        {#if selectedNames.length}
+          <div class="flex min-h-12 flex-wrap items-center gap-2 border-b border-brand/20 bg-brand/5 px-4 py-2 text-sm" role="region" aria-label={t('storage.browser.selection.selected', { count: selectedNames.length })}>
+            <span class="font-medium text-foreground" aria-live="polite">{t('storage.browser.selection.selected', { count: selectedNames.length })}</span>
+            <div class="ml-auto flex flex-wrap items-center gap-2">
+              <Button variant="destructive" size="sm" onclick={() => { removeManyCount = selectedNames.length; removeManyOpen = true }}><Trash2 />{t('storage.browser.selection.delete')}</Button>
+              <Button variant="ghost" size="icon-sm" aria-label={t('storage.browser.selection.clear')} title={t('storage.browser.selection.clear')} onclick={() => (selected = new Set())}><X /></Button>
+            </div>
+          </div>
+        {/if}
         <Table.Root class="table-fixed md:table-auto">
           <Table.Header>
             <Table.Row class="hover:bg-transparent">
+              <Table.Head class="w-10">
+                <Checkbox
+                  checked={allSelected}
+                  indeterminate={selectedNames.length > 0 && !allSelected}
+                  disabled={!files.length}
+                  onCheckedChange={(v) => (selected = v === true ? new Set(files?.map((file) => file.name)) : new Set())}
+                  aria-label={t('storage.browser.selection.selectAll')}
+                />
+              </Table.Head>
               <Table.Head>{t('storage.browser.columns.name')}</Table.Head>
               <Table.Head class="w-20 text-right 2xl:w-auto">{t('storage.browser.columns.size')}</Table.Head>
               <Table.Head class="hidden 2xl:table-cell">{t('storage.browser.columns.type')}</Table.Head>
@@ -198,6 +248,7 @@
           <Table.Body>
             {#each folders as folder (folder)}
               <Table.Row>
+                <Table.Cell></Table.Cell>
                 <Table.Cell class="max-w-0">
                   <a class="flex min-w-0 items-center gap-2 font-medium hover:underline" href={folderHref(`${prefix}${folder}/`)}>
                     <Folder class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" /><span class="truncate">{folder}/</span>
@@ -208,7 +259,10 @@
             {/each}
             {#each files as file (file.id)}
               {@const Icon = fileIcon(file)}
-              <Table.Row>
+              <Table.Row data-state={selected.has(file.name) ? 'selected' : undefined}>
+                <Table.Cell>
+                  <Checkbox checked={selected.has(file.name)} onCheckedChange={(v) => toggleFile(file.name, v === true)} aria-label={t('storage.browser.selection.selectFile', { name: baseName(file.name) })} />
+                </Table.Cell>
                 <Table.Cell class="max-w-0 font-medium"><button type="button" class="flex w-full min-w-0 cursor-pointer items-center gap-2 text-left hover:text-brand" onclick={() => showPreview(file)} title={file.name}><Icon class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" /><span class="truncate">{baseName(file.name)}</span></button></Table.Cell>
                 <Table.Cell class="text-right font-mono text-xs tabular-nums">{size(file.size)}</Table.Cell>
                 <Table.Cell class="hidden font-mono text-xs text-muted-foreground 2xl:table-cell">{file.mime_type}</Table.Cell>
@@ -276,6 +330,14 @@
 
 {#if preview}<FilePreviewDialog bind:open={previewOpen} file={preview} url={fileHref(preview.name)} />{/if}
 
+<ConfirmDialog
+  bind:open={removeManyOpen}
+  title={t('storage.browser.confirmDeleteMany.title', { count: removeManyCount })}
+  description={t('storage.browser.confirmDeleteMany.description')}
+  confirmLabel={t('common.delete')}
+  destructive
+  onconfirm={removeSelected}
+/>
 {#if removing}
   <ConfirmDialog
     bind:open={removeOpen}

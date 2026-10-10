@@ -2,11 +2,16 @@ import { RemoteResource } from '$lib/remote-resource.svelte'
 import type { Bucket, StorageListing } from '$lib/types'
 import { UploadQueue, type UploadTarget } from './upload-queue.svelte'
 
-export type BucketInfo = { bucket: Bucket; publicOrigin: string } | null
+/** Files per bulk deletion request (the server's limit, MAX_BULK_DELETE). */
+export const BULK_DELETE_BATCH = 200
+
+export type BucketInfo ={ bucket: Bucket; publicOrigin: string } | null
 export interface StorageBrowserAdapter {
   info(bucket: string, signal: AbortSignal): Promise<BucketInfo>
   list(target: UploadTarget, offset: number, signal: AbortSignal): Promise<StorageListing>
   remove(bucket: string, name: string): Promise<unknown>
+  /** Deletes up to {@link BULK_DELETE_BATCH} files; resolves to how many were deleted. */
+  removeMany(bucket: string, names: string[]): Promise<number>
   upload(file: File, target: UploadTarget, replace: boolean, progress: (loaded: number, total: number) => void): Promise<unknown>
   isConflict(error: unknown): boolean
 }
@@ -64,6 +69,24 @@ export class StorageBrowser {
     const target = { ...this.target }
     await this.adapter.remove(target.bucket, name)
     if (this.matches(target)) await this.refresh()
+  }
+
+  /**
+   * Deletes several files in batches; resolves to how many were deleted. The
+   * folder reloads even after a failure, since earlier batches already went.
+   */
+  async removeMany(names: string[]) {
+    if (!this.target || names.length === 0) return 0
+    const target = { ...this.target }
+    let deleted = 0
+    try {
+      for (let start = 0; start < names.length; start += BULK_DELETE_BATCH) {
+        deleted += await this.adapter.removeMany(target.bucket, names.slice(start, start + BULK_DELETE_BATCH))
+      }
+    } finally {
+      if (this.matches(target)) await this.refresh()
+    }
+    return deleted
   }
 
   private matches(target: UploadTarget) {
