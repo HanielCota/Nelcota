@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Add `auth.updateUser({ password?, currentPassword?, data? })` for the new
+  `PUT /auth/v1/user`: change the password (other sessions end) or merge
+  `user_metadata`. Needs a server with that endpoint.
+- Know the server's newer codes: `invalid_email`, `weak_password`,
+  `bad_request`, `method_not_allowed`, `payload_too_large`,
+  `unsupported_media_type`, `range_not_satisfiable` and a server `timeout`.
 - Expose the optional Postgres fields of server errors (`sqlstate`, `details`,
   `hint`, `constraint`) on `NelcotaError`, and export `NelcotaErrorCode` and
   `ServerErrorCode` for autocompletion of known codes.

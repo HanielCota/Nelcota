@@ -323,6 +323,24 @@ describe('refresh', () => {
 });
 
 describe('sign-out and user', () => {
+  it('updateUser sends snake_case fields and stores the returned user', async () => {
+    const changed = { ...session().user, user_metadata: { plan: 'pro' } };
+    const { nelcota, calls, storage, events } = setup(stored(session()), json(changed));
+    const result = await nelcota.auth.updateUser({ password: 'new-password-123', currentPassword: 'old', data: { plan: 'pro' } });
+    expect(result.error).toBeNull();
+    expect(calls[0]!.method).toBe('PUT');
+    expect(calls[0]!.url.pathname).toBe('/auth/v1/user');
+    expect(JSON.parse(calls[0]!.body!)).toEqual({ password: 'new-password-123', current_password: 'old', data: { plan: 'pro' } });
+    expect(JSON.parse((await storage.getItem(KEY))!).user.user_metadata).toEqual({ plan: 'pro' });
+    expect(events).toEqual(['user_updated']);
+  });
+
+  it('updateUser without password or data is a usage error', async () => {
+    const { nelcota, calls } = setup(stored(session()), empty());
+    await expect(nelcota.auth.updateUser({ currentPassword: 'x' })).rejects.toThrow('password or data');
+    expect(calls).toHaveLength(0);
+  });
+
   it('does not restore a session when getUser completes after logout', async () => {
     let started!: () => void, finish!: () => void;
     const begun = new Promise<void>(resolve => { started = resolve; });

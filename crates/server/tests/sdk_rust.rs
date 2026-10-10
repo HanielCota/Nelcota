@@ -3,6 +3,7 @@ mod common;
 use common::*;
 use nelcota_client::{
     Client,
+    auth::UserUpdate,
     rest::{Condition, IsValue, Order, UpsertOptions},
     storage::{BucketSettings, BucketUpdate, ListOptions, OpenOptions, UploadOptions},
 };
@@ -367,6 +368,56 @@ async fn login_rotation_recovery_magic_links_and_scoped_tokens() {
             .user
             .id,
         old.user.id
+    );
+}
+
+#[tokio::test]
+async fn update_user_merges_metadata_and_changes_the_password() {
+    let live = Live::spawn(Options::default()).await;
+    let auth = live.client.auth();
+    auth.sign_up("upd@example.com", "strong-pass-123", None)
+        .await
+        .unwrap();
+    let data = |value: Value| UserUpdate {
+        data: Some(value),
+        ..Default::default()
+    };
+    let user = auth
+        .update_user(data(json!({"plan": "pro", "tmp": 1})))
+        .await
+        .unwrap();
+    assert_eq!(json!(user.user_metadata), json!({"plan": "pro", "tmp": 1}));
+    let user = auth.update_user(data(json!({"tmp": null}))).await.unwrap();
+    assert_eq!(json!(user.user_metadata), json!({"plan": "pro"}));
+    let stored = auth.get_session().await.unwrap().unwrap();
+    assert_eq!(json!(stored.user.user_metadata), json!({"plan": "pro"}));
+
+    let password = |current: Option<&str>| UserUpdate {
+        password: Some("newer-pass-456".into()),
+        current_password: current.map(Into::into),
+        data: None,
+    };
+    let missing = auth.update_user(password(None)).await.unwrap_err();
+    assert_eq!(missing.code(), "validation_failed");
+    let wrong = auth
+        .update_user(password(Some("not-the-password")))
+        .await
+        .unwrap_err();
+    assert_eq!(wrong.code(), "invalid_grant");
+    auth.update_user(password(Some("strong-pass-123")))
+        .await
+        .unwrap();
+    auth.refresh_session().await.unwrap();
+    auth.sign_out().await.unwrap();
+    auth.sign_in_with_password("upd@example.com", "newer-pass-456")
+        .await
+        .unwrap();
+    assert!(
+        auth.update_user(UserUpdate::default())
+            .await
+            .unwrap_err()
+            .to_string()
+            .contains("password or data")
     );
 }
 

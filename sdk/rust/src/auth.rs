@@ -249,6 +249,26 @@ pub struct AuthClient {
     pub(crate) client: Client,
 }
 
+/// Changes for [`AuthClient::update_user`]; `None` leaves a field as it is.
+#[derive(Clone, Default)]
+pub struct UserUpdate {
+    /// New password (same rules as sign-up).
+    pub password: Option<String>,
+    /// Required with `password` when the account already has one.
+    pub current_password: Option<String>,
+    /// Merged into `user_metadata` one level deep; a key set to `null` is
+    /// removed. Must be a JSON object.
+    pub data: Option<Value>,
+}
+impl std::fmt::Debug for UserUpdate {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("UserUpdate")
+            .field("password", &self.password.as_ref().map(|_| "<redacted>"))
+            .field("data", &self.data)
+            .finish_non_exhaustive()
+    }
+}
+
 #[derive(Debug)]
 pub struct SignUp {
     pub user: User,
@@ -431,27 +451,70 @@ impl AuthClient {
 
     /// Read the server's current user. Scoped clients use their explicit caller token.
     pub async fn get_user(&self) -> Result<User> {
-        let token = match &self.client.token {
-            TokenMode::Fixed(Some(token)) => token.clone(),
-            TokenMode::Fixed(None) => return Err(Error::SessionMissing),
-            TokenMode::Session => {
-                self.get_session()
-                    .await?
-                    .ok_or(Error::SessionMissing)?
-                    .access_token
-            }
-        };
+        let token = self.caller_token().await?;
         let user = self
             .client
             .json::<User>(Spec::new(Method::GET, "/auth/v1/user").token(&token))
             .await?
             .data;
+        self.remember_user(&token, &user).await?;
+        Ok(user)
+    }
+
+    /// Change the signed-in user's password and/or `user_metadata`. A password
+    /// change ends the user's other sessions; this one keeps working.
+    pub async fn update_user(&self, update: UserUpdate) -> Result<User> {
+        if update.password.is_none() && update.data.is_none() {
+            return Err(Error::Usage("update_user needs password or data".into()));
+        }
+        if update.data.as_ref().is_some_and(|data| !data.is_object()) {
+            return Err(Error::Usage("user data must be a JSON object".into()));
+        }
+        let mut body = serde_json::Map::new();
+        if let Some(password) = update.password {
+            body.insert("password".into(), password.into());
+        }
+        if let Some(current) = update.current_password {
+            body.insert("current_password".into(), current.into());
+        }
+        if let Some(data) = update.data {
+            body.insert("data".into(), data);
+        }
+        let token = self.caller_token().await?;
+        let user = self
+            .client
+            .json::<User>(
+                Spec::new(Method::PUT, "/auth/v1/user")
+                    .json(Value::Object(body))
+                    .token(&token),
+            )
+            .await?
+            .data;
+        self.remember_user(&token, &user).await?;
+        Ok(user)
+    }
+
+    async fn caller_token(&self) -> Result<String> {
+        match &self.client.token {
+            TokenMode::Fixed(Some(token)) => Ok(token.clone()),
+            TokenMode::Fixed(None) => Err(Error::SessionMissing),
+            TokenMode::Session => Ok(self
+                .get_session()
+                .await?
+                .ok_or(Error::SessionMissing)?
+                .access_token),
+        }
+    }
+
+    /// Store a fresher user in the session the request was made with, unless
+    /// the session rotated or changed meanwhile.
+    async fn remember_user(&self, token: &str, user: &User) -> Result<()> {
         let manager = &self.client.inner.auth;
         let mut state = manager.gate.lock().await;
         if let Some(session) = state
             .session
             .as_ref()
-            .filter(|s| s.access_token == token && s.user != user)
+            .filter(|s| s.access_token == token && s.user != *user)
         {
             let mut session = session.clone();
             session.user = user.clone();
@@ -459,7 +522,7 @@ impl AuthClient {
                 .save(&mut state, Some(session), AuthEventKind::UserUpdated)
                 .await?;
         }
-        Ok(user)
+        Ok(())
     }
 
     /// Serialize against refresh and clear locally even when server revocation fails.

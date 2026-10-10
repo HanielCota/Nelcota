@@ -7,6 +7,7 @@
 /** Codes produced by the client itself, never by the server. */
 export type ClientErrorCode =
   | 'network_error'
+  // Also sent by the server when a request outlives its time budget (504).
   | 'timeout'
   | 'aborted'
   | 'invalid_response'
@@ -29,12 +30,19 @@ export type ServerErrorCode =
   | 'internal'
   | 'not_found'
   | 'invalid_body'
+  | 'bad_request'
+  | 'method_not_allowed'
+  | 'payload_too_large'
+  | 'unsupported_media_type'
+  | 'range_not_satisfiable'
   // REST
   | 'db_error'
   | 'invalid_query'
   | 'response_too_large'
   // Auth
   | 'validation_failed'
+  | 'invalid_email'
+  | 'weak_password'
   | 'invalid_credentials'
   | 'email_not_confirmed'
   | 'user_already_exists'

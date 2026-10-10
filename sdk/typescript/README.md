@@ -196,6 +196,8 @@ await nelcota.auth.signOut();
 
 const { data: session } = await nelcota.auth.getSession();   // refreshed first when about to expire
 const { data: user } = await nelcota.auth.getUser();         // the server's view, now
+await nelcota.auth.updateUser({ data: { plan: 'pro' } });     // merged into user_metadata; null removes a key
+await nelcota.auth.updateUser({ password: next, currentPassword: password }); // ends the other sessions
 
 const stop = nelcota.auth.onChange((event, session) => {
   // 'signed_in' | 'signed_out' | 'refreshed' | 'user_updated', also from other tabs

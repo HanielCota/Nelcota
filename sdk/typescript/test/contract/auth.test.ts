@@ -60,6 +60,27 @@ describe.skipIf(skip)('auth against the server', () => {
     expect(duplicate.error).toMatchObject({ status: 409, code: 'user_already_exists' });
   });
 
+  it('updates metadata and changes the password with the current one', async () => {
+    const { client, email, password } = await signedIn();
+    const meta = await client.auth.updateUser({ data: { plan: 'pro', tmp: 1 } });
+    expect(meta.error).toBeNull();
+    expect(meta.data!.user_metadata).toEqual({ plan: 'pro', tmp: 1 });
+    expect((await client.auth.updateUser({ data: { tmp: null } })).data!.user_metadata).toEqual({ plan: 'pro' });
+
+    const other = visitor();
+    expect((await other.auth.signInWithPassword({ email, password })).error).toBeNull();
+    const next = `pw-${randomUUID()}`;
+    expect((await client.auth.updateUser({ password: next })).error?.code).toBe('validation_failed');
+    expect((await client.auth.updateUser({ password: next, currentPassword: 'wrong-password' })).error?.code).toBe('invalid_grant');
+    expect((await client.auth.updateUser({ password: 'short', currentPassword: password })).error?.code).toBe('weak_password');
+    expect((await client.auth.updateUser({ password: next, currentPassword: password })).error).toBeNull();
+
+    // The other session ends; this one keeps refreshing.
+    expect((await other.auth.refreshSession()).error?.code).toBe('invalid_grant');
+    expect((await client.auth.refreshSession()).error).toBeNull();
+    expect((await visitor().auth.signInWithPassword({ email, password: next })).error).toBeNull();
+  });
+
   it('rotates refresh tokens, and a reused one ends the session (as the server enforces)', async () => {
     const { client } = await signedIn();
     const first = (await client.auth.getSession()).data!;

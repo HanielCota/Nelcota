@@ -2,6 +2,10 @@
 
 ## 0.1.0 (unreleased)
 
+- `AuthClient::update_user(UserUpdate)` for the new `PUT /auth/v1/user`:
+  change the password (other sessions end) or merge `user_metadata`. Needs a
+  server with that endpoint.
+
 - Minimum supported Rust version lowered from 1.99 to 1.88, the oldest
   release the dependency tree supports; CI tests it.
 

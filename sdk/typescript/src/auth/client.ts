@@ -24,6 +24,18 @@ export interface SignUpInput extends Credentials {
   data?: Record<string, unknown>;
 }
 
+export interface UserUpdate {
+  /** New password (same rules as sign-up). */
+  password?: string;
+  /** Required with `password` when the account already has one. */
+  currentPassword?: string;
+  /**
+   * Merged into `user_metadata` one level deep; a key set to `null` is
+   * removed. Never trust it for authorization.
+   */
+  data?: Record<string, unknown>;
+}
+
 export interface OAuthInput {
   provider: OAuthProvider;
   /** App page to come back to; must be allowed in NELCOTA_OAUTH_REDIRECT_URLS. */
@@ -212,6 +224,26 @@ export class AuthClient {
     if (error) return fail(error);
     if (!session) return fail(clientError('session_missing', 'Not signed in'));
     const result = await this.#http.json<unknown>({ method: 'GET', path: '/auth/v1/user', auth: session.access_token, signal: options.signal, timeout: options.timeout });
+    if (result.error) return fail(result.error);
+    if (!isUser(result.data)) return fail(invalidResponse());
+    await this.#manager.updateUser(session, result.data);
+    return ok(result.data);
+  }
+
+  /**
+   * Changes the signed-in user's password and/or `user_metadata`. A password
+   * change ends the user's other sessions; this one keeps working.
+   */
+  async updateUser(input: UserUpdate, options: AuthRequestOptions = {}): Promise<Result<User>> {
+    if (input.password === undefined && input.data === undefined) throw new NelcotaUsageError('updateUser needs password or data');
+    const body: Record<string, unknown> = {};
+    if (input.password !== undefined) body['password'] = input.password;
+    if (input.currentPassword !== undefined) body['current_password'] = input.currentPassword;
+    if (input.data !== undefined) body['data'] = input.data;
+    const { data: session, error } = await this.getSession(options);
+    if (error) return fail(error);
+    if (!session) return fail(clientError('session_missing', 'Not signed in'));
+    const result = await this.#http.json<unknown>({ method: 'PUT', path: '/auth/v1/user', json: body, auth: session.access_token, signal: options.signal, timeout: options.timeout });
     if (result.error) return fail(result.error);
     if (!isUser(result.data)) return fail(invalidResponse());
     await this.#manager.updateUser(session, result.data);
