@@ -52,6 +52,11 @@ pub enum StorageBackend {
     S3,
 }
 
+/// Default REST body limit: axum's own default, which the API always had.
+/// A body is buffered and parsed whole, and a 1000-row insert of typical
+/// rows fits well under it; raise it for larger batches if memory allows.
+pub const DEFAULT_MAX_BODY_BYTES: usize = 2 * 1024 * 1024;
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Config {
     /// Postgres URL with a role that owns the schema (used only for migrations
@@ -119,6 +124,8 @@ pub struct Config {
     pub db_schema: String,
     /// Row cap per API collection (`None` uses 1000).
     pub max_rows: Option<i64>,
+    /// Largest REST request body (`/rest/v1`), in bytes.
+    pub max_body_bytes: usize,
     pub listen: SocketAddr,
     pub db_pool_size: usize,
     pub request_timeout_secs: u64,
@@ -192,6 +199,7 @@ impl Default for Config {
             migrations_dir: None,
             db_schema: "public".into(),
             max_rows: Some(1000),
+            max_body_bytes: DEFAULT_MAX_BODY_BYTES,
             listen: SocketAddr::from(([0, 0, 0, 0], 8000)),
             db_pool_size: 10,
             request_timeout_secs: 15,
@@ -258,6 +266,9 @@ impl Config {
         }
         if self.max_rows.is_some_and(|rows| rows <= 0) {
             return Err(ConfigError::Invalid("NELCOTA_MAX_ROWS must be > 0"));
+        }
+        if self.max_body_bytes == 0 {
+            return Err(ConfigError::Invalid("NELCOTA_MAX_BODY_BYTES must be > 0"));
         }
         self.mail()?;
         self.validate_storage()?;
@@ -469,6 +480,27 @@ fn non_empty(value: &Option<Secret>) -> Option<&str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The smallest configuration that passes `validate`.
+    fn valid() -> Config {
+        Config {
+            database_url: Secret::new("postgres://u:p@localhost/db"),
+            authenticator_password: Secret::new("a-password-of-16+"),
+            jwt_secret: Some(Secret::new("a-secret-with-at-least-32-characters")),
+            ..Config::default()
+        }
+    }
+
+    #[test]
+    fn body_limit_must_be_positive() {
+        assert!(valid().validate().is_ok());
+        assert_eq!(valid().max_body_bytes, 2 * 1024 * 1024);
+        let zero = Config {
+            max_body_bytes: 0,
+            ..valid()
+        };
+        assert!(zero.validate().is_err());
+    }
 
     #[test]
     fn secret_never_shows_in_debug() {

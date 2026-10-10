@@ -133,7 +133,10 @@ Same syntax as PostgREST. Inside the parentheses each filter is written
 ## Writes
 
 An insert accepts at most **1000 rows** and **128 distinct column sets** per
-request. Split larger batches into requests. Each accepted request keeps its
+request. Split larger batches into requests. A request body (writes and RPC
+arguments) can have at most `NELCOTA_MAX_BODY_BYTES` bytes, **2 MiB** by
+default; a larger one gets `413 payload_too_large`. The body is buffered and
+parsed whole, so raise the limit only as far as the server's memory allows. Each accepted request keeps its
 transactional behavior and missing columns still receive their defaults.
 
 | Verb | Body | Filters | Without `return=representation` | With `return=representation` |

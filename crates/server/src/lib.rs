@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use axum::{
     Json, Router,
-    extract::{FromRef, Request, State},
+    extract::{DefaultBodyLimit, FromRef, Request, State},
     http::{HeaderName, Method, StatusCode, header},
     middleware::{self, Next},
     response::{IntoResponse, Response},
@@ -94,7 +94,7 @@ pub fn app(
     let verifier = state.verifier.clone();
     let mut router = Router::new()
         .route("/health", get(health))
-        .merge(nelcota_api::router())
+        .merge(nelcota_api::router().layer(DefaultBodyLimit::max(state.api.max_body_bytes)))
         .with_state(state)
         .merge(nelcota_auth::router(auth));
     let observed = admin.as_ref().map(|admin| Observed {

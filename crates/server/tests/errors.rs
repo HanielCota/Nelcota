@@ -166,3 +166,24 @@ async fn every_error_is_json() {
         .await;
     assert!(reply.body.get("error").is_some(), "{}", reply.text);
 }
+
+#[tokio::test]
+async fn rest_body_limit_is_configurable() {
+    let app = TestApp::spawn_with(Options {
+        max_body_bytes: 1024,
+        ..Options::default()
+    })
+    .await;
+    let s = service_token();
+    let row = |len: usize| json!({ "name": "x".repeat(len), "price": 1 });
+    let reply = app.post("/rest/v1/products", Some(&s), row(40)).await;
+    assert_eq!(reply.status, StatusCode::CREATED, "{}", reply.text);
+    let reply = app
+        .post(
+            "/rest/v1/products",
+            Some(&s),
+            serde_json::Value::Array(vec![row(40); 20]),
+        )
+        .await;
+    assert_api_error(&reply, StatusCode::PAYLOAD_TOO_LARGE, "payload_too_large");
+}

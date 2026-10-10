@@ -57,6 +57,7 @@ async fn serve(config: Config) -> anyhow::Result<()> {
         catalog,
         api: Arc::new(ApiSettings {
             max_rows: config.max_rows,
+            max_body_bytes: config.max_body_bytes,
         }),
     };
     // Auth email (single-use links). Without SMTP those endpoints answer
