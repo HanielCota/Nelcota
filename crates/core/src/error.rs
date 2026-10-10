@@ -332,7 +332,11 @@ mod tests {
             );
         }
         for transient in ["40001", "40P01", "53300", "55P03", "57P01"] {
-            assert_eq!(client(transient, Role::Anon), Class::Transient, "{transient}");
+            assert_eq!(
+                client(transient, Role::Anon),
+                Class::Transient,
+                "{transient}"
+            );
         }
         assert_eq!(client("XX000", Role::Anon), Class::Internal);
         assert_eq!(client("42P07", Role::Anon), Class::Internal);

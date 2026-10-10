@@ -10,14 +10,17 @@ use crate::{
     verify::{self, VerifyBody},
 };
 use axum::{
-    Json, Router,
-    extract::{Query, State},
+    Router,
+    extract::State,
     http::{HeaderMap, StatusCode, header},
     response::IntoResponse,
     response::Redirect,
     routing::{get, post},
 };
-use nelcota_core::ApiError;
+use nelcota_core::{
+    ApiError,
+    extract::{Json, Query},
+};
 use serde::Deserialize;
 use serde_json::Value;
 pub fn router(state: AuthState) -> Router {

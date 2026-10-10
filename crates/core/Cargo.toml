@@ -21,5 +21,8 @@ tracing.workspace = true
 tokio = { workspace = true, features = ["rt"] }
 uuid.workspace = true
 
+[dev-dependencies]
+tower.workspace = true
+
 [lints]
 workspace = true
