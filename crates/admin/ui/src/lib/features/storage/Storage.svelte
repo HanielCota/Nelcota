@@ -11,6 +11,8 @@
   import Lock from '@lucide/svelte/icons/lock'
   import Pencil from '@lucide/svelte/icons/pencil'
   import Trash2 from '@lucide/svelte/icons/trash-2'
+  import ShieldCheck from '@lucide/svelte/icons/shield-check'
+  import ArrowUpRight from '@lucide/svelte/icons/arrow-up-right'
   import { Badge } from '$lib/components/ui/badge'
   import { toast } from 'svelte-sonner'
   import PageHeader from '$lib/components/shared/PageHeader.svelte'
@@ -27,6 +29,7 @@
   import type { Bucket, StorageOverview } from '$lib/types'
   import { errorMessage, intlLocale, t } from '$lib/i18n/index.svelte'
 
+  const STORAGE_DOCS = 'https://github.com/HanielCota/Nelcota/blob/main/docs/storage.md'
   const resource = new RemoteResource<StorageOverview>()
   const data = $derived(resource.data)
   const loading = $derived(resource.loading)
@@ -75,6 +78,9 @@
     </DropdownMenu.Trigger>
     <DropdownMenu.Content align="end" class="w-48">
       <DropdownMenu.Item onclick={() => edit(bucket)}><Pencil aria-hidden="true" />{t('storage.edit')}</DropdownMenu.Item>
+      <DropdownMenu.Item>
+        {#snippet child({ props })}<a {...props} href={href(`/storage/${enc(bucket.id)}`)}><ShieldCheck aria-hidden="true" />{t('storage.accessRules')}</a>{/snippet}
+      </DropdownMenu.Item>
       <DropdownMenu.Separator />
       <DropdownMenu.Item variant="destructive" disabled={bucket.files > 0} onclick={() => { removing = bucket; confirmOpen = true }}><Trash2 aria-hidden="true" />{t('storage.deleteBucket')}</DropdownMenu.Item>
       {#if bucket.files > 0}<p class="px-2 py-2 text-xs text-muted-foreground">{t('storage.emptyBeforeDelete')}</p>{/if}
@@ -133,8 +139,8 @@
               {@render bucketActions(bucket)}
             </div>
             <dl class="mt-4 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2 text-xs">
-              <dt class="text-muted-foreground">{t('storage.columns.files')}</dt><dd class="text-right font-mono tabular-nums">{bucket.files}</dd>
-              <dt class="text-muted-foreground">{t('storage.columns.size')}</dt><dd class="text-right font-mono tabular-nums">{size(bucket.bytes)}</dd>
+              <dt class="text-muted-foreground">{t('storage.columns.files')}</dt><dd class="text-right tabular-nums">{bucket.files}</dd>
+              <dt class="text-muted-foreground">{t('storage.columns.size')}</dt><dd class="text-right tabular-nums">{size(bucket.bytes)}</dd>
               <dt class="text-muted-foreground">{t('storage.columns.limit')}</dt><dd class="text-right">{bucket.file_size_limit ? size(bucket.file_size_limit) : t('storage.serverLimit', { size: size(data.max_file_size) })}</dd>
               <dt class="text-muted-foreground">{t('storage.columns.types')}</dt><dd class="break-words text-right">{bucket.allowed_mime_types?.join(', ') ?? t('storage.anyType')}</dd>
             </dl>
@@ -163,9 +169,9 @@
                 <Table.Cell class="text-muted-foreground">
                   {@render accessBadge(bucket)}
                 </Table.Cell>
-                <Table.Cell class="text-right font-mono text-xs tabular-nums">{bucket.files}</Table.Cell>
-                <Table.Cell class="text-right font-mono text-xs tabular-nums">{size(bucket.bytes)}</Table.Cell>
-                <Table.Cell class="hidden text-muted-foreground md:table-cell">
+                <Table.Cell class="text-right tabular-nums">{bucket.files}</Table.Cell>
+                <Table.Cell class="text-right tabular-nums">{size(bucket.bytes)}</Table.Cell>
+                <Table.Cell class="hidden text-muted-foreground tabular-nums md:table-cell">
                   {bucket.file_size_limit
                     ? size(bucket.file_size_limit)
                     : t('storage.serverLimit', { size: size(data.max_file_size) })}
@@ -187,10 +193,33 @@
       </div>
       {/if}
     {/if}
-    <p class="mt-4 text-sm text-muted-foreground">{t('storage.policiesNote')}</p>
-    {#if data.backend === 'disk'}
-      <p class="mt-1 text-sm text-muted-foreground">{t('storage.diskNote')}</p>
-    {/if}
+    <!-- Standing notes about every bucket: who reaches the files, and where they live. -->
+    <div class="mt-6 grid gap-4 md:grid-cols-2">
+      {#if data.buckets.length}
+        <aside class="flex items-start gap-3 rounded-3xl bg-card p-5" aria-labelledby="storage-access-note">
+          <span class="grid size-10 shrink-0 place-items-center rounded-full bg-well text-muted-foreground"><ShieldCheck class="size-[18px]" aria-hidden="true" /></span>
+          <div class="grid min-w-0 gap-1">
+            <h2 id="storage-access-note" class="text-sm font-semibold">{t('storage.notes.access.title')}</h2>
+            <p class="text-sm text-muted-foreground">{t('storage.notes.access.text')}</p>
+            {#if data.buckets.length === 1}
+              <Button variant="outline" size="sm" class="mt-2 w-fit" href={href(`/storage/${enc(data.buckets[0].id)}`)}><ShieldCheck data-icon="inline-start" aria-hidden="true" />{t('storage.notes.access.action', { bucket: data.buckets[0].id })}</Button>
+            {:else}
+              <p class="text-sm text-muted-foreground">{t('storage.notes.access.openBucket')}</p>
+            {/if}
+          </div>
+        </aside>
+      {/if}
+      {#if data.backend === 'disk'}
+        <aside class="flex items-start gap-3 rounded-3xl bg-card p-5" aria-labelledby="storage-disk-note">
+          <span class="grid size-10 shrink-0 place-items-center rounded-full bg-well text-muted-foreground"><HardDrive class="size-[18px]" aria-hidden="true" /></span>
+          <div class="grid min-w-0 gap-1">
+            <h2 id="storage-disk-note" class="text-sm font-semibold">{t('storage.notes.disk.title')}</h2>
+            <p class="text-sm text-muted-foreground">{t('storage.notes.disk.text')}</p>
+            <Button variant="outline" size="sm" class="mt-2 w-fit" href={STORAGE_DOCS} target="_blank" rel="noopener">{t('storage.notes.disk.action')}<ArrowUpRight data-icon="inline-end" aria-hidden="true" /></Button>
+          </div>
+        </aside>
+      {/if}
+    </div>
   {/if}
 </div>
 
