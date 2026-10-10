@@ -58,6 +58,15 @@ describe('select', () => {
     const get = nelcota.from('orders').select('id', { head: false });
     expectTypeOf<Result<typeof get>>().toEqualTypeOf<{ id: number }[]>();
   });
+
+  it('pages yield arrays of the selected row, only on row reads', () => {
+    const pages = nelcota.from('orders').select('id').order('id').offset(10).pages(100);
+    expectTypeOf(pages).toEqualTypeOf<AsyncGenerator<{ id: number }[], void, undefined>>();
+    // @ts-expect-error a HEAD read has no rows to page
+    nelcota.from('orders').select('id', { head: true }).pages(100);
+    // @ts-expect-error a single row has no pages
+    nelcota.from('orders').select('id').single().pages(100);
+  });
 });
 
 describe('filters', () => {

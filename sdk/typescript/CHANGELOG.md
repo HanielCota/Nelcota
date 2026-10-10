@@ -8,6 +8,9 @@
 - Bodyless error responses (HEAD counts) keep a meaningful code:
   `unauthorized`, `forbidden`, `not_found`, `rate_limited` or `unavailable`
   instead of `http_<status>`.
+- Add `offset(n)` (parity with the Rust client), a `range` field on query
+  results (the returned rows, from `Content-Range`) so a server row cap is
+  visible, and a `pages(size)` async iterator that walks every row.
 
 - Cancel auth/request waits independently while accepted refresh rotation
   completes and persists the replacement token.

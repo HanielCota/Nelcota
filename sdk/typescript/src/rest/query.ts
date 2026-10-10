@@ -21,9 +21,28 @@ import type { GenericSchema, Relation, RowOf, SelectRow } from './types.js';
 /** Filters and ordering use every column of the table, not only the selected ones. */
 type TableRow<S extends GenericSchema, Name extends string> = RowOf<Relation<S, Name>>;
 
+/**
+ * The rows a read returned, zero-based and inclusive, from `Content-Range`.
+ * `null` when no rows came back or the response has no range (writes).
+ */
+export interface RowRange {
+  from: number;
+  to: number;
+}
+
+export interface QuerySuccess<T> {
+  data: T;
+  error: null;
+  /** Total matching rows with `count: 'exact'`, else `null`. */
+  count: number | null;
+  /** Which rows of the match these are. With `count`, `range.to + 1 < count` means more rows exist. */
+  range: RowRange | null;
+  status: number;
+}
+
 export type QueryResult<T> =
-  | { data: T; error: null; count: number | null; status: number }
-  | { data: null; error: NelcotaError; count: null; status: number };
+  | QuerySuccess<T>
+  | { data: null; error: NelcotaError; count: null; range: null; status: number };
 
 /** A column of the row, or a path into an embed (`orders.total`). */
 export type FilterColumn<Row> = (string & keyof Row) | `${string}.${string}`;
@@ -67,6 +86,15 @@ export function countFromRange(header: string | null): number | null {
   if (!total || total === '*') return null;
   const count = Number(total);
   return Number.isSafeInteger(count) ? count : null;
+}
+
+/** Rows from `Content-Range: 0-19/137`; `null` for `*\/137` (no rows) or no header. */
+export function rangeFromHeader(header: string | null): RowRange | null {
+  const match = header?.match(/^(\d+)-(\d+)\//);
+  if (!match) return null;
+  const from = Number(match[1]);
+  const to = Number(match[2]);
+  return Number.isSafeInteger(from) && Number.isSafeInteger(to) && to >= from ? { from, to } : null;
 }
 
 export class Query<S extends GenericSchema, Name extends string, Row, Out, Head extends boolean = false>
@@ -168,6 +196,11 @@ export class Query<S extends GenericSchema, Name extends string, Row, Out, Head 
     return this.#replace(referenced('limit', options), nonNegative('limit', count));
   }
 
+  /** Skips the first `count` rows (combine with `limit`, or use `range`). */
+  offset(count: number, options?: ReferencedOption): this {
+    return this.#replace(referenced('offset', options), nonNegative('offset', count));
+  }
+
   /** Rows `from` to `to`, both included (zero-based). */
   range(from: number, to: number, options?: ReferencedOption): this {
     nonNegative('range start', from);
@@ -249,26 +282,55 @@ export class Query<S extends GenericSchema, Name extends string, Row, Out, Head 
       signal: state.signal,
       timeout: state.timeout,
     });
-    if (error) return { data: null, error, count: null, status: error.status };
+    if (error) return { data: null, error, count: null, range: null, status: error.status };
 
-    const count = countFromRange(response.headers.get('content-range'));
+    const contentRange = response.headers.get('content-range');
+    const count = countFromRange(contentRange);
+    const range = rangeFromHeader(contentRange);
     if (state.returnsRows && !Array.isArray(rows)) {
       const error = new NelcotaError({ status: response.status, code: 'invalid_response', message: 'The server answered with something that is not an array of rows' });
-      return { data: null, error, count: null, status: response.status };
+      return { data: null, error, count: null, range: null, status: response.status };
     }
     if (state.cardinality === 'many') {
-      return { data: rows as Out, error: null, count, status: response.status };
+      return { data: rows as Out, error: null, count, range, status: response.status };
     }
     if (!Array.isArray(rows)) throw new NelcotaUsageError('single/maybeSingle requires a row representation');
     if (rows.length === 1 || (rows.length === 0 && state.cardinality === 'maybe')) {
-      return { data: (rows[0] ?? null) as Out, error: null, count, status: response.status };
+      return { data: (rows[0] ?? null) as Out, error: null, count, range, status: response.status };
     }
     const failure = new NelcotaError({
       status: 406,
       code: 'not_single',
       message: `Expected ${state.cardinality === 'one' ? 'exactly one row' : 'at most one row'}, got ${rows.length === 2 && state.method === 'GET' ? 'more than one' : rows.length}`,
     });
-    return { data: null, error: failure, count: null, status: response.status };
+    return { data: null, error: failure, count: null, range: null, status: response.status };
+  }
+
+  /**
+   * Reads every matching row, `size` rows per request, from the current
+   * offset on. Order by a unique column so pages do not overlap. It ends at
+   * the first empty page, so a server row cap smaller than `size` cannot cut
+   * it short; a failed page throws its `NelcotaError`.
+   *
+   * ```ts
+   * for await (const page of nelcota.from('notes').select().order('id').pages(500)) { ... }
+   * ```
+   */
+  async *pages(this: Query<S, Name, Row, Row[], false>, size: number): AsyncGenerator<Row[], void, undefined> {
+    const state = this.#state;
+    if (state.method !== 'GET' || state.cardinality !== 'many') {
+      throw new NelcotaUsageError('pages() works on select() reads, without single/maybeSingle or head: true');
+    }
+    if (!Number.isSafeInteger(size) || size < 1) throw new NelcotaUsageError('page size must be an integer >= 1');
+    const start = state.params.find(([k]) => k === 'offset')?.[1];
+    let offset = start === undefined ? 0 : Number(start);
+    for (;;) {
+      const { data, error } = await this.offset(offset).limit(size).execute();
+      if (error) throw error;
+      if (data.length === 0) return;
+      yield data;
+      offset += data.length;
+    }
   }
 
   then<A = QueryResult<Out>, B = never>(

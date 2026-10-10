@@ -146,6 +146,31 @@ when you show it.
 HEAD queries return `data: null`. `single()` and `maybeSingle()` require
 rows: use `.select()` on writes first, and omit `head: true`.
 
+### Paging
+
+The server returns at most `NELCOTA_MAX_ROWS` rows per request (1000 by
+default), even without a `limit`. Page with `range(from, to)` or
+`limit(n)` + `offset(n)`, and read `range` (the rows returned, from
+`Content-Range`) and `count` (with `count: 'exact'`) to know whether more
+rows exist:
+
+```ts
+const { data, range, count } = await nelcota
+  .from('notes').select('id,body', { count: 'exact' }).order('id').range(0, 49);
+const more = range !== null && count !== null && range.to + 1 < count;
+```
+
+To walk every row, `pages(size)` requests one page after another until an
+empty one, so a server cap below `size` cannot cut it short. Order by a
+unique column so pages neither overlap nor skip rows; a failed page throws
+its `NelcotaError`:
+
+```ts
+for await (const page of nelcota.from('notes').select('id,body').order('id').pages(500)) {
+  for (const note of page) console.log(note.id);
+}
+```
+
 ## Auth
 
 ```ts

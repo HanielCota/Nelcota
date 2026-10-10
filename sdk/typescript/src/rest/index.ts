@@ -36,13 +36,15 @@ export function createRestClient<Database = any, SchemaName extends string = Def
   return new RestClient(createHttpClient(url, options));
 }
 
-export { Query, TableRef, countFromRange, selectList } from './query.js';
+export { Query, TableRef, countFromRange, rangeFromHeader, selectList } from './query.js';
 export type {
   CountOption,
   FilterColumn,
   OrderOptions,
   QueryResult,
+  QuerySuccess,
   ReferencedOption,
+  RowRange,
   SelectOptions,
   UpsertOptions,
 } from './query.js';
