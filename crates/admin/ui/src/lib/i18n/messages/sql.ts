@@ -42,6 +42,8 @@ const ptBR = {
     position: 'Posição {position} no texto.',
     hint: 'Dica: {hint}',
     noRows: 'Executado, sem linhas',
+    noMatchingRows: 'A consulta rodou, mas nenhuma linha atende às condições.',
+    failed: 'A consulta falhou',
     resultOf: 'Resultado {index} de {total}',
     rows: { one: '{count} linha', other: '{count} linhas' },
     truncated: '(resultado limitado por linhas ou tamanho)',
@@ -63,6 +65,7 @@ const ptBR = {
     noSaved: 'Nenhuma consulta salva.',
     localOnly: 'Guardadas neste navegador',
     actionsFor: 'Ações de {name}',
+    discardDraft: 'Descartar o rascunho {name}',
     rename: 'Renomear',
   },
   title: {
@@ -182,6 +185,8 @@ const en: Messages<typeof ptBR> = {
     position: 'Position {position} in the text.',
     hint: 'Hint: {hint}',
     noRows: 'Done, no rows',
+    noMatchingRows: 'The query ran, but no row matched.',
+    failed: 'The query failed',
     resultOf: 'Result {index} of {total}',
     rows: { one: '{count} row', other: '{count} rows' },
     truncated: '(result limited by rows or size)',
@@ -203,6 +208,7 @@ const en: Messages<typeof ptBR> = {
     noSaved: 'No saved queries.',
     localOnly: 'Kept in this browser',
     actionsFor: 'Actions for {name}',
+    discardDraft: 'Discard the draft {name}',
     rename: 'Rename',
   },
   title: {

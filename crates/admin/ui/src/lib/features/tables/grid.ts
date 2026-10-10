@@ -17,8 +17,30 @@ export type ColumnKind = 'number' | 'boolean' | 'temporal' | 'json' | 'uuid' | '
 const NUMBER = ['smallint', 'integer', 'bigint', 'numeric', 'real', 'double precision']
 const TEMPORAL = ['timestamp with time zone', 'timestamp without time zone', 'date', 'time without time zone', 'time with time zone', 'interval']
 
+// Short names Postgres also accepts (and `pg_type.typname` uses). The catalog
+// sends `format_type` names, but a type written by hand or a mock may not.
+const ALIASES: Record<string, string> = {
+  timestamptz: 'timestamp with time zone',
+  timestamp: 'timestamp without time zone',
+  timetz: 'time with time zone',
+  time: 'time without time zone',
+  int2: 'smallint',
+  int4: 'integer',
+  int: 'integer',
+  int8: 'bigint',
+  float4: 'real',
+  float8: 'double precision',
+  decimal: 'numeric',
+  bool: 'boolean',
+}
+
+/** The `format_type` name of a Postgres type, also from its short alias. */
+export function canonicalType(type: string): string {
+  return ALIASES[type] ?? type
+}
+
 export function columnKind(column: Pick<Column, 'type' | 'enum_values'>): ColumnKind {
-  const type = column.type
+  const type = canonicalType(column.type)
   if (column.enum_values.length) return 'enum'
   if (NUMBER.includes(type)) return 'number'
   if (type === 'boolean') return 'boolean'
@@ -45,11 +67,23 @@ export function columnWidth(
     boolean: 104,
     temporal: 188,
     json: 260,
-    uuid: 300,
+    // Shown shortened (`shortUuid`); the full value is on hover, copy and edit.
+    uuid: 150,
     enum: 140,
     text: 220,
   }
   return Math.ceil(Math.min(Math.max(base[kind], header), 420))
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * `0f8e3c2a-…-9b1d4e7f6a10` → `0f8e3c2a…6a10`: the start and the end tell rows
+ * apart (random and sequential ids alike) in a third of the width. Anything
+ * that is not a canonical UUID comes back unchanged.
+ */
+export function shortUuid(value: string): string {
+  return UUID.test(value) ? `${value.slice(0, 8)}…${value.slice(-4)}` : value
 }
 
 /** Numbers on the right (to compare magnitudes); everything else on the left. */

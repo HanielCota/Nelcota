@@ -33,6 +33,12 @@ describe('dates in the grid', () => {
     )
   })
 
+  it('reads the short type names too (timestamptz, timestamp)', () => {
+    const raw = '2026-10-08T10:30:00Z'
+    expect(formatCell(raw, 'timestamptz', { ...ptBR, timeZone: 'UTC' })).toEqual({ text: '08/10/2026, 10:30:00', raw })
+    expect(formatCell('2026-10-08T10:30:00', 'timestamp', ptBR).text).toBe('08/10/2026, 10:30:00')
+  })
+
   it('unknown value or another type is shown as it came', () => {
     expect(formatCell('infinity', 'timestamp with time zone')).toEqual({ text: 'infinity', raw: null })
     expect(formatCell('infinity', 'date')).toEqual({ text: 'infinity', raw: null })

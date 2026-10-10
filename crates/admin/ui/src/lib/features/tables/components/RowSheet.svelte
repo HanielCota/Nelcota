@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { untrack } from 'svelte'
+  import { tick, untrack } from 'svelte'
   import * as Sheet from '$lib/components/ui/sheet'
   import { Button } from '$lib/components/ui/button'
   import { toast } from 'svelte-sonner'
@@ -40,6 +40,7 @@
     if (open) untrack(() => {
       fields = initialFields(columns, row)
       initial = JSON.stringify(fields)
+      attempted = false
     })
   })
 
@@ -50,6 +51,10 @@
     Object.fromEntries(editable.map((c) => [c.name, fields[c.name] ? fieldProblem(c, fields[c.name], inserting) : null])),
   )
   const valid = $derived(Object.values(problems).every((p) => p === null))
+  // An empty required field is not a mistake until the person tries to save:
+  // flagging it on open painted the form red before anything was typed.
+  let attempted = $state(false)
+  const shown = (column: string) => (problems[column] === 'required' && !attempted ? null : problems[column])
   const payload = $derived(rowPayload(columns, fields, row))
   const changes = $derived(Object.keys(payload).length)
   /** `id = 1` (or the composite key) to tell which row is open. */
@@ -59,6 +64,8 @@
     event?.preventDefault()
     if (saving) return
     if (!valid) {
+      attempted = true
+      await tick()
       document.querySelector<HTMLElement>('#row-form [aria-invalid="true"]')?.focus()
       return
     }
@@ -123,7 +130,7 @@
         {/if}
         {#each editable as column (column.name)}
           {#if fields[column.name]}
-            <RowField {column} bind:field={fields[column.name]} {inserting} problem={problems[column.name]} />
+            <RowField {column} bind:field={fields[column.name]} {inserting} problem={shown(column.name)} />
           {/if}
         {/each}
         </fieldset>

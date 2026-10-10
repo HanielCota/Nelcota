@@ -2,6 +2,7 @@
 // tooltip keep the exact text Postgres returned.
 
 import { intlLocale } from '$lib/i18n/index.svelte'
+import { canonicalType } from './grid'
 
 export interface CellDisplay {
   text: string
@@ -23,6 +24,7 @@ export function formatCell(
   options: { timeZone?: string; locale?: string } = {},
 ): CellDisplay {
   const locale = options.locale ?? intlLocale()
+  type = canonicalType(type)
   if (type === 'timestamp with time zone') {
     const instant = new Date(value)
     if (Number.isNaN(instant.getTime())) return { text: value, raw: null }

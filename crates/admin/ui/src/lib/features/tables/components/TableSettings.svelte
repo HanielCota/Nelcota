@@ -59,6 +59,11 @@
   })
   const pendingGrants = $derived(grantChanges(structure.grants, grants))
 
+  function resetIdentity() {
+    name = structure.name
+    comment = structure.comment ?? ''
+  }
+
   async function apply(actions: AlterAction[], area: 'identity' | 'grants' | 'rls') {
     if (busy || actions.length === 0) return
     busy = area
@@ -66,7 +71,7 @@
   }
 </script>
 
-<fieldset class="grid min-w-0 gap-6" disabled={busy !== null} aria-busy={busy !== null}>
+<fieldset class="grid min-w-0 gap-4"disabled={busy !== null} aria-busy={busy !== null}>
   <section class="rounded-3xl bg-well p-5">
     <h2 class="text-base font-semibold">{t('tables.settings.table')}</h2>
     <form
@@ -86,7 +91,14 @@
         <Label for="settings-comment">{t('tables.settings.description')}</Label>
         <Input id="settings-comment" bind:value={comment} placeholder={t('tables.settings.descriptionPlaceholder')} />
       </div>
-      <Button type="submit" variant="outline" disabled={busy !== null || identityChanges.length === 0}>{#if busy === 'identity'}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{:else}<Save data-icon="inline-start" aria-hidden="true" />{/if}{busy === 'identity' ? t('common.saving') : t('tables.settings.save')}</Button>
+      <!-- Filled only while there is something to save, so the state reads at a glance. -->
+      <Button type="submit" variant={identityChanges.length ? 'default' : 'outline'} disabled={busy !== null || identityChanges.length === 0}>{#if busy === 'identity'}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{:else}<Save data-icon="inline-start" aria-hidden="true" />{/if}{busy === 'identity' ? t('common.saving') : t('tables.settings.save')}</Button>
+      {#if identityChanges.length && busy !== 'identity'}
+        <p class="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground sm:col-span-3" role="status">
+          {t('tables.settings.unsaved')}
+          <button type="button" class="cursor-pointer text-foreground underline underline-offset-4" onclick={resetIdentity}>{t('tables.settings.undo')}</button>
+        </p>
+      {/if}
     </form>
   </section>
 
@@ -113,20 +125,27 @@
   </section>
 
   <section class="grid gap-3 rounded-3xl bg-well p-5">
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <div class="min-w-0 flex-1 basis-60">
-        <h2 class="text-base font-semibold">{t('tables.settings.grants')}</h2>
-        <p class="mt-0.5 text-sm text-muted-foreground">{t('tables.settings.grantsHint')}</p>
-      </div>
-      <Button variant="outline" disabled={busy !== null || pendingGrants.length === 0} onclick={() => apply(pendingGrants, 'grants').catch(() => {})}>
-        {#if busy === 'grants'}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{:else}<Save data-icon="inline-start" aria-hidden="true" />{/if}
-        {t('tables.settings.saveGrants')}
-      </Button>
+    <div class="min-w-0">
+      <h2 class="text-base font-semibold">{t('tables.settings.grants')}</h2>
+      <p class="mt-0.5 text-sm text-muted-foreground">{t('tables.settings.grantsHint')}</p>
     </div>
     <GrantsEditor bind:grants surface="bg-card" />
+    <!-- The save sits under the checkboxes it saves, not above them. -->
+    <div class="flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
+      {#if pendingGrants.length && busy !== 'grants'}
+        <p class="mr-auto flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground" role="status">
+          {t('tables.settings.unsaved')}
+          <button type="button" class="cursor-pointer text-foreground underline underline-offset-4" onclick={() => (grants = fromStructure(structure))}>{t('tables.settings.undo')}</button>
+        </p>
+      {/if}
+      <Button variant={pendingGrants.length ? 'default' : 'outline'} disabled={busy !== null || pendingGrants.length === 0} onclick={() => apply(pendingGrants, 'grants').catch(() => {})}>
+        {#if busy === 'grants'}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{:else}<Save data-icon="inline-start" aria-hidden="true" />{/if}
+        {busy === 'grants' ? t('common.saving') : t('tables.settings.saveGrants')}
+      </Button>
+    </div>
   </section>
 
-  <section class="flex flex-wrap items-center gap-4 rounded-2xl bg-destructive/10 p-5">
+  <section class="flex flex-wrap items-center gap-4 rounded-3xl bg-destructive/10 p-5">
     <div class="min-w-0 flex-1 basis-60">
       <h2 class="text-base font-semibold">{t('tables.settings.dropTitle')}</h2>
       <p class="mt-0.5 text-sm text-muted-foreground">{t('tables.settings.dropHint')}</p>
