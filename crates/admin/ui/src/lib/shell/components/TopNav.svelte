@@ -76,7 +76,7 @@
   <Sheet.Content side="left" class="w-72 gap-0 p-0">
     <Sheet.Title class="sr-only">{t('shell.nav.main')}</Sheet.Title>
     <div class="flex shrink-0 items-center gap-2 p-3 pr-12">
-      <div class="min-w-0 flex-1"><ProjectSwitcher /></div>
+      <div class="min-w-0 flex-1"><ProjectSwitcher expanded /></div>
     </div>
     <nav class="grid content-start gap-1 overflow-y-auto p-3" aria-label={t('shell.nav.main')}>
       {#each navPills as item (item.path)}
