@@ -129,6 +129,10 @@ pub fn router(state: AdminState) -> Router {
             "/admin/api/storage/buckets/{id}/file",
             get(storage::download).delete(storage::delete),
         )
+        .route(
+            "/admin/api/storage/buckets/{id}/files/delete",
+            post(storage::delete_many),
+        )
         .route("/admin/api/profile", get(profile::get))
         .route(
             "/admin/api/profile/avatar",
