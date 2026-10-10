@@ -66,8 +66,14 @@ network failures. `error` is a `NelcotaError`:
 - `code`: the server's code untouched (`user_already_exists`,
   `invalid_grant`, `db_error`, `rate_limited`...), or a client code:
   `network_error`, `timeout`, `aborted`, `invalid_response`, `not_single`,
-  `session_missing`, `pkce_missing`.
+  `session_missing`, `pkce_missing`. A response without a JSON body (a HEAD
+  count, a proxy page) gets `unauthorized`, `forbidden`, `not_found`,
+  `rate_limited`, `unavailable` or `http_<status>`. The `NelcotaErrorCode`
+  type lists the known codes and still accepts any string.
 - `retryAfter`: seconds to wait, after a 429 or 503.
+- `sqlstate`, `details`, `hint`, `constraint`: what Postgres reported for a
+  `db_error` (`23505`, `Key (slug)=(a) already exists.`, `notes_slug_key`),
+  when the server sends them; `undefined` otherwise.
 
 A programming mistake (an invalid column name, a `..` in a file path, a
 `service_role` token in a browser) throws a `NelcotaUsageError` before

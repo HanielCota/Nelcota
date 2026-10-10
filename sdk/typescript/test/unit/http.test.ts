@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createClient, NelcotaUsageError } from '../../src/index.js';
 import { baseUrl, parseRetryAfter } from '../../src/core/http.js';
 import { assertTokenAllowed } from '../../src/core/jwt.js';
-import { json, jwt, mockFetch, session } from './helpers.js';
+import { empty, json, jwt, mockFetch, session } from './helpers.js';
 
 afterEach(() => {
   vi.useRealTimers();
@@ -189,6 +189,32 @@ describe('failures without a response', () => {
   it('keeps non-JSON error pages generic', async () => {
     const mock = mockFetch(new Response('<html>Bad Gateway</html>', { status: 502, statusText: 'Bad Gateway' }));
     expect((await client(mock).from('t').select()).error).toMatchObject({ status: 502, code: 'http_502', message: 'Bad Gateway' });
+  });
+
+  it('keeps a code for bodyless errors such as HEAD counts', async () => {
+    for (const [status, code] of [[401, 'unauthorized'], [403, 'forbidden'], [404, 'not_found']] as const) {
+      const mock = mockFetch(empty(status));
+      const { error } = await client(mock).from('t').select('*', { count: 'exact', head: true });
+      expect(error).toMatchObject({ status, code });
+    }
+  });
+
+  it('exposes the optional Postgres fields of a db_error', async () => {
+    const body = {
+      code: 'db_error',
+      message: 'duplicate key value violates unique constraint "notes_title_key" (23505)',
+      sqlstate: '23505',
+      details: 'Key (title)=(a) already exists.',
+      hint: 'Pick another title.',
+      constraint: 'notes_title_key',
+    };
+    const { error } = await client(mockFetch(json(body, 409))).from('notes').insert({ title: 'a' });
+    expect(error).toMatchObject({ status: 409, code: 'db_error', sqlstate: '23505', details: body.details, hint: body.hint, constraint: 'notes_title_key' });
+    expect(error!.toJSON()).toEqual({ name: 'NelcotaError', status: 409, ...body });
+
+    const old = await client(mockFetch(json({ code: 'db_error', message: 'boom' }, 400))).from('notes').insert({ title: 'a' });
+    expect(old.error).toMatchObject({ sqlstate: undefined, details: undefined, hint: undefined, constraint: undefined });
+    expect(Object.keys(old.error!.toJSON())).toEqual(['name', 'status', 'code', 'message']);
   });
 });
 

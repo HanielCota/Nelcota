@@ -56,7 +56,7 @@ export function createClient<Database = any, SchemaName extends string = Default
 }
 
 export { NelcotaError, NelcotaUsageError } from './core/errors.js';
-export type { ClientErrorCode, Result } from './core/errors.js';
+export type { ClientErrorCode, NelcotaErrorCode, NelcotaErrorJson, Result, ServerErrorCode } from './core/errors.js';
 export { escapeLike } from './core/encoding.js';
 export type { FetchLike, TokenSource } from './core/http.js';
 export type { TransportOptions } from './core/options.js';

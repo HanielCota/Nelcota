@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Expose the optional Postgres fields of server errors (`sqlstate`, `details`,
+  `hint`, `constraint`) on `NelcotaError`, and export `NelcotaErrorCode` and
+  `ServerErrorCode` for autocompletion of known codes.
+- Bodyless error responses (HEAD counts) keep a meaningful code:
+  `unauthorized`, `forbidden`, `not_found`, `rate_limited` or `unavailable`
+  instead of `http_<status>`.
+
 - Cancel auth/request waits independently while accepted refresh rotation
   completes and persists the replacement token.
 - Type HEAD data as null and require row representation for single/maybeSingle;
