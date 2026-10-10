@@ -7,6 +7,7 @@
   import { api, ApiError } from '$lib/api'
   import { Button } from '$lib/components/ui/button'
   import Logo from '$lib/shell/components/Logo.svelte'
+  import LoadError from '$lib/components/shared/LoadError.svelte'
   import LoaderCircle from '@lucide/svelte/icons/loader-circle'
   import { session } from '$lib/features/auth/session.svelte'
   import { route } from '$lib/router.svelte'
@@ -50,6 +51,10 @@
     }
   }
 
+  function retryWhenOffline() {
+    if (offline && !checking) void checkSession()
+  }
+
   // Tab title: the current page (or the login) followed by the product name.
   const title = $derived(
     session.email === null ? `${t('shell.pages.signIn')} · Nelcota` : session.email ? documentTitle(crumbsFor(route.path)) : 'Nelcota',
@@ -59,15 +64,19 @@
 <svelte:head><title>{title}</title></svelte:head>
 
 <ModeWatcher defaultMode="dark" />
+<!-- While the server is unreachable, try again by itself when the network or
+     the window comes back. -->
+<svelte:window ononline={retryWhenOffline} onfocus={retryWhenOffline} />
 {#if session.email === undefined && offline}
-  <main class="flex min-h-dvh items-center justify-center bg-background px-6 py-12">
-    <div class="flex w-full max-w-sm flex-col items-center gap-6 text-center" role="alert">
+  <!-- On a card like the login and the 404. -->
+  <main class="flex min-h-dvh items-center justify-center bg-background px-4 py-12">
+    <div class="flex w-full max-w-md flex-col items-center gap-6 rounded-3xl bg-card px-8 pt-8 pb-10 text-center" role="alert">
       <Logo size="lg" />
       <div class="grid gap-2">
-        <h1 class="text-base font-semibold">{t('shell.app.offlineTitle')}</h1>
+        <h1 class="text-xl font-semibold tracking-tight">{t('shell.app.offlineTitle')}</h1>
         <p class="text-sm text-muted-foreground">{errorMessage(offline)}</p>
       </div>
-      <Button variant="outline" disabled={checking} onclick={checkSession}>
+      <Button disabled={checking} onclick={checkSession}>
         {#if checking}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{/if}{t('common.retry')}
       </Button>
     </div>
@@ -82,9 +91,8 @@
   {:then shell}
     <shell.default />
   {:catch error}
-    <div class="p-6" role="alert">
-      <p>{errorMessage(error)}</p>
-      <button class="mt-3 underline" onclick={() => window.location.reload()}>{t('common.retry')}</button>
-    </div>
+    <main class="mx-auto flex min-h-dvh w-full max-w-xl items-center bg-background px-4 py-12">
+      <div class="w-full"><LoadError message={errorMessage(error)} onretry={() => window.location.reload()} /></div>
+    </main>
   {/await}
 {/if}

@@ -1,1 +1,0 @@
-import{Nt as e,b as t,y as n}from"./router.svelte-BArCQBPY.js";var r=`nelcota.technical`,i=e({on:n(r,`off`)===`on`});function a(){i.on=!i.on,t(r,i.on?`on`:`off`)}export{a as n,i as t};

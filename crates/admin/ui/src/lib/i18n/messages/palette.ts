@@ -6,7 +6,9 @@ const ptBR = {
   title: 'Paleta de comandos',
   description: 'Busque páginas, tabelas, consultas e ações',
   placeholder: 'Buscar páginas, tabelas, consultas…',
-  empty: 'Nada encontrado.',
+  empty: 'Nada encontrado. Tente outro nome de página, tabela ou consulta.',
+  view: 'view',
+  hints: { move: 'navegar', open: 'abrir', close: 'fechar' },
   groups: {
     pages: 'Páginas',
     tables: 'Tabelas',
@@ -34,7 +36,9 @@ const en: Messages<typeof ptBR> = {
   title: 'Command palette',
   description: 'Search pages, tables, queries and actions',
   placeholder: 'Search pages, tables, queries…',
-  empty: 'Nothing found.',
+  empty: 'Nothing found. Try another page, table or query name.',
+  view: 'view',
+  hints: { move: 'move', open: 'open', close: 'close' },
   groups: {
     pages: 'Pages',
     tables: 'Tables',
