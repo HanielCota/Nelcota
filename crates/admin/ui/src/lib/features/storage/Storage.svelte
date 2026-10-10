@@ -15,6 +15,8 @@
   import { toast } from 'svelte-sonner'
   import PageHeader from '$lib/components/shared/PageHeader.svelte'
   import EmptyState from '$lib/components/shared/EmptyState.svelte'
+  import SearchField from '$lib/components/shared/SearchField.svelte'
+  import Search from '@lucide/svelte/icons/search'
   import LoadError from '$lib/components/shared/LoadError.svelte'
   import ConfirmDialog from '$lib/components/shared/ConfirmDialog.svelte'
   import BucketDialog from '$lib/features/storage/components/BucketDialog.svelte'
@@ -33,6 +35,8 @@
   let dialogOpen = $state(false)
   let removing = $state<Bucket | null>(null)
   let confirmOpen = $state(false)
+  let search = $state('')
+  const visible = $derived(data?.enabled ? data.buckets.filter(bucket => bucket.id.toLowerCase().includes(search.trim().toLowerCase())) : [])
 
   async function load() {
     await resource.load(signal => api.get<StorageOverview>('/storage', { signal }))
@@ -94,7 +98,7 @@
   >
     {#snippet actions()}
       {#if data?.enabled}
-        <Button onclick={() => edit(null)}><Plus />{t('storage.newBucket')}</Button>
+        <Button onclick={() => edit(null)}><Plus data-icon="inline-start" aria-hidden="true" />{t('storage.newBucket')}</Button>
       {/if}
     {/snippet}
   </PageHeader>
@@ -112,8 +116,17 @@
         {/snippet}
       </EmptyState>
     {:else}
+      <div class="mb-4 grid gap-3 sm:flex sm:items-center sm:justify-between">
+        <p class="text-sm text-muted-foreground">{t('storage.bucketHint')}</p>
+        <div class="w-full shrink-0 sm:w-72"><SearchField bind:value={search} label={t('storage.search')} /></div>
+      </div>
+      {#if !visible.length}
+        <EmptyState icon={Search} class="rounded-3xl bg-card" title={t('common.noMatches')}>
+          {#snippet actions()}<Button variant="outline" onclick={() => (search = '')}>{t('common.clearSearch')}</Button>{/snippet}
+        </EmptyState>
+      {:else}
       <div class="grid gap-3 md:hidden">
-        {#each data.buckets as bucket (bucket.id)}
+        {#each visible as bucket (bucket.id)}
           <article class="min-w-0 rounded-3xl bg-card p-4">
             <div class="flex min-w-0 items-start justify-between gap-2">
               <div class="min-w-0"><a class="flex items-center gap-2 font-mono font-medium hover:underline" href={href(`/storage/${enc(bucket.id)}`)}><HardDrive class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" /><span class="truncate">{bucket.id}</span></a><div class="mt-2">{@render accessBadge(bucket)}</div></div>
@@ -142,7 +155,7 @@
             </Table.Row>
           </Table.Header>
           <Table.Body>
-            {#each data.buckets as bucket (bucket.id)}
+            {#each visible as bucket (bucket.id)}
               <Table.Row>
                 <Table.Cell>
                   <a class="inline-flex items-center gap-2 font-mono font-medium hover:underline" href={href(`/storage/${enc(bucket.id)}`)}><HardDrive class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />{bucket.id}</a>
@@ -172,6 +185,7 @@
           </Table.Body>
         </Table.Root>
       </div>
+      {/if}
     {/if}
     <p class="mt-4 text-sm text-muted-foreground">{t('storage.policiesNote')}</p>
     {#if data.backend === 'disk'}

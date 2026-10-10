@@ -20,6 +20,12 @@ type ApiResult = Result<Json<crate::contracts::DdlResult>, ApiError>;
 #[derive(Deserialize)]
 pub struct PolicyRequest {
     policy: PolicyDef,
+    /// Guided creation also enables RLS and adds the necessary API grants.
+    #[serde(default)]
+    prepare_access: bool,
+    /// An optional owner field for tables that do not have one yet.
+    #[serde(default)]
+    owner_column: Option<String>,
     #[serde(default)]
     preview: bool,
 }
@@ -32,7 +38,14 @@ pub async fn create(
 ) -> ApiResult {
     let table = table_or_404(&state, &name)?;
     let schema = state.catalog.get().schema.clone();
-    let statements = policy::create(&schema, &table.name, &body.policy)?;
+    let mut statements = Vec::new();
+    if let Some(column) = &body.owner_column {
+        statements.extend(policy::add_owner_column(&schema, &table.name, column)?);
+    }
+    statements.extend(policy::create(&schema, &table.name, &body.policy)?);
+    if body.prepare_access {
+        statements.extend(policy::prepare_access(&schema, &table.name, &body.policy));
+    }
     apply(
         &state,
         statements,
@@ -51,7 +64,10 @@ pub async fn replace(
 ) -> ApiResult {
     let table = table_or_404(&state, &name)?;
     let schema = state.catalog.get().schema.clone();
-    let statements = policy::replace(&schema, &table.name, &original, &body.policy)?;
+    let mut statements = policy::replace(&schema, &table.name, &original, &body.policy)?;
+    if body.prepare_access {
+        statements.extend(policy::prepare_access(&schema, &table.name, &body.policy));
+    }
     apply(
         &state,
         statements,

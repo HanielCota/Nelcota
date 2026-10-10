@@ -3,7 +3,7 @@
   import * as Table from '$lib/components/ui/table'
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu'
   import { Button } from '$lib/components/ui/button'
-  import { Input } from '$lib/components/ui/input'
+  import SearchField from '$lib/components/shared/SearchField.svelte'
   import { Skeleton } from '$lib/components/ui/skeleton'
   import Ellipsis from '@lucide/svelte/icons/ellipsis'
   import Search from '@lucide/svelte/icons/search'
@@ -52,6 +52,15 @@
   let createOpen = $state(false)
   let passwordUser = $state<User | null>(null)
   let passwordOpen = $state(false)
+
+  $effect(() => {
+    if (route.query.get('create') === 'true') {
+      createOpen = true
+      const params = new URLSearchParams(route.query)
+      params.delete('create')
+      navigate(`/users${params.size ? `?${params}` : ''}`, true)
+    }
+  })
 
   async function load() {
     const params = new URLSearchParams({ page: String(page) })
@@ -152,21 +161,11 @@
 <div class="mx-auto w-full max-w-page px-4 pt-2 pb-12 sm:px-6 lg:px-8">
   <PageHeader
     title={t('users.title')}
-    description={users ? t('users.count', { count: total }) : undefined}
+    description={users ? t('users.count', { count: total }) : t('users.description')}
   >
     {#snippet actions()}
-      <div class="relative w-full sm:w-72">
-        <Search class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          type="search"
-          bind:value={query}
-          oninput={onSearch}
-          placeholder={t('users.searchPlaceholder')}
-          aria-label={t('users.searchLabel')}
-          class="pl-9"
-        />
-      </div>
-      <Button onclick={() => (createOpen = true)}><UserPlus />{t('users.new')}</Button>
+      <div class="w-full sm:w-72"><SearchField bind:value={query} oninput={onSearch} placeholder={t('users.searchPlaceholder')} label={t('users.searchLabel')} /></div>
+      <Button onclick={() => (createOpen = true)}><UserPlus data-icon="inline-start" aria-hidden="true" />{t('users.new')}</Button>
     {/snippet}
   </PageHeader>
   <div class="-mt-2 mb-6"><PillTabs label={t('shell.pages.users')} current={'/users'} tabs={[{ path: '/users', label: t('shell.pages.users') }, { path: '/sign-in', label: t('shell.pages.userSignIn') }]} /></div>
@@ -206,7 +205,7 @@
           </div>
           <dl class="mt-4 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2 text-xs">
             <dt class="text-muted-foreground">{t('users.columns.signIn')}</dt><dd class="text-right">{@render methods(user)}</dd>
-            <dt class="text-muted-foreground">{t('users.columns.lastSignIn')}</dt><dd class="text-right">{when(user.last_sign_in_at)}</dd>
+            <dt class="text-muted-foreground">{t('users.columns.lastSignIn')}</dt><dd class="text-right">{user.last_sign_in_at ? when(user.last_sign_in_at) : t('users.neverSignedIn')}</dd>
             <dt class="text-muted-foreground">{t('users.columns.created')}</dt><dd class="text-right">{when(user.created_at)}</dd>
             <dt class="text-muted-foreground">{t('users.columns.sessions')}</dt><dd class="text-right"><Badge variant="secondary">{user.sessions}</Badge></dd>
           </dl>
@@ -242,7 +241,7 @@
               </Table.Cell>
               <Table.Cell>{@render methods(user)}</Table.Cell>
               <Table.Cell class="text-muted-foreground">{when(user.created_at)}</Table.Cell>
-              <Table.Cell class="text-muted-foreground">{when(user.last_sign_in_at)}</Table.Cell>
+              <Table.Cell class="text-muted-foreground">{user.last_sign_in_at ? when(user.last_sign_in_at) : t('users.neverSignedIn')}</Table.Cell>
               <Table.Cell class="text-right font-mono text-xs tabular-nums">{user.sessions}</Table.Cell>
               <Table.Cell class="text-right">
                 {@render userActions(user)}

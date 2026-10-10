@@ -18,6 +18,7 @@
   import { copyText } from '$lib/clipboard'
   import { RemoteResource } from '$lib/remote-resource.svelte'
   import { api } from '$lib/api'
+  import { href } from '$lib/router.svelte'
   import { openProject } from '$lib/features/projects/projects'
   import type { ProjectStatus, ProjectsData } from '$lib/types'
   import { errorMessage, t } from '$lib/i18n/index.svelte'
@@ -95,9 +96,11 @@
             {#if project.version}<span class="ml-auto font-mono text-xs text-muted-foreground">v{project.version.replace(/^v/, '')}</span>{/if}
           </div>
 
-          {#if !project.current && project.url}
+          {#if project.current}
+            <Button variant="outline" class="mt-auto w-full" href={href('/')}>{t('projects.back')}</Button>
+          {:else if project.url}
             <Button variant="outline" class="mt-auto w-full" onclick={() => open(project)}>
-              {t('projects.open')}<ArrowUpRight />
+              {t('projects.open')}<ArrowUpRight data-icon="inline-end" aria-hidden="true" />
             </Button>
           {/if}
         </article>

@@ -10,6 +10,54 @@ use serde_json::{Value, json};
 
 use super::{Result, expression, invalid, qualified, validate_name};
 
+/// Existing records keep a NULL owner: assigning them to the administrator
+/// would be incorrect. New API records receive the signed-in user's ID.
+pub fn add_owner_column(schema: &str, table: &str, column: &str) -> Result<Vec<String>> {
+    validate_name("column", column)?;
+    Ok(vec![format!(
+        "ALTER TABLE {} ADD COLUMN {} uuid DEFAULT auth.uid()",
+        qualified(schema, table),
+        ident(column)
+    )])
+}
+
+/// Additive grants: existing permissions are retained. All statements run in
+/// the same transaction as the policy, so a failed rule cannot leave access open.
+pub fn prepare_access(schema: &str, table: &str, def: &PolicyDef) -> Vec<String> {
+    use super::{ApiRole, GrantDef, Privilege, grant};
+    let table = qualified(schema, table);
+    let mut statements = vec![format!("ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")];
+    let privileges = match def.command {
+        Command::Select => vec![Privilege::Select],
+        Command::Insert => vec![Privilege::Insert],
+        Command::Update => vec![Privilege::Select, Privilege::Update],
+        Command::Delete => vec![Privilege::Select, Privilege::Delete],
+        Command::All => vec![
+            Privilege::Select,
+            Privilege::Insert,
+            Privilege::Update,
+            Privilege::Delete,
+        ],
+    };
+    let public = def.roles.is_empty() || def.roles.contains(&PolicyRole::Public);
+    for (policy_role, api_role) in [
+        (PolicyRole::Anon, ApiRole::Anon),
+        (PolicyRole::Authenticated, ApiRole::Authenticated),
+        (PolicyRole::ServiceRole, ApiRole::ServiceRole),
+    ] {
+        if public || def.roles.contains(&policy_role) {
+            statements.extend(grant(
+                &table,
+                &GrantDef {
+                    role: api_role,
+                    privileges: privileges.clone(),
+                },
+            ));
+        }
+    }
+    statements
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, ts_rs::TS, schemars::JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum Command {
@@ -255,5 +303,32 @@ mod tests {
         let sql = replace("public", "t", "old", &policy).unwrap();
         assert_eq!(sql[0], "DROP POLICY \"old\" ON \"public\".\"t\"");
         assert!(sql[1].starts_with("CREATE POLICY \"new name\" ON \"public\".\"t\""));
+    }
+
+    #[test]
+    fn guided_access_enables_protection_and_only_adds_needed_grants() {
+        let mut policy = def(Command::Select, Some("true"), None);
+        policy.roles = vec![
+            PolicyRole::Anon,
+            PolicyRole::Authenticated,
+            PolicyRole::Anon,
+        ];
+        let sql = prepare_access("public", "notes", &policy);
+        assert_eq!(sql.len(), 3);
+        assert_eq!(
+            sql[0],
+            "ALTER TABLE \"public\".\"notes\" ENABLE ROW LEVEL SECURITY"
+        );
+        assert!(sql[1].contains("GRANT SELECT ON TABLE"));
+        assert!(sql[2].contains("TO \"authenticated\""));
+        assert!(
+            !sql.iter()
+                .any(|statement| statement.contains("REVOKE") || statement.contains("INSERT"))
+        );
+        policy.command = Command::All;
+        policy.roles = vec![PolicyRole::Authenticated];
+        let sql = prepare_access("public", "notes", &policy);
+        assert_eq!(sql.len(), 2);
+        assert!(sql[1].contains("GRANT SELECT, INSERT, UPDATE, DELETE"));
     }
 }

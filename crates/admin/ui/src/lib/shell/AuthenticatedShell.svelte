@@ -49,10 +49,12 @@
     class="sr-only z-50 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-raised focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
     >{t('shell.app.skipToContent')}</a
   >
-  <div class="flex h-screen flex-col overflow-hidden bg-background">
+  <div class="flex h-dvh flex-col overflow-hidden bg-background">
     <TopNav />
     <div class="flex min-h-0 min-w-0 flex-1 flex-col">
-      <main bind:this={content} id="conteudo" tabindex="-1" aria-label={pageLabel} class="min-h-0 min-w-0 flex-1 overflow-auto focus-visible:outline-offset-[-2px]">
+      <!-- Route and skip-link focus identify the page without framing the viewport. -->
+      <!-- Keep absolute accessibility labels inside this scroll container. -->
+      <main bind:this={content} id="conteudo" tabindex="-1" aria-label={pageLabel} class="relative min-h-0 min-w-0 flex-1 overflow-auto outline-none">
         {#key pageKey}
           {#if path === '/'}
             {#await import('$lib/features/overview/Overview.svelte')}

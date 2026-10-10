@@ -9,9 +9,7 @@
   import { isActive, navPills } from '$lib/shell/nav'
   import { t } from '$lib/i18n/index.svelte'
 
-  // The panel's frame (D98), after the user's reference dashboard: three
-  // columns, the pages as pills in the middle. Below lg the pills take a row
-  // of their own; on phones they live in a sheet.
+  // Main navigation stays centred; on phones it moves into a sheet.
   let mobileOpen = $state(false)
   const isMac = /Mac|iPhone|iPad/.test(navigator.platform)
 
@@ -52,9 +50,9 @@
         onclick={() => (mobileOpen = true)}
         aria-label={t('shell.nav.menu')}
       >
-        <Menu class="size-5" />
+        <Menu class="size-5" aria-hidden="true" />
       </button>
-      <div class="min-w-0 max-w-64 lg:w-[7.5rem] xl:w-[19rem] lg:max-w-none"><ProjectSwitcher /></div>
+      <div class="min-w-0 max-w-64 lg:w-14 xl:w-auto"><ProjectSwitcher /></div>
     </div>
 
     <nav aria-label={t('shell.nav.main')} class="hidden items-center gap-1 rounded-full bg-nav p-1.5 lg:flex">
@@ -67,7 +65,7 @@
     </div>
   </div>
 
-  <!-- Below lg: the pills get a row of their own. -->
+  <!-- Below lg: navigation gets a row of its own. -->
   <nav aria-label={t('shell.nav.main')} class="mt-3 hidden overflow-x-auto md:block lg:hidden">
     <div class="mx-auto flex w-max items-center gap-1 rounded-full bg-nav p-1.5">{@render pills()}</div>
   </nav>
@@ -84,7 +82,7 @@
       {#each navPills as item (item.path)}
         {@const active = isActive(item.path, item.also)}
         <a href={href(item.path)} onclick={() => (mobileOpen = false)} aria-current={active ? 'page' : undefined} class={[...pill(active), 'gap-3']}>
-          <item.icon class="size-[18px]" strokeWidth={1.6} />{t(item.title)}
+          <item.icon class="size-[18px]" strokeWidth={1.6} aria-hidden="true" />{t(item.title)}
         </a>
       {/each}
     </nav>

@@ -2,7 +2,8 @@
   import { onMount } from 'svelte'
   import { Button } from '$lib/components/ui/button'
   import { Input } from '$lib/components/ui/input'
-  import { Label } from '$lib/components/ui/label'
+  import * as Field from '$lib/components/ui/field'
+  import * as InputGroup from '$lib/components/ui/input-group'
   import Eye from '@lucide/svelte/icons/eye'
   import EyeOff from '@lucide/svelte/icons/eye-off'
   import LoaderCircle from '@lucide/svelte/icons/loader-circle'
@@ -38,6 +39,11 @@
   let loading = $state(false)
   let typingPassword = $state(false)
   let showPassword = $state(false)
+  let capsLock = $state(false)
+
+  function checkCapsLock(event: KeyboardEvent) {
+    capsLock = event.getModifierState('CapsLock')
+  }
 
   async function submit(event: SubmitEvent) {
     event.preventDefault()
@@ -69,7 +75,7 @@
   }
 </script>
 
-<main class="relative flex min-h-screen flex-col items-center bg-background px-4 pt-[max(10rem,27vh)] pb-12">
+<main class="relative flex min-h-dvh flex-col items-center bg-background px-4 pt-[max(10rem,27vh)] pb-12">
   <!-- Language and theme, in the corner (the account menu is not there yet). -->
   <div class="absolute top-4 right-4 flex items-center gap-2 sm:top-6 sm:right-6">
     <div class="flex items-center gap-1 rounded-full bg-card p-1" role="group" aria-label={t('shell.account.language')}>
@@ -103,63 +109,83 @@
   <div class="relative w-full max-w-[400px]">
     <Mascot {pose} lookAt={caret} class="pointer-events-none absolute -top-[8.6rem] left-1/2 size-36 -translate-x-1/2" />
 
-    <form class="grid gap-5 rounded-3xl bg-card px-6 pt-10 pb-6 sm:px-8 sm:pb-8" onsubmit={submit}>
+    <form class="flex flex-col gap-5 rounded-3xl bg-card px-6 pt-10 pb-6 sm:px-8 sm:pb-8" onsubmit={submit} aria-busy={loading}>
       <div class="text-center">
         <h1 class="text-xl font-semibold tracking-tight">{t('login.title')}</h1>
-        <p class="mt-1 text-sm text-muted-foreground">
-          {#if project}{t('login.projectPanel')} <span class="font-medium text-foreground">{project}</span>{:else}{t('login.adminPanel')}{/if}
+        <p class="mt-1 text-sm text-muted-foreground [overflow-wrap:anywhere]">
+          {#if project}{t('login.projectPanel')} <span class="font-medium text-foreground" translate="no">{project}</span>{:else}{t('login.adminPanel')}{/if}
         </p>
       </div>
 
-      <div class="grid gap-2">
-        <Label for="email">{t('login.email')}</Label>
-        <Input
-          id="email"
-          name="email"
-          type="email"
-          autocomplete="username"
-          spellcheck={false}
-          class="h-10"
-          bind:value={email}
-          onfocus={followCaret}
-          onkeyup={followCaret}
-          onclick={followCaret}
-          onblur={() => (caret = null)}
-          oninput={(e) => {
-            failure = null
-            followCaret(e)
-          }}
-          required
-        />
-      </div>
-      <div class="grid gap-2">
-        <Label for="password">{t('login.password')}</Label>
-        <div class="relative">
-        <Input
-          id="password"
-          name="password"
-          type={showPassword ? 'text' : 'password'}
-          autocomplete="current-password"
-          class="h-10 pr-11"
-          bind:value={password}
-          onfocus={() => (typingPassword = true)}
-          onblur={() => (typingPassword = false)}
-          oninput={() => (failure = null)}
-          required
-          aria-invalid={failure ? true : undefined}
-          aria-describedby={failure ? 'login-error' : undefined}
-        />
-        <Button type="button" variant="ghost" size="icon-sm" class="absolute top-1 right-1 z-10" aria-label={t(showPassword ? 'common.hidePassword' : 'common.showPassword')} aria-pressed={showPassword} onclick={() => { showPassword = !showPassword; document.getElementById('password')?.focus() }}>{#if showPassword}<EyeOff aria-hidden="true" />{:else}<Eye aria-hidden="true" />{/if}</Button>
-        </div>
-      </div>
-
-      {#if failure}
-        <p id="login-error" class="text-sm text-destructive" role="alert">{errorMessage(failure)}</p>
-      {/if}
+      <Field.Group class="gap-5">
+        <Field.Field>
+          <Field.Label for="email">{t('login.email')}</Field.Label>
+          <Input
+            id="email"
+            name="email"
+            type="email"
+            autocomplete="username"
+            spellcheck={false}
+            placeholder={t('login.emailPlaceholder')}
+            class="h-10"
+            readonly={loading}
+            bind:value={email}
+            onfocus={followCaret}
+            onkeyup={followCaret}
+            onclick={followCaret}
+            onblur={() => (caret = null)}
+            oninput={(e) => {
+              failure = null
+              followCaret(e)
+            }}
+            required
+          />
+        </Field.Field>
+        <Field.Field data-invalid={failure ? true : undefined}>
+          <Field.Label for="password">{t('login.password')}</Field.Label>
+          <InputGroup.Root class="h-10">
+            <InputGroup.Input
+              id="password"
+              name="password"
+              type={showPassword ? 'text' : 'password'}
+              autocomplete="current-password"
+              class="h-full"
+              readonly={loading}
+              bind:value={password}
+              onfocus={() => (typingPassword = true)}
+              onblur={() => { typingPassword = false; capsLock = false }}
+              onkeydown={checkCapsLock}
+              onkeyup={checkCapsLock}
+              oninput={() => (failure = null)}
+              required
+              aria-invalid={failure ? true : undefined}
+              aria-describedby={failure ? 'login-error' : capsLock ? 'login-caps-lock' : undefined}
+            />
+            <InputGroup.Addon align="inline-end" class="py-0">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                disabled={loading}
+                aria-label={t(showPassword ? 'common.hidePassword' : 'common.showPassword')}
+                aria-pressed={showPassword}
+                onclick={() => { showPassword = !showPassword; document.getElementById('password')?.focus() }}
+              >
+                {#if showPassword}<EyeOff aria-hidden="true" />{:else}<Eye aria-hidden="true" />{/if}
+              </Button>
+            </InputGroup.Addon>
+          </InputGroup.Root>
+          <div class="min-h-10 text-sm leading-5">
+            <p id="login-error" class="break-words text-destructive" role="alert">{failure ? errorMessage(failure) : ''}</p>
+            <p id="login-caps-lock" class="text-warning" role="status" aria-live="polite">{!failure && capsLock ? t('login.capsLock') : ''}</p>
+          </div>
+        </Field.Field>
+      </Field.Group>
 
       <Button type="submit" class="mt-1 h-10 w-full" disabled={loading}>{#if loading}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{/if}{loading ? t('login.signingIn') : t('login.signIn')}</Button>
     </form>
 
+    <p class="sr-only" role="status" aria-live="polite" aria-atomic="true">{loading ? t('login.signingIn') : ''}</p>
     <p class="mt-6 text-center text-sm text-muted-foreground">{t('login.restricted')}</p>
   </div>
 </main>

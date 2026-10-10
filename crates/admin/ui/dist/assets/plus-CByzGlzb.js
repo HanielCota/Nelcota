@@ -1,1 +1,0 @@
-import{D as e,O as t,y as n}from"./api-D7w_tm9R.js";var r=new Set([`$$slots`,`$$events`,`$$legacy`]);function i(i,a){let o=e(a,r),s={name:`plus`,size:24,node:[[`path`,{d:`M5 12h14`}],[`path`,{d:`M12 5v14`}]]};n(i,t(()=>o,{get icon(){return s}}))}export{i as t};

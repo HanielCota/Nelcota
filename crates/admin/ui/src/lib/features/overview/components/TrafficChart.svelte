@@ -86,7 +86,7 @@
       aria-valuemax={Math.max(0, points.length - 1)}
       aria-valuenow={active ?? points.length - 1}
       aria-valuetext={valueText}
-      class="block touch-none rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
+      class="block max-w-full touch-none rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
       onpointermove={move}
       onpointerleave={() => (active = null)}
       onkeydown={key}

@@ -78,7 +78,7 @@
                 {#snippet child({ props })}
                   <button
                     {...props}
-                    class="grid size-7 shrink-0 cursor-pointer place-items-center rounded-md opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 hover:bg-accent aria-expanded:opacity-100"
+                    class="grid size-7 shrink-0 cursor-pointer place-items-center rounded-md opacity-100 hover:bg-accent"
                     aria-label={t('sql.sidebar.actionsFor', { name: query.name })}
                   >
                     <Ellipsis class="size-4" />
@@ -86,9 +86,9 @@
                 {/snippet}
               </DropdownMenu.Trigger>
               <DropdownMenu.Content align="start" class="w-44">
-                <DropdownMenu.Item onclick={() => onrename(query)}><Pencil aria-hidden="true" />{t('sql.sidebar.rename')}</DropdownMenu.Item>
+                <DropdownMenu.Group><DropdownMenu.Item onclick={() => onrename(query)}><Pencil aria-hidden="true" />{t('sql.sidebar.rename')}</DropdownMenu.Item></DropdownMenu.Group>
                 <DropdownMenu.Separator />
-                <DropdownMenu.Item variant="destructive" onclick={() => ondelete(query)}><Trash2 aria-hidden="true" />{t('common.delete')}</DropdownMenu.Item>
+                <DropdownMenu.Group><DropdownMenu.Item variant="destructive" onclick={() => ondelete(query)}><Trash2 aria-hidden="true" />{t('common.delete')}</DropdownMenu.Item></DropdownMenu.Group>
               </DropdownMenu.Content>
             </DropdownMenu.Root>
           </div>
@@ -109,7 +109,7 @@
               title={draft.sql.trim().split('\n')[0]}
               ><FilePen class="size-4 shrink-0" aria-hidden="true" /><span class="truncate">{draftName(draft.sql)}</span></button
             >
-            <Button variant="ghost" size="icon-xs" class="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100" aria-label={t('common.discard')} title={t('common.discard')} onclick={() => ondeleteDraft(draft)}><Trash2 aria-hidden="true" /></Button>
+            <Button variant="ghost" size="icon-xs" aria-label={t('common.discard')} title={t('common.discard')} onclick={() => ondeleteDraft(draft)}><Trash2 aria-hidden="true" /></Button>
           </div>
         {/each}
       </div>
