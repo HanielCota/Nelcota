@@ -46,7 +46,7 @@ impl RunAs {
                     "sub": id,
                     "email": email,
                 }))
-                .map_err(|err| ApiError::from(err.to_string().as_str()))?;
+                .map_err(|err| ApiError::from(err.to_string()))?;
                 Ok(Some(claims))
             }
         }
