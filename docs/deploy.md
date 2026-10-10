@@ -231,7 +231,8 @@ project fails (it was rolled back) and lists the failures at the end.
 Without `--version`, the target is the CLI's own version. The CLI compares it
 with the project's `NELCOTA_VERSION` first:
 
-- same version: nothing to do;
+- same version: nothing to do (`--reinstall` redeploys it anyway, e.g. a rebuilt
+  binary on a systemd host);
 - older target: refused, because the older app does not know the newer
   migrations. When the CLI itself is the older one, reinstall it
   (`curl -fsSL https://nelcota.com/install | sh`); to go back on purpose, pass
