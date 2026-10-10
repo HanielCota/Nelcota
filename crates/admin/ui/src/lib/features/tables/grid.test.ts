@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { alignRight, canonicalType, columnKind, columnWidth, editedValue, monospace, nextCell, pageInfo } from './grid'
+import { alignRight, canonicalType, columnKind, shortUuid, columnWidth, editedValue, monospace, nextCell, pageInfo } from './grid'
 
 const col = (
   name: string,
@@ -32,6 +32,12 @@ describe('column kind', () => {
     expect(columnKind(col('a', 'bool'))).toBe('boolean')
     expect(canonicalType('timestamp')).toBe('timestamp without time zone')
     expect(canonicalType('citext')).toBe('citext')
+  })
+
+  it('shortens canonical UUIDs only', () => {
+    expect(shortUuid('0f8e3c2a-1b2c-4d5e-8f90-9b1d4e7f6a10')).toBe('0f8e3c2a…6a10')
+    expect(shortUuid('not-a-uuid')).toBe('not-a-uuid')
+    expect(columnWidth(col('id', 'uuid', { is_pk: true }))).toBeLessThan(200)
   })
 
   it('enum wins over the type', () => {

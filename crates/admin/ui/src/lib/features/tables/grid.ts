@@ -67,11 +67,23 @@ export function columnWidth(
     boolean: 104,
     temporal: 188,
     json: 260,
-    uuid: 300,
+    // Shown shortened (`shortUuid`); the full value is on hover, copy and edit.
+    uuid: 150,
     enum: 140,
     text: 220,
   }
   return Math.ceil(Math.min(Math.max(base[kind], header), 420))
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * `0f8e3c2a-…-9b1d4e7f6a10` → `0f8e3c2a…6a10`: the start and the end tell rows
+ * apart (random and sequential ids alike) in a third of the width. Anything
+ * that is not a canonical UUID comes back unchanged.
+ */
+export function shortUuid(value: string): string {
+  return UUID.test(value) ? `${value.slice(0, 8)}…${value.slice(-4)}` : value
 }
 
 /** Numbers on the right (to compare magnitudes); everything else on the left. */
