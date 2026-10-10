@@ -3,6 +3,7 @@
 use std::{
     fs,
     net::{IpAddr, TcpListener, ToSocketAddrs},
+    path::Path,
     process::Command,
 };
 
@@ -95,8 +96,29 @@ pub fn total_ram_mb() -> Option<u64> {
     Some(kb / 1024)
 }
 
-/// Does the domain point at this machine's public IP?
-pub fn dns(domain: &str) {
+/// Free space (MB) on the filesystem holding `path`, from `df` (Unix).
+pub fn free_disk_mb(path: &Path) -> Option<u64> {
+    let output = Command::new("df").arg("-Pk").arg(path).output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    parse_df_available_kb(&String::from_utf8_lossy(&output.stdout)).map(|kb| kb / 1024)
+}
+
+/// The "Available" column of POSIX `df -Pk` output, in KB.
+fn parse_df_available_kb(output: &str) -> Option<u64> {
+    output
+        .lines()
+        .nth(1)?
+        .split_whitespace()
+        .nth(3)?
+        .parse()
+        .ok()
+}
+
+/// Does the domain point at this machine's public IP? False when it does
+/// not resolve or points elsewhere.
+pub fn dns(domain: &str) -> bool {
     let resolved: Vec<IpAddr> = (domain, 443)
         .to_socket_addrs()
         .map(|addrs| addrs.map(|a| a.ip()).collect())
@@ -106,7 +128,7 @@ pub fn dns(domain: &str) {
             "{domain} does not resolve in DNS yet: create an A record pointing at this machine \
              (HTTPS only works after that)"
         ));
-        return;
+        return false;
     }
     let public = Command::new("curl")
         .args(["-fsS", "--max-time", "4", "https://api.ipify.org"])
@@ -120,13 +142,22 @@ pub fn dns(domain: &str) {
                 .ok()
         });
     match public {
-        Some(ip) if resolved.contains(&ip) => ok(&format!("DNS: {domain} → {ip} (this machine)")),
-        Some(ip) => warn(&format!(
-            "DNS: {domain} → {resolved:?}, but this machine's public IP is {ip}"
-        )),
-        None => ok(&format!(
-            "DNS: {domain} → {resolved:?} (public IP not verified)"
-        )),
+        Some(ip) if resolved.contains(&ip) => {
+            ok(&format!("DNS: {domain} → {ip} (this machine)"));
+            true
+        }
+        Some(ip) => {
+            warn(&format!(
+                "DNS: {domain} → {resolved:?}, but this machine's public IP is {ip}"
+            ));
+            false
+        }
+        None => {
+            ok(&format!(
+                "DNS: {domain} → {resolved:?} (public IP not verified)"
+            ));
+            true
+        }
     }
 }
 
@@ -140,6 +171,14 @@ mod tests {
                       unix:///var/run/docker.sock";
         assert!(docker_failure(denied).contains("usermod -aG docker $USER"));
         assert!(docker_failure("Cannot connect to the Docker daemon").contains("systemctl"));
+    }
+
+    #[test]
+    fn reads_available_space_from_df() {
+        let df = "Filesystem     1024-blocks     Used Available Capacity Mounted on\n\
+                  /dev/vda1         40470732 12345678  26062440      33% /\n";
+        assert_eq!(parse_df_available_kb(df), Some(26_062_440));
+        assert_eq!(parse_df_available_kb("Filesystem\n"), None);
     }
 
     #[test]

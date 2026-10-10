@@ -104,7 +104,7 @@ pub fn ensure_network() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn running(host: &Host) -> bool {
+pub(crate) fn running(host: &Host) -> bool {
     compose_command(&host.caddy_dir())
         .args(["ps", "-q", "caddy"])
         .output()

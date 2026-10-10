@@ -12,6 +12,7 @@ mod caddy;
 mod checks;
 mod db;
 mod dev;
+mod doctor;
 mod envfile;
 mod host;
 mod init;
@@ -86,6 +87,8 @@ pub enum Command {
     },
     /// State of the projects (all of them, or only the one from -p).
     Status,
+    /// Checks the host: Docker, ports, disk, DNS, backup job and age, S3, health.
+    Doctor,
     /// Logs of a project.
     Logs {
         #[arg(short, long)]
@@ -374,8 +377,9 @@ pub fn run(cli: Cli) -> anyhow::Result<Outcome> {
                 Some(_) => vec![host.select(&manifest, selection)?],
                 None => host.projects(&manifest),
             };
-            done(lifecycle::status(&manifest, &targets))
+            done(lifecycle::status(&host, &manifest, &targets))
         }
+        Command::Doctor => done(doctor::run(&host)),
         Command::Logs { follow, service } => {
             let manifest = host.require()?;
             done(lifecycle::logs(

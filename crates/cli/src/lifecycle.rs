@@ -93,7 +93,7 @@ fn check_public_https(
     );
     println!("    - firewall / cloud security group: ports 80 and 443 open");
     println!("    - Caddy's certificate errors: {caddy_logs}");
-    println!("  Then run `nelcota up` again.");
+    println!("  Then run `nelcota up` again (`nelcota doctor` checks all of this).");
     bail!("public HTTPS check failed for: {}", failed.join(", "));
 }
 
@@ -149,22 +149,34 @@ pub fn confirm_volume_deletion(projects: &[Project], all: bool, yes: bool) -> an
     Ok(())
 }
 
-pub fn status(manifest: &Manifest, projects: &[Project]) -> anyhow::Result<()> {
-    println!("{:<16} {:<32} {:<10} VERSION", "PROJECT", "DOMAIN", "APP");
+pub fn status(host: &Host, manifest: &Manifest, projects: &[Project]) -> anyhow::Result<()> {
+    println!(
+        "{:<16} {:<32} {:<10} {:<10} {:<12} VERSION",
+        "PROJECT", "DOMAIN", "APP", "POSTGRES", "LAST BACKUP"
+    );
     for project in projects {
         let domain = manifest
             .projects
             .iter()
             .find(|e| e.name == project.name)
             .map_or("", |e| e.domain.as_str());
-        let health = project
-            .health(Service::App)
-            .unwrap_or_else(|| "stopped".into());
+        let health = |service| project.health(service).unwrap_or_else(|| "stopped".into());
+        let backup = crate::backup::latest(project)
+            .map_or_else(|| "never".to_owned(), |t| format!("{} ago", util::age(t)));
         let version = project.env().get("NELCOTA_VERSION")?.unwrap_or_default();
         println!(
-            "{:<16} {:<32} {:<10} {}",
-            project.name, domain, health, version
+            "{:<16} {:<32} {:<10} {:<10} {:<12} {}",
+            project.name,
+            domain,
+            health(Service::App),
+            health(Service::Postgres),
+            backup,
+            version
         );
+    }
+    if let Some(mb) = crate::checks::free_disk_mb(host.root()) {
+        println!();
+        println!("Free disk: {:.1} GB", mb as f64 / 1024.0);
     }
     Ok(())
 }

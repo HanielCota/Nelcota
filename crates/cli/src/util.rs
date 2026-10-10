@@ -53,6 +53,20 @@ fn format_timestamp(secs: u64) -> String {
     )
 }
 
+/// How long ago `time` was, e.g. `45m`, `5h`, `3d`.
+pub fn age(time: SystemTime) -> String {
+    format_age(SystemTime::now().duration_since(time).unwrap_or_default())
+}
+
+fn format_age(age: Duration) -> String {
+    let secs = age.as_secs();
+    match secs {
+        0..3600 => format!("{}m", secs / 60),
+        3600..172_800 => format!("{}h", secs / 3600),
+        _ => format!("{}d", secs / 86_400),
+    }
+}
+
 pub fn interactive() -> bool {
     std::io::stdin().is_terminal()
 }
@@ -130,6 +144,15 @@ mod tests {
         assert_eq!(s.len(), 40);
         assert!(s.bytes().all(|b| b.is_ascii_alphanumeric()));
         assert_ne!(secret(40), s);
+    }
+
+    #[test]
+    fn formats_ages() {
+        assert_eq!(format_age(Duration::from_secs(59)), "0m");
+        assert_eq!(format_age(Duration::from_secs(45 * 60)), "45m");
+        assert_eq!(format_age(Duration::from_secs(5 * 3600 + 10)), "5h");
+        assert_eq!(format_age(Duration::from_secs(47 * 3600)), "47h");
+        assert_eq!(format_age(Duration::from_secs(3 * 86_400)), "3d");
     }
 
     #[test]

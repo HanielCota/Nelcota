@@ -45,6 +45,16 @@ pub fn backup(
     Ok(path)
 }
 
+/// When the newest local dump of the project was written.
+pub(crate) fn latest(project: &Project) -> Option<std::time::SystemTime> {
+    fs::read_dir(project.path("backups"))
+        .ok()?
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .filter(|p| p.extension().is_some_and(|x| x == "dump"))
+        .filter_map(|p| fs::metadata(p).and_then(|m| m.modified()).ok())
+        .max()
+}
+
 pub(crate) fn prune(dir: &Path, keep: usize) -> anyhow::Result<()> {
     let mut dumps: Vec<PathBuf> = fs::read_dir(dir)?
         .filter_map(|e| e.ok().map(|e| e.path()))

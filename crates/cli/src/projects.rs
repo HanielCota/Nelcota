@@ -31,7 +31,7 @@ pub fn list(host: &Host) -> anyhow::Result<()> {
         println!("No projects. Create one with `nelcota init`.");
         return Ok(());
     }
-    lifecycle::status(&manifest, &host.projects(&manifest))
+    lifecycle::status(host, &manifest, &host.projects(&manifest))
 }
 
 /// `nelcota remove -p <name>`: final backup in `archive/`, containers and data
