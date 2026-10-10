@@ -147,7 +147,7 @@ const ptBR = {
     role: 'Role',
     privilegeFor: '{privilege} para {role}',
     hints: {
-      anon: 'requests sem token',
+      anon: 'chamadas sem token',
       authenticated: 'usuários logados',
       service_role: 'seu backend (ignora RLS)',
     },
