@@ -109,6 +109,18 @@ const ptBR = {
       description: "'{name}' será apagado do bucket. Não dá para desfazer.",
     },
     deleted: "'{name}' apagado",
+    selection: {
+      selected: { one: '{count} arquivo selecionado', other: '{count} arquivos selecionados' },
+      selectAll: 'Selecionar todos os arquivos carregados',
+      selectFile: 'Selecionar {name}',
+      delete: 'Apagar selecionados',
+      clear: 'Limpar seleção',
+    },
+    confirmDeleteMany: {
+      title: { one: 'Apagar {count} arquivo?', other: 'Apagar {count} arquivos?' },
+      description: 'Os arquivos selecionados serão apagados do bucket. Não dá para desfazer.',
+    },
+    deletedMany: { one: '{count} arquivo apagado', other: '{count} arquivos apagados' },
     replace: {
       title: 'Substituir arquivos?',
       description: {
@@ -232,6 +244,18 @@ const en: Messages<typeof ptBR> = {
       description: "'{name}' will be deleted from the bucket. This cannot be undone.",
     },
     deleted: "'{name}' deleted",
+    selection: {
+      selected: { one: '{count} file selected', other: '{count} files selected' },
+      selectAll: 'Select all loaded files',
+      selectFile: 'Select {name}',
+      delete: 'Delete selected',
+      clear: 'Clear selection',
+    },
+    confirmDeleteMany: {
+      title: { one: 'Delete {count} file?', other: 'Delete {count} files?' },
+      description: 'The selected files will be deleted from the bucket. This cannot be undone.',
+    },
+    deletedMany: { one: '{count} file deleted', other: '{count} files deleted' },
     replace: {
       title: 'Replace files?',
       description: {

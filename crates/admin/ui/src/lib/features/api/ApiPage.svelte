@@ -232,8 +232,8 @@
               <Select.Trigger class="w-52 max-w-full rounded-full font-mono text-xs" aria-label={t('connect.table')}><span class="truncate">{table}</span></Select.Trigger>
               <Select.Content>
                 <Select.Group>
-                {#each tables as t (t.name)}
-                  <Select.Item value={t.name} class="font-mono text-xs">{t.name}</Select.Item>
+                {#each tables as item (item.name)}
+                  <Select.Item value={item.name} class="font-mono text-xs">{item.name}</Select.Item>
                 {/each}
                 </Select.Group>
               </Select.Content>

@@ -1,1 +1,0 @@
-import{A as e,S as t,j as n}from"./router.svelte-DjWQh0op.js";var r=new Set([`$$slots`,`$$events`,`$$legacy`]);function i(i,a){let o=e(a,r),s={name:`rows-3`,size:24,node:[[`rect`,{width:`18`,height:`18`,x:`3`,y:`3`,rx:`2`}],[`path`,{d:`M21 9H3`}],[`path`,{d:`M21 15H3`}]],aliases:[`panels-top-bottom`]};t(i,n(()=>o,{get icon(){return s}}))}export{i as t};

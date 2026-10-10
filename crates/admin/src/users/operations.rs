@@ -16,13 +16,7 @@ pub(super) struct CreatedUser {
 pub(super) async fn list(pool: &Pool, page: i64, search: &str) -> Result<UsersResponse, ApiError> {
     const SIZE: i64 = 50;
     let page = page.max(0);
-    let pattern = format!(
-        "%{}%",
-        search
-            .replace('\\', "\\\\")
-            .replace('%', "\\%")
-            .replace('_', "\\_")
-    );
+    let (pattern, id) = search_terms(search);
     let client = pool.get().await?;
     let rows = client.query(
         "SELECT u.id::text, u.email, u.created_at::text, u.last_sign_in_at::text,
@@ -31,9 +25,9 @@ pub(super) async fn list(pool: &Pool, page: i64, search: &str) -> Result<UsersRe
                 u.encrypted_password IS NOT NULL,
                 -- Sign-in providers linked to the account (D91), in a stable order.
                 ARRAY(SELECT i.provider FROM auth.identities i WHERE i.user_id = u.id ORDER BY i.provider)
-         FROM auth.users u WHERE u.email LIKE $1
+         FROM auth.users u WHERE u.email ILIKE $1 OR u.id::text = $4
          ORDER BY u.created_at DESC LIMIT $2 OFFSET $3",
-        &[&pattern, &(SIZE + 1), &(page * SIZE)],
+        &[&pattern, &(SIZE + 1), &(page * SIZE), &id],
     ).await?;
     let total = client
         .query_one("SELECT count(*) FROM auth.users", &[])
@@ -58,6 +52,21 @@ pub(super) async fn list(pool: &Pool, page: i64, search: &str) -> Result<UsersRe
             })
             .collect(),
     })
+}
+
+/// Search box terms: an ILIKE pattern matching the email anywhere (case
+/// insensitive, with `\`, `%` and `_` taken literally) and the trimmed,
+/// lowercased text compared to the user id, so a pasted UUID finds its user.
+fn search_terms(search: &str) -> (String, String) {
+    let search = search.trim();
+    let pattern = format!(
+        "%{}%",
+        search
+            .replace('\\', "\\\\")
+            .replace('%', "\\%")
+            .replace('_', "\\_")
+    );
+    (pattern, search.to_ascii_lowercase())
 }
 
 /// UUID format check (8-4-4-4-12 hex), before querying PostgreSQL.
@@ -209,7 +218,20 @@ pub(super) async fn set_password(
 
 #[cfg(test)]
 mod tests {
-    use super::check_id;
+    use super::{check_id, search_terms};
+
+    #[test]
+    fn search_terms_escape_wildcards_and_normalize_the_id() {
+        assert_eq!(search_terms(""), ("%%".into(), String::new()));
+        assert_eq!(
+            search_terms(" a_b%c\\ "),
+            ("%a\\_b\\%c\\\\%".into(), "a_b%c\\".into())
+        );
+        assert_eq!(
+            search_terms("054F8CD2-DECB-4C78-91A1-F351BD8F5B92").1,
+            "054f8cd2-decb-4c78-91a1-f351bd8f5b92"
+        );
+    }
 
     #[test]
     fn validates_uuid() {

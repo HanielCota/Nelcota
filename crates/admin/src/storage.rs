@@ -260,6 +260,76 @@ pub async fn delete(
     Ok(StatusCode::NO_CONTENT)
 }
 
+#[derive(Deserialize)]
+pub struct DeleteFiles {
+    names: Vec<String>,
+}
+
+/// Most files one bulk deletion takes; the panel sends bigger selections in
+/// batches so each request stays well inside the request timeout.
+const MAX_BULK_DELETE: usize = 200;
+/// Files deleted at the same time (each takes a pooled connection).
+const BULK_DELETE_CONCURRENCY: usize = 4;
+
+/// `POST /admin/api/storage/buckets/{id}/files/delete` `{"names": [...]}`:
+/// deletes each file through the same path as a single deletion (row, then
+/// stored bytes). A file that is already gone counts as done; any other
+/// failure is reported after the rest of the batch ran.
+pub async fn delete_many(
+    State(state): State<AdminState>,
+    Path(id): Path<String>,
+    Json(body): Json<DeleteFiles>,
+) -> Result<Json<Value>, ApiError> {
+    use futures_util::{StreamExt, stream};
+
+    let storage = enabled(&state)?;
+    let id = bucket_id(&id)?;
+    check_bulk_size(body.names.len())?;
+    let claims = service_role();
+    // Futures built up front: a closure inside the stream trips the handler's
+    // `Send` check over higher-ranked lifetimes.
+    let deletions: Vec<_> = body
+        .names
+        .iter()
+        .map(|name| storage.delete(&claims, id, name))
+        .collect();
+    let results: Vec<_> = stream::iter(deletions)
+        .buffer_unordered(BULK_DELETE_CONCURRENCY)
+        .collect()
+        .await;
+    let mut deleted = 0usize;
+    let mut failure = None;
+    for result in results {
+        match result {
+            Ok(()) => deleted += 1,
+            Err(err) if err.code() == "object_not_found" => {}
+            Err(err) => failure = failure.or(Some(err)),
+        }
+    }
+    tracing::info!(bucket = id, deleted, "files deleted from the panel");
+    match failure {
+        Some(err) => Err(from_storage(err)),
+        None => Ok(Json(json!({ "deleted": deleted }))),
+    }
+}
+
+fn check_bulk_size(count: usize) -> Result<(), ApiError> {
+    if count == 0 {
+        return Err(ApiError::bad_request(
+            "no_files_selected",
+            "no files selected",
+        ));
+    }
+    if count > MAX_BULK_DELETE {
+        return Err(ApiError::bad_request(
+            "too_many_files",
+            format!("at most {MAX_BULK_DELETE} files per request"),
+        )
+        .params(json!({ "max": MAX_BULK_DELETE })));
+    }
+    Ok(())
+}
+
 /// `POST /admin/api/storage/buckets/{id}/upload?name=&replace=`: the body is
 /// the file. Mounted outside the request timeout (see [`crate::upload_router`]).
 pub async fn upload(
@@ -281,4 +351,17 @@ pub async fn upload(
         .await
         .map_err(from_storage)?;
     Ok(nelcota_storage::http::upload_response(storage, outcome))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{MAX_BULK_DELETE, check_bulk_size};
+
+    #[test]
+    fn bulk_deletion_takes_one_to_max_files() {
+        assert!(check_bulk_size(0).is_err());
+        assert!(check_bulk_size(1).is_ok());
+        assert!(check_bulk_size(MAX_BULK_DELETE).is_ok());
+        assert!(check_bulk_size(MAX_BULK_DELETE + 1).is_err());
+    }
 }

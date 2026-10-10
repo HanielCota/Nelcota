@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { SqlResponse } from '$lib/types'
-import { SqlExecution, type SqlAdapter } from './execution.svelte'
+import { changesSchema, SqlExecution, type SqlAdapter } from './execution.svelte'
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -58,6 +58,30 @@ describe('SQL execution lifetime', () => {
     expect(execution.running).toBe(false)
     expect(await execution.run('select 1')).toBe(true)
     expect(execution.error).toBeNull()
+  })
+
+  it('stops a running query and keeps schema loading', async () => {
+    const { execution, adapter } = fixture(), pending = deferred<SqlResponse>()
+    adapter.execute = vi.fn(() => pending.promise)
+    const loading = execution.loadSchema()
+    const run = execution.run('select pg_sleep(60)')
+    const signal = vi.mocked(adapter.execute).mock.calls[0][1]
+    execution.stop()
+    expect(signal.aborted).toBe(true)
+    expect(execution.running).toBe(false)
+    pending.reject(new DOMException('Aborted', 'AbortError'))
+    expect(await run).toBe(false)
+    expect(execution.error).toBeNull()
+    expect(await loading).toBe(true)
+    expect(execution.schema.data?.tables).toEqual({ docs: ['id'] })
+  })
+
+  it('detects SQL that changes the schema', () => {
+    expect(changesSchema('create table notes (id int)')).toBe(true)
+    expect(changesSchema('ALTER TABLE notes ADD x int')).toBe(true)
+    expect(changesSchema('select 1;\ndrop view v')).toBe(true)
+    expect(changesSchema('select created_at from notes')).toBe(false)
+    expect(changesSchema('update notes set dropped = true')).toBe(false)
   })
 
   it('cancels schema loading without preventing SQL execution', async () => {

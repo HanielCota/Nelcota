@@ -104,6 +104,21 @@
     sheetOpen = true
   }
 
+  // Turning RLS on with no policy hides every row from anon/authenticated:
+  // ask first. With policies, it applies right away.
+  let toEnable = $state<string | null>(null)
+  let enableOpen = $state(false)
+
+  function requestEnableRls(table: string, policies: number) {
+    if (policies > 0) {
+      enableRls(table).catch(() => {})
+      return
+    }
+    toEnable = table
+    enableOpen = true
+  }
+
+  /** Rejects after showing the error, so the confirm dialog stays open. */
   async function enableRls(table: string) {
     if (enabling) return
     enabling = table
@@ -113,6 +128,7 @@
       await load()
     } catch (e) {
       toast.error(errorMessage(e))
+      throw e
     } finally {
       enabling = null
     }
@@ -197,7 +213,7 @@
             </div>
             <div class="ml-auto flex items-center gap-2">
               {#if !table.rls.enabled}
-                <Button variant="outline" size="sm" disabled={enabling !== null} onclick={() => enableRls(table.name)}>{#if enabling === table.name}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{:else}<ShieldCheck data-icon="inline-start" aria-hidden="true" />{/if}{t('policies.enableRls')}</Button>
+                <Button variant="outline" size="sm" disabled={enabling !== null} onclick={() => requestEnableRls(table.name, table.policies.length)}>{#if enabling === table.name}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{:else}<ShieldCheck data-icon="inline-start" aria-hidden="true" />{/if}{t('policies.enableRls')}</Button>
               {/if}
               <Button variant="outline" size="sm" onclick={() => openSheet(table.name, null)}><Plus />{t('policies.newPolicy')}</Button>
             </div>
@@ -293,5 +309,15 @@
     confirmLabel={t('policies.confirmDelete.confirm')}
     destructive
     onconfirm={dropPolicy}
+  />
+{/if}
+{#if toEnable}
+  {@const table = toEnable}
+  <ConfirmDialog
+    bind:open={enableOpen}
+    title={t('policies.enableRlsEmpty.title', { table })}
+    description={t('policies.enableRlsEmpty.description')}
+    confirmLabel={t('policies.enableRlsEmpty.confirm')}
+    onconfirm={() => enableRls(table)}
   />
 {/if}

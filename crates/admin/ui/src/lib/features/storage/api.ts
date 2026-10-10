@@ -11,6 +11,8 @@ export const storageBrowserAdapter: StorageBrowserAdapter = {
   list: (target, offset, signal) => api.get<StorageListing>(
     `/storage/buckets/${enc(target.bucket)}/objects?${new URLSearchParams({ prefix: target.prefix, offset: String(offset) })}`, { signal }),
   remove: (bucket, name) => api.delete(`/storage/buckets/${enc(bucket)}/file?${new URLSearchParams({ name })}`),
+  removeMany: async (bucket, names) =>
+    (await api.post<{ deleted: number }>(`/storage/buckets/${enc(bucket)}/files/delete`, { names })).deleted,
   upload(file, target, replace, progress) {
     const params = new URLSearchParams({ name: target.prefix + file.name })
     if (replace) params.set('replace', 'true')

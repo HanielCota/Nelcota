@@ -7,7 +7,7 @@
   import GridColumnHeader from './GridColumnHeader.svelte'
   import CellDetailDialog from '$lib/components/shared/CellDetailDialog.svelte'
   import { copyText } from '$lib/clipboard'
-  import { alignRight, columnKind, columnWidth, monospace, nextCell, rowKey, rowPk, type CellPos } from '$lib/features/tables/grid'
+  import { alignRight, columnKind, columnWidth, editedValue, monospace, nextCell, rowKey, rowPk, type CellPos } from '$lib/features/tables/grid'
   import type { Column, RowData, TableData } from '$lib/types'
   import { t } from '$lib/i18n/index.svelte'
 
@@ -89,20 +89,26 @@
     document.getElementById('inline-editor')?.focus()
   }
 
-  async function commitEdit(asNull = false) {
+  /**
+   * Saves the open edit. `refocus` is false when the editor lost focus to
+   * something else (a click elsewhere): focus stays where the user put it.
+   */
+  async function commitEdit(asNull = false, refocus = true) {
     if (!editing) return
     if (disabled) return
     const target = editing
     const { pk, column, original } = editing
-    const value = asNull ? null : draft
+    const value = editedValue(original, draft, asNull)
     editing = null
-    focusCell(active)
-    if (value === original) return
+    if (refocus) focusCell(active)
+    if (value === undefined) return
     try {
       await oncommit(pk, column, value)
     } catch {
-      if (data.rows.some((row, i) => rowKey(row, data.table.primary_key, i) === target.key)) {
+      // Reopen the failed edit, unless another cell is being edited by now.
+      if (!editing && data.rows.some((row, i) => rowKey(row, data.table.primary_key, i) === target.key)) {
         editing = target
+        if (!refocus) return
         await tick()
         document.getElementById('inline-editor')?.focus()
       }
@@ -255,24 +261,40 @@
           >
             {#if editing?.key === rowKey(row, data.table.primary_key, i) && editing.column === column.name}
               <div class="flex items-center gap-1 bg-card p-0.5 ring-2 ring-brand ring-inset" onfocusout={(event) => {
-                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) editing = null
+                // Focus left the editor (click elsewhere, Tab): save like Enter
+                // does. Escape and Enter clear `editing` first, so this is a no-op.
+                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) commitEdit(false, false)
               }}>
-                <input
-                  id="inline-editor"
-                  class={[
-                    'w-full min-w-0 bg-transparent px-2.5 py-1.5 text-xs outline-none',
-                    monospace(kind) && 'font-mono',
-                    alignRight(kind) && 'text-right',
-                  ]}
-                  bind:value={draft}
-                  onkeydown={onEditorKey}
-                  aria-label={t('tables.grid.edit', { column: column.name })}
-                />
+                {#if editing.original?.includes('\n')}
+                  <!-- Multi-line text: an <input> would flatten the line breaks.
+                       Enter saves, Shift+Enter adds a line. -->
+                  <textarea
+                    id="inline-editor"
+                    rows="4"
+                    class={['w-full min-w-0 resize-y bg-transparent px-2.5 py-1.5 text-xs outline-none', monospace(kind) && 'font-mono']}
+                    bind:value={draft}
+                    onkeydown={onEditorKey}
+                    aria-label={t('tables.grid.edit', { column: column.name })}
+                  ></textarea>
+                {:else}
+                  <input
+                    id="inline-editor"
+                    class={[
+                      'w-full min-w-0 bg-transparent px-2.5 py-1.5 text-xs outline-none',
+                      monospace(kind) && 'font-mono',
+                      alignRight(kind) && 'text-right',
+                    ]}
+                    bind:value={draft}
+                    onkeydown={onEditorKey}
+                    aria-label={t('tables.grid.edit', { column: column.name })}
+                  />
+                {/if}
                 {#if column.nullable}
                   <button
                     class="shrink-0 cursor-pointer rounded border border-border-strong bg-muted px-1.5 py-0.5 font-mono text-3xs text-muted-foreground hover:text-foreground"
                     type="button"
                     onkeydown={(event) => { if (event.key === 'Escape') cancelEdit() }}
+                    onmousedown={(event) => event.preventDefault()}
                     onclick={() => commitEdit(true)}>NULL</button
                   >
                 {/if}
