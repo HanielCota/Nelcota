@@ -137,6 +137,9 @@ nelcota.from('products').select().ilike('name', `*${escapeLike(search)}*`);
 otherwise. `count: 'exact'` scans every matching row, so ask for it only
 when you show it.
 
+HEAD queries return `data: null`. `single()` and `maybeSingle()` require
+rows: use `.select()` on writes first, and omit `head: true`.
+
 ## Auth
 
 ```ts
@@ -218,7 +221,10 @@ validates the Bearer header and forwards it to RLS. `accessToken` disables
 automatic session refresh; explicitly called auth methods still store sessions.
 
 Auth HTTP methods take `{ signal, timeout }` as their last argument. Concurrent
-refresh calls share the first caller's request options. `signOut()` waits for a
+refresh calls share the first caller's timeout; each caller can cancel its own
+wait independently. Once rotation starts, it finishes and saves the new token
+even if a waiter cancels. REST/storage cancellation also covers waiting for a
+token or session refresh. `signOut()` waits for a
 pending refresh. Call `nelcota.dispose()` (or `auth.dispose()` for the standalone
 client) to stop timers and close channels when the client is no longer used.
 
@@ -250,6 +256,18 @@ files.publicUrl('logo.png');                                                 // 
   `.` and `..` segments, control characters and backslashes are refused.
 - **Buckets** are managed with `createBucket`, `updateBucket`,
   `deleteBucket`, `getBucket` and `listBuckets`, usually as `service_role`.
+  `updateBucket` replaces every setting and requires all three fields:
+
+```ts
+await nelcota.storage.updateBucket('avatars', {
+  public: true,
+  file_size_limit: 5_000_000,
+  allowed_mime_types: ['image/png', 'image/jpeg'],
+});
+```
+
+Use explicit `null` to clear a size or MIME limit. Partial updates are refused
+before HTTP, so an omitted field cannot silently clear an existing restriction.
 
 Who may read or write which file is up to the policies on
 `storage.objects`; see the server's

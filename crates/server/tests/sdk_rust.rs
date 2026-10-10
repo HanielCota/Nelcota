@@ -3,7 +3,7 @@ mod common;
 use common::*;
 use nelcota_client::{
     Client,
-    rest::{Condition, Order, UpsertOptions},
+    rest::{Condition, IsValue, Order, UpsertOptions},
     storage::{BucketSettings, ListOptions, OpenOptions, UploadOptions},
 };
 use serde_json::{Value, json};
@@ -86,6 +86,18 @@ async fn crud_rpc_filters_and_user_isolation_over_http() {
             Condition::eq("title", title),
             Condition::all([Condition::eq("title", "absent"), Condition::gt("id", 0)]),
         ]),
+        a.from("todos")
+            .eq("id", id)
+            .or([!Condition::eq("title", "absent")]),
+        a.from("todos").or([!!Condition::eq("title", title)]),
+        a.from("todos")
+            .eq("id", id)
+            .or([!Condition::is("done", IsValue::True)]),
+        a.from("todos")
+            .eq("id", id)
+            .or([!Condition::all([Condition::eq("title", "absent")])]),
+        a.from("todos")
+            .or([!!Condition::any([Condition::eq("title", title)])]),
     ] {
         let rows = query.execute::<Vec<Value>>().await.unwrap();
         assert_eq!(rows.data.len(), 1);

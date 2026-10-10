@@ -35,6 +35,9 @@ export interface BucketSettings {
   allowed_mime_types?: string[] | null;
 }
 
+/** PUT replaces every setting. Use explicit null to clear a limit. */
+export type BucketUpdateSettings = Required<BucketSettings>;
+
 export interface StoredObject {
   id: string;
   bucket: string;
@@ -261,7 +264,12 @@ export class StorageClient {
     return result.error ? fail(result.error) : ok(result.data);
   }
 
-  async updateBucket(id: string, settings: BucketSettings, options: RequestOptions = {}): Promise<Result<Bucket>> {
+  /** Replaces every setting; all fields are required, including explicit null limits. */
+  async updateBucket(id: string, settings: BucketUpdateSettings, options: RequestOptions = {}): Promise<Result<Bucket>> {
+    if (typeof settings !== 'object' || settings === null || typeof settings.public !== 'boolean'
+        || settings.file_size_limit === undefined || settings.allowed_mime_types === undefined) {
+      throw new NelcotaUsageError('updateBucket replaces all settings: provide public, file_size_limit and allowed_mime_types (use null to clear limits)');
+    }
     const result = await this.#http.json<Bucket>({
       method: 'PUT',
       path: `/storage/v1/bucket/${bucketId(id)}`,

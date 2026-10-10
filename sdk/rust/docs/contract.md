@@ -1,7 +1,10 @@
 # Rust SDK contract
 
-`nelcota-client` 0.1.x targets the HTTP protocol of Nelcota 0.2.0. Package and
-server versions are independent. Native Tokio on Linux, Windows and macOS is
+`nelcota-client` 0.1.x targets the current repository HTTP protocol (workspace
+version 0.2.0), rather than every binary carrying that version. The released
+v0.2.0 tag is a legacy baseline without the newer OAuth routes and generators;
+see the README compatibility matrix. Package and server versions are
+independent. Native Tokio on Linux, Windows and macOS is
 the supported target; blocking and WASM interfaces are not part of 0.1.
 
 | Module | HTTP contract |

@@ -2,6 +2,9 @@
 
 ## 0.1.0 (unreleased)
 
+- Correct negated leaf condition encoding and double negation for leaves and
+  groups, with production HTTP/Postgres regressions.
+
 - Native Tokio client with standalone rustls/ring HTTPS, structured errors,
   request cancellation, bounded read retries and deadlines.
 - REST reads/writes, groups, embeds, count, cardinality, upsert and RPC.

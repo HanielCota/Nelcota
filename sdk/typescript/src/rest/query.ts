@@ -69,7 +69,7 @@ export function countFromRange(header: string | null): number | null {
   return Number.isSafeInteger(count) ? count : null;
 }
 
-export class Query<S extends GenericSchema, Name extends string, Row, Out>
+export class Query<S extends GenericSchema, Name extends string, Row, Out, Head extends boolean = false>
   implements PromiseLike<QueryResult<Out>>
 {
   readonly #state: State;
@@ -184,27 +184,35 @@ export class Query<S extends GenericSchema, Name extends string, Row, Out>
   }
 
   /** Exactly one row, or an error (`not_single`). */
-  single(): Query<S, Name, Row, Row> {
-    return this.#with({ cardinality: 'one' }) as unknown as Query<S, Name, Row, Row>;
+  single(this: [Out] extends [null] ? never : Query<S, Name, Row, Out, Head>): Query<S, Name, Row, Row, Head> {
+    this.#requireRows();
+    return this.#with({ cardinality: 'one' }) as unknown as Query<S, Name, Row, Row, Head>;
   }
 
   /** One row or `null`; more than one is an error (`not_single`). */
-  maybeSingle(): Query<S, Name, Row, Row | null> {
-    return this.#with({ cardinality: 'maybe' }) as unknown as Query<S, Name, Row, Row | null>;
+  maybeSingle(this: [Out] extends [null] ? never : Query<S, Name, Row, Out, Head>): Query<S, Name, Row, Row | null, Head> {
+    this.#requireRows();
+    return this.#with({ cardinality: 'maybe' }) as unknown as Query<S, Name, Row, Row | null, Head>;
+  }
+
+  #requireRows(): void {
+    if (!this.#state.returnsRows || this.#state.method === 'HEAD') {
+      throw new NelcotaUsageError('single/maybeSingle requires rows: call select() on writes and omit head: true');
+    }
   }
 
   /**
    * After `insert`/`update`/`upsert`/`delete`: return the affected rows,
    * with these columns and embeds.
    */
-  select<Q extends string = '*'>(columns?: Q): Query<S, Name, SelectRow<S, Name, Q>, SelectRow<S, Name, Q>[]> {
+  select<Q extends string = '*'>(columns?: Q): Query<S, Name, SelectRow<S, Name, Q>, Head extends true ? null : SelectRow<S, Name, Q>[], Head> {
     const params = this.#state.params.filter(([k]) => k !== 'select');
     const next = this.#with({
       params: [...params, ['select', selectList(columns ?? '*')]],
       prefer: [...this.#state.prefer.filter((p) => !p.startsWith('return=')), 'return=representation'],
-      returnsRows: true,
+      returnsRows: this.#state.method !== 'HEAD',
     });
-    return next as unknown as Query<S, Name, SelectRow<S, Name, Q>, SelectRow<S, Name, Q>[]>;
+    return next as unknown as Query<S, Name, SelectRow<S, Name, Q>, Head extends true ? null : SelectRow<S, Name, Q>[], Head>;
   }
 
   abortSignal(signal: AbortSignal): this {
@@ -244,9 +252,14 @@ export class Query<S extends GenericSchema, Name extends string, Row, Out>
     if (error) return { data: null, error, count: null, status: error.status };
 
     const count = countFromRange(response.headers.get('content-range'));
-    if (state.cardinality === 'many' || !Array.isArray(rows)) {
+    if (state.returnsRows && !Array.isArray(rows)) {
+      const error = new NelcotaError({ status: response.status, code: 'invalid_response', message: 'The server answered with something that is not an array of rows' });
+      return { data: null, error, count: null, status: response.status };
+    }
+    if (state.cardinality === 'many') {
       return { data: rows as Out, error: null, count, status: response.status };
     }
+    if (!Array.isArray(rows)) throw new NelcotaUsageError('single/maybeSingle requires a row representation');
     if (rows.length === 1 || (rows.length === 0 && state.cardinality === 'maybe')) {
       return { data: (rows[0] ?? null) as Out, error: null, count, status: response.status };
     }
@@ -291,9 +304,9 @@ export interface CountOption {
   count?: 'exact';
 }
 
-export interface SelectOptions extends CountOption {
+export interface SelectOptions<Head extends boolean = boolean> extends CountOption {
   /** Only the count, no rows (a HEAD request). */
-  head?: boolean;
+  head?: Head;
 }
 
 export interface UpsertOptions {
@@ -314,7 +327,7 @@ export class TableRef<S extends GenericSchema, Name extends string, Row, Insert,
     this.#table = identifier(table, 'table');
   }
 
-  #query<R, O>(method: Method, extra: Partial<State> = {}): Query<S, Name, R, O> {
+  #query<R, O, Head extends boolean = false>(method: Method, extra: Partial<State> = {}): Query<S, Name, R, O, Head> {
     return new Query<S, Name, R, O>({
       http: this.#http,
       table: this.#table,
@@ -328,14 +341,14 @@ export class TableRef<S extends GenericSchema, Name extends string, Row, Insert,
   }
 
   /** Reads rows: columns, `*` and embeds (`id,author:users(email)`). */
-  select<Q extends string = '*'>(
+  select<Q extends string = '*', Head extends boolean = false>(
     columns?: Q,
-    options: SelectOptions = {},
-  ): Query<S, Name, SelectRow<S, Name, Q>, SelectRow<S, Name, Q>[]> {
+    options: SelectOptions<Head> = {},
+  ): Query<S, Name, SelectRow<S, Name, Q>, Head extends true ? null : SelectRow<S, Name, Q>[], Head> {
     return this.#query(options.head ? 'HEAD' : 'GET', {
       params: [['select', selectList(columns ?? '*')]],
       prefer: options.count === 'exact' ? ['count=exact'] : [],
-      returnsRows: true,
+      returnsRows: !options.head,
     });
   }
 

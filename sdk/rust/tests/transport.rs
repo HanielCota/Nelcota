@@ -28,6 +28,52 @@ async fn serve(router: Router) -> (String, tokio::task::JoinHandle<()>) {
     (url, task)
 }
 
+#[test]
+fn negation_uses_the_server_grammar_and_double_negation_restores_conditions() {
+    let client = Client::builder("https://api.example.com").build().unwrap();
+    for (condition, expected) in [
+        (!Condition::eq("name", "Ana"), "(name.not.eq.\"Ana\")"),
+        (!!Condition::eq("name", "Ana"), "(name.eq.\"Ana\")"),
+        (
+            !Condition::is("deleted", IsValue::True),
+            "(deleted.not.is.true)",
+        ),
+        (
+            !!Condition::is("deleted", IsValue::True),
+            "(deleted.is.true)",
+        ),
+        (
+            !Condition::in_values("id", [1, 2]),
+            "(id.not.in.(\"1\",\"2\"))",
+        ),
+        (
+            !!Condition::in_values("id", [1, 2]),
+            "(id.in.(\"1\",\"2\"))",
+        ),
+        (
+            !Condition::all([Condition::eq("id", 1)]),
+            "(not.and(id.eq.\"1\"))",
+        ),
+        (
+            !!Condition::any([Condition::eq("id", 1)]),
+            "(or(id.eq.\"1\"))",
+        ),
+    ] {
+        let query = client.from("notes").or([condition]).query_string().unwrap();
+        let params: Vec<_> = url::form_urlencoded::parse(query.as_bytes())
+            .into_owned()
+            .collect();
+        assert_eq!(params, [("or".into(), expected.into())]);
+    }
+    assert!(
+        client
+            .from("notes")
+            .or([!Condition::eq("bad,column", 1)])
+            .query_string()
+            .is_err()
+    );
+}
+
 #[tokio::test]
 async fn read_write_headers_cardinality_and_rpc() {
     let seen = Arc::new(tokio::sync::Mutex::new(Vec::new()));

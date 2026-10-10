@@ -4,6 +4,7 @@
  */
 
 import { NelcotaError, NelcotaUsageError, clientError } from './errors.js';
+import { abortable } from './cancellation.js';
 import { assertTokenAllowed } from './jwt.js';
 
 export type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
@@ -138,7 +139,14 @@ export class HttpClient {
 
     let token: string | null = null;
     if (typeof spec.auth === 'string') token = spec.auth;
-    else if (spec.auth !== false) token = await this.#options.token();
+    else if (spec.auth !== false) {
+      const result = await abortable(Promise.resolve(this.#options.token()), spec.signal);
+      if (result.error) return { data: null, response: null, error: result.error };
+      token = result.data;
+    }
+    if (spec.signal?.aborted) {
+      return { data: null, response: null, error: clientError('aborted', 'The request was aborted') };
+    }
     if (token) {
       assertTokenAllowed(token);
       headers.set('authorization', `Bearer ${token}`);

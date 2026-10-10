@@ -89,14 +89,29 @@ describe('buckets', () => {
     const bucket = { id: 'avatars', public: true, file_size_limit: null, allowed_mime_types: ['image/*'], created_at: '', updated_at: '' };
     const { nelcota, calls } = client(json(bucket, 201), json(bucket), empty(204), json([bucket]));
     await nelcota.storage.createBucket('avatars', { public: true, allowed_mime_types: ['image/*'] });
-    await nelcota.storage.updateBucket('avatars', { file_size_limit: 1024 });
+    await nelcota.storage.updateBucket('avatars', { public: true, file_size_limit: 1024, allowed_mime_types: ['image/*'] });
     await nelcota.storage.deleteBucket('avatars');
     expect((await nelcota.storage.listBuckets()).data).toEqual([bucket]);
     expect(calls.map((c) => [c.method, c.url.pathname, c.body && JSON.parse(c.body)])).toEqual([
       ['POST', '/storage/v1/bucket', { id: 'avatars', public: true, allowed_mime_types: ['image/*'] }],
-      ['PUT', '/storage/v1/bucket/avatars', { file_size_limit: 1024 }],
+      ['PUT', '/storage/v1/bucket/avatars', { public: true, file_size_limit: 1024, allowed_mime_types: ['image/*'] }],
       ['DELETE', '/storage/v1/bucket/avatars', null],
       ['GET', '/storage/v1/bucket', null],
     ]);
+  });
+
+  it('refuses incomplete replacements before sending and permits explicit clearing', async () => {
+    const { nelcota, calls } = client(json({}));
+    for (const settings of [
+      { public: true },
+      { file_size_limit: 1024, allowed_mime_types: ['image/png'] },
+      { public: true, file_size_limit: 1024 },
+      { public: true, allowed_mime_types: ['image/png'] },
+    ]) {
+      await expect(nelcota.storage.updateBucket('avatars', settings as never)).rejects.toThrow(NelcotaUsageError);
+    }
+    expect(calls).toHaveLength(0);
+    await nelcota.storage.updateBucket('avatars', { public: false, file_size_limit: null, allowed_mime_types: null });
+    expect(JSON.parse(calls[0]!.body!)).toEqual({ public: false, file_size_limit: null, allowed_mime_types: null });
   });
 });

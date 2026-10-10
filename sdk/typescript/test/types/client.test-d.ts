@@ -1,5 +1,5 @@
 import { describe, expectTypeOf, it } from 'vitest';
-import { createClient, type SelectError } from '../../src/index.js';
+import { createClient, type SelectError, type SelectOptions } from '../../src/index.js';
 import type { Database, Json } from './database.js';
 
 const nelcota = createClient<Database>('https://api.example.com');
@@ -42,6 +42,21 @@ describe('select', () => {
     expectTypeOf<Result<typeof one>>().toEqualTypeOf<{ id: number }>();
     const maybe = nelcota.from('orders').select('id').maybeSingle();
     expectTypeOf<Result<typeof maybe>>().toEqualTypeOf<{ id: number } | null>();
+  });
+
+  it('types HEAD as null and preserves that through another select', () => {
+    const head = nelcota.from('orders').select('id', { head: true });
+    expectTypeOf<Result<typeof head>>().toEqualTypeOf<null>();
+    const reselected = head.select('status');
+    expectTypeOf<Result<typeof reselected>>().toEqualTypeOf<null>();
+    // @ts-expect-error HEAD never returns a row
+    head.single();
+    // @ts-expect-error HEAD never returns a row
+    reselected.maybeSingle();
+    const withOptions = (options: SelectOptions) => nelcota.from('orders').select('id', options);
+    expectTypeOf<Result<ReturnType<typeof withOptions>>>().toEqualTypeOf<{ id: number }[] | null>();
+    const get = nelcota.from('orders').select('id', { head: false });
+    expectTypeOf<Result<typeof get>>().toEqualTypeOf<{ id: number }[]>();
   });
 });
 
@@ -86,6 +101,10 @@ describe('writes', () => {
   it('returns nothing unless select() asks for rows', () => {
     const minimal = nelcota.from('orders').insert({ total: 1 });
     expectTypeOf<Result<typeof minimal>>().toEqualTypeOf<null>();
+    // @ts-expect-error select is required before single on a minimal write
+    minimal.single();
+    // @ts-expect-error select is required before maybeSingle on a minimal write
+    minimal.maybeSingle();
     const back = nelcota.from('orders').insert({ total: 1 }).select('id').single();
     expectTypeOf<Result<typeof back>>().toEqualTypeOf<{ id: number }>();
   });
@@ -112,5 +131,19 @@ describe('untyped client', () => {
     const loose = createClient('https://api.example.com');
     const query = loose.from('anything').select('a,b(c)').eq('x', 1);
     expectTypeOf<Result<typeof query>>().toEqualTypeOf<Record<string, any>[]>();
+  });
+});
+
+describe('bucket settings', () => {
+  it('requires every replacement setting but keeps creation defaults', () => {
+    void nelcota.storage.createBucket('avatars', { public: true });
+    void nelcota.storage.updateBucket('avatars', { public: true, file_size_limit: 1024, allowed_mime_types: ['image/png'] });
+    void nelcota.storage.updateBucket('avatars', { public: false, file_size_limit: null, allowed_mime_types: null });
+    // @ts-expect-error a replacement must explicitly keep or clear both limits
+    void nelcota.storage.updateBucket('avatars', { public: true });
+    // @ts-expect-error public must be explicit in a replacement
+    void nelcota.storage.updateBucket('avatars', { file_size_limit: null, allowed_mime_types: null });
+    // @ts-expect-error MIME settings must be explicit in a replacement
+    void nelcota.storage.updateBucket('avatars', { public: true, file_size_limit: null });
   });
 });

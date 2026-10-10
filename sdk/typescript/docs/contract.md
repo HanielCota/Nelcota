@@ -27,7 +27,11 @@ at runtime. RLS and GRANTs always remain server/Postgres decisions.
 ## Results and failures
 
 - Auth and storage return `{data,error}`. REST adds `status` and `count`; RPC
-  adds `status`. Writes without `.select()` and empty responses return null.
+  adds `status`. Writes without `.select()` and HEAD responses return null.
+  HEAD is typed as null, including chained selects. `single`/`maybeSingle`
+  require a row representation and refuse minimal writes or HEAD before HTTP.
+  A requested row representation that is empty or not a JSON array returns
+  `invalid_response`; it never succeeds with null or another shape.
 - HTTP failures preserve server `code`, `message` and status. Network, abort,
   timeout and interrupted buffered bodies return status 0 and client codes.
 - Invalid JSON returns `invalid_response` with the response's HTTP status.
@@ -58,7 +62,11 @@ Web Locks, use per-tab sessionStorage or an adapter with external coordination;
 the module-local queue does not guarantee cross-tab rotation safety.
 
 Auth methods that perform HTTP accept `{signal,timeout}` as the last argument.
-Concurrent refresh callers share the first caller's options. `signOut()` waits
+Concurrent refresh callers share the first caller's timeout. Signals cancel
+each caller's wait independently; rotation continues and persists its result
+even when a waiter cancels. An already aborted caller does not start rotation.
+REST/storage signals also cover waiting for the token source or session
+refresh, without aborting an operation shared by other callers. `signOut()` waits
 for a pending refresh and clears locally even when server revocation fails.
 `dispose()` stops timers, closes channels and clears listeners; it neither
 revokes the session nor aborts requests already in flight.
@@ -66,6 +74,14 @@ revokes the session nor aborts requests already in flight.
 An explicit `accessToken` controls REST/storage requests and disables automatic
 session refresh in the combined client. Auth methods remain available and may
 store a session when called explicitly.
+
+## Bucket settings
+
+Creation accepts `BucketSettings` with optional fields. Updating uses
+`BucketUpdateSettings`, requires `public`, `file_size_limit` and
+`allowed_mime_types`, and replaces the entire settings object with PUT.
+Use explicit null to clear a limit. Missing fields throw `NelcotaUsageError`
+before any HTTP request, including in JavaScript consumers.
 
 ## Release acceptance
 

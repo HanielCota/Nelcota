@@ -99,6 +99,29 @@ describe('reads', () => {
     expect(count).toBe(137);
   });
 
+  it('refuses cardinality on minimal writes and HEAD before sending', () => {
+    const { nelcota, calls } = client(empty());
+    const minimal = nelcota.from('todos').insert({ title: 'a' });
+    // @ts-expect-error minimal writes do not have a row representation
+    expect(() => minimal.single()).toThrow(NelcotaUsageError);
+    // @ts-expect-error minimal writes do not have a row representation
+    expect(() => minimal.maybeSingle()).toThrow(NelcotaUsageError);
+    const head = nelcota.from('todos').select('*', { head: true }).select('id');
+    // @ts-expect-error HEAD never returns rows, even after another select
+    expect(() => head.single()).toThrow(NelcotaUsageError);
+    // @ts-expect-error HEAD never returns rows
+    expect(() => head.maybeSingle()).toThrow(NelcotaUsageError);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('rejects empty or non-array representations instead of returning typed rows', async () => {
+    for (const response of [empty(200), json({ id: 1 }), json(null)]) {
+      const { nelcota } = client(response);
+      expect((await nelcota.from('todos').select()).error?.code).toBe('invalid_response');
+      expect((await nelcota.from('todos').select().single()).error?.code).toBe('invalid_response');
+    }
+  });
+
   it('reads totals from Content-Range', () => {
     expect(countFromRange('0-19/137')).toBe(137);
     expect(countFromRange('0-19/*')).toBeNull();

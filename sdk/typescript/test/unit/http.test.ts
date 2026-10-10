@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createClient, NelcotaUsageError } from '../../src/index.js';
 import { baseUrl, parseRetryAfter } from '../../src/core/http.js';
 import { assertTokenAllowed } from '../../src/core/jwt.js';
-import { json, jwt, mockFetch } from './helpers.js';
+import { json, jwt, mockFetch, session } from './helpers.js';
 
 afterEach(() => {
   vi.useRealTimers();
@@ -67,6 +67,69 @@ describe('retries', () => {
 });
 
 describe('failures without a response', () => {
+  it('cancels while waiting for a caller token without sending HTTP', async () => {
+    let started!: () => void, finish!: (token: string) => void;
+    const begun = new Promise<void>(resolve => { started = resolve; });
+    const token = new Promise<string>(resolve => { finish = resolve; });
+    const mock = mockFetch(json([]));
+    const nelcota = client(mock, { accessToken: () => { started(); return token; } });
+    const controller = new AbortController();
+    const pending = nelcota.from('todos').select().abortSignal(controller.signal).execute();
+    await begun;
+    try {
+      controller.abort();
+      expect((await pending).error?.code).toBe('aborted');
+      expect(mock.calls).toHaveLength(0);
+    } finally { finish('late-token'); nelcota.dispose(); }
+  });
+
+  it('cancels a query independently of the shared session refresh', async () => {
+    vi.useFakeTimers();
+    let started!: () => void, finish!: () => void;
+    const begun = new Promise<void>(resolve => { started = resolve; });
+    const wait = new Promise<void>(resolve => { finish = resolve; });
+    let requests = 0;
+    const nelcota = createClient('https://api.example.com', {
+      auth: { autoRefresh: false },
+      fetch: async () => { requests++; started(); await wait; return json(session(900, 'refresh-2', 'access-2')); },
+    });
+    await nelcota.auth.setSession(session(30));
+    const controller = new AbortController();
+    let code: string | undefined;
+    const pending = nelcota.from('todos').select().abortSignal(controller.signal).execute()
+      .then(result => { code = result.error?.code; });
+    await begun;
+    try {
+      controller.abort();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(code).toBe('aborted');
+      expect(requests).toBe(1);
+    } finally {
+      finish(); await pending;
+      expect((await nelcota.auth.getSession()).data?.refresh_token).toBe('refresh-2');
+      nelcota.dispose(); vi.useRealTimers();
+    }
+  });
+
+  it('preserves token adapter exceptions and observes late failures after cancellation', async () => {
+    const mock = mockFetch(json([]));
+    const failure = new Error('adapter failed');
+    const broken = client(mock, { accessToken: async () => { throw failure; } });
+    await expect(broken.from('todos').select().execute()).rejects.toBe(failure);
+    let rejectToken!: (error: Error) => void, started!: () => void;
+    const begun = new Promise<void>(resolve => { started = resolve; });
+    const token = new Promise<string>((_resolve, reject) => { rejectToken = reject; });
+    const detached = client(mock, { accessToken: () => { started(); return token; } });
+    const controller = new AbortController();
+    const pending = detached.from('todos').select().abortSignal(controller.signal).execute();
+    await begun; controller.abort();
+    expect((await pending).error?.code).toBe('aborted');
+    rejectToken(failure);
+    await Promise.resolve();
+    expect(mock.calls).toHaveLength(0);
+    broken.dispose(); detached.dispose();
+  });
+
   it('returns errors for truncated JSON and file bodies and retries only reads', async () => {
     const broken = () => new Response(new ReadableStream({ start(controller) { controller.error(new TypeError('connection lost')); } }));
     const read = mockFetch(broken, json([]));
