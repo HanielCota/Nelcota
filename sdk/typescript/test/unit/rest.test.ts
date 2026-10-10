@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createClient, escapeLike, NelcotaUsageError } from '../../src/index.js';
+import { createClient, escapeLike, NelcotaUsageError, unwrap } from '../../src/index.js';
 import { countFromRange, rangeFromHeader } from '../../src/rest/query.js';
 import { empty, json, mockFetch } from './helpers.js';
 
@@ -152,6 +152,29 @@ describe('reads', () => {
     expect(seen).toEqual([[{ id: 1 }, { id: 2 }], [{ id: 3 }]]);
     // A short page does not end the walk: the server may cap pages below `size`.
     expect(calls.map((c) => [c.url.searchParams.get('offset'), c.url.searchParams.get('limit')])).toEqual([['4', '2'], ['6', '2'], ['7', '2']]);
+  });
+
+  it('throwOnError() throws the error and keeps successes as results', async () => {
+    const failing = client(json({ code: 'db_error', message: 'nope', sqlstate: '42501' }, 403));
+    await expect(failing.nelcota.from('todos').select().throwOnError()).rejects.toMatchObject({ name: 'NelcotaError', code: 'db_error', sqlstate: '42501' });
+    await expect(failing.nelcota.from('todos').select().throwOnError().execute()).rejects.toMatchObject({ status: 403 });
+
+    const { nelcota } = client(json([{ id: 1 }], 200, { 'content-range': '0-0/*' }));
+    const { data, error } = await nelcota.from('todos').select('id').throwOnError().eq('id', 1);
+    expect(error).toBeNull();
+    expect(data).toEqual([{ id: 1 }]);
+    await expect(nelcota.from('todos').select('id').throwOnError().single()).resolves.toMatchObject({ data: { id: 1 } });
+
+    const many = client(json([{ id: 1 }, { id: 2 }]));
+    await expect(many.nelcota.from('todos').select().single().throwOnError()).rejects.toMatchObject({ code: 'not_single' });
+  });
+
+  it('unwrap() returns the data or throws the error', async () => {
+    const { nelcota } = client(json([{ id: 1 }]));
+    expect(unwrap(await nelcota.from('todos').select())).toEqual([{ id: 1 }]);
+    const failing = client(json({ code: 'invalid_credentials', message: 'no' }, 400));
+    const result = await failing.nelcota.auth.signInWithPassword({ email: 'a@x.com', password: 'pw' });
+    expect(() => unwrap(result)).toThrow(expect.objectContaining({ code: 'invalid_credentials' }));
   });
 
   it('throws page errors and refuses pages() outside reads', async () => {

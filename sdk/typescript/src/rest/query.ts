@@ -44,6 +44,9 @@ export type QueryResult<T> =
   | QuerySuccess<T>
   | { data: null; error: NelcotaError; count: null; range: null; status: number };
 
+/** What awaiting a query gives: a result, or only a success after `throwOnError()`. */
+export type QueryOutcome<T, Throws extends boolean> = Throws extends true ? QuerySuccess<T> : QueryResult<T>;
+
 /** A column of the row, or a path into an embed (`orders.total`). */
 export type FilterColumn<Row> = (string & keyof Row) | `${string}.${string}`;
 
@@ -73,6 +76,7 @@ interface State {
   readonly returnsRows: boolean;
   readonly signal?: AbortSignal | undefined;
   readonly timeout?: number | undefined;
+  readonly throws?: boolean;
 }
 
 function referenced(key: string, options: ReferencedOption | undefined): string {
@@ -97,8 +101,8 @@ export function rangeFromHeader(header: string | null): RowRange | null {
   return Number.isSafeInteger(from) && Number.isSafeInteger(to) && to >= from ? { from, to } : null;
 }
 
-export class Query<S extends GenericSchema, Name extends string, Row, Out, Head extends boolean = false>
-  implements PromiseLike<QueryResult<Out>>
+export class Query<S extends GenericSchema, Name extends string, Row, Out, Head extends boolean = false, Throws extends boolean = false>
+  implements PromiseLike<QueryOutcome<Out, Throws>>
 {
   readonly #state: State;
 
@@ -217,15 +221,15 @@ export class Query<S extends GenericSchema, Name extends string, Row, Out, Head 
   }
 
   /** Exactly one row, or an error (`not_single`). */
-  single(this: [Out] extends [null] ? never : Query<S, Name, Row, Out, Head>): Query<S, Name, Row, Row, Head> {
+  single(this: [Out] extends [null] ? never : Query<S, Name, Row, Out, Head, Throws>): Query<S, Name, Row, Row, Head, Throws> {
     this.#requireRows();
-    return this.#with({ cardinality: 'one' }) as unknown as Query<S, Name, Row, Row, Head>;
+    return this.#with({ cardinality: 'one' }) as unknown as Query<S, Name, Row, Row, Head, Throws>;
   }
 
   /** One row or `null`; more than one is an error (`not_single`). */
-  maybeSingle(this: [Out] extends [null] ? never : Query<S, Name, Row, Out, Head>): Query<S, Name, Row, Row | null, Head> {
+  maybeSingle(this: [Out] extends [null] ? never : Query<S, Name, Row, Out, Head, Throws>): Query<S, Name, Row, Row | null, Head, Throws> {
     this.#requireRows();
-    return this.#with({ cardinality: 'maybe' }) as unknown as Query<S, Name, Row, Row | null, Head>;
+    return this.#with({ cardinality: 'maybe' }) as unknown as Query<S, Name, Row, Row | null, Head, Throws>;
   }
 
   #requireRows(): void {
@@ -238,14 +242,14 @@ export class Query<S extends GenericSchema, Name extends string, Row, Out, Head 
    * After `insert`/`update`/`upsert`/`delete`: return the affected rows,
    * with these columns and embeds.
    */
-  select<Q extends string = '*'>(columns?: Q): Query<S, Name, SelectRow<S, Name, Q>, Head extends true ? null : SelectRow<S, Name, Q>[], Head> {
+  select<Q extends string = '*'>(columns?: Q): Query<S, Name, SelectRow<S, Name, Q>, Head extends true ? null : SelectRow<S, Name, Q>[], Head, Throws> {
     const params = this.#state.params.filter(([k]) => k !== 'select');
     const next = this.#with({
       params: [...params, ['select', selectList(columns ?? '*')]],
       prefer: [...this.#state.prefer.filter((p) => !p.startsWith('return=')), 'return=representation'],
       returnsRows: this.#state.method !== 'HEAD',
     });
-    return next as unknown as Query<S, Name, SelectRow<S, Name, Q>, Head extends true ? null : SelectRow<S, Name, Q>[], Head>;
+    return next as unknown as Query<S, Name, SelectRow<S, Name, Q>, Head extends true ? null : SelectRow<S, Name, Q>[], Head, Throws>;
   }
 
   abortSignal(signal: AbortSignal): this {
@@ -264,7 +268,23 @@ export class Query<S extends GenericSchema, Name extends string, Row, Out, Head 
 
   // ------------------------------------------------------------ sending
 
-  async execute(): Promise<QueryResult<Out>> {
+  /**
+   * Awaiting the query throws its `NelcotaError` instead of returning it,
+   * and the result type drops the error branch:
+   * `const { data } = await nelcota.from('notes').select().throwOnError()`.
+   */
+  throwOnError(): Query<S, Name, Row, Out, Head, true> {
+    return this.#with({ throws: true }) as unknown as Query<S, Name, Row, Out, Head, true>;
+  }
+
+  /** Sends the request; throws on failure after `throwOnError()`. */
+  async execute(): Promise<QueryOutcome<Out, Throws>> {
+    const result = await this.#run();
+    if (result.error && this.#state.throws) throw result.error;
+    return result as QueryOutcome<Out, Throws>;
+  }
+
+  async #run(): Promise<QueryResult<Out>> {
     const state = this.#state;
     const params = [...state.params];
     // `single` on a read needs two rows at most to tell one from many.
@@ -316,7 +336,7 @@ export class Query<S extends GenericSchema, Name extends string, Row, Out, Head 
    * for await (const page of nelcota.from('notes').select().order('id').pages(500)) { ... }
    * ```
    */
-  async *pages(this: Query<S, Name, Row, Row[], false>, size: number): AsyncGenerator<Row[], void, undefined> {
+  async *pages<T extends boolean>(this: Query<S, Name, Row, Row[], false, T>, size: number): AsyncGenerator<Row[], void, undefined> {
     const state = this.#state;
     if (state.method !== 'GET' || state.cardinality !== 'many') {
       throw new NelcotaUsageError('pages() works on select() reads, without single/maybeSingle or head: true');
@@ -325,7 +345,7 @@ export class Query<S extends GenericSchema, Name extends string, Row, Out, Head 
     const start = state.params.find(([k]) => k === 'offset')?.[1];
     let offset = start === undefined ? 0 : Number(start);
     for (;;) {
-      const { data, error } = await this.offset(offset).limit(size).execute();
+      const { data, error } = await this.offset(offset).limit(size).#run();
       if (error) throw error;
       if (data.length === 0) return;
       yield data;
@@ -333,8 +353,8 @@ export class Query<S extends GenericSchema, Name extends string, Row, Out, Head 
     }
   }
 
-  then<A = QueryResult<Out>, B = never>(
-    onfulfilled?: ((value: QueryResult<Out>) => A | PromiseLike<A>) | null,
+  then<A = QueryOutcome<Out, Throws>, B = never>(
+    onfulfilled?: ((value: QueryOutcome<Out, Throws>) => A | PromiseLike<A>) | null,
     onrejected?: ((reason: unknown) => B | PromiseLike<B>) | null,
   ): Promise<A | B> {
     return this.execute().then(onfulfilled, onrejected);

@@ -87,6 +87,18 @@ const { data, error } = await nelcota.from('notes').select('id,body');
 if (error) console.error(error.code, error.message);
 ```
 
+To use exceptions instead, call `.throwOnError()` on a query (its result
+type then has no error branch) or pass any result to `unwrap`, which
+returns `data` or throws the `NelcotaError`:
+
+```ts
+import { unwrap } from '@nelcota/client';
+
+const { data: notes } = await nelcota.from('notes').select('id,body').throwOnError();
+const user = unwrap(await nelcota.auth.getUser());
+const blob = unwrap(await nelcota.storage.from('files').download('a.txt'));
+```
+
 ## Tables, views and functions
 
 ```ts

@@ -23,7 +23,7 @@ import type {
   SchemaOf,
 } from './types.js';
 
-export { NelcotaError, NelcotaUsageError } from '../core/errors.js';
+export { NelcotaError, NelcotaUsageError, unwrap } from '../core/errors.js';
 export { escapeLike } from '../core/encoding.js';
 export type { TransportOptions } from '../core/options.js';
 export type { FetchLike, TokenSource } from '../core/http.js';
@@ -41,6 +41,7 @@ export type {
   CountOption,
   FilterColumn,
   OrderOptions,
+  QueryOutcome,
   QueryResult,
   QuerySuccess,
   ReferencedOption,

@@ -150,6 +150,15 @@ export function fail(error: NelcotaError): { data: null; error: NelcotaError } {
   return { data: null, error };
 }
 
+/**
+ * The data of a result, or its error thrown: for code that prefers
+ * exceptions. `const user = unwrap(await nelcota.auth.getUser())`.
+ */
+export function unwrap<T>(result: { data: T; error: null } | { data: null; error: NelcotaError }): T {
+  if (result.error) throw result.error;
+  return result.data as T;
+}
+
 export function clientError(code: ClientErrorCode, message: string, cause?: unknown): NelcotaError {
   return new NelcotaError({ status: 0, code, message, cause });
 }

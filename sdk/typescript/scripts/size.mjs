@@ -23,12 +23,12 @@ process.on('exit', () => rmSync(dist, { recursive: true, force: true }));
 
 const BUDGETS = {
   // Includes shared cancellation, explicit row/bucket contract validation and
-  // the optional Postgres error fields and the pages() iterator.
-  'index.js': 13_550,
+  // the optional Postgres error fields, pages() and throwOnError()/unwrap().
+  'index.js': 13_650,
   // Standalone factories include HTTP and keep the other feature modules out.
-  'rest/index.js': 8_400,
+  'rest/index.js': 8_500,
   'auth/index.js': 7_800,
-  'storage/index.js': 6_300,
+  'storage/index.js': 6_350,
 };
 
 function closure(entry, seen = new Set()) {

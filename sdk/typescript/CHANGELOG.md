@@ -11,6 +11,9 @@
 - Add `offset(n)` (parity with the Rust client), a `range` field on query
   results (the returned rows, from `Content-Range`) so a server row cap is
   visible, and a `pages(size)` async iterator that walks every row.
+- Add `.throwOnError()` on queries and an exported `unwrap(result)` helper
+  for code that prefers exceptions; the examples use them instead of a local
+  helper.
 
 - Cancel auth/request waits independently while accepted refresh rotation
   completes and persists the replacement token.
