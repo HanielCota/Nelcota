@@ -4,6 +4,7 @@
   import { Button } from '$lib/components/ui/button'
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu'
   import Play from '@lucide/svelte/icons/play'
+  import Square from '@lucide/svelte/icons/square'
   import ChevronDown from '@lucide/svelte/icons/chevron-down'
   import FolderOpen from '@lucide/svelte/icons/folder-open'
   import History from '@lucide/svelte/icons/history'
@@ -105,6 +106,13 @@
     // Postgres counts from 1 within the text it received.
     const position = !execution.error && result && 'error' in result ? result.error.position : null
     errorAt = position ? offset + position - 1 : null
+  }
+
+  /** Stops waiting for the query; dropping the request cancels it on the server. */
+  function stop() {
+    if (!execution.running) return
+    execution.stop()
+    toast.info(t('sql.editor.stoppedToast'))
   }
 
   /** Line of the editor text where the last run failed. */
@@ -260,6 +268,11 @@
           </DropdownMenu.Root>
         </div>
 
+        {#if running}
+          <Button variant="outline" onclick={stop} title={t('sql.editor.stopTitle')}>
+            <Square data-icon="inline-start" aria-hidden="true" />{t('sql.editor.stop')}
+          </Button>
+        {/if}
         <Button onclick={run} disabled={running} title={t('sql.editor.runTitle', { shortcut: `${mod}+Enter` })} class="min-w-28">
           {#if running}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{:else}<Play data-icon="inline-start" aria-hidden="true" />{/if}{running ? t('sql.editor.running') : runsSelection ? t('sql.editor.runSelection') : t('sql.editor.run')}
         </Button>

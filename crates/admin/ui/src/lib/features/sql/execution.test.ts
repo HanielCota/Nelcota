@@ -60,6 +60,22 @@ describe('SQL execution lifetime', () => {
     expect(execution.error).toBeNull()
   })
 
+  it('stops a running query and keeps schema loading', async () => {
+    const { execution, adapter } = fixture(), pending = deferred<SqlResponse>()
+    adapter.execute = vi.fn(() => pending.promise)
+    const loading = execution.loadSchema()
+    const run = execution.run('select pg_sleep(60)')
+    const signal = vi.mocked(adapter.execute).mock.calls[0][1]
+    execution.stop()
+    expect(signal.aborted).toBe(true)
+    expect(execution.running).toBe(false)
+    pending.reject(new DOMException('Aborted', 'AbortError'))
+    expect(await run).toBe(false)
+    expect(execution.error).toBeNull()
+    expect(await loading).toBe(true)
+    expect(execution.schema.data?.tables).toEqual({ docs: ['id'] })
+  })
+
   it('cancels schema loading without preventing SQL execution', async () => {
     const { execution, adapter } = fixture(), schema = deferred<{ schema: string; tables: Record<string, string[]> }>()
     adapter.schema = vi.fn(() => schema.promise)

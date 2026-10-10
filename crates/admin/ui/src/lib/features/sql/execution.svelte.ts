@@ -45,11 +45,19 @@ export class SqlExecution {
     }
   }
 
-  cancel() {
+  /**
+   * Stops the running query (the server cancels it when the request drops)
+   * and keeps the previous result. Schema loading is left alone.
+   */
+  stop() {
     this.generation++
     this.controller?.abort()
     this.controller = undefined
     this.running = false
+  }
+
+  cancel() {
+    this.stop()
     this.schema.cancel()
   }
 }
