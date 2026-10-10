@@ -18,7 +18,6 @@
   import * as Field from '$lib/components/ui/field'
   import { Skeleton } from '$lib/components/ui/skeleton'
   import { toast } from 'svelte-sonner'
-  import PageHeader from '$lib/components/shared/PageHeader.svelte'
   import DatabaseTabs from '$lib/components/shared/DatabaseTabs.svelte'
   import { RemoteResource } from '$lib/remote-resource.svelte'
   import { api } from '$lib/api'
@@ -97,174 +96,190 @@
   }
 </script>
 
-<div class="mx-auto grid w-full max-w-page gap-6 px-4 pt-2 pb-12 *:min-w-0 sm:px-6 lg:px-8 [&>:first-child]:mb-0">
-  <PageHeader title={t('migrations.title')} description={t('migrations.description')} />
-  <DatabaseTabs />
+{#snippet howTo(data: MigrationsData)}
+  <!-- How a panel change reaches the other environments. -->
+  <section class="grid gap-4" aria-label={t('migrations.steps.title')}>
+    <h2 class="text-sm font-semibold">{t('migrations.steps.title')}</h2>
+    <ol class="grid gap-4" aria-label={t('migrations.steps.label')}>
+      {#each steps as step, index (step.id)}
+        <li class="grid grid-cols-[1.75rem_minmax(0,1fr)] gap-x-3 gap-y-1">
+          <span class={['grid size-7 place-items-center rounded-full text-xs font-semibold tabular-nums', step.done ? 'bg-brand/15 text-brand' : 'bg-well']}>
+            {#if step.done}<CircleCheck class="size-4" aria-hidden="true" />{:else}{index + 1}{/if}
+          </span>
+          <p class="self-center text-sm font-medium">{step.title}</p>
+          <p class={['col-start-2 text-sm text-muted-foreground', step.id === 'generate' && generated && 'break-all font-mono text-xs']}>{step.hint}</p>
+          {#if step.id === 'keep' && generated}
+            <Badge variant="secondary" class="col-start-2 mt-1 justify-self-start">{t(data.migrations.some((migration) => migration.version === generated!.version && migration.in_folder === true) ? 'migrations.steps.inFolder' : 'migrations.steps.pending')}</Badge>
+          {/if}
+        </li>
+      {/each}
+    </ol>
+    {#if generated}
+      <p class="rounded-2xl bg-well px-4 py-3 text-sm">
+        <span class="font-mono">{generated.filename}</span> {t('migrations.generatedBefore')}
+        <span class="font-mono">migrations/</span> {t('migrations.generatedMiddle')}
+        <span class="font-mono">nelcota migrate</span> {t('migrations.generatedAfter')}
+      </p>
+    {/if}
+  </section>
+{/snippet}
 
-  {#if error}<LoadError message={error} onretry={load} busy={loading} />{/if}
-  {#if !data && loading}
-    <div class="grid gap-4 sm:grid-cols-3">{#each [0, 1, 2] as i (i)}<Skeleton class="h-28 rounded-3xl" />{/each}</div>
-    <Skeleton class="h-72 rounded-3xl" />
-  {:else if data}
-    <!-- Figures on the same tracks as the columns below (as on Policies). -->
-    <div class="grid gap-4 sm:grid-cols-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_24rem] xl:gap-6">
-      <div class="grid gap-1 rounded-3xl bg-card p-5">
-        <p class="text-sm text-muted-foreground">{t('migrations.stats.pending')}</p>
-        <p class={['text-3xl font-semibold tracking-tight tabular-nums', data.pending.length > 0 && 'text-warning']}>{data.pending.length}</p>
-      </div>
-      <div class="grid gap-1 rounded-3xl bg-card p-5">
-        <p class="text-sm text-muted-foreground">{t('migrations.stats.applied')}</p>
-        <p class="text-3xl font-semibold tracking-tight tabular-nums">{data.migrations.filter((migration) => migration.applied_on).length}</p>
-      </div>
-      <div class="grid gap-1 rounded-3xl bg-card p-5">
-        <p class="text-sm text-muted-foreground">{t('migrations.stats.next')}</p>
-        <p class="font-mono text-3xl font-semibold tracking-tight tabular-nums">V{data.next_version}</p>
+<!-- Same frame as Tables and SQL: the Database tabs head a sidebar card on
+     the left, the work fills the rest. -->
+<div class="mx-auto flex w-full max-w-page flex-col gap-3 px-4 pt-1 pb-4 *:min-w-0 sm:px-6 lg:h-full lg:min-h-0 lg:flex-row lg:px-8">
+  <aside aria-label={t('migrations.title')} class="flex w-full shrink-0 flex-col overflow-hidden rounded-3xl bg-card lg:w-64 xl:w-72">
+    <div class="grid gap-3 border-b p-4">
+      <DatabaseTabs fill />
+      <div class="grid gap-1 px-1">
+        <h1 class="text-sm font-semibold">{t('migrations.title')}</h1>
+        <p class="text-xs text-muted-foreground">{t('migrations.description')}</p>
       </div>
     </div>
-
-    <div class="grid gap-6 *:min-w-0 xl:grid-cols-[minmax(0,1fr)_24rem] xl:items-start">
-      <div class="grid min-w-0 gap-6">
-        <section class="grid gap-4 rounded-3xl bg-card p-5" aria-labelledby="migrations-pending">
-          <div class="flex flex-wrap items-start justify-between gap-3">
-            <div class="grid gap-1">
-              <h2 id="migrations-pending" class="text-lg font-semibold">{t('migrations.pendingTitle')}</h2>
-              <p class="text-sm text-muted-foreground">{t('migrations.pendingHint')}</p>
-            </div>
-            {#if data.pending.length}
-              <Button onclick={() => (dialogOpen = true)}><FilePlus data-icon="inline-start" aria-hidden="true" />{t('migrations.generate')}</Button>
-            {/if}
+    <div class="grid min-h-0 flex-1 content-start gap-5 overflow-y-auto p-5">
+      {#if data}
+        <dl class="grid grid-cols-3 gap-3 lg:grid-cols-1">
+          <div class="grid content-start gap-1 lg:flex lg:items-baseline lg:justify-between">
+            <dt class="text-xs text-muted-foreground lg:text-sm">{t('migrations.stats.pending')}</dt>
+            <dd class={['text-2xl font-semibold tracking-tight tabular-nums', data.pending.length > 0 && 'text-warning']}>{data.pending.length}</dd>
           </div>
+          <div class="grid content-start gap-1 lg:flex lg:items-baseline lg:justify-between">
+            <dt class="text-xs text-muted-foreground lg:text-sm">{t('migrations.stats.applied')}</dt>
+            <dd class="text-2xl font-semibold tracking-tight tabular-nums">{data.migrations.filter((migration) => migration.applied_on).length}</dd>
+          </div>
+          <div class="grid content-start gap-1 lg:flex lg:items-baseline lg:justify-between">
+            <dt class="text-xs text-muted-foreground lg:text-sm">{t('migrations.stats.next')}</dt>
+            <dd class="font-mono text-2xl font-semibold tracking-tight tabular-nums">V{data.next_version}</dd>
+          </div>
+        </dl>
+        <div class="hidden border-t pt-5 lg:block">{@render howTo(data)}</div>
+      {:else if loading}
+        {#each [0, 1, 2] as i (i)}<Skeleton class="h-7 w-full" />{/each}
+      {/if}
+    </div>
+  </aside>
 
-          {#if data.pending.length === 0}
-            <div class="flex items-center gap-3 rounded-2xl bg-well px-4 py-3.5">
-              <CircleCheck class="size-5 shrink-0 text-brand" aria-hidden="true" />
-              <div class="grid gap-0.5">
-                <p class="text-sm font-medium">{t('migrations.nothingPending')}</p>
-                <p class="text-sm text-muted-foreground">{t('migrations.nothingPendingHint')}</p>
-              </div>
-            </div>
-          {:else}
-            <ol class="grid gap-2">
-              {#each data.pending as change (change.id)}
-                <li class="rounded-2xl bg-well px-4 py-3">
-                  <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                    <p class="text-sm font-medium">{describe(change)}</p>
-                    <p class="text-xs text-muted-foreground">{date(change.applied_at)}</p>
-                  </div>
-                  <details class="mt-1 text-sm">
-                    <summary class="cursor-pointer text-muted-foreground hover:text-foreground">
-                      {t('migrations.statements', { count: change.statements.length })}
-                    </summary>
-                    <div class="mt-2"><CodeBlock code={change.statements
-                        .map((s) => s.trim().replace(/;$/, '') + ';')
-                        .join('\n')} lang="sql" /></div>
-                  </details>
-                </li>
-              {/each}
-            </ol>
-          {/if}
-        </section>
-
-        <section class="grid gap-4 rounded-3xl bg-card p-5" aria-labelledby="migrations-list">
-          <h2 id="migrations-list" class="text-lg font-semibold">{t('migrations.listTitle')}</h2>
-          {#if data.migrations.length === 0}
-            <div class="flex items-center gap-3 rounded-2xl bg-well px-4 py-3.5">
-              <FilePlus class="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
-              <div class="grid gap-0.5">
-                <p class="text-sm font-medium">{t('migrations.noMigrations')}</p>
-                <p class="text-sm text-muted-foreground">{t('migrations.noMigrationsHint')}</p>
-              </div>
-            </div>
-          {:else}
-            <div class="grid gap-2 md:hidden">
-              {#each data.migrations as migration (migration.version)}
-                {@const situation = status(migration)}
-                <article class="grid min-w-0 gap-3 rounded-2xl bg-well p-4">
-                  <p class="break-words font-mono text-xs"><span class="text-muted-foreground">V{migration.version}</span> · {migration.name}</p>
-                  <div class="flex flex-wrap items-center gap-2"><Badge variant="outline" class={situation.warn ? 'border-warning/30 text-warning' : 'text-muted-foreground'}>{#if situation.warn}<CircleAlert aria-hidden="true" />{:else}<CircleCheck aria-hidden="true" />{/if}{situation.label}</Badge>{#if migration.from_panel}<span class="text-xs text-muted-foreground">{t('migrations.fromPanel')}</span>{/if}</div>
-                  <p class="text-xs text-muted-foreground">{t('migrations.columns.appliedOn')}: {date(migration.applied_on)}</p>
-                  {#if migration.from_panel}<Button variant="outline" size="sm" class="justify-self-start" href={`/admin/api/migrations/${migration.version}/file`} download><Download data-icon="inline-start" aria-hidden="true" />{t('common.download')}</Button>{/if}
-                </article>
-              {/each}
-            </div>
-            <div class="-mx-5 hidden md:block">
-              <Table.Root>
-                <Table.Header>
-                  <Table.Row class="hover:bg-transparent">
-                    <Table.Head class="w-20">{t('migrations.columns.version')}</Table.Head>
-                    <Table.Head>{t('migrations.columns.name')}</Table.Head>
-                    <Table.Head>{t('migrations.columns.status')}</Table.Head>
-                    <Table.Head>{t('migrations.columns.appliedOn')}</Table.Head>
-                    <Table.Head class="w-28"><span class="sr-only">{t('common.actions')}</span></Table.Head>
-                  </Table.Row>
-                </Table.Header>
-                <Table.Body>
-                  {#each data.migrations as migration (migration.version)}
-                    {@const situation = status(migration)}
-                    <Table.Row>
-                      <Table.Cell class="font-mono text-xs tabular-nums">V{migration.version}</Table.Cell>
-                      <Table.Cell>
-                        <span class="font-mono text-xs">{migration.name}</span>
-                        {#if migration.from_panel}<span class="ml-2 text-xs text-muted-foreground">{t('migrations.fromPanel')}</span>{/if}
-                      </Table.Cell>
-                      <Table.Cell><Badge variant="outline" class={situation.warn ? 'border-warning/30 text-warning' : 'text-muted-foreground'}>{#if situation.warn}<CircleAlert aria-hidden="true" />{:else}<CircleCheck aria-hidden="true" />{/if}{situation.label}</Badge></Table.Cell>
-                      <Table.Cell class="text-muted-foreground">{date(migration.applied_on)}</Table.Cell>
-                      <Table.Cell class="text-right">
-                        {#if migration.from_panel}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            href={`/admin/api/migrations/${migration.version}/file`}
-                            download><Download data-icon="inline-start" aria-hidden="true" />{t('common.download')}</Button
-                          >
-                        {/if}
-                      </Table.Cell>
-                    </Table.Row>
-                  {/each}
-                </Table.Body>
-              </Table.Root>
-            </div>
-          {/if}
-          <p class="flex items-start gap-2 text-xs text-muted-foreground">
-            <FolderOpen class="mt-px size-3.5 shrink-0" aria-hidden="true" />
-            <span>
-              {#if data.folder}
-                {t('migrations.folderRead')} <span class="font-mono">{data.folder}</span>.
-              {:else}
-                {t('migrations.folderMissing')}
-              {/if}
-            </span>
-          </p>
-        </section>
+  <div class="grid min-w-0 flex-1 content-start gap-3 lg:overflow-y-auto lg:rounded-3xl">
+    {#if error}<LoadError message={error} onretry={load} busy={loading} />{/if}
+    {#if !data && loading}
+      <Skeleton class="h-40 rounded-3xl" />
+      <Skeleton class="h-72 rounded-3xl" />
+    {:else if data}
+    <section class="grid gap-4 rounded-3xl bg-card p-5" aria-labelledby="migrations-pending">
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <div class="grid gap-1">
+          <h2 id="migrations-pending" class="text-lg font-semibold">{t('migrations.pendingTitle')}</h2>
+          <p class="text-sm text-muted-foreground">{t('migrations.pendingHint')}</p>
+        </div>
+        {#if data.pending.length}
+          <Button onclick={() => (dialogOpen = true)}><FilePlus data-icon="inline-start" aria-hidden="true" />{t('migrations.generate')}</Button>
+        {/if}
       </div>
 
-      <!-- How a panel change reaches the other environments. -->
-      <aside class="grid gap-4 rounded-3xl bg-card p-5 xl:sticky xl:top-24" aria-labelledby="migrations-steps">
-        <h2 id="migrations-steps" class="text-lg font-semibold">{t('migrations.steps.title')}</h2>
-        <ol class="grid gap-4" aria-label={t('migrations.steps.label')}>
-          {#each steps as step, index (step.id)}
-            <li class="grid grid-cols-[1.75rem_minmax(0,1fr)] gap-x-3 gap-y-1">
-              <span class={['grid size-7 place-items-center rounded-full text-xs font-semibold tabular-nums', step.done ? 'bg-brand/15 text-brand' : 'bg-well']}>
-                {#if step.done}<CircleCheck class="size-4" aria-hidden="true" />{:else}{index + 1}{/if}
-              </span>
-              <p class="self-center text-sm font-medium">{step.title}</p>
-              <p class={['col-start-2 text-sm text-muted-foreground', step.id === 'generate' && generated && 'break-all font-mono text-xs']}>{step.hint}</p>
-              {#if step.id === 'keep' && generated}
-                <Badge variant="secondary" class="col-start-2 mt-1 justify-self-start">{t(data.migrations.some((migration) => migration.version === generated!.version && migration.in_folder === true) ? 'migrations.steps.inFolder' : 'migrations.steps.pending')}</Badge>
-              {/if}
+      {#if data.pending.length === 0}
+        <div class="flex items-center gap-3 rounded-2xl bg-well px-4 py-3.5">
+          <CircleCheck class="size-5 shrink-0 text-brand" aria-hidden="true" />
+          <div class="grid gap-0.5">
+            <p class="text-sm font-medium">{t('migrations.nothingPending')}</p>
+            <p class="text-sm text-muted-foreground">{t('migrations.nothingPendingHint')}</p>
+          </div>
+        </div>
+      {:else}
+        <ol class="grid gap-2">
+          {#each data.pending as change (change.id)}
+            <li class="rounded-2xl bg-well px-4 py-3">
+              <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                <p class="text-sm font-medium">{describe(change)}</p>
+                <p class="text-xs text-muted-foreground">{date(change.applied_at)}</p>
+              </div>
+              <details class="mt-1 text-sm">
+                <summary class="cursor-pointer text-muted-foreground hover:text-foreground">
+                  {t('migrations.statements', { count: change.statements.length })}
+                </summary>
+                <div class="mt-2"><CodeBlock code={change.statements
+                    .map((s) => s.trim().replace(/;$/, '') + ';')
+                    .join('\n')} lang="sql" /></div>
+              </details>
             </li>
           {/each}
         </ol>
-        {#if generated}
-          <p class="rounded-2xl bg-well px-4 py-3 text-sm">
-            <span class="font-mono">{generated.filename}</span> {t('migrations.generatedBefore')}
-            <span class="font-mono">migrations/</span> {t('migrations.generatedMiddle')}
-            <span class="font-mono">nelcota migrate</span> {t('migrations.generatedAfter')}
-          </p>
-        {/if}
-      </aside>
-    </div>
-  {/if}
+      {/if}
+    </section>
+
+    <section class="grid gap-4 rounded-3xl bg-card p-5" aria-labelledby="migrations-list">
+      <h2 id="migrations-list" class="text-lg font-semibold">{t('migrations.listTitle')}</h2>
+      {#if data.migrations.length === 0}
+        <div class="flex items-center gap-3 rounded-2xl bg-well px-4 py-3.5">
+          <FilePlus class="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <div class="grid gap-0.5">
+            <p class="text-sm font-medium">{t('migrations.noMigrations')}</p>
+            <p class="text-sm text-muted-foreground">{t('migrations.noMigrationsHint')}</p>
+          </div>
+        </div>
+      {:else}
+        <div class="grid gap-2 md:hidden">
+          {#each data.migrations as migration (migration.version)}
+            {@const situation = status(migration)}
+            <article class="grid min-w-0 gap-3 rounded-2xl bg-well p-4">
+              <p class="break-words font-mono text-xs"><span class="text-muted-foreground">V{migration.version}</span> · {migration.name}</p>
+              <div class="flex flex-wrap items-center gap-2"><Badge variant="outline" class={situation.warn ? 'border-warning/30 text-warning' : 'text-muted-foreground'}>{#if situation.warn}<CircleAlert aria-hidden="true" />{:else}<CircleCheck aria-hidden="true" />{/if}{situation.label}</Badge>{#if migration.from_panel}<span class="text-xs text-muted-foreground">{t('migrations.fromPanel')}</span>{/if}</div>
+              <p class="text-xs text-muted-foreground">{t('migrations.columns.appliedOn')}: {date(migration.applied_on)}</p>
+              {#if migration.from_panel}<Button variant="outline" size="sm" class="justify-self-start" href={`/admin/api/migrations/${migration.version}/file`} download><Download data-icon="inline-start" aria-hidden="true" />{t('common.download')}</Button>{/if}
+            </article>
+          {/each}
+        </div>
+        <div class="-mx-5 hidden md:block">
+          <Table.Root>
+            <Table.Header>
+              <Table.Row class="hover:bg-transparent">
+                <Table.Head class="w-20">{t('migrations.columns.version')}</Table.Head>
+                <Table.Head>{t('migrations.columns.name')}</Table.Head>
+                <Table.Head>{t('migrations.columns.status')}</Table.Head>
+                <Table.Head>{t('migrations.columns.appliedOn')}</Table.Head>
+                <Table.Head class="w-28"><span class="sr-only">{t('common.actions')}</span></Table.Head>
+              </Table.Row>
+            </Table.Header>
+            <Table.Body>
+              {#each data.migrations as migration (migration.version)}
+                {@const situation = status(migration)}
+                <Table.Row>
+                  <Table.Cell class="font-mono text-xs tabular-nums">V{migration.version}</Table.Cell>
+                  <Table.Cell>
+                    <span class="font-mono text-xs">{migration.name}</span>
+                    {#if migration.from_panel}<span class="ml-2 text-xs text-muted-foreground">{t('migrations.fromPanel')}</span>{/if}
+                  </Table.Cell>
+                  <Table.Cell><Badge variant="outline" class={situation.warn ? 'border-warning/30 text-warning' : 'text-muted-foreground'}>{#if situation.warn}<CircleAlert aria-hidden="true" />{:else}<CircleCheck aria-hidden="true" />{/if}{situation.label}</Badge></Table.Cell>
+                  <Table.Cell class="text-muted-foreground">{date(migration.applied_on)}</Table.Cell>
+                  <Table.Cell class="text-right">
+                    {#if migration.from_panel}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        href={`/admin/api/migrations/${migration.version}/file`}
+                        download><Download data-icon="inline-start" aria-hidden="true" />{t('common.download')}</Button
+                      >
+                    {/if}
+                  </Table.Cell>
+                </Table.Row>
+              {/each}
+            </Table.Body>
+          </Table.Root>
+        </div>
+      {/if}
+      <p class="flex items-start gap-2 text-xs text-muted-foreground">
+        <FolderOpen class="mt-px size-3.5 shrink-0" aria-hidden="true" />
+        <span>
+          {#if data.folder}
+            {t('migrations.folderRead')} <span class="font-mono">{data.folder}</span>.
+          {:else}
+            {t('migrations.folderMissing')}
+          {/if}
+        </span>
+      </p>
+    </section>
+
+      <div class="rounded-3xl bg-card p-5 lg:hidden">{@render howTo(data)}</div>
+    {/if}
+  </div>
 </div>
 
 <Dialog.Root bind:open={() => dialogOpen, guard.change}>
