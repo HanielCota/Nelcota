@@ -12,7 +12,7 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 
 Before the first crates.io release, use a path dependency on `sdk/rust`.
-Requires Rust 1.99+. Full support targets the current repository build.
+Requires Rust 1.88+ (checked in CI). Full support targets the current repository build.
 
 | SDK | Server baseline | Support |
 |---|---|---|

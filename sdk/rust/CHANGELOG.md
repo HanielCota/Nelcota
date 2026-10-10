@@ -2,6 +2,9 @@
 
 ## 0.1.0 (unreleased)
 
+- Minimum supported Rust version lowered from 1.99 to 1.88, the oldest
+  release the dependency tree supports; CI tests it.
+
 - `auth::FileStorage` persists the session in a JSON file, replaced
   atomically and created with mode 0600 on Unix.
 

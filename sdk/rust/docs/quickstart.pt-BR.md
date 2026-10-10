@@ -1,6 +1,6 @@
 # Começando com Rust
 
-O SDK usa Tokio e requer Rust 1.99+. Até a primeira publicação, adicione
+O SDK usa Tokio e requer Rust 1.88+. Até a primeira publicação, adicione
 `nelcota-client = { path = "/caminho/Nelcota/sdk/rust" }` no Cargo.toml do seu
 aplicativo, junto de serde, serde_json e tokio (veja o README).
 
