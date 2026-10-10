@@ -279,6 +279,9 @@ const ptBR = {
     dropHint: 'Remove a tabela, as linhas e as políticas. Não dá para desfazer.',
     disableRlsTitle: 'Desativar o RLS?',
     disableRlsDescription: 'Sem RLS, as políticas deixam de valer: quem tem GRANT na tabela lê e altera todas as linhas.',
+    renameTitle: 'Renomear {from} para {to}?',
+    renameDescription: 'O endereço da API muda de /rest/v1/{from} para /rest/v1/{to}. Apps e clientes que ainda usam o nome antigo passam a receber erro até serem atualizados.',
+    renameConfirm: 'Renomear',
   },
   drop: {
     title: 'Apagar a tabela {name}?',
@@ -569,6 +572,9 @@ const en: Messages<typeof ptBR> = {
     dropHint: 'Removes the table, its rows and its policies. This cannot be undone.',
     disableRlsTitle: 'Disable RLS?',
     disableRlsDescription: 'Without RLS, policies stop applying: anyone with a GRANT on the table reads and changes every row.',
+    renameTitle: 'Rename {from} to {to}?',
+    renameDescription: 'The API address changes from /rest/v1/{from} to /rest/v1/{to}. Apps and clients still using the old name get errors until they are updated.',
+    renameConfirm: 'Rename',
   },
   drop: {
     title: 'Delete table {name}?',

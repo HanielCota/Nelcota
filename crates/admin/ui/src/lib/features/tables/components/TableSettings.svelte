@@ -35,6 +35,7 @@
   let grants = $state<GrantDef[]>([])
   let disableRlsOpen = $state(false)
   let enableRlsOpen = $state(false)
+  let renameOpen = $state(false)
   let busy = $state<'identity' | 'grants' | 'rls' | null>(null)
   let previous: Structure | null = null
 
@@ -72,7 +73,9 @@
       class="mt-3 grid gap-3 sm:grid-cols-[1fr_2fr_auto] sm:items-end"
       onsubmit={(e) => {
         e.preventDefault()
-        apply(identityChanges, 'identity').catch(() => {})
+        // A new name moves the REST endpoint: confirm before breaking clients.
+        if (identityChanges.some((a) => a.action === 'rename_table')) renameOpen = true
+        else apply(identityChanges, 'identity').catch(() => {})
       }}
     >
       <div class="grid gap-2">
@@ -139,6 +142,15 @@
   confirmLabel={t('tables.settings.disable')}
   destructive
   onconfirm={() => apply([{ action: 'set_rls', enabled: false }], 'rls')}
+/>
+
+<ConfirmDialog
+  bind:open={renameOpen}
+  title={t('tables.settings.renameTitle', { from: structure.name, to: name.trim() })}
+  description={t('tables.settings.renameDescription', { from: structure.name, to: name.trim() })}
+  confirmLabel={t('tables.settings.renameConfirm')}
+  destructive
+  onconfirm={() => apply(identityChanges, 'identity')}
 />
 
 <ConfirmDialog
