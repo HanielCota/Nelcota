@@ -19,6 +19,19 @@ describe.skipIf(skip)('REST against the server', () => {
     expect(head).toMatchObject({ data: null, error: null, count: 3 });
   });
 
+  it('reports the returned range, offsets and walks every page', async () => {
+    const nelcota = visitor();
+    const second = await nelcota.from('customers').select('id').order('id').limit(1).offset(1);
+    expect(second).toMatchObject({ error: null, range: { from: 1, to: 1 }, count: null });
+    const empty = await nelcota.from('customers').select('id').order('id').offset(100);
+    expect(empty).toMatchObject({ data: [], error: null, range: null });
+
+    const all = (await nelcota.from('customers').select('id').order('id').throwOnError()).data;
+    const paged: unknown[] = [];
+    for await (const page of nelcota.from('customers').select('id').order('id').pages(2)) paged.push(...page);
+    expect(paged).toEqual(all);
+  });
+
   it('finds values with delimiters through every operator form', async () => {
     const nelcota = visitor();
     const name = 'Ruler, "30cm" (wood)';
