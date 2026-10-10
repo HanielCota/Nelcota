@@ -109,7 +109,7 @@
               title={draft.sql.trim().split('\n')[0]}
               ><FilePen class="size-4 shrink-0" aria-hidden="true" /><span class="truncate">{draftName(draft.sql)}</span></button
             >
-            <Button variant="ghost" size="icon-xs" aria-label={t('common.discard')} title={t('common.discard')} onclick={() => ondeleteDraft(draft)}><Trash2 aria-hidden="true" /></Button>
+            <Button variant="ghost" size="icon-xs" aria-label={t('sql.sidebar.discardDraft', { name: draftName(draft.sql) })} title={t('common.discard')} onclick={() => ondeleteDraft(draft)}><Trash2 aria-hidden="true" /></Button>
           </div>
         {/each}
       </div>

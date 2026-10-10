@@ -30,6 +30,8 @@ const ptBR = {
     requests: 'Requisições no período',
     refused: 'Recusadas',
     errors: 'Erros do servidor',
+    ofTotal: 'de {whole} · {percent}',
+    share: '{part} de {whole} ({percent})',
   },
   cards: {
     database: 'Banco de dados',
@@ -99,6 +101,7 @@ const ptBR = {
     title: 'Página não encontrada',
     description: 'O endereço não existe neste painel.',
     back: 'Voltar à visão geral',
+    search: 'Buscar no painel',
   },
 }
 
@@ -131,6 +134,8 @@ const en: Messages<typeof ptBR> = {
     requests: 'Requests in the period',
     refused: 'Refused',
     errors: 'Server errors',
+    ofTotal: 'of {whole} · {percent}',
+    share: '{part} of {whole} ({percent})',
   },
   cards: {
     database: 'Database',
@@ -200,6 +205,7 @@ const en: Messages<typeof ptBR> = {
     title: 'Page not found',
     description: 'This address does not exist in this panel.',
     back: 'Back to the overview',
+    search: 'Search the panel',
   },
 }
 

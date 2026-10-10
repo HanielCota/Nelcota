@@ -25,6 +25,8 @@
   } = $props()
 
   const id = $props.id()
+  // Many columns on screen (new table): one compact row each.
+  const compact = $derived(mode === 'create')
   // Starts collapsed only when creating a table (many columns on screen).
   let expanded = $state(untrack(() => mode !== 'create'))
 
@@ -64,31 +66,64 @@
   }
 </script>
 
+<datalist id={`${id}-types`}>
+  {#each pgTypes.base as type (type)}<option value={type}></option>{/each}
+  {#each pgTypes.enums as type (type)}<option value={type}>enum</option>{/each}
+</datalist>
+<datalist id={`${id}-defaults`}>
+  {#each defaults as value (value)}<option {value}></option>{/each}
+</datalist>
+
+{#snippet nameInput(cls: string)}
+  <Input id={`${id}-name`} bind:value={column.name} placeholder={t('tables.columns.name')} class={cls} aria-label={compact ? t('tables.columns.nameLabel') : undefined} autocomplete="off" spellcheck={false} />
+{/snippet}
+{#snippet typeInput(cls: string)}
+  <Input id={`${id}-type`} bind:value={column.data_type} list={`${id}-types`} placeholder={t('tables.columns.type')} class={cls} aria-label={compact ? t('tables.columns.typeLabel') : undefined} autocomplete="off" spellcheck={false} />
+{/snippet}
+{#snippet defaultInput(cls: string)}
+  <Input
+    id={`${id}-default`}
+    bind:value={() => column.default ?? '', (v) => (column.default = v || null)}
+    list={`${id}-defaults`}
+    placeholder={column.identity ? 'identity' : t('tables.columns.defaultPlaceholder')}
+    disabled={column.identity}
+    class={cls}
+    aria-label={compact ? t('tables.columns.defaultLabel') : undefined}
+    autocomplete="off"
+    spellcheck={false}
+  />
+{/snippet}
+
 <div class="rounded-2xl bg-well">
+  {#if !compact}
+    <!-- One column at a time (Structure tab): visible labels instead of
+         placeholders that vanish as soon as you type. -->
+    <div class="grid gap-3 p-4 sm:grid-cols-3">
+      <div class="grid gap-1.5">
+        <label for={`${id}-name`} class="text-xs font-medium">{t('tables.columns.nameLabel')}</label>
+        {@render nameInput('font-mono text-xs')}
+      </div>
+      <div class="grid gap-1.5">
+        <label for={`${id}-type`} class="text-xs font-medium">{t('tables.columns.typeLabel')}</label>
+        {@render typeInput('font-mono text-xs')}
+      </div>
+      <div class="grid gap-1.5">
+        <label for={`${id}-default`} class="text-xs font-medium">{t('tables.columns.defaultLabel')} <span class="font-normal text-muted-foreground">({t('tables.create.optional')})</span></label>
+        {@render defaultInput('font-mono text-xs')}
+      </div>
+      <label class="flex cursor-pointer items-center gap-1.5 text-xs font-medium text-muted-foreground sm:col-span-3" title="NOT NULL">
+        <Checkbox
+          checked={!column.nullable || column.primary_key}
+          disabled={column.primary_key}
+          onCheckedChange={(v) => (column.nullable = v !== true)}
+        />{t('tables.columns.requiredLong')}
+      </label>
+    </div>
+  {:else}
   <div class="flex flex-wrap items-center gap-2 p-3">
-    <Input bind:value={column.name} placeholder={t('tables.columns.name')} class="w-32 font-mono text-xs" aria-label={t('tables.columns.nameLabel')} />
-    <Input
-      bind:value={column.data_type}
-      list={`${id}-types`}
-      placeholder={t('tables.columns.type')}
-      class="w-32 font-mono text-xs"
-      aria-label={t('tables.columns.typeLabel')}
-    />
-    <datalist id={`${id}-types`}>
-      {#each pgTypes.base as type (type)}<option value={type}></option>{/each}
-      {#each pgTypes.enums as type (type)}<option value={type}>enum</option>{/each}
-    </datalist>
-    <Input
-      bind:value={() => column.default ?? '', (v) => (column.default = v || null)}
-      list={`${id}-defaults`}
-      placeholder={column.identity ? 'identity' : t('tables.columns.defaultPlaceholder')}
-      disabled={column.identity}
-      class="min-w-24 flex-1 font-mono text-xs"
-      aria-label={t('tables.columns.defaultLabel')}
-    />
-    <datalist id={`${id}-defaults`}>
-      {#each defaults as value (value)}<option {value}></option>{/each}
-    </datalist>
+    {@render nameInput('w-32 font-mono text-xs')}
+    {@render typeInput('w-32 font-mono text-xs')}
+    {@render defaultInput('min-w-24 flex-1 font-mono text-xs')}
 
     {#if mode === 'create'}
       <label class="flex cursor-pointer items-center gap-1.5 text-xs font-medium text-muted-foreground" title={t('tables.columns.primaryKey')}>
@@ -118,9 +153,10 @@
       {/if}
     </div>
   </div>
+  {/if}
 
-  {#if expanded}
-    <div class="grid gap-4 rounded-b-xl border-t bg-muted/30 p-4 text-xs">
+  {#if expanded || !compact}
+    <div class="grid gap-4 rounded-b-2xl border-t bg-muted/30 p-4 text-xs">
       <div class="flex flex-wrap gap-4">
         <label class="flex items-center gap-1.5 text-muted-foreground">
           <Checkbox bind:checked={column.unique} disabled={column.primary_key} />{t('tables.columns.unique')}

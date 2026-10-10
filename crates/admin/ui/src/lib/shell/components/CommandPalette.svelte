@@ -90,7 +90,7 @@
             onSelect={() => run(() => navigate(`/tables/${encodeURIComponent(table.name)}`))}
           >
             <Rows3 /><span class="truncate">{table.name}</span>
-            {#if table.kind !== 'table'}<Command.Shortcut>view</Command.Shortcut>{/if}
+            {#if table.kind !== 'table'}<Command.Shortcut>{t('palette.view')}</Command.Shortcut>{/if}
           </Command.Item>
         {/each}
       </Command.Group>
@@ -127,4 +127,14 @@
       </Command.Item>
     </Command.Group>
   </Command.List>
+  <!-- The keys, for whoever opened it with the mouse; phones have none. -->
+  <p class="hidden items-center gap-4 border-t px-4 py-2.5 text-xs text-muted-foreground sm:flex" aria-hidden="true">
+    <span class="flex items-center gap-1.5">{@render key('↑')}{@render key('↓')}{t('palette.hints.move')}</span>
+    <span class="flex items-center gap-1.5">{@render key('Enter')}{t('palette.hints.open')}</span>
+    <span class="flex items-center gap-1.5">{@render key('Esc')}{t('palette.hints.close')}</span>
+  </p>
 </Command.Dialog>
+
+{#snippet key(label: string)}
+  <kbd class="grid h-5 min-w-5 place-items-center rounded-md border bg-well px-1 font-sans text-[0.6875rem] font-medium text-foreground">{label}</kbd>
+{/snippet}

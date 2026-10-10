@@ -179,8 +179,11 @@
   <SqlSidebar onrename={(query) => openDialog({ mode: 'rename', query })} ondelete={askDelete} ondeleteDraft={(draft) => { toDeleteDraft = draft; deleteDraftOpen = true }} />
 
   <div class="flex min-w-0 flex-1 flex-col overflow-hidden rounded-3xl bg-card">
-    <div class="flex min-h-14 shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b px-4 py-2.5 xl:flex-nowrap">
-      <div class="min-w-0 flex-1 basis-48">
+    <!-- Visual order differs by width. Phones: title with the open/history/save
+         icons, then "run as" next to Run. Desktop: title, run as, history,
+         save, run. -->
+    <div class="flex min-h-14 shrink-0 flex-wrap items-center gap-x-2 gap-y-2 border-b px-4 py-2.5 sm:gap-x-3 xl:flex-nowrap">
+      <div class="order-1 min-w-0 flex-1 basis-24 sm:basis-40">
       <QueryTitle
         name={sqlStore.current?.name ?? null}
         fallback={sqlStore.draft.trim() ? draftName(sqlStore.draft) : t('sql.editor.newQuery')}
@@ -189,13 +192,13 @@
         onsave={() => openDialog({ mode: 'save' })}
       />
       </div>
-      <RunAsPicker viewer={runAs} labels={runAsLabels} warnOwner onchange={chooseRunAs} />
-      <div class="ml-auto flex min-w-0 max-w-full flex-wrap items-center justify-end gap-2">
+      <div class="order-4 min-w-0 lg:order-2"><RunAsPicker viewer={runAs} labels={runAsLabels} warnOwner onchange={chooseRunAs} /></div>
+      <div class="order-2 flex items-center gap-1 sm:ml-auto lg:order-3">
         <!-- On screens without the sidebar, templates and saved queries live in a menu. -->
         <DropdownMenu.Root>
           <DropdownMenu.Trigger>
             {#snippet child({ props })}
-              <Button variant="ghost" size="sm" class="lg:hidden" {...props}><FolderOpen data-icon="inline-start" aria-hidden="true" />{t('sql.editor.open')}</Button>
+              <Button variant="ghost" size="sm" class="lg:hidden" title={t('sql.editor.open')} {...props}><FolderOpen data-icon="inline-start" aria-hidden="true" /><span class="max-sm:sr-only">{t('sql.editor.open')}</span></Button>
             {/snippet}
           </DropdownMenu.Trigger>
           <DropdownMenu.Content align="end" class="w-64">
@@ -243,11 +246,12 @@
             {/each}
           </DropdownMenu.Content>
         </DropdownMenu.Root>
+      </div>
 
-        <div class="flex">
-          <Button variant="outline" size="sm" class="rounded-r-none" onclick={save} title={`${mod}+S`}>
+        <div class="order-2 flex lg:order-4">
+          <Button variant="outline" size="sm" class="rounded-r-none" onclick={save} title={`${t('common.save')} (${mod}+S)`}>
             <Save data-icon="inline-start" aria-hidden="true" />
-            {t('common.save')}
+            <span class="max-sm:sr-only">{t('common.save')}</span>
           </Button>
           <DropdownMenu.Root>
             <DropdownMenu.Trigger>
@@ -272,12 +276,15 @@
           </DropdownMenu.Root>
         </div>
 
+      <!-- Phones only: ends the first row, so "run as" starts the second. -->
+      <div class="order-3 h-0 basis-full sm:hidden" aria-hidden="true"></div>
+      <div class="order-5 ml-auto flex items-center gap-2 sm:ml-0">
         {#if running}
           <Button variant="outline" onclick={stop} title={t('sql.editor.stopTitle')}>
             <Square data-icon="inline-start" aria-hidden="true" />{t('sql.editor.stop')}
           </Button>
         {/if}
-        <Button onclick={run} disabled={running} title={t('sql.editor.runTitle', { shortcut: `${mod}+Enter` })} class="min-w-28">
+        <Button onclick={run} disabled={running} title={t('sql.editor.runTitle', { shortcut: `${mod}+Enter` })} class="sm:min-w-28">
           {#if running}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{:else}<Play data-icon="inline-start" aria-hidden="true" />{/if}{running ? t('sql.editor.running') : runsSelection ? t('sql.editor.runSelection') : t('sql.editor.run')}
         </Button>
       </div>
@@ -321,6 +328,7 @@
       {:else if 'error' in response}
         <div class="p-4" role="alert">
           <div class="rounded-2xl bg-destructive/10 px-4 py-3 text-sm">
+            <p class="mb-1 font-medium text-destructive">{t('sql.results.failed')}</p>
             <p class="font-mono text-xs leading-relaxed text-destructive">
               {#if response.error.code}{response.error.code}:{' '}{/if}{response.error.message}
             </p>
@@ -374,13 +382,17 @@
                   <tr class="hover:bg-muted/40">
                     {#each row as cell, c (c)}
                       <td class="max-w-96 truncate border-r border-b px-3 py-2 font-mono text-xs" title={cell ?? 'NULL'}>
-                        <div class="flex items-center gap-2"><span class="min-w-0 flex-1 truncate">{#if cell === null}<span class="text-muted-foreground italic">NULL</span>{:else}{cell}{/if}</span>{#if cell && (cell.length > 80 || cell.includes('\n'))}<Button variant="ghost" size="icon-xs" aria-label={t('common.details')} onclick={() => { detail = { title: result.columns[c], value: cell }; detailOpen = true }}><Maximize2 aria-hidden="true" /></Button>{/if}</div>
+                        <div class="flex items-center gap-2"><span class="min-w-0 flex-1 truncate">{#if cell === null}<span class="text-3xs text-muted-foreground/80">NULL</span>{:else}{cell}{/if}</span>{#if cell && (cell.length > 80 || cell.includes('\n'))}<Button variant="ghost" size="icon-xs" aria-label={t('common.details')} onclick={() => { detail = { title: result.columns[c], value: cell }; detailOpen = true }}><Maximize2 aria-hidden="true" /></Button>{/if}</div>
                       </td>
                     {/each}
                   </tr>
                 {/each}
               </tbody>
             </table>
+            {#if result.rows.length === 0}
+              <!-- Headers alone looked like a rendering glitch; say the query just matched nothing. -->
+              <p class="border-b px-4 py-6 text-center text-sm text-muted-foreground">{t('sql.results.noMatchingRows')}</p>
+            {/if}
           {/if}
         {/each}
       {/if}

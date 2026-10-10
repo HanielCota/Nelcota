@@ -35,7 +35,8 @@
   <span class="hidden items-center gap-1 xl:inline-flex">
     {data.table.editable ? t('tables.footer.hintsEditable') : t('tables.footer.hints')}
   </span>
-  <div class="ml-auto flex items-center gap-2">
+  <!-- Phones: first/last page go (prev/next remain), so the row never clips. -->
+  <div class="ml-auto flex min-w-0 items-center gap-1.5 sm:gap-2">
     <span class="mr-1 hidden sm:inline">{t('tables.footer.perPage')}</span>
     <Select.Root type="single" value={size} onValueChange={onsize} {disabled}>
       <Select.Trigger size="sm" class="w-20" aria-label={t('tables.footer.rowsPerPage')}>{size}</Select.Trigger>
@@ -45,12 +46,12 @@
         {/each}
       </Select.Content>
     </Select.Root>
-    <span class="px-2 font-medium whitespace-nowrap text-foreground tabular-nums">
+    <span class="px-1 font-medium whitespace-nowrap text-foreground tabular-nums sm:px-2">
       {info.pageCount
         ? t('tables.footer.pageOf', { page: fmt.format(data.page + 1), count: fmt.format(info.pageCount) })
         : t('tables.footer.page', { page: fmt.format(data.page + 1) })}
     </span>
-    <Button variant="outline" size="icon-sm" disabled={disabled || page === 0} onclick={() => onpage(0)} aria-label={t('tables.footer.first')}>
+    <Button variant="outline" size="icon-sm" class="max-sm:hidden" disabled={disabled || page === 0} onclick={() => onpage(0)} aria-label={t('tables.footer.first')}>
       <ChevronsLeft />
     </Button>
     <Button variant="outline" size="icon-sm" disabled={disabled || page === 0} onclick={() => onpage(page - 1)} aria-label={t('tables.footer.previous')}>
@@ -62,6 +63,7 @@
     <Button
       variant="outline"
       size="icon-sm"
+      class="max-sm:hidden"
       disabled={disabled || info.lastPage === null || page >= info.lastPage}
       onclick={() => info.lastPage !== null && onpage(info.lastPage)}
       aria-label={t('tables.footer.last')}

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { formatCell } from '$lib/features/tables/format'
-  import { alignRight, monospace, type ColumnKind } from '$lib/features/tables/grid'
+  import { alignRight, monospace, shortUuid, type ColumnKind } from '$lib/features/tables/grid'
 
   let { value, type, kind }: { value: string | null; type: string; kind: ColumnKind } = $props()
 
@@ -30,6 +30,9 @@
     <span class={['font-mono', value === 'true' ? 'text-foreground' : 'text-muted-foreground']}>{value}</span>
   {:else if kind === 'enum'}
     <span class="rounded-full bg-well px-2 py-0.5 text-2xs">{value}</span>
+  {:else if kind === 'uuid' && shortUuid(value) !== value}
+    <!-- Shortened on screen; assistive tech and the tooltip get the whole id. -->
+    <span aria-hidden="true">{shortUuid(value)}</span><span class="sr-only">{value}</span>
   {:else if kind === 'json'}
     <span class="text-muted-foreground">{compactJson(value)}</span>
   {:else}

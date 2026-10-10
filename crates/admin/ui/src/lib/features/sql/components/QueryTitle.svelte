@@ -66,6 +66,9 @@
     </h1>
   {/if}
   {#if dirty && !editing}
-    <span class="shrink-0 text-xs text-muted-foreground" title={t('sql.editor.unsavedTitle')}>{t('sql.editor.unsaved')}</span>
+    <!-- Phones keep the room for the name: a dot stands in for the words. -->
+    <span class="shrink-0 text-xs text-muted-foreground" title={t('sql.editor.unsavedTitle')}
+      ><span class="block size-1.5 rounded-full bg-muted-foreground sm:hidden" aria-hidden="true"></span><span class="max-sm:sr-only">{t('sql.editor.unsaved')}</span></span
+    >
   {/if}
 </div>

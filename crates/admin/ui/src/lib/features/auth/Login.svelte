@@ -24,6 +24,8 @@
   // The mascot waves when the page opens, then stands still.
   let greeting = $state(true)
   onMount(() => {
+    // Signing in is the only thing to do here: start in the email field.
+    document.getElementById('email')?.focus()
     const timer = setTimeout(() => (greeting = false), 2200)
     api
       .get<{ project: string }>('/whoami')
@@ -36,6 +38,9 @@
   let password = $state('')
   // The failure itself (not its text), so the message follows a language switch.
   let failure = $state<unknown>(null)
+  // A field left empty, checked here instead of by the browser so the hint
+  // follows the panel language rather than the browser's.
+  let missing = $state<'email' | 'password' | null>(null)
   let loading = $state(false)
   let typingPassword = $state(false)
   let showPassword = $state(false)
@@ -48,6 +53,12 @@
   async function submit(event: SubmitEvent) {
     event.preventDefault()
     if (loading) return
+    missing = !email.trim() ? 'email' : !password ? 'password' : null
+    if (missing) {
+      failure = null
+      document.getElementById(missing)?.focus()
+      return
+    }
     loading = true
     failure = null
     try {
@@ -110,7 +121,7 @@
   <div class="relative w-full max-w-[400px]">
     <Mascot {pose} lookAt={caret} class="pointer-events-none absolute -top-[8.6rem] left-1/2 size-36 -translate-x-1/2" />
 
-    <form class="flex flex-col gap-5 rounded-3xl bg-card px-6 pt-10 pb-6 sm:px-8 sm:pb-8" onsubmit={submit} aria-busy={loading}>
+    <form class="flex flex-col gap-5 rounded-3xl bg-card px-6 pt-10 pb-6 sm:px-8 sm:pb-8" onsubmit={submit} aria-busy={loading} novalidate>
       <div class="text-center">
         <h1 class="text-xl font-semibold tracking-tight">{t('login.title')}</h1>
         <p class="mt-1 text-sm text-muted-foreground [overflow-wrap:anywhere]">
@@ -122,7 +133,7 @@
       {/if}
 
       <Field.Group class="gap-5">
-        <Field.Field>
+        <Field.Field data-invalid={missing === 'email' ? true : undefined}>
           <Field.Label for="email">{t('login.email')}</Field.Label>
           <Input
             id="email"
@@ -140,12 +151,16 @@
             onblur={() => (caret = null)}
             oninput={(e) => {
               failure = null
+              if (missing === 'email') missing = null
               followCaret(e)
             }}
             required
+            aria-invalid={missing === 'email' ? true : undefined}
+            aria-describedby={missing === 'email' ? 'login-email-error' : undefined}
           />
+          {#if missing === 'email'}<p id="login-email-error" class="text-sm text-destructive" role="alert">{t('login.emailRequired')}</p>{/if}
         </Field.Field>
-        <Field.Field data-invalid={failure ? true : undefined}>
+        <Field.Field data-invalid={failure || missing === 'password' ? true : undefined}>
           <Field.Label for="password">{t('login.password')}</Field.Label>
           <InputGroup.Root class="h-10">
             <InputGroup.Input
@@ -160,10 +175,13 @@
               onblur={() => { typingPassword = false; capsLock = false }}
               onkeydown={checkCapsLock}
               onkeyup={checkCapsLock}
-              oninput={() => (failure = null)}
+              oninput={() => {
+                failure = null
+                if (missing === 'password') missing = null
+              }}
               required
-              aria-invalid={failure ? true : undefined}
-              aria-describedby={failure ? 'login-error' : capsLock ? 'login-caps-lock' : undefined}
+              aria-invalid={failure || missing === 'password' ? true : undefined}
+              aria-describedby={failure || missing === 'password' ? 'login-error' : capsLock ? 'login-caps-lock' : undefined}
             />
             <InputGroup.Addon align="inline-end" class="py-0">
               <Button
@@ -179,14 +197,16 @@
               </Button>
             </InputGroup.Addon>
           </InputGroup.Root>
-          <div class="min-h-10 text-sm leading-5">
-            <p id="login-error" class="break-words text-destructive" role="alert">{failure ? errorMessage(failure) : ''}</p>
-            <p id="login-caps-lock" class="text-warning" role="status" aria-live="polite">{!failure && capsLock ? t('login.capsLock') : ''}</p>
+          <!-- One line kept for the error or the Caps Lock hint, so the button
+               does not jump when either appears; a longer error grows the card. -->
+          <div class="-mt-1 min-h-5 text-sm leading-5">
+            <p id="login-error" class="break-words text-destructive" role="alert">{failure ? errorMessage(failure) : missing === 'password' ? t('login.passwordRequired') : ''}</p>
+            <p id="login-caps-lock" class="text-warning" role="status" aria-live="polite">{!failure && !missing && capsLock ? t('login.capsLock') : ''}</p>
           </div>
         </Field.Field>
       </Field.Group>
 
-      <Button type="submit" class="mt-1 h-10 w-full" disabled={loading}>{#if loading}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{/if}{loading ? t('login.signingIn') : t('login.signIn')}</Button>
+      <Button type="submit" class="h-10 w-full" disabled={loading}>{#if loading}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{/if}{loading ? t('login.signingIn') : t('login.signIn')}</Button>
     </form>
 
     <p class="sr-only" role="status" aria-live="polite" aria-atomic="true">{loading ? t('login.signingIn') : ''}</p>
