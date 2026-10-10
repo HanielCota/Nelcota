@@ -163,6 +163,29 @@ pub fn reload(host: &Host, runtime: Runtime) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// The shared proxy's logs (certificates, routing errors).
+pub fn logs(host: &Host, runtime: Runtime, follow: bool) -> anyhow::Result<()> {
+    let mut command = match runtime {
+        Runtime::Docker => {
+            let mut command = compose_command(&host.caddy_dir());
+            command.args(["logs", "--tail", "200"]);
+            command
+        }
+        Runtime::Systemd => {
+            let mut command = Command::new("journalctl");
+            command.args(["--no-pager", "-n", "200", "-u", "caddy"]);
+            command
+        }
+    };
+    if follow {
+        command.arg("-f");
+    }
+    if runtime == Runtime::Docker {
+        command.arg("caddy");
+    }
+    crate::project::run(&mut command, "caddy logs")
+}
+
 pub fn down(host: &Host, runtime: Runtime, volumes: bool) -> anyhow::Result<()> {
     if runtime == Runtime::Systemd {
         return native::systemctl(&["stop".into(), "caddy".into()]);

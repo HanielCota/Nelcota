@@ -89,12 +89,13 @@ pub enum Command {
     Status,
     /// Checks the host: Docker, ports, disk, DNS, backup job and age, S3, health.
     Doctor,
-    /// Logs of a project.
+    /// Logs of a project, or of the host's Caddy.
     Logs {
         #[arg(short, long)]
         follow: bool,
-        /// postgres or app (default: both).
-        service: Option<String>,
+        /// app, postgres or caddy (default: the project's app and postgres).
+        #[arg(value_enum)]
+        service: Option<LogService>,
     },
     /// Removes a project: final backup in archive/, containers and data deleted.
     Remove {
@@ -200,6 +201,14 @@ fn at_least_one(value: &str) -> Result<usize, String> {
         Ok(n) => Ok(n),
         Err(err) => Err(err.to_string()),
     }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
+pub enum LogService {
+    App,
+    Postgres,
+    /// The shared proxy (host-wide; -p is not needed).
+    Caddy,
 }
 
 #[derive(Clone, Copy, Debug, Default, ValueEnum)]
@@ -408,10 +417,18 @@ pub fn run(cli: Cli) -> anyhow::Result<Outcome> {
         Command::Doctor => done(doctor::run(&host)),
         Command::Logs { follow, service } => {
             let manifest = host.require()?;
+            let service = match service {
+                Some(LogService::Caddy) => {
+                    return done(caddy::logs(&host, manifest.runtime, follow));
+                }
+                Some(LogService::App) => Some(project::Service::App),
+                Some(LogService::Postgres) => Some(project::Service::Postgres),
+                None => None,
+            };
             done(lifecycle::logs(
                 &host.select(&manifest, selection)?,
                 follow,
-                service.as_deref(),
+                service,
             ))
         }
         Command::Remove {
@@ -561,6 +578,22 @@ mod cli_tests {
             cli.command,
             Some(Command::Down { yes: false, .. })
         ));
+    }
+
+    #[test]
+    fn logs_take_a_known_service() {
+        for (name, service) in [
+            ("app", LogService::App),
+            ("postgres", LogService::Postgres),
+            ("caddy", LogService::Caddy),
+        ] {
+            let cli = Cli::try_parse_from(["nelcota", "logs", "-f", name]).unwrap();
+            assert!(matches!(
+                cli.command,
+                Some(Command::Logs { follow: true, service: Some(s) }) if s == service
+            ));
+        }
+        assert!(Cli::try_parse_from(["nelcota", "logs", "redis"]).is_err());
     }
 
     #[test]

@@ -181,7 +181,7 @@ pub fn status(host: &Host, manifest: &Manifest, projects: &[Project]) -> anyhow:
     Ok(())
 }
 
-pub fn logs(project: &Project, follow: bool, service: Option<&str>) -> anyhow::Result<()> {
+pub fn logs(project: &Project, follow: bool, service: Option<Service>) -> anyhow::Result<()> {
     project.logs(follow, service)
 }
 

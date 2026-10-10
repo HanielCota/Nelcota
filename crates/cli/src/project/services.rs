@@ -10,7 +10,7 @@ pub(super) trait Services {
     fn start(&self, services: &[Service]) -> anyhow::Result<()>;
     fn stop(&self, services: &[Service]) -> anyhow::Result<()>;
     fn recreate(&self, service: Service) -> anyhow::Result<()>;
-    fn logs(&self, follow: bool, service: Option<&str>) -> anyhow::Result<()>;
+    fn logs(&self, follow: bool, service: Option<Service>) -> anyhow::Result<()>;
     fn health(&self, service: Service) -> Option<String>;
     fn postgres_crashed(&self) -> bool;
     fn prepare_version(&self, version: &str) -> anyhow::Result<()>;
@@ -49,13 +49,13 @@ impl Services for Docker<'_> {
         self.0
             .compose_ok(&["up", "-d", "--force-recreate", service.compose()])
     }
-    fn logs(&self, follow: bool, service: Option<&str>) -> anyhow::Result<()> {
+    fn logs(&self, follow: bool, service: Option<Service>) -> anyhow::Result<()> {
         let mut args = vec!["logs", "--tail", "200"];
         if follow {
             args.push("-f");
         }
         if let Some(service) = service {
-            args.push(service);
+            args.push(service.compose());
         }
         self.0.compose_ok(&args)
     }
@@ -162,12 +162,10 @@ impl Services for Systemd<'_> {
         let _ = native::systemctl_quiet(&["reset-failed".to_owned(), self.unit(service)]);
         self.action("restart", &[service])
     }
-    fn logs(&self, follow: bool, service: Option<&str>) -> anyhow::Result<()> {
+    fn logs(&self, follow: bool, service: Option<Service>) -> anyhow::Result<()> {
         let units = match service {
             None => self.units(&[Service::Postgres, Service::App]),
-            Some("postgres") => self.units(&[Service::Postgres]),
-            Some("app") => self.units(&[Service::App]),
-            Some(other) => bail!("unknown service '{other}' (postgres or app)"),
+            Some(service) => self.units(&[service]),
         };
         let mut command = Command::new("journalctl");
         command.args(["--no-pager", "-n", "200"]);
