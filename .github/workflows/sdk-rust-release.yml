@@ -1,0 +1,50 @@
+name: Rust SDK release
+
+on:
+  push:
+    tags: ['rust-sdk-v*']
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    uses: ./.github/workflows/sdk-rust-check.yml
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d
+        with:
+          toolchain: '1.99.0'
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+      - run: cargo test -p nelcota-api --lib rust::tests
+      - run: cargo test -p nelcota-server --test sdk_rust
+      - run: cargo test -p nelcota-server --test oauth rust_sdk_finishes_a_real_pkce_flow
+  publish:
+    needs: [checks, contract]
+    runs-on: ubuntu-latest
+    environment: crates-io
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d
+        with:
+          toolchain: '1.99.0'
+      - name: tag matches the package version
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          python3 - <<'PY'
+          import os, tomllib
+          with open('sdk/rust/Cargo.toml', 'rb') as source:
+              version = tomllib.load(source)['package']['version']
+          assert os.environ['RELEASE_TAG'] == f'rust-sdk-v{version}', 'tag/version mismatch'
+          PY
+      - run: cargo publish -p nelcota-client --dry-run
+      - run: cargo publish -p nelcota-client
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}

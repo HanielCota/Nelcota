@@ -17,6 +17,7 @@
   import { Badge } from '$lib/components/ui/badge'
   import { toast } from 'svelte-sonner'
   import PageHeader from '$lib/components/shared/PageHeader.svelte'
+  import PillTabs from '$lib/components/shared/PillTabs.svelte'
   import EmptyState from '$lib/components/shared/EmptyState.svelte'
   import LoadError from '$lib/components/shared/LoadError.svelte'
   import ConfirmDialog from '$lib/components/shared/ConfirmDialog.svelte'
@@ -148,7 +149,7 @@
   </DropdownMenu.Root>
 {/snippet}
 
-<div class="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-10 lg:py-10">
+<div class="mx-auto w-full max-w-page px-4 pt-2 pb-12 sm:px-6 lg:px-8">
   <PageHeader
     title={t('users.title')}
     description={users ? t('users.count', { count: total }) : undefined}
@@ -168,13 +169,14 @@
       <Button onclick={() => (createOpen = true)}><UserPlus />{t('users.new')}</Button>
     {/snippet}
   </PageHeader>
+  <div class="-mt-2 mb-6"><PillTabs label={t('shell.pages.users')} current={'/users'} tabs={[{ path: '/users', label: t('shell.pages.users') }, { path: '/sign-in', label: t('shell.pages.userSignIn') }]} /></div>
 
   {#if error}<LoadError message={error} onretry={load} busy={loading} />{/if}
   {#if users === null}
-    {#if loading}<Skeleton class="h-64 rounded-lg" />{/if}
+    {#if loading}<Skeleton class="h-64 rounded-3xl" />{/if}
   {:else if users.length === 0}
     <EmptyState
-      class="rounded-lg border"
+      class="rounded-3xl bg-card"
       icon={appliedQuery ? Search : UsersIcon}
       title={appliedQuery ? t('users.noResults') : t('users.empty')}
       description={appliedQuery
@@ -197,7 +199,7 @@
   {:else}
     <div class="grid gap-3 md:hidden" aria-busy={loading}>
       {#each users as user (user.id)}
-        <article class="min-w-0 rounded-lg border bg-card p-4">
+        <article class="min-w-0 rounded-3xl bg-card p-4">
           <div class="flex min-w-0 items-start justify-between gap-2">
             <div class="min-w-0"><p class="break-all font-medium">{user.email}{@render unconfirmed(user)}</p><p class="mt-1 truncate font-mono text-xs text-muted-foreground" title={user.id}>{user.id}</p></div>
             {@render userActions(user)}
@@ -211,7 +213,7 @@
         </article>
       {/each}
     </div>
-    <div class="hidden overflow-hidden rounded-lg border bg-card md:block" aria-busy={loading}>
+    <div class="hidden overflow-hidden rounded-3xl bg-card md:block" aria-busy={loading}>
       <Table.Root>
         <Table.Header>
           <Table.Row class="hover:bg-transparent">

@@ -7,15 +7,37 @@
 #[derive(Debug, PartialEq, Eq)]
 pub struct InvalidCredential(pub &'static str);
 
-/// Lowercase email with no surrounding spaces, minimally validated (the
-/// database also requires lowercase and at most 254 characters).
+/// A simple mailbox address (ASCII dot-atom local part, DNS domain), matching
+/// the SMTP address parser. Display names, quoted local parts and controls
+/// are not account identifiers. Surrounding spaces are trimmed.
 pub fn normalize_email(email: &str) -> Result<String, InvalidCredential> {
+    if email.chars().any(char::is_control) {
+        return Err(InvalidCredential("invalid email"));
+    }
     let email = email.trim().to_lowercase();
     let valid = email.len() <= 254
         && !email.chars().any(char::is_whitespace)
         && email.split_once('@').is_some_and(|(local, domain)| {
-            !local.is_empty() && domain.contains('.') && !domain.contains('@')
-        });
+            !local.is_empty()
+                && local.len() <= 64
+                && local.split('.').all(|part| {
+                    !part.is_empty()
+                        && part.bytes().all(|b| {
+                            b.is_ascii_alphanumeric() || b"!#$%&'*+-/=?^_`{|}~".contains(&b)
+                        })
+                })
+                && domain.contains('.')
+                && domain.split('.').all(|label| {
+                    !label.is_empty()
+                        && label.len() <= 63
+                        && !label.starts_with('-')
+                        && !label.ends_with('-')
+                        && label
+                            .bytes()
+                            .all(|b| b.is_ascii_alphanumeric() || b == b'-')
+                })
+        })
+        && email.parse::<lettre::Address>().is_ok();
     if valid {
         Ok(email)
     } else {
@@ -53,6 +75,16 @@ mod tests {
             "ana@x",
             "a b@x.com",
             "a@b@x.com",
+            "ana\0@example.com",
+            "\nana@example.com",
+            "<victim@example.com>",
+            "a@.com",
+            "a..b@example.com",
+            ".a@example.com",
+            "a.@example.com",
+            "a@example..com",
+            "a@-example.com",
+            "a@example-.com",
         ] {
             assert!(normalize_email(bad).is_err(), "{bad}");
         }

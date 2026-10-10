@@ -15,6 +15,7 @@
 pub mod catalog;
 pub mod openapi;
 pub mod query;
+pub mod rust;
 pub mod typescript;
 
 mod http;
@@ -31,7 +32,8 @@ use std::sync::Arc;
 
 #[derive(Clone, Debug, Default)]
 pub struct ApiSettings {
-    /// Row cap per read (`NELCOTA_MAX_ROWS`); `None` = no cap.
+    /// Row cap per root, embedded collection and set-returning RPC.
+    /// `None` uses the safe default of 1000.
     pub max_rows: Option<i64>,
 }
 

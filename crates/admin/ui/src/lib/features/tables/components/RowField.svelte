@@ -6,6 +6,7 @@
   import { Button } from '$lib/components/ui/button'
   import KeyRound from '@lucide/svelte/icons/key-round'
   import { formatCell } from '$lib/features/tables/format'
+  import { formatJson as prettyJson } from '$lib/features/tables/json-format'
   import { columnKind } from '$lib/features/tables/grid'
   import type { FieldState } from '$lib/features/tables/row-form'
   import type { Column } from '$lib/types'
@@ -38,7 +39,7 @@
 
   function formatJson() {
     try {
-      field.value = JSON.stringify(JSON.parse(field.value), null, 2)
+      field.value = prettyJson(field.value)
     } catch {
       // Invalid: the error message is already visible.
     }
@@ -61,7 +62,7 @@
   </div>
 
   {#if field.isNull}
-    <div class="flex h-9 items-center rounded-lg border border-dashed border-border-strong bg-muted/40 px-3 font-mono text-xs text-muted-foreground">NULL</div>
+    <div class="flex h-9 items-center rounded-xl border border-dashed border-border-strong bg-well px-3 font-mono text-xs text-muted-foreground">NULL</div>
   {:else if options.length}
     <Select.Root type="single" bind:value={field.value}>
       <Select.Trigger {id} class="w-full" aria-invalid={problem ? true : undefined} aria-describedby={descriptionId}>{field.value || placeholder || t('tables.row.select')}</Select.Trigger>

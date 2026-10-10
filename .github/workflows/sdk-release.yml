@@ -14,7 +14,11 @@ permissions:
   contents: read
 
 jobs:
+  verify:
+    uses: ./.github/workflows/sdk-check.yml
+
   publish:
+    needs: verify
     runs-on: ubuntu-latest
     environment: npm
     permissions:
@@ -41,10 +45,6 @@ jobs:
             exit 1
           fi
       - run: npm ci
-      - run: npm audit --audit-level=high
-      - run: npm run check
-      - run: npm test
-      - run: npm run test:types
       - run: npm run build
-      - run: npm run size
-      - run: npm publish --access public --provenance
+      # The complete verification job already checked this tagged commit.
+      - run: npm publish --access public --provenance --ignore-scripts

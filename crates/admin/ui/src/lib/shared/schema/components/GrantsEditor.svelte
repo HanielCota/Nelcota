@@ -3,7 +3,8 @@
   import { API_ROLES, PRIVILEGES, type GrantDef, type Privilege, type ApiRole } from '$lib/shared/schema/ddl'
   import { t } from '$lib/i18n/index.svelte'
 
-  let { grants = $bindable() }: { grants: GrantDef[] } = $props()
+  // `surface` contrasts with what holds it: a well in a sheet, a card in a well.
+  let { grants = $bindable(), surface = 'bg-well' }: { grants: GrantDef[]; surface?: string } = $props()
 
   const has = (role: ApiRole, privilege: Privilege) =>
     grants.find((g) => g.role === role)?.privileges.includes(privilege) ?? false
@@ -20,7 +21,7 @@
 </script>
 
 <!-- Role × privilege matrix. RLS still filters the rows of anon and authenticated. -->
-<div class="overflow-x-auto rounded-lg border bg-card">
+<div class={['overflow-x-auto rounded-2xl', surface]}>
   <table class="w-full text-sm">
     <thead>
       <tr class="bg-muted/60 text-xs text-muted-foreground">

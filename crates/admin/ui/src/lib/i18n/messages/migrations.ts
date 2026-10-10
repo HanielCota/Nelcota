@@ -3,13 +3,15 @@ import type { Messages } from '../index.svelte'
 
 const ptBR = {
   title: 'Migrações',
+  stats: { pending: 'Alterações pendentes', applied: 'Migrações aplicadas', next: 'Próxima versão' },
   steps: {
+    title: 'Como levar a outros ambientes',
     label: 'Etapas para levar as mudanças a outros ambientes',
-    generate: '1. Gerar arquivo',
+    generate: 'Gerar arquivo',
     generateHint: 'Exporte as alterações do painel em uma migração SQL.',
-    keep: '2. Salvar e versionar',
+    keep: 'Salvar e versionar',
     keepHint: 'Coloque o arquivo em migrations/ e faça commit no projeto.',
-    apply: '3. Aplicar nos outros ambientes',
+    apply: 'Aplicar nos outros ambientes',
     applyHint: 'Execute nelcota migrate em cada ambiente. Neste banco, as mudanças do painel já estão aplicadas.',
     inFolder: 'Arquivo encontrado na pasta',
     pending: 'Aguardando arquivo na pasta',
@@ -63,13 +65,15 @@ const ptBR = {
 
 const en: Messages<typeof ptBR> = {
   title: 'Migrations',
+  stats: { pending: 'Pending changes', applied: 'Applied migrations', next: 'Next version' },
   steps: {
+    title: 'Taking it to other environments',
     label: 'Steps to bring changes to other environments',
-    generate: '1. Generate file',
+    generate: 'Generate file',
     generateHint: 'Export panel changes as a SQL migration.',
-    keep: '2. Save and version',
+    keep: 'Save and version',
     keepHint: 'Place the file in migrations/ and commit it to the project.',
-    apply: '3. Apply to other environments',
+    apply: 'Apply to other environments',
     applyHint: 'Run nelcota migrate in each environment. Panel changes are already applied to this database.',
     inFolder: 'File found in the folder',
     pending: 'Waiting for file in the folder',

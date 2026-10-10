@@ -19,6 +19,7 @@ mod password;
 mod rate_limit;
 mod recovery;
 mod request;
+pub use request::{PeerAddr, client_ip};
 mod sessions;
 mod state;
 mod verify;

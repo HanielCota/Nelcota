@@ -170,7 +170,7 @@
 
   // Column pinned to the left (selection + expand): opaque background so the
   // content scrolling underneath does not show through.
-  const stickyCell = 'sticky left-0 z-[1] border-r border-b bg-background'
+  const stickyCell = 'sticky left-0 z-[1] border-r border-b bg-card'
 </script>
 
 <!-- table-layout fixed + per-column widths: editing a cell does not resize
@@ -201,7 +201,7 @@
         </th>
       {/if}
       {#each columns as { column, kind } (column.name)}
-        <th class="border-r border-b bg-card p-0 align-top font-normal shadow-[inset_0_-1px_0_var(--border)]">
+        <th aria-sort={sortOf(column.name) === 'asc' ? 'ascending' : sortOf(column.name) === 'desc' ? 'descending' : undefined} class="border-r border-b bg-card p-0 align-top font-normal shadow-[inset_0_-1px_0_var(--border)]">
           <GridColumnHeader
             {column}
             {kind}
@@ -219,7 +219,7 @@
   <tbody>
     {#each data.rows as row, i (rowKey(row, data.table.primary_key, i))}
       {@const isSelected = selected.has(i)}
-      <tr class={['group transition-colors', isSelected ? 'bg-brand/[0.07]' : 'hover:bg-muted/60']}>
+      <tr aria-selected={editable ? isSelected : undefined} class={['group transition-colors', isSelected ? 'bg-brand/[0.07]' : 'hover:bg-muted/60']}>
         {#if editable}
           <td role="gridcell" class={[stickyCell, 'px-3.5 py-2', isSelected ? 'bg-[color-mix(in_oklch,var(--brand)_7%,var(--background))]' : 'group-hover:bg-[color-mix(in_oklch,var(--muted)_60%,var(--background))]']}>
             <div class="flex items-center gap-2">
@@ -245,15 +245,16 @@
             tabindex={active.row === i && active.col === c ? 0 : -1}
             aria-selected={isSelected}
             class={[
-              'group/cell border-r border-b p-0 focus-visible:bg-brand/[0.06] focus-visible:outline-offset-[-2px]',
-              editable && !column.generated && 'cursor-text',
+              'group/cell border-b p-0 focus-visible:bg-brand/[0.06] focus-visible:outline-offset-[-2px]',
+              // Only rows are ruled; an editable cell lights up under the pointer.
+              editable && !column.generated && 'cursor-text hover:bg-accent/50',
             ]}
             onfocus={() => (active = { row: i, col: c })}
             onkeydown={(e) => onCellKey(e, i, c)}
             ondblclick={() => startEdit(i, column)}
           >
             {#if editing?.key === rowKey(row, data.table.primary_key, i) && editing.column === column.name}
-              <div class="flex items-center gap-1 bg-background p-0.5 ring-2 ring-brand ring-inset" onfocusout={(event) => {
+              <div class="flex items-center gap-1 bg-card p-0.5 ring-2 ring-brand ring-inset" onfocusout={(event) => {
                 if (!event.currentTarget.contains(event.relatedTarget as Node | null)) editing = null
               }}>
                 <input

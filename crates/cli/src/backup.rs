@@ -126,7 +126,7 @@ fn dump(project: &Project, path: &Path, snapshot: Option<&str>) -> anyhow::Resul
     }
     let status = command
         .stdin(Stdio::null())
-        .stdout(Stdio::from(fs::File::create(path)?))
+        .stdout(Stdio::from(crate::private_fs::file(path)?))
         .status()?;
     if !status.success() || fs::metadata(path)?.len() == 0 {
         bail!("pg_dump failed ({status})");
@@ -135,6 +135,7 @@ fn dump(project: &Project, path: &Path, snapshot: Option<&str>) -> anyhow::Resul
 }
 
 pub fn capture(project: &Project, path: &Path) -> anyhow::Result<()> {
+    crate::private_fs::dir(path.parent().context("invalid backup directory")?)?;
     if path.exists() || bundle_path(path)?.exists() {
         bail!("backup already exists: {}", path.display());
     }
@@ -149,13 +150,14 @@ pub fn capture(project: &Project, path: &Path) -> anyhow::Result<()> {
             }
             let objects: Vec<Object> = serde_json::from_str(&snapshot.line()?)?;
             let root = bundle.join("objects");
-            fs::create_dir_all(&root)?;
+            crate::private_fs::dir(&bundle)?;
+            crate::private_fs::dir(&root)?;
             let mut records = Vec::with_capacity(objects.len());
             for object in objects {
                 let source = object_path(&project.storage_dir(), &object.key)?;
                 let destination = object_path(&root, &object.key)?;
-                fs::create_dir_all(destination.parent().context("invalid object directory")?)?;
-                fs::copy(&source, &destination)
+                crate::private_fs::dir(destination.parent().context("invalid object directory")?)?;
+                crate::private_fs::copy(&source, &destination)
                     .with_context(|| format!("could not snapshot {}", object.key))?;
                 let (size, sha256) = checksum(&destination)?;
                 if size != object.size {
@@ -177,8 +179,8 @@ pub fn capture(project: &Project, path: &Path) -> anyhow::Result<()> {
                     .into_owned(),
                 objects: records,
             };
-            fs::write(
-                bundle.join("manifest.json"),
+            crate::private_fs::write(
+                &bundle.join("manifest.json"),
                 serde_json::to_vec_pretty(&manifest)?,
             )?;
         } else {
@@ -215,6 +217,7 @@ pub fn validate(dump: &Path) -> anyhow::Result<Manifest> {
 
 /// Project removal archives the complete pair before deleting live storage.
 pub fn archive(dump: &Path, destination: &Path) -> anyhow::Result<()> {
+    crate::private_fs::dir(destination.parent().context("invalid archive directory")?)?;
     let source = bundle_path(dump)?;
     if source.exists() {
         let manifest = validate(dump)?;
@@ -222,16 +225,17 @@ pub fn archive(dump: &Path, destination: &Path) -> anyhow::Result<()> {
         if target.exists() {
             bail!("archived snapshot already exists");
         }
-        fs::create_dir_all(target.join("objects"))?;
+        crate::private_fs::dir(&target)?;
+        crate::private_fs::dir(&target.join("objects"))?;
         for file in manifest.objects {
             let to = object_path(&target.join("objects"), &file.key)?;
-            fs::create_dir_all(to.parent().context("invalid archive path")?)?;
-            fs::copy(object_path(&source.join("objects"), &file.key)?, to)?;
+            crate::private_fs::dir(to.parent().context("invalid archive path")?)?;
+            crate::private_fs::copy(object_path(&source.join("objects"), &file.key)?, to)?;
         }
-        fs::copy(source.join("manifest.json"), target.join("manifest.json"))?;
+        crate::private_fs::copy(source.join("manifest.json"), target.join("manifest.json"))?;
         validate(destination)?;
     }
-    fs::copy(dump, destination)?;
+    crate::private_fs::copy(dump, destination)?;
     Ok(())
 }
 
@@ -250,7 +254,7 @@ pub fn restore_files(project: &Project, dump: &Path, manifest: &Manifest) -> any
     for file in &manifest.objects {
         let destination = object_path(&target, &file.key)?;
         fs::create_dir_all(destination.parent().context("invalid object directory")?)?;
-        fs::copy(object_path(&source, &file.key)?, destination)?;
+        crate::private_fs::copy(object_path(&source, &file.key)?, destination)?;
     }
     #[cfg(unix)]
     if !std::process::Command::new("chown")

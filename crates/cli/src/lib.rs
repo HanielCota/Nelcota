@@ -17,10 +17,12 @@ mod host;
 mod init;
 mod lifecycle;
 mod machine;
+mod maintenance;
 mod naming;
 mod native;
 mod panel_login;
 mod pitr;
+mod private_fs;
 mod project;
 mod projects;
 mod registry;
@@ -31,7 +33,7 @@ mod util;
 use std::path::PathBuf;
 
 use anyhow::bail;
-use clap::{Args, Parser, Subcommand};
+use clap::{Args, Parser, Subcommand, ValueEnum};
 use nelcota_core::Config;
 
 pub use host::{PanelLogin, Runtime};
@@ -143,8 +145,10 @@ pub enum Command {
         #[command(subcommand)]
         action: PitrAction,
     },
-    /// Generates TypeScript types from the exposed schema.
+    /// Generates TypeScript or Rust types from the exposed schema.
     Types {
+        #[arg(long, value_enum, default_value_t = TypesLanguage::Typescript)]
+        lang: TypesLanguage,
         #[arg(long, short)]
         out: Option<PathBuf>,
     },
@@ -162,6 +166,47 @@ pub enum Command {
         #[arg(long, default_value = "127.0.0.1:8000")]
         addr: String,
     },
+}
+
+#[derive(Clone, Copy, Debug, Default, ValueEnum)]
+pub enum TypesLanguage {
+    #[default]
+    Typescript,
+    Rust,
+}
+impl TypesLanguage {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Typescript => "typescript",
+            Self::Rust => "rust",
+        }
+    }
+}
+
+#[cfg(test)]
+mod types_tests {
+    use super::*;
+    #[test]
+    fn types_default_stays_typescript_and_rust_is_explicit() {
+        let default = Cli::try_parse_from(["nelcota", "types"]).unwrap();
+        assert!(matches!(
+            default.command,
+            Some(Command::Types {
+                lang: TypesLanguage::Typescript,
+                ..
+            })
+        ));
+        let rust = Cli::try_parse_from(["nelcota", "types", "--lang", "rust", "-o", "database.rs"])
+            .unwrap();
+        assert!(matches!(
+            rust.command,
+            Some(Command::Types {
+                lang: TypesLanguage::Rust,
+                out: Some(_)
+            })
+        ));
+        assert!(Cli::try_parse_from(["nelcota", "types", "--lang", "python"]).is_err());
+    }
 }
 
 #[derive(Subcommand, Debug)]
@@ -391,7 +436,7 @@ pub fn run(cli: Cli) -> anyhow::Result<Outcome> {
                 PitrAction::Restore { time, yes } => pitr::restore(&project, time.as_deref(), yes),
             })
         }
-        Command::Types { out } => done(db::types(&host, selection, out.as_deref())),
+        Command::Types { out, lang } => done(db::types(&host, selection, out.as_deref(), lang)),
         Command::Token {
             kind: TokenKind::ServiceRole { days },
         } => done(db::service_role_token(&host, selection, days)),

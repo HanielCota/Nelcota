@@ -54,7 +54,7 @@ pub fn now_rfc3339() -> String {
 
 /// Seconds since the epoch as RFC 3339, UTC (days to civil date, Howard
 /// Hinnant's algorithm).
-fn rfc3339(secs: u64) -> String {
+pub(crate) fn rfc3339(secs: u64) -> String {
     let days = (secs / 86_400) as i64;
     let rem = secs % 86_400;
     let z = days + 719_468;

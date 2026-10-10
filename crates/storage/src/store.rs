@@ -28,6 +28,65 @@ pub struct Store {
     backend: Backend,
 }
 
+#[cfg(all(test, unix))]
+mod tests {
+    use super::*;
+    use std::{fs, os::unix::fs::PermissionsExt};
+
+    #[tokio::test]
+    async fn disk_root_is_private_for_new_and_existing_uploads() {
+        let temp = tempfile::tempdir().unwrap();
+        for existing in [false, true] {
+            let root = temp
+                .path()
+                .join(if existing { "existing" } else { "nested/new" });
+            if existing {
+                fs::create_dir_all(root.join("bucket")).unwrap();
+                fs::set_permissions(&root, fs::Permissions::from_mode(0o755)).unwrap();
+                fs::write(root.join("bucket/old"), b"old private bytes").unwrap();
+            }
+            let store = Store::disk(root.clone()).unwrap();
+            assert_eq!(
+                fs::metadata(&root).unwrap().permissions().mode() & 0o777,
+                0o700
+            );
+            let key = Store::key("bucket", Uuid::now_v7());
+            store
+                .put(&key, bytes::Bytes::from_static(b"private"))
+                .await
+                .unwrap();
+            let multipart_key = Store::key("bucket", Uuid::now_v7());
+            let mut writer = store.writer(&multipart_key).await.unwrap();
+            writer.write(b"private multipart");
+            writer.finish().await.unwrap();
+            assert_eq!(
+                store.get(&key, None).await.unwrap().bytes().await.unwrap(),
+                "private"
+            );
+            assert_eq!(
+                store
+                    .get(&multipart_key, None)
+                    .await
+                    .unwrap()
+                    .bytes()
+                    .await
+                    .unwrap(),
+                "private multipart"
+            );
+            assert_eq!(
+                fs::metadata(&root).unwrap().permissions().mode() & 0o777,
+                0o700
+            );
+            if existing {
+                assert_eq!(
+                    fs::read(root.join("bucket/old")).unwrap(),
+                    b"old private bytes"
+                );
+            }
+        }
+    }
+}
+
 enum Backend {
     Disk { root: PathBuf },
     S3 { s3: Arc<AmazonS3> },
@@ -89,7 +148,7 @@ impl Store {
 
     /// A store on a local directory, created if missing.
     pub fn disk(root: PathBuf) -> Result<Self, StoreError> {
-        std::fs::create_dir_all(&root).map_err(|e| StoreError::Directory(root.clone(), e))?;
+        crate::private_dir::create(&root).map_err(|e| StoreError::Directory(root.clone(), e))?;
         let fs = LocalFileSystem::new_with_prefix(&root)?.with_automatic_cleanup(true);
         Ok(Store {
             inner: Arc::new(fs),

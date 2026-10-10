@@ -9,7 +9,8 @@
 // --browser also builds the package and runs test/browser/smoke.mjs in Chromium.
 
 import { spawn, spawnSync } from 'node:child_process';
-import { createHmac } from 'node:crypto';
+import { createHmac, randomUUID } from 'node:crypto';
+import { createServer } from 'node:net';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -23,12 +24,17 @@ const vitestArgs = process.argv.slice(2).filter((a) => a !== '--keep' && a !== '
 const exe = process.platform === 'win32' ? 'nelcota.exe' : 'nelcota';
 const bin = process.env.NELCOTA_BIN ?? join(repo, 'target', 'debug', exe);
 
-const PG = 'nelcota-sdk-postgres';
-const MAIL = 'nelcota-sdk-mailpit';
-const PG_PORT = 54329;
-const API_PORT = 8031;
-const SMTP_PORT = 10259;
-const MAIL_PORT = 18025;
+const runId = randomUUID().slice(0, 8);
+const PG = `nelcota-sdk-postgres-${runId}`;
+const MAIL = `nelcota-sdk-mailpit-${runId}`;
+const API_PORT = await new Promise((resolvePort, reject) => {
+  const probe = createServer();
+  probe.on('error', reject);
+  probe.listen(0, '127.0.0.1', () => {
+    const port = probe.address().port;
+    probe.close(() => resolvePort(port));
+  });
+});
 const JWT_SECRET = 'sdk-contract-secret-with-more-than-32-characters';
 
 function run(command, args, options = {}) {
@@ -39,6 +45,13 @@ function run(command, args, options = {}) {
 
 function docker(...args) {
   return spawnSync('docker', args, { encoding: 'utf8' });
+}
+
+function mappedPort(container, port) {
+  const result = docker('port', container, port);
+  const match = result.stdout?.trim().match(/:(\d+)$/);
+  if (result.status !== 0 || !match) throw new Error(`No mapped port for ${container}:${port}`);
+  return Number(match[1]);
 }
 
 async function waitFor(what, check, seconds = 60) {
@@ -72,9 +85,11 @@ process.on('SIGINT', () => {
 
 let status = 1;
 try {
-  docker('rm', '-f', PG, MAIL);
-  run('docker', ['run', '-d', '--name', PG, '-e', 'POSTGRES_PASSWORD=postgres', '-p', `127.0.0.1:${PG_PORT}:5432`, 'postgres:17-alpine']);
-  run('docker', ['run', '-d', '--name', MAIL, '-p', `127.0.0.1:${SMTP_PORT}:1025`, '-p', `127.0.0.1:${MAIL_PORT}:8025`, 'axllent/mailpit:v1.27.0']);
+  run('docker', ['run', '-d', '--name', PG, '-e', 'POSTGRES_PASSWORD=postgres', '-p', '127.0.0.1::5432', 'postgres:17-alpine']);
+  run('docker', ['run', '-d', '--name', MAIL, '-p', '127.0.0.1::1025', '-p', '127.0.0.1::8025', 'axllent/mailpit:v1.27.0']);
+  const PG_PORT = mappedPort(PG, '5432/tcp');
+  const SMTP_PORT = mappedPort(MAIL, '1025/tcp');
+  const MAIL_PORT = mappedPort(MAIL, '8025/tcp');
   await waitFor('Postgres', () => docker('exec', PG, 'pg_isready', '-U', 'postgres', '-h', '127.0.0.1').status === 0);
 
   const env = {
@@ -110,6 +125,10 @@ try {
     input: readFileSync(join(root, 'test/contract/fixture.sql')),
     stdio: ['pipe', 'inherit', 'inherit'],
   });
+  run('docker', ['exec', '-i', PG, 'psql', '-q', '-v', 'ON_ERROR_STOP=1', '-U', 'postgres'], {
+    input: readFileSync(join(root, 'examples/schema.sql')),
+    stdio: ['pipe', 'inherit', 'inherit'],
+  });
 
   // The types the tests compile against come from the real generator.
   const generated = join(root, 'test/contract/generated');
@@ -143,8 +162,13 @@ try {
     const now = Math.floor(Date.now() / 1000);
     const body = `${encode({ alg: 'HS256', typ: 'JWT' })}.${encode({ role: 'service_role', iat: now, exp: now + 600 })}`;
     const serviceToken = `${body}.${createHmac('sha256', JWT_SECRET).update(body).digest('base64url')}`;
-    const smoke = spawnSync(process.execPath, [join(root, 'test/browser/smoke.mjs'), url, serviceToken], { stdio: 'inherit' });
-    status = smoke.status ?? 1;
+    for (const engine of (process.env.NELCOTA_SDK_BROWSERS ?? 'chromium').split(',')) {
+      const smoke = spawnSync(process.execPath, [join(root, 'test/browser/smoke.mjs'), url, serviceToken], {
+        stdio: 'inherit', env: { ...process.env, NELCOTA_SDK_BROWSER: engine.trim() },
+      });
+      status = smoke.status ?? 1;
+      if (status !== 0) break;
+    }
   }
   if (keep) console.log(`\nKept running: ${url} (containers ${PG}, ${MAIL}; stop the server with Ctrl+C)`);
 } catch (error) {

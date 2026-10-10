@@ -203,8 +203,10 @@ with WAL-G is pending (daily dumps: an RPO of up to 24 h).
 **D40. Upgrade with rollback = previous image + restore of the pre-upgrade
 backup.** The new version may have applied internal migrations the previous
 one does not know (refinery refuses to start with an "unknown" migration).
-That is why the rollback also restores the database. The acceptance test
-covers this path.
+That is why the rollback also restores the database and the matching disk-file
+snapshot. The proxy stays in maintenance from before the old app stops until
+the upgraded or restored app is healthy, so successful public writes cannot
+be lost between capture and rollback. Failure-path tests cover this sequencing.
 
 **D41. `scratch` image with a musl binary; built-in healthcheck.** No shell or
 curl in the image: `nelcota healthcheck` performs `GET /health` over plain TCP.
@@ -575,6 +577,9 @@ Postgres share a disk. Every upload has a size cap (per bucket, and a global
 `NELCOTA_STORAGE_MAX_FILE_SIZE`, 50 MiB by default); an optional total quota
 covers all buckets; and on the disk backend an upload is refused when free
 space would fall under `NELCOTA_STORAGE_MIN_FREE_BYTES` (1 GiB by default).
+In-flight uploads reserve their capacity, and publication checks the resulting
+total under a database transaction lock across instances. Replacements credit
+their old logical size while reserving disk space for the new version.
 Per-user quotas are left to policies, which see the final row (with its
 size) on insert. Image transformations and resumable (TUS) uploads stay out:
 decoding untrusted images is a steady source of CVEs.
@@ -820,6 +825,46 @@ query string or token, and reads the role by verifying the token again only
 for refused calls. The sign-in page is read-only because those settings come
 from the environment. Pages off the main path (policies, a bucket, sign-in)
 load on demand so the main chunk stays inside its 900 kB budget.
+
+## Panel redesign
+
+**D98. A dashboard look with real traffic, replacing D55's restraint and
+D63's sidebar.** The panel follows a reference dashboard the user maintains:
+its tokens (oklch page and card tones, a bright green for actions, a 0.75rem
+base radius giving 26.4px cards), a three-column top bar with the pages as
+short pills and an account chip, full-width pages with 32px gutters, 24px
+titles inside and a large one on the overview, borderless cards, pill
+searches and lighter tables. The overview mirrors the reference layout: one
+period selector for the page, the period's traffic as the headline with
+meters, stat cards beside a chart, and three cards below (rows per table,
+recently blocked calls, what needs attention). The charts need data over
+time, so the server counts API requests per minute (refused, server errors,
+a latency histogram for p95) for 24 hours in memory, alongside the D97 log:
+no write per request, gone on restart, which the overview says. As in the
+reference, requests are a green area and refused calls a grey one; a grey
+series alone would fail a colour-vision check, so values stay reachable
+through the series filters, the tooltip, a keyboard crosshair (a slider for
+assistive technology) and a table view. The mascot and the syntax colours
+(D62, D92) stay; plain language first (D93) stays.
+
+Later passes settled the rules new screens follow:
+
+- **Surfaces, darkest to lightest in dark mode:** page (graphite, a step
+  lighter than the reference at the user's request), card (rounded-3xl),
+  well (rounded-2xl insets inside a card: code, tiles, rows, empty states),
+  field (inputs, a step above the well). In light mode the page is grey,
+  cards and fields white, wells light grey. Boxes are filled, not outlined;
+  a dashed border marks only drop zones and "add" tiles, and a tinted fill
+  (destructive or warning at 10%) marks danger and alerts.
+- **Top bar:** a project chip (mascot, project, environment, a dot for
+  whether the server answers) and the account chip balance the six centred
+  pills; search is a round button. Tables, SQL and Migrations share the
+  Database pill, with tabs between them inside.
+- **Page grid:** pages cap at 1440px. Figures lead pages that have them, on
+  the same tracks as the columns below; side columns are 24rem. Grids start
+  at the container's width, so nothing scrolls sideways on phones.
+- **Contrast:** text tones are checked against every surface in both themes
+  (4.5:1 or more for body text), not eyeballed.
 
 ### Known pending items
 

@@ -1,6 +1,7 @@
 //! SQL generation from the validated request representation.
 use super::parse::column;
 use super::*;
+use std::collections::HashMap;
 
 pub(super) fn qualified(schema: &str, table: &Table) -> String {
     format!("{}.{}", ident(schema), ident(&table.name))
@@ -67,12 +68,21 @@ pub(super) fn embed_sql(
         conditions.join(" AND "),
         order_clause(&row, &embed.order),
     );
-    rows.push_str(&paging(sql, embed.limit, embed.offset));
+    let limit = if embed.many {
+        match (embed.limit, sql.embed_limit) {
+            (Some(l), Some(m)) => Some(l.min(m)),
+            (l, m) => l.or(m),
+        }
+    } else {
+        embed.limit
+    };
+    rows.push_str(&paging(sql, limit, embed.offset));
+    let checked = sql.json(&json);
     let value = if embed.many {
-        format!("(SELECT coalesce(json_agg({json}), '[]') FROM ({rows}) AS {json})")
+        format!("(SELECT coalesce(json_agg({checked}), '[]') FROM ({rows}) AS {json})")
     } else {
         // The foreign key references a unique key: at most one row.
-        format!("(SELECT to_json({json}) FROM ({rows}) AS {json})")
+        format!("(SELECT {checked} FROM ({rows}) AS {json})")
     };
     format!("{value} AS {}", ident(&embed.alias))
 }
@@ -182,16 +192,27 @@ pub(super) fn order_clause(alias: &str, order: &[OrderTerm]) -> String {
 
 /// `SELECT` returning `(json_text, rows)`; Postgres builds the JSON.
 pub fn select(schema: &str, table: &Table, request: &Request, max_rows: Option<i64>) -> Sql {
-    let mut sql = Sql::default();
+    let max_rows = Some(max_rows.unwrap_or(DEFAULT_MAX_ROWS));
+    let mut sql = Sql {
+        embed_limit: max_rows,
+        ..Sql::default()
+    };
     let rows = rows_subquery(&mut sql, schema, table, request, max_rows);
-    sql.text = format!("SELECT coalesce(json_agg(_r), '[]')::text, count(*) FROM ({rows}) _r");
+    sql.text = format!(
+        "SELECT coalesce(json_agg({}), '[]')::text, count(*) FROM ({rows}) _r",
+        sql.json("_r")
+    );
     sql
 }
 
 /// One record per result row, as JSON text: for streaming reads (export)
 /// without building the whole response in memory.
 pub fn select_rows(schema: &str, table: &Table, request: &Request) -> Sql {
-    let mut sql = Sql::default();
+    let mut sql = Sql {
+        checked_json: false,
+        embed_limit: None,
+        ..Sql::default()
+    };
     let rows = rows_subquery(&mut sql, schema, table, request, None);
     sql.text = format!("SELECT row_to_json(_r)::text FROM ({rows}) _r");
     sql
@@ -253,7 +274,8 @@ pub(super) fn with_representation(
 ) -> String {
     format!(
         "WITH _w AS ({write} RETURNING _t.*) \
-         SELECT coalesce(json_agg(_r), '[]')::text, count(*) FROM (SELECT {} FROM _w AS _t) _r",
+         SELECT coalesce(json_agg({}), '[]')::text, count(*) FROM (SELECT {} FROM _w AS _t) _r",
+        sql.json("_r"),
         select_list(sql, schema, select, "_t", ""),
     )
 }
@@ -301,19 +323,50 @@ pub fn insert(
     if rows.is_empty() {
         return Err(invalid("nothing to insert"));
     }
-    // Group by column set, in the table's column order.
+    if rows.len() > MAX_BATCH_ROWS {
+        return Err(invalid(format!(
+            "insert accepts at most {MAX_BATCH_ROWS} rows per request"
+        )));
+    }
+    // Resolve names once per batch. Integer positions canonicalize each set
+    // without repeatedly scanning the whole catalog for every row and key.
+    let positions: HashMap<&str, usize> = table
+        .columns
+        .iter()
+        .enumerate()
+        .map(|(index, column)| (column.name.as_str(), index))
+        .collect();
     let mut groups: Vec<(Vec<String>, Vec<Value>)> = Vec::new();
+    let mut group_index: HashMap<Vec<usize>, usize> = HashMap::new();
     for row in rows {
-        let columns = body_columns(table, std::slice::from_ref(&row))?;
-        let ordered: Vec<String> = table
-            .columns
-            .iter()
-            .filter(|c| columns.contains(&c.name))
-            .map(|c| c.name.clone())
-            .collect();
-        match groups.iter_mut().find(|(cols, _)| *cols == ordered) {
-            Some((_, group)) => group.push(row),
-            None => groups.push((ordered, vec![row])),
+        let Value::Object(map) = &row else {
+            return Err(invalid(
+                "the body must be a JSON object or an array of objects",
+            ));
+        };
+        let mut columns = map
+            .keys()
+            .map(|key| {
+                positions.get(key.as_str()).copied().ok_or_else(|| {
+                    invalid(format!("column '{key}' does not exist in '{}'", table.name))
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        columns.sort_unstable();
+        if let Some(&index) = group_index.get(&columns) {
+            groups[index].1.push(row);
+        } else {
+            if groups.len() >= MAX_INSERT_GROUPS {
+                return Err(invalid(format!(
+                    "insert accepts at most {MAX_INSERT_GROUPS} distinct column sets"
+                )));
+            }
+            let ordered = columns
+                .iter()
+                .map(|&index| table.columns[index].name.clone())
+                .collect();
+            group_index.insert(columns, groups.len());
+            groups.push((ordered, vec![row]));
         }
     }
 
@@ -356,8 +409,9 @@ pub fn insert(
                 .map(|i| format!("SELECT * FROM _w{i}"))
                 .collect();
             format!(
-                "WITH {} SELECT coalesce(json_agg(_r), '[]')::text, count(*) FROM (SELECT {} FROM ({}) AS _t) _r",
+                "WITH {} SELECT coalesce(json_agg({}), '[]')::text, count(*) FROM (SELECT {} FROM ({}) AS _t) _r",
                 ctes.join(", "),
+                sql.json("_r"),
                 select_list(&mut sql, schema, select, "_t", ""),
                 union.join(" UNION ALL "),
             )
@@ -443,7 +497,12 @@ pub fn resolve_function<'a>(
 
 /// Function call with named arguments, converted by Postgres from the JSON
 /// (`json_to_record`).
-pub fn rpc(schema: &str, function: &Function, args: Map<String, Value>) -> Sql {
+pub fn rpc(
+    schema: &str,
+    function: &Function,
+    args: Map<String, Value>,
+    max_rows: Option<i64>,
+) -> Sql {
     let mut sql = Sql::default();
     let used: Vec<_> = function
         .args
@@ -468,14 +527,20 @@ pub fn rpc(schema: &str, function: &Function, args: Map<String, Value>) -> Sql {
         Some(format!("json_to_record({p}::json) AS _a({definition})"))
     };
     sql.text = match (function.returns_set, function.returns_void, source) {
-        (true, _, Some(source)) => {
-            format!("SELECT coalesce(json_agg(_r), '[]')::text FROM {source}, LATERAL {call} AS _r")
+        (true, _, source) => {
+            let from = source
+                .map(|s| format!("{s}, LATERAL {call} AS _r"))
+                .unwrap_or_else(|| format!("{call} AS _r"));
+            let limit = sql.param(Param::Int(max_rows.unwrap_or(DEFAULT_MAX_ROWS)));
+            format!(
+                "SELECT coalesce(json_agg({}), '[]')::text FROM (SELECT _r AS _value FROM {from} LIMIT {limit}) _limited",
+                sql.json("_value")
+            )
         }
-        (true, _, None) => format!("SELECT coalesce(json_agg(_r), '[]')::text FROM {call} AS _r"),
         (false, true, Some(source)) => format!("SELECT {call}::text FROM {source}"),
         (false, true, None) => format!("SELECT {call}::text"),
-        (false, false, Some(source)) => format!("SELECT to_json({call})::text FROM {source}"),
-        (false, false, None) => format!("SELECT to_json({call})::text"),
+        (false, false, Some(source)) => format!("SELECT {}::text FROM {source}", sql.json(&call)),
+        (false, false, None) => format!("SELECT {}::text", sql.json(&call)),
     };
     sql
 }

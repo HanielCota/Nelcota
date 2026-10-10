@@ -2117,6 +2117,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "nelcota-client"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "base64 0.23.1",
+ "bytes",
+ "futures-util",
+ "getrandom 0.4.3",
+ "httpdate",
+ "reqwest",
+ "rustls",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "unicode-normalization",
+ "url",
+ "webpki-roots",
+]
+
+[[package]]
 name = "nelcota-core"
 version = "0.2.0"
 dependencies = [
@@ -2152,9 +2175,12 @@ dependencies = [
  "nelcota-api",
  "nelcota-auth",
  "nelcota-cli",
+ "nelcota-client",
  "nelcota-core",
  "nelcota-storage",
  "refinery",
+ "reqwest",
+ "rustls",
  "serde_json",
  "sha2 0.11.0",
  "testcontainers-modules",
@@ -2164,6 +2190,7 @@ dependencies = [
  "tower-http 0.7.1",
  "tracing",
  "tracing-subscriber",
+ "url",
  "uuid",
 ]
 
@@ -2187,6 +2214,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.11.0",
+ "tempfile",
  "thiserror",
  "tokio",
  "tokio-postgres",
@@ -2981,6 +3009,8 @@ dependencies = [
  "rustls",
  "rustls-pki-types",
  "rustls-platform-verifier",
+ "serde",
+ "serde_json",
  "sync_wrapper",
  "tokio",
  "tokio-rustls",
@@ -3886,6 +3916,7 @@ dependencies = [
  "bytes",
  "futures-core",
  "futures-sink",
+ "futures-util",
  "libc",
  "pin-project-lite",
  "tokio",

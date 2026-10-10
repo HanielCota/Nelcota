@@ -82,7 +82,7 @@
   <Badge variant={bucket.public ? 'outline' : 'secondary'}>{#if bucket.public}<Globe aria-hidden="true" />{:else}<Lock aria-hidden="true" />{/if}{bucket.public ? t('storage.public') : t('storage.private')}</Badge>
 {/snippet}
 
-<div class="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-10 lg:py-10">
+<div class="mx-auto w-full max-w-page px-4 pt-2 pb-12 sm:px-6 lg:px-8">
   <PageHeader
     title={t('storage.title')}
     description={data?.enabled
@@ -101,12 +101,12 @@
 
   {#if error}<LoadError message={error} onretry={load} busy={loading} />{/if}
   {#if data === null}
-    {#if loading}<Skeleton class="h-48 rounded-lg" />{/if}
+    {#if loading}<Skeleton class="h-48 rounded-3xl" />{/if}
   {:else if !data.enabled}
-    <EmptyState icon={HardDrive} class="rounded-lg border" title={t('storage.disabled')} description={t('storage.disabledDescription')} />
+    <EmptyState icon={HardDrive} class="rounded-3xl bg-card" title={t('storage.disabled')} description={t('storage.disabledDescription')} />
   {:else}
     {#if data.buckets.length === 0}
-      <EmptyState icon={HardDrive} class="rounded-lg border" title={t('storage.empty')} description={t('storage.emptyDescription')}>
+      <EmptyState icon={HardDrive} class="rounded-3xl bg-card" title={t('storage.empty')} description={t('storage.emptyDescription')}>
         {#snippet actions()}
           <Button variant="outline" onclick={() => edit(null)}><Plus data-icon="inline-start" aria-hidden="true" />{t('storage.newBucket')}</Button>
         {/snippet}
@@ -114,7 +114,7 @@
     {:else}
       <div class="grid gap-3 md:hidden">
         {#each data.buckets as bucket (bucket.id)}
-          <article class="min-w-0 rounded-lg border bg-card p-4">
+          <article class="min-w-0 rounded-3xl bg-card p-4">
             <div class="flex min-w-0 items-start justify-between gap-2">
               <div class="min-w-0"><a class="flex items-center gap-2 font-mono font-medium hover:underline" href={href(`/storage/${enc(bucket.id)}`)}><HardDrive class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" /><span class="truncate">{bucket.id}</span></a><div class="mt-2">{@render accessBadge(bucket)}</div></div>
               {@render bucketActions(bucket)}
@@ -128,7 +128,7 @@
           </article>
         {/each}
       </div>
-      <div class="hidden overflow-hidden rounded-lg border bg-card md:block">
+      <div class="hidden overflow-hidden rounded-3xl bg-card md:block">
         <Table.Root>
           <Table.Header>
             <Table.Row class="hover:bg-transparent">

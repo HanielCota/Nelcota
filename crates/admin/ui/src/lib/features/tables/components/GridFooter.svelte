@@ -25,7 +25,7 @@
   )
 </script>
 
-<footer class="flex min-h-12 shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-t bg-sidebar px-4 py-2 text-xs text-muted-foreground">
+<footer class="flex min-h-12 shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-t bg-card px-4 py-2 text-xs text-muted-foreground">
   <span class="tabular-nums" aria-live="polite">
     {#if info.to === 0}{t('tables.footer.noRows')}
     {:else}<span class="font-medium text-foreground">{fmt.format(info.from)}–{fmt.format(info.to)}</span>
@@ -45,7 +45,7 @@
         {/each}
       </Select.Content>
     </Select.Root>
-    <span class="px-2 font-medium text-foreground tabular-nums">
+    <span class="px-2 font-medium whitespace-nowrap text-foreground tabular-nums">
       {info.pageCount
         ? t('tables.footer.pageOf', { page: fmt.format(data.page + 1), count: fmt.format(info.pageCount) })
         : t('tables.footer.page', { page: fmt.format(data.page + 1) })}

@@ -1,9 +1,10 @@
 <script lang="ts">
+  import DatabaseTabs from '$lib/components/shared/DatabaseTabs.svelte'
   import { Button } from '$lib/components/ui/button'
   import { Input } from '$lib/components/ui/input'
   import Search from '@lucide/svelte/icons/search'
   import Plus from '@lucide/svelte/icons/plus'
-  import Table2 from '@lucide/svelte/icons/table-2'
+  import Rows3 from '@lucide/svelte/icons/rows-3'
   import RlsDot from '$lib/shared/schema/components/RlsDot.svelte'
   import LoadError from '$lib/components/shared/LoadError.svelte'
   import EmptyState from '$lib/components/shared/EmptyState.svelte'
@@ -42,9 +43,10 @@
 
 <aside
   aria-label={t('tables.sidebar.label')}
-  class={cn('w-full shrink-0 flex-col border-r bg-sidebar lg:flex lg:w-64 xl:w-72', current ? 'hidden' : 'flex lg:w-64 xl:w-72')}
+  class={cn('w-full shrink-0 flex-col overflow-hidden rounded-3xl bg-card lg:flex lg:w-64 xl:w-72', current ? 'hidden' : 'flex lg:w-64 xl:w-72')}
 >
   <div class="grid gap-3 border-b p-4">
+    <DatabaseTabs fill />
     <div class="flex items-center justify-between gap-2">
       <svelte:element this={current ? 'p' : 'h1'} class="px-1 text-sm font-semibold">{t('tables.sidebar.title')}</svelte:element>
       <Button variant="outline" size="sm" title={t('tables.sidebar.newTable')} aria-label={t('tables.sidebar.newTable')} onclick={oncreate}>
@@ -70,18 +72,18 @@
         title={rlsTitle(table.rls)}
         aria-current={table.name === current ? 'page' : undefined}
         class={cn(
-          'flex h-11 items-center gap-2.5 rounded-md px-3 text-sm text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground md:h-9',
+          'flex h-11 items-center gap-2.5 rounded-full px-3.5 text-sm text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground md:h-9',
           table.name === current && 'bg-accent font-medium text-foreground',
         )}
       >
-        <Table2 class={['size-4 shrink-0', table.name === current && 'text-brand']} strokeWidth={1.6} />
+        <Rows3 class={['size-4 shrink-0', table.name === current && 'text-brand']} strokeWidth={1.6} />
         <span class="truncate">{table.name}</span>
         <span class="ml-auto flex"><RlsDot state={table.rls.state} /></span>
         {#if table.kind !== 'table'}<span class="text-2xs text-muted-foreground">{t('tables.sidebar.view')}</span>{/if}
       </a>
     {:else}
       {#if !error}
-        <EmptyState icon={Table2} title={t('tables.sidebar.empty')} class="px-3 py-6">
+        <EmptyState icon={Rows3} title={t('tables.sidebar.empty')} class="px-3 py-6">
           {#snippet actions()}{#if !tables.length}<Button variant="outline" size="sm" onclick={oncreate}><Plus aria-hidden="true" />{t('tables.sidebar.newTable')}</Button>{/if}{/snippet}
         </EmptyState>
       {/if}

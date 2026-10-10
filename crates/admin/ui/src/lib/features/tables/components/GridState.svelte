@@ -3,6 +3,7 @@
   import { Skeleton } from '$lib/components/ui/skeleton'
   import Plus from '@lucide/svelte/icons/plus'
   import RotateCw from '@lucide/svelte/icons/rotate-cw'
+  import Rows3 from '@lucide/svelte/icons/rows-3'
   import EmptyState from '$lib/components/shared/EmptyState.svelte'
   import { t } from '$lib/i18n/index.svelte'
 
@@ -12,6 +13,7 @@
     state,
     message = '',
     insertable = false,
+    table = '',
     onretry,
     onclearfilters,
     oninsert,
@@ -19,6 +21,7 @@
     state: 'loading' | 'error' | 'no-match' | 'empty'
     message?: string
     insertable?: boolean
+    table?: string
     onretry?: () => void
     onclearfilters?: () => void
     oninsert?: () => void
@@ -42,15 +45,15 @@
     {#if onretry}<Button variant="outline" size="sm" onclick={onretry}><RotateCw />{t('common.retry')}</Button>{/if}
   </div>
 {:else if state === 'no-match'}
-  <EmptyState title={t('tables.state.noMatch')}>
+  <EmptyState class="py-20" title={t('tables.state.noMatch')}>
     {#snippet actions()}
       {#if onclearfilters}<Button variant="outline" onclick={onclearfilters}>{t('tables.state.clearFilters')}</Button>{/if}
     {/snippet}
   </EmptyState>
 {:else}
-  <EmptyState title={t('tables.state.empty')}>
+  <EmptyState class="py-20" icon={Rows3} title={t('tables.state.empty')} description={t(insertable ? 'tables.state.emptyHint' : 'tables.state.emptyReadOnly', { table })}>
     {#snippet actions()}
-      {#if insertable && oninsert}<Button variant="outline" onclick={oninsert}><Plus />{t('tables.state.insertRow')}</Button>{/if}
+      {#if insertable && oninsert}<Button onclick={oninsert}><Plus />{t('tables.state.insertFirst')}</Button>{/if}
     {/snippet}
   </EmptyState>
 {/if}

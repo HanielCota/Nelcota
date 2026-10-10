@@ -30,11 +30,11 @@
         {...props}
         type="button"
         class={[
-          'inline-flex max-w-64 shrink-0 cursor-pointer items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium transition-colors',
+          'inline-flex h-10 max-w-64 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-3.5 text-xs font-medium transition-colors',
           owner && warnOwner
             ? 'border-warning/30 bg-warning/10 text-warning hover:bg-warning/15'
             : owner
-              ? 'border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground'
+              ? 'border-transparent bg-well text-muted-foreground hover:bg-accent hover:text-foreground'
               : 'border-border-strong bg-muted text-foreground hover:bg-accent',
         ]}
         title={owner ? (labels.ownerTriggerTitle ?? labels.label) : labels.label}

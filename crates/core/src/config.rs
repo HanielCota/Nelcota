@@ -117,7 +117,7 @@ pub struct Config {
     pub migrations_dir: Option<std::path::PathBuf>,
     /// Schema exposed by the REST API.
     pub db_schema: String,
-    /// Row cap per read in the API (`None` = no cap).
+    /// Row cap per API collection (`None` uses 1000).
     pub max_rows: Option<i64>,
     pub listen: SocketAddr,
     pub db_pool_size: usize,
@@ -191,7 +191,7 @@ impl Default for Config {
             host_registry: None,
             migrations_dir: None,
             db_schema: "public".into(),
-            max_rows: None,
+            max_rows: Some(1000),
             listen: SocketAddr::from(([0, 0, 0, 0], 8000)),
             db_pool_size: 10,
             request_timeout_secs: 15,
@@ -255,6 +255,9 @@ impl Config {
         }
         if self.db_pool_size == 0 {
             return Err(ConfigError::Invalid("NELCOTA_DB_POOL_SIZE must be > 0"));
+        }
+        if self.max_rows.is_some_and(|rows| rows <= 0) {
+            return Err(ConfigError::Invalid("NELCOTA_MAX_ROWS must be > 0"));
         }
         self.mail()?;
         self.validate_storage()?;

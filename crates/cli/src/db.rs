@@ -124,13 +124,27 @@ pub fn migrate(host: &Host, selection: Option<&str>, dir: &Path) -> anyhow::Resu
     }
 }
 
-pub fn types(host: &Host, selection: Option<&str>, out: Option<&Path>) -> anyhow::Result<()> {
+pub fn types(
+    host: &Host,
+    selection: Option<&str>,
+    out: Option<&Path>,
+    lang: crate::TypesLanguage,
+) -> anyhow::Result<()> {
     let code = match target(host, selection)? {
-        Target::Container(project) => project.in_app_output(&["types"])?,
+        Target::Container(project) => match lang {
+            // Existing deployed binaries understand the original TypeScript command.
+            crate::TypesLanguage::Typescript => project.in_app_output(&["types"])?,
+            crate::TypesLanguage::Rust => {
+                project.in_app_output(&["types", "--lang", lang.as_str()])?
+            }
+        },
         Target::Direct(config) => runtime()?.block_on(async {
             let client = connect(&config).await?;
             let catalog = nelcota_api::Catalog::load(&client, &config.db_schema).await?;
-            Ok::<_, anyhow::Error>(nelcota_api::typescript::generate(&catalog))
+            Ok::<_, anyhow::Error>(match lang {
+                crate::TypesLanguage::Typescript => nelcota_api::typescript::generate(&catalog),
+                crate::TypesLanguage::Rust => nelcota_api::rust::generate(&catalog),
+            })
         })?,
     };
     match out {

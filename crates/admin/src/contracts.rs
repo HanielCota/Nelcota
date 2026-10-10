@@ -111,6 +111,9 @@ dto!(StoragePolicy { name: String, command: String, roles: Vec<String>, using: O
 dto!(StorageAccess { bucket: String, public: bool, policies: Vec<StoragePolicy> });
 dto!(DeniedRequest { at: String, method: String, path: String, status: u16, code: String, message: String, role: String, user_id: Option<String>, email: Option<String> });
 dto!(DeniedRequests { capacity: usize, requests: Vec<DeniedRequest> });
+dto!(MetricsPoint { at: String, requests: u32, refused: u32, errors: u32, p95_ms: Option<u32> });
+dto!(MetricsTotals { requests: u32, refused: u32, errors: u32, rest: u32, auth: u32, storage: u32, p95_ms: Option<u32> });
+dto!(MetricsResponse { range: String, step_secs: u64, since: String, points: Vec<MetricsPoint>, totals: MetricsTotals });
 dto!(SignInProviders {
     google: bool,
     github: bool
@@ -210,6 +213,9 @@ pub fn exports() -> (String, String) {
         StorageAccess,
         DeniedRequest,
         DeniedRequests,
+        MetricsPoint,
+        MetricsTotals,
+        MetricsResponse,
         SignInProviders,
         SignIn,
         TypesResponse,

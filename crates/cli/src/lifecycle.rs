@@ -18,8 +18,10 @@ pub fn up(host: &Host, manifest: &Manifest, projects: &[Project]) -> anyhow::Res
         step(&format!("Starting {}", project.name));
         project.up()?;
         project.wait_healthy(Service::App, HEALTH_TIMEOUT)?;
+        crate::maintenance::recover(project)?;
         ok(&format!("{} healthy", project.name));
     }
+    caddy::write(host, manifest)?;
     caddy::up(host, manifest.runtime)?;
     println!();
     for entry in manifest

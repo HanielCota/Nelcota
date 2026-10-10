@@ -349,3 +349,40 @@ async fn refused_api_requests_are_listed_for_the_panel() {
     assert!(read["at"].as_str().unwrap().ends_with('Z'));
     assert_eq!(reply.body["capacity"], 100);
 }
+
+#[tokio::test]
+async fn api_traffic_is_counted_per_minute_for_the_overview() {
+    let app = TestApp::spawn().await;
+    let cookie = login(&app).await;
+    assert_eq!(app.get("/rest/v1/products", None).await.0, StatusCode::OK);
+    assert_eq!(
+        app.get("/rest/v1/todos", None).await.0,
+        StatusCode::UNAUTHORIZED
+    );
+    // The panel's own routes and /health are not API traffic.
+    get(&app, "/admin/api/overview", &cookie).await;
+    app.get("/health", None).await;
+
+    let reply = get(&app, "/admin/api/metrics?range=1h", &cookie).await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.text);
+    assert_eq!(reply.body["range"], "1h");
+    assert_eq!(reply.body["step_secs"], 60);
+    assert_eq!(reply.body["points"].as_array().unwrap().len(), 60);
+    let totals = &reply.body["totals"];
+    assert_eq!(totals["requests"], 2);
+    assert_eq!(totals["refused"], 1);
+    assert_eq!(totals["rest"], 2);
+    assert!(totals["p95_ms"].is_number());
+    let last = reply.body["points"].as_array().unwrap().last().unwrap();
+    assert!(last["requests"].as_u64().unwrap() >= 1, "{last}");
+
+    let day = get(&app, "/admin/api/metrics", &cookie).await;
+    assert_eq!(day.body["range"], "24h");
+    assert_eq!(day.body["points"].as_array().unwrap().len(), 96);
+    assert_eq!(
+        get(&app, "/admin/api/metrics?range=7d", &cookie)
+            .await
+            .status,
+        StatusCode::BAD_REQUEST
+    );
+}

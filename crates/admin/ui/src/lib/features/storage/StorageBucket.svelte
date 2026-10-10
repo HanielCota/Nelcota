@@ -120,7 +120,7 @@
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-10 lg:py-10" ondragenter={(event) => { if (event.dataTransfer?.types.includes('Files')) { event.preventDefault(); dragDepth++; dragging = true } }} ondragleave={() => { dragDepth = Math.max(0, dragDepth - 1); if (!dragDepth) dragging = false }} ondragover={(event) => { if (event.dataTransfer?.types.includes('Files')) event.preventDefault() }} ondrop={dropped}>
+<div class="mx-auto w-full max-w-page px-4 pt-2 pb-12 sm:px-6 lg:px-8" ondragenter={(event) => { if (event.dataTransfer?.types.includes('Files')) { event.preventDefault(); dragDepth++; dragging = true } }} ondragleave={() => { dragDepth = Math.max(0, dragDepth - 1); if (!dragDepth) dragging = false }} ondragover={(event) => { if (event.dataTransfer?.types.includes('Files')) event.preventDefault() }} ondrop={dropped}>
   <PageHeader
     title={bucket}
     description={info ? `${info.bucket.public ? t('storage.public') : t('storage.private')} · ${size(info.bucket.bytes)}` : undefined}
@@ -140,10 +140,10 @@
   {#if error}<LoadError message={error} onretry={() => load()} busy={loading} />{/if}
   {#if info}
     <BucketAccess {bucket} />
-    <button type="button" disabled={uploading !== null} class={['mb-4 flex w-full cursor-pointer flex-col items-center gap-2 rounded-lg border border-dashed px-4 py-5 text-sm text-muted-foreground transition-colors hover:border-brand/50 hover:bg-muted/30 disabled:cursor-wait', dragging && 'border-brand bg-brand/5 text-brand']} onclick={() => picker?.click()}><Upload class="size-5" aria-hidden="true" />{t('storage.browser.dropHint')}</button>
+    <button type="button" disabled={uploading !== null} class={['mb-4 flex w-full cursor-pointer flex-col items-center gap-2 rounded-3xl border-2 border-dashed border-border bg-card px-4 py-6 text-sm text-muted-foreground transition-colors hover:border-brand/50 hover:text-foreground disabled:cursor-wait', dragging && 'border-brand bg-brand/5 text-brand']} onclick={() => picker?.click()}><Upload class="size-5" aria-hidden="true" />{t('storage.browser.dropHint')}</button>
   {/if}
   {#if queue.length}
-    <section class="mb-4 grid gap-3 rounded-lg border bg-card p-4" aria-label={t('storage.browser.uploadProgress')}>
+    <section class="mb-4 grid gap-3 rounded-3xl bg-card p-4" aria-label={t('storage.browser.uploadProgress')}>
       <div class="flex items-center justify-between"><h2 class="text-sm font-medium">{t('storage.browser.uploadProgress')}</h2>{#if !uploading}<Button variant="ghost" size="sm" onclick={() => uploads.clear()}>{t('common.close')}</Button>{/if}</div>
       {#each queue as item, index (index)}
         <div class="grid gap-1"><div class="flex min-w-0 items-center gap-2 text-xs">{#if item.status === 'done'}<CircleCheck class="size-4 shrink-0 text-brand" aria-hidden="true" />{:else if item.status === 'error' || item.status === 'conflict'}<CircleAlert class="size-4 shrink-0 text-warning" aria-hidden="true" />{:else}<Upload class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />{/if}<span class="min-w-0 flex-1 truncate">{item.name}</span><span class="shrink-0 text-muted-foreground" aria-live="polite">{t(`storage.browser.uploadStatus.${item.status}`)}</span></div>{#if item.status === 'sending' || item.status === 'queued'}<progress class="h-1.5 w-full accent-brand" value={item.loaded} max={item.total || 1} aria-label={item.name}></progress>{/if}</div>
@@ -152,7 +152,7 @@
   {/if}
 
   {#if info === null}
-    <EmptyState class="rounded-lg border" title={t('storage.browser.notFound', { bucket })}>
+    <EmptyState class="rounded-3xl bg-card" title={t('storage.browser.notFound', { bucket })}>
       {#snippet actions()}
         <Button variant="outline" href={href('/storage')}>{t('storage.browser.back')}</Button>
       {/snippet}
@@ -168,16 +168,16 @@
     </nav>
 
     {#if files === null}
-      {#if loading}<Skeleton class="h-48 rounded-lg" />{/if}
+      {#if loading}<Skeleton class="h-48 rounded-3xl" />{/if}
     {:else if files.length === 0 && folders.length === 0}
       <EmptyState
-        class="rounded-lg border"
+        class="rounded-3xl bg-card"
         icon={Folder}
         title={prefix ? t('storage.browser.emptyFolder') : t('storage.browser.emptyBucket')}
         description={t('storage.browser.emptyFolderDescription')}
       >{#snippet actions()}<Button variant="outline" disabled={!info || uploading !== null} onclick={() => picker?.click()}><Upload data-icon="inline-start" aria-hidden="true" />{t('storage.browser.upload')}</Button>{/snippet}</EmptyState>
     {:else}
-      <div class="overflow-hidden rounded-lg border bg-card">
+      <div class="overflow-hidden rounded-3xl bg-card">
         <Table.Root class="table-fixed md:table-auto">
           <Table.Header>
             <Table.Row class="hover:bg-transparent">

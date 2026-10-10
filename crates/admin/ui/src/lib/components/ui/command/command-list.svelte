@@ -5,6 +5,7 @@
 	let {
 		ref = $bindable(null),
 		class: className,
+		children,
 		...restProps
 	}: CommandPrimitive.ListProps = $props();
 </script>
@@ -12,6 +13,13 @@
 <CommandPrimitive.List
 	bind:ref
 	data-slot="command-list"
-	class={cn("no-scrollbar max-h-96 scroll-py-1 outline-none overflow-x-hidden overflow-y-auto", className)}
+	tabindex={0}
+	class={cn("no-scrollbar max-h-96 scroll-py-1 overflow-x-hidden overflow-y-auto focus-visible:outline-offset-[-2px]", className)}
 	{...restProps}
-/>
+>
+	<!-- Bits UI uses the viewport to connect the search field to its options
+	     with aria-controls and aria-activedescendant. -->
+	<CommandPrimitive.Viewport>
+		{@render children?.()}
+	</CommandPrimitive.Viewport>
+</CommandPrimitive.List>

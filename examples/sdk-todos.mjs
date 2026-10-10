@@ -11,6 +11,7 @@ const nelcota = createClient(process.env.NELCOTA_URL ?? 'http://127.0.0.1:8000')
 const email = `demo-${Date.now()}@example.com`;
 const signUp = await nelcota.auth.signUp({ email, password: 'a-demo-password' });
 if (signUp.error) throw signUp.error;
+if (!signUp.data.session) throw new Error('Confirm the signup email before using authenticated CRUD');
 
 // RLS fills user_id from the token (DEFAULT auth.uid()) and hides other users' rows.
 const { data: created, error } = await nelcota

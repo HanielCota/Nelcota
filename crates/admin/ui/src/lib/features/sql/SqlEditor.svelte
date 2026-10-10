@@ -161,10 +161,10 @@
 
 <svelte:window onkeydown={onKeydown} />
 
-<div class="flex h-full min-h-0">
+<div class="mx-auto flex h-full min-h-0 w-full max-w-page gap-3 px-4 pt-1 pb-4 sm:px-6 lg:px-8">
   <SqlSidebar onrename={(query) => openDialog({ mode: 'rename', query })} ondelete={askDelete} ondeleteDraft={(draft) => { toDeleteDraft = draft; deleteDraftOpen = true }} />
 
-  <div class="flex min-w-0 flex-1 flex-col">
+  <div class="flex min-w-0 flex-1 flex-col overflow-hidden rounded-3xl bg-card">
     <div class="flex min-h-14 shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b px-4 py-2.5 xl:flex-nowrap">
       <div class="min-w-0 flex-1 basis-48">
       <QueryTitle
@@ -176,7 +176,7 @@
       />
       </div>
       <RunAsPicker viewer={runAs} labels={runAsLabels} warnOwner onchange={chooseRunAs} />
-      <div class="ml-auto flex shrink-0 flex-wrap items-center gap-2">
+      <div class="ml-auto flex min-w-0 max-w-full flex-wrap items-center justify-end gap-2">
         <!-- On screens without the sidebar, templates and saved queries live in a menu. -->
         <DropdownMenu.Root>
           <DropdownMenu.Trigger>
@@ -275,7 +275,11 @@
     <Resizable.Handle withHandle aria-label={t('sql.editor.resize')} />
     <Resizable.Pane bind:this={resultsPane} defaultSize={58} minSize={20} collapsible collapsedSize={0}>
 
-    <div class="relative h-full min-h-0 overflow-auto bg-background" aria-busy={running}>
+    <p class="sr-only" role="status" aria-atomic="true">{running ? t('sql.editor.running') : response && 'results' in response ? t('sql.results.completed', { ms: elapsed }) : ''}</p>
+    <!-- Keyboard users need a Tab stop to scroll results, including the empty
+         state; this named region intentionally has a nonnegative tabindex. -->
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+    <div class="relative h-full min-h-0 overflow-auto bg-card focus-visible:outline-offset-[-2px]" role="region" tabindex="0" aria-label={t('sql.results.label')} aria-busy={running}>
       {#if running}
         <div class="pointer-events-none sticky top-0 z-20 h-0.5 overflow-hidden bg-brand/15" aria-hidden="true">
           <div class="animate-progress h-full w-2/5 bg-brand"></div>
@@ -289,7 +293,7 @@
         />
       {:else if 'error' in response}
         <div class="p-4" role="alert">
-          <div class="rounded-md border border-destructive/30 px-4 py-3 text-sm">
+          <div class="rounded-2xl bg-destructive/10 px-4 py-3 text-sm">
             <p class="font-mono text-xs leading-relaxed text-destructive">
               {#if response.error.code}{response.error.code}:{' '}{/if}{response.error.message}
             </p>

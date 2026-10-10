@@ -60,7 +60,7 @@ pub async fn create(
     State(state): State<AdminState>,
     Json(body): Json<CreateUser>,
 ) -> Result<(StatusCode, Json<Value>), ApiError> {
-    let user = operations::create(&state.db, &body.email, body.password).await?;
+    let user = operations::create(&state.db, &state.passwords, &body.email, body.password).await?;
     Ok((
         StatusCode::CREATED,
         Json(json!({
@@ -79,7 +79,8 @@ pub async fn set_password(
     Path(id): Path<String>,
     Json(body): Json<SetPassword>,
 ) -> ApiResult {
-    let sessions = operations::set_password(&state.db, &id, body.password).await?;
+    let sessions =
+        operations::set_password(&state.db, &state.passwords, &id, body.password).await?;
     Ok(Json(json!({
         "message": format!("password reset; {sessions} session(s) ended"),
         "sessions_revoked": sessions,

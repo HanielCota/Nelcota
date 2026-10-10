@@ -37,6 +37,12 @@ export async function fixture(page: Page) {
     else if (path === '/storage') data = { enabled: true, backend: 'disk', max_file_size: 52428800, max_total_size: null, public_url: null, buckets: [bucket] };
     else if (path === '/storage/buckets/documents') data = bucket;
     else if (path === '/storage/buckets/documents/access' && req.method() === 'GET') data = { bucket: 'documents', public: false, policies: [{ name: 'documents_own_folder', command: 'ALL', roles: ['authenticated'], using: "((bucket_id = 'documents'::text) AND ((storage.foldername(name))[1] = (auth.uid())::text))", check: "((bucket_id = 'documents'::text) AND ((storage.foldername(name))[1] = (auth.uid())::text))", all_buckets: false }] };
+    else if (path === '/metrics') {
+      const hourly = url.searchParams.get('range') === '1h'
+      const count = hourly ? 60 : 96, step = hourly ? 60 : 900, end = Date.parse(stamp)
+      const points = Array.from({ length: count }, (_, i) => ({ at: new Date(end - (count - 1 - i) * step * 1000).toISOString(), requests: 40 + (i % 12) * 9, refused: i % 5, errors: 0, p95_ms: 25 }))
+      data = { range: hourly ? '1h' : '24h', step_secs: step, since: stamp, points, totals: { requests: points.reduce((a, p) => a + p.requests, 0), refused: points.reduce((a, p) => a + p.refused, 0), errors: 0, rest: 900, auth: 40, storage: 12, p95_ms: 25 } }
+    }
     else if (path === '/denied') data = { capacity: 100, requests: [{ at: stamp, method: 'GET', path: '/rest/v1/notes', status: 401, code: 'db_error', message: 'permission denied for table notes (42501)', role: 'anon', user_id: null, email: null }] };
     else if (path === '/sign-in') data = { signup_enabled: true, email: false, email_confirmation: false, password_recovery: false, magic_link: false, providers: { google: false, github: true }, redirect_urls: ['https://app.example.test/auth/callback'], callback_url: 'https://api.example.test/auth/v1/callback', access_ttl_secs: 900, refresh_ttl_days: 30, rate_limit_per_minute: 30 };
     else if (path === '/storage/buckets/documents/file' && req.method() === 'GET') {

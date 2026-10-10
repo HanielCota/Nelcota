@@ -43,10 +43,12 @@ export class StorageBrowser {
   load(more = false) {
     if (!this.target || (more && this.filesResource.loading)) return Promise.resolve(false)
     const target = { ...this.target }
-    const previous = more ? [...(this.filesResource.data?.objects ?? [])] : []
+    const previous = more ? this.filesResource.data : null
+    const objects = [...(previous?.objects ?? [])]
+    const folders = [...(previous?.folders ?? [])]
     return this.filesResource.load(async signal => {
-      const page = await this.adapter.list(target, previous.length, signal)
-      return { ...page, objects: [...previous, ...page.objects] }
+      const page = await this.adapter.list(target, Math.max(objects.length, folders.length), signal)
+      return { ...page, objects: [...objects, ...page.objects], folders: [...folders, ...page.folders] }
     })
   }
 

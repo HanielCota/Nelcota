@@ -40,11 +40,12 @@
   }
 </script>
 
-<section class="mb-6 grid gap-3 rounded-lg border bg-card p-4" aria-labelledby="recently-blocked">
+<section class="grid gap-4 rounded-3xl bg-card p-5" aria-labelledby="recently-blocked">
   <div class="flex items-start justify-between gap-3">
     <div class="grid gap-0.5">
-      <h2 id="recently-blocked" class="text-sm font-medium">{t('policies.blocked.title')}</h2>
+      <h2 id="recently-blocked" class="text-base font-semibold">{t('policies.blocked.title')}</h2>
       <p class="text-xs text-muted-foreground">{t('policies.blocked.hint', { capacity: data?.capacity ?? 100 })}</p>
+      <p class="text-xs text-muted-foreground">{t('policies.blocked.hintMore')}</p>
     </div>
     <Button variant="ghost" size="icon-sm" disabled={resource.loading} onclick={load} aria-label={t('policies.blocked.refresh')} title={t('policies.blocked.refresh')}>
       <RefreshCw class={resource.loading ? 'animate-spin' : ''} />
@@ -56,18 +57,18 @@
   {:else if !data}
     <Skeleton class="h-12" />
   {:else if data.requests.length === 0}
-    <p class="text-sm text-muted-foreground">{t('policies.blocked.none')}</p>
+    <p class="rounded-2xl bg-well px-4 py-3.5 text-sm text-muted-foreground">{t('policies.blocked.none')}</p>
   {:else}
-    <ul class="divide-y rounded-md border">
+    <ul class="divide-y overflow-hidden rounded-2xl bg-well">
       {#each shown as request, index (`${request.at}-${index}`)}
-        <li class="grid gap-1 px-3 py-2.5">
+        <li class="grid gap-1 px-4 py-3">
           <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm">
             <span class="font-medium">{who(request)}</span>
             <span class="text-muted-foreground">·</span>
             <span>{target(request)}</span>
-            <span class="ml-auto text-xs text-muted-foreground tabular-nums">{time(request.at)}</span>
+            <span class="w-full text-xs text-muted-foreground tabular-nums">{time(request.at)}</span>
           </div>
-          <p class="text-sm text-muted-foreground">{t(`policies.blocked.reasons.${blockReason(request)}`)}</p>
+          <p class="text-xs text-muted-foreground">{t(`policies.blocked.reasons.${blockReason(request)}`)}</p>
           {#if technical.on || blockReason(request) === 'other'}
             <p class="font-mono text-xs break-all text-muted-foreground">
               {request.method} {request.path} · {request.status} {request.code}{#if request.message} · {request.message}{/if}
@@ -77,7 +78,7 @@
       {/each}
     </ul>
     {#if data.requests.length > PREVIEW}
-      <Button variant="ghost" size="sm" class="justify-self-start" onclick={() => (expanded = !expanded)}>
+      <Button variant="outline" size="sm" class="w-full" onclick={() => (expanded = !expanded)}>
         {expanded ? t('policies.blocked.showLess') : t('policies.blocked.showAll', { count: data.requests.length })}
       </Button>
     {/if}

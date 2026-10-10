@@ -89,11 +89,8 @@ pub async fn object(pool: &Pool, bucket: &str, name: &str) -> Result<Option<Obje
 /// Bytes stored in all buckets.
 pub async fn used_bytes(pool: &Pool) -> Result<u64, ApiError> {
     let row = internal(pool, async |tx| {
-        tx.query_one(
-            "SELECT coalesce(sum(size), 0)::bigint FROM storage.objects",
-            &[],
-        )
-        .await
+        tx.query_one("SELECT bytes FROM storage.usage WHERE singleton", &[])
+            .await
     })
     .await?;
     Ok(row.get::<_, i64>(0).max(0) as u64)

@@ -145,7 +145,7 @@ pub(crate) async fn callback(state: &AuthState, answer: Callback) -> Result<Stri
     let mut client = state.pool.get().await.map_err(ApiError::from_pool)?;
     let pending = {
         let tx = begin_auth(&mut client).await?;
-        let pending = flow::pending(&tx, &answer.state).await?;
+        let pending = flow::claim(&tx, &answer.state).await?;
         tx.commit().await.map_err(db_error)?;
         pending
     }

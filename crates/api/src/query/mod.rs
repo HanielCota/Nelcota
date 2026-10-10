@@ -63,13 +63,39 @@ impl ToSql for Param {
 }
 
 /// SQL under construction + its parameters.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Sql {
     pub text: String,
     pub params: Vec<Param>,
+    embed_limit: Option<i64>,
+    checked_json: bool,
+}
+
+pub const DEFAULT_MAX_ROWS: i64 = 1000;
+pub const MAX_JSON_BYTES: i64 = 8 * 1024 * 1024;
+pub const MAX_BATCH_ROWS: usize = 1000;
+const MAX_INSERT_GROUPS: usize = 128;
+const MAX_SELECT_ITEMS: usize = 128;
+
+impl Default for Sql {
+    fn default() -> Self {
+        Self {
+            text: String::new(),
+            params: Vec::new(),
+            embed_limit: Some(DEFAULT_MAX_ROWS),
+            checked_json: true,
+        }
+    }
 }
 
 impl Sql {
+    fn json(&self, expression: &str) -> String {
+        if self.checked_json {
+            format!("extensions.nelcota_check_json(to_json({expression}), {MAX_JSON_BYTES})")
+        } else {
+            format!("to_json({expression})")
+        }
+    }
     fn param(&mut self, param: Param) -> String {
         self.params.push(param);
         format!("${}", self.params.len())
@@ -357,7 +383,7 @@ mod tests {
         let sql = select("public", &t, &req, Some(1000));
         assert_eq!(
             sql.text,
-            "SELECT coalesce(json_agg(_r), '[]')::text, count(*) FROM (SELECT _t.\"id\", _t.\"title\" \
+            "SELECT coalesce(json_agg(extensions.nelcota_check_json(to_json(_r), 8388608)), '[]')::text, count(*) FROM (SELECT _t.\"id\", _t.\"title\" \
              FROM \"public\".\"todos\" AS _t WHERE _t.\"done\" IS FALSE AND _t.\"id\" >= $1::text::bigint \
              AND NOT (_t.\"title\"::text ILIKE $2::text) ORDER BY _t.\"id\" DESC NULLS LAST LIMIT $3 OFFSET $4) _r"
         );
@@ -384,6 +410,67 @@ mod tests {
         let req = parse_request(&pairs(&[("limit", "5000")]), &t).unwrap();
         let sql = select("public", &t, &req, Some(100));
         assert!(matches!(sql.params[0], Param::Int(100)));
+    }
+
+    #[test]
+    fn bounded_batches_and_unique_projections() {
+        let t = table();
+        assert!(parse_request(&pairs(&[("select", "id,id")]), &t).is_err());
+        let request = parse_request(&pairs(&[("select", "*,id")]), &t).unwrap();
+        assert!(request.select.columns.is_empty());
+        let sql = select("public", &t, &request, None);
+        assert!(matches!(
+            sql.params.last(),
+            Some(Param::Int(DEFAULT_MAX_ROWS))
+        ));
+        assert!(
+            insert(
+                "public",
+                &t,
+                Value::Array(vec![serde_json::json!({}); MAX_BATCH_ROWS + 1]),
+                None,
+                None
+            )
+            .is_err()
+        );
+        assert!(
+            insert(
+                "public",
+                &t,
+                Value::Array(vec![serde_json::json!({}); MAX_BATCH_ROWS]),
+                None,
+                None
+            )
+            .is_ok()
+        );
+    }
+
+    #[test]
+    fn heterogeneous_batch_complexity_is_bounded() {
+        let mut t = table();
+        for n in 0..8 {
+            let mut col = t.columns[0].clone();
+            col.name = format!("field{n}");
+            t.columns.push(col);
+        }
+        let rows = (0..129)
+            .map(|bits| {
+                let mut row = Map::new();
+                for n in 0..8 {
+                    if bits & (1 << n) != 0 {
+                        row.insert(format!("field{n}"), Value::Null);
+                    }
+                }
+                Value::Object(row)
+            })
+            .collect::<Vec<_>>();
+        assert!(insert("public", &t, Value::Array(rows[..128].to_vec()), None, None).is_ok());
+        assert!(
+            insert("public", &t, Value::Array(rows), None, None)
+                .unwrap_err()
+                .to_string()
+                .contains("distinct column sets")
+        );
     }
 
     #[test]
@@ -472,6 +559,68 @@ mod tests {
         assert!(sql.text.starts_with("WITH _w0 AS (INSERT"), "{}", sql.text);
         assert!(sql.text.contains("DEFAULT VALUES"));
         assert_eq!(sql.params.len(), 2);
+    }
+
+    #[test]
+    fn repeated_insert_sets_keep_catalog_order_and_first_group_order() {
+        let mut t = table();
+        t.columns.swap(0, 1);
+        let sql = insert(
+            "public",
+            &t,
+            serde_json::json!([
+                {"id":1,"title":"a"}, {"done":true}, {"title":"b","id":2}, {}, {"done":false}
+            ]),
+            None,
+            None,
+        )
+        .unwrap();
+        assert!(sql.text.starts_with(
+            "WITH _w0 AS (INSERT INTO \"public\".\"todos\" AS _t (\"title\", \"id\")"
+        ));
+        assert!(
+            sql.text
+                .contains("_w1 AS (INSERT INTO \"public\".\"todos\" AS _t (\"done\")")
+        );
+        assert!(
+            sql.text.contains(
+                "_w2 AS (INSERT INTO \"public\".\"todos\" AS _t DEFAULT VALUES) SELECT 3"
+            )
+        );
+        assert!(
+            matches!(&sql.params[..], [Param::Json(first), Param::Json(second)]
+            if first == &serde_json::json!([{"id":1,"title":"a"},{"title":"b","id":2}])
+            && second == &serde_json::json!([{"done":true},{"done":false}]))
+        );
+        for bad in [
+            serde_json::json!([{"title":"a"},{"absent":1}]),
+            serde_json::json!([{"title":"a"},false]),
+        ] {
+            assert!(insert("public", &t, bad, None, None).is_err());
+        }
+    }
+
+    #[test]
+    fn wide_catalog_batches_keep_only_the_supplied_columns() {
+        let mut t = table();
+        t.columns = (0..1600)
+            .rev()
+            .map(|n| col(&format!("c{n:04}"), "integer"))
+            .collect();
+        let row = (1500..1600)
+            .map(|n| (format!("c{n:04}"), Value::from(n)))
+            .collect::<Map<_, _>>();
+        let body = Value::Array(vec![Value::Object(row); MAX_BATCH_ROWS]);
+        let sql = insert("public", &t, body.clone(), None, None).unwrap();
+        let columns = (1500..1600)
+            .rev()
+            .map(|n| ident(&format!("c{n:04}")))
+            .collect::<Vec<_>>()
+            .join(", ");
+        assert!(sql.text.starts_with(&format!(
+            "INSERT INTO \"public\".\"todos\" AS _t ({columns}) SELECT {columns}"
+        )));
+        assert!(matches!(&sql.params[..], [Param::Json(rows)] if rows == &body));
     }
 
     // ------------------------------------------------------------- or / and
@@ -733,10 +882,10 @@ mod tests {
             (true, &vec![("order_id".to_owned(), "id".to_owned())])
         );
         assert!(text.contains(
-            "(SELECT to_json(_j0) FROM (SELECT _e0.\"name\" FROM \"public\".\"customers\" AS _e0 WHERE _e0.\"id\" = _t.\"customer_id\") AS _j0) AS \"customers\""
+            "(SELECT extensions.nelcota_check_json(to_json(_j0), 8388608) FROM (SELECT _e0.\"name\" FROM \"public\".\"customers\" AS _e0 WHERE _e0.\"id\" = _t.\"customer_id\") AS _j0) AS \"customers\""
         ), "{text}");
         assert!(text.contains(
-            "(SELECT coalesce(json_agg(_j1), '[]') FROM (SELECT _e1.* FROM \"public\".\"items\" AS _e1 WHERE _e1.\"order_id\" = _t.\"id\") AS _j1) AS \"items\""
+            "(SELECT coalesce(json_agg(extensions.nelcota_check_json(to_json(_j1), 8388608)), '[]') FROM (SELECT _e1.* FROM \"public\".\"items\" AS _e1 WHERE _e1.\"order_id\" = _t.\"id\" LIMIT $1) AS _j1) AS \"items\""
         ), "{text}");
     }
 
@@ -802,7 +951,7 @@ mod tests {
         assert_eq!(orders.select.columns, ["id"]);
         assert_eq!(orders.select.embeds[0].alias, "items");
         assert!(text.contains(
-            "(SELECT coalesce(json_agg(_j0_0), '[]') FROM (SELECT _e0_0.\"qty\" FROM \"public\".\"items\" AS _e0_0 WHERE _e0_0.\"order_id\" = _e0.\"id\") AS _j0_0) AS \"items\""
+            "(SELECT coalesce(json_agg(extensions.nelcota_check_json(to_json(_j0_0), 8388608)), '[]') FROM (SELECT _e0_0.\"qty\" FROM \"public\".\"items\" AS _e0_0 WHERE _e0_0.\"order_id\" = _e0.\"id\" LIMIT $1) AS _j0_0) AS \"items\""
         ), "{text}");
         assert!(
             text.contains("WHERE _e0_1.\"id\" = _e0.\"buyer_id\") AS _j0_1) AS \"buyer\""),
@@ -846,8 +995,8 @@ mod tests {
             "{text}"
         );
         assert!(text.contains(" WHERE _t.\"id\" = $"), "{text}");
-        // Every value is a parameter: 10, 1, 5, 2 and 7.
-        assert_eq!(sql.params.len(), 5);
+        // Values and the default limits of root and nested collection are parameters.
+        assert_eq!(sql.params.len(), 7);
     }
 
     #[test]

@@ -195,12 +195,12 @@ nelcota -p shop restore "$(native "$s3_dump")" --files --yes
   --data-binary 'replaced' "$file_url" >/dev/null || fail "the app cannot replace a restored file"
 echo "ok: files went to S3 and came back"
 
-say "Upgrade to a missing version → automatic rollback (shop)"
+say "Upgrade to a missing version → rejected before stopping shop"
 if nelcota -p shop upgrade --version does-not-exist-999; then fail "upgrade should have failed"; fi
 grep -q "NELCOTA_VERSION=$VERSION" "$WORK/projects/shop/.env" || fail "version did not go back to $VERSION"
-"${CURL[@]}" "${auth[@]}" "$SHOP/rest/v1/notes" | grep -q "before the backup" || fail "data lost in the rollback"
+"${CURL[@]}" "${auth[@]}" "$SHOP/rest/v1/notes" | grep -q "before the backup" || fail "data lost after rejected upgrade"
 "${CURL[@]}" "$BLOG/health" >/dev/null || fail "blog must not be affected by the shop upgrade"
-echo "ok: rollback kept version and data; blog untouched"
+echo "ok: unavailable target kept version and data; blog untouched"
 
 say "Remove blog"
 nelcota -p blog remove --yes

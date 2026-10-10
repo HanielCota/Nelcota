@@ -1,7 +1,7 @@
 <script lang="ts">
   import * as Command from '$lib/components/ui/command'
   import { toggleMode } from 'mode-watcher'
-  import Table2 from '@lucide/svelte/icons/table-2'
+  import Rows3 from '@lucide/svelte/icons/rows-3'
   import FileCode from '@lucide/svelte/icons/file-code'
   import Sparkles from '@lucide/svelte/icons/sparkles'
   import SunMoon from '@lucide/svelte/icons/sun-moon'
@@ -68,8 +68,8 @@
   description={t('palette.description')}
   class="sm:max-w-xl"
 >
-  <Command.Input placeholder={t('palette.placeholder')} />
-  <Command.List class="max-h-[min(60vh,420px)]">
+  <Command.Input aria-label={t('shell.topbar.searchLabel')} placeholder={t('palette.placeholder')} />
+  <Command.List aria-label={t('palette.title')} class="max-h-[min(60vh,420px)]">
     <Command.Empty class="py-8 text-muted-foreground">{t('palette.empty')}</Command.Empty>
 
     <Command.Group heading={t('palette.groups.pages')}>
@@ -87,7 +87,7 @@
             value={`${t('palette.keywords.table')} ${table.name}`}
             onSelect={() => run(() => navigate(`/tables/${encodeURIComponent(table.name)}`))}
           >
-            <Table2 /><span class="truncate">{table.name}</span>
+            <Rows3 /><span class="truncate">{table.name}</span>
             {#if table.kind !== 'table'}<Command.Shortcut>view</Command.Shortcut>{/if}
           </Command.Item>
         {/each}

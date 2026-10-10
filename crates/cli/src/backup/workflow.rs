@@ -20,7 +20,7 @@ pub fn backup(
     keep: Option<usize>,
 ) -> anyhow::Result<PathBuf> {
     let dir = project.path("backups");
-    fs::create_dir_all(&dir)?;
+    crate::private_fs::dir(&dir)?;
     let name = format!(
         "nelcota-{}-{}-{}.dump",
         project.name,

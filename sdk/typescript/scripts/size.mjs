@@ -23,9 +23,10 @@ process.on('exit', () => rmSync(dist, { recursive: true, force: true }));
 
 const BUDGETS = {
   'index.js': 12_500,
-  'rest/index.js': 5_500,
-  'auth/index.js': 5_000,
-  'storage/index.js': 3_500,
+  // Standalone factories include HTTP and keep the other feature modules out.
+  'rest/index.js': 8_000,
+  'auth/index.js': 7_500,
+  'storage/index.js': 6_000,
 };
 
 function closure(entry, seen = new Set()) {

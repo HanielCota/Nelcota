@@ -190,11 +190,20 @@ pub(crate) async fn remove(
 
 pub(crate) async fn rpc(
     State(pool): State<Pool>,
+    State(settings): State<Arc<ApiSettings>>,
     State(catalog): State<Arc<CatalogHandle>>,
     Path(name): Path<String>,
     Auth(claims): Auth,
     bytes: Bytes,
 ) -> Result<Response, ApiError> {
-    let body = operations::rpc(&pool, &claims, &catalog.get(), &name, &bytes).await?;
+    let body = operations::rpc(
+        &pool,
+        &claims,
+        &catalog.get(),
+        &name,
+        &bytes,
+        settings.max_rows,
+    )
+    .await?;
     Ok(write_response(body, StatusCode::OK, StatusCode::NO_CONTENT))
 }

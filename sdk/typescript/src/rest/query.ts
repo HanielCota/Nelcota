@@ -232,7 +232,7 @@ export class Query<S extends GenericSchema, Name extends string, Row, Out>
     }
     const headers: Record<string, string> = {};
     if (state.prefer.length > 0) headers['prefer'] = state.prefer.join(',');
-    const { response, error } = await state.http.send({
+    const { data: rows, response, error } = await state.http.json<unknown>({
       method: state.method,
       path: `/rest/v1/${encodeURIComponent(state.table)}`,
       query: new URLSearchParams(params.map(([k, v]) => [k, v])),
@@ -244,21 +244,6 @@ export class Query<S extends GenericSchema, Name extends string, Row, Out>
     if (error) return { data: null, error, count: null, status: error.status };
 
     const count = countFromRange(response.headers.get('content-range'));
-    const text = state.method === 'HEAD' ? '' : await response.text();
-    let rows: unknown = null;
-    if (text !== '') {
-      try {
-        rows = JSON.parse(text);
-      } catch (cause) {
-        const failure = new NelcotaError({
-          status: response.status,
-          code: 'invalid_response',
-          message: 'The server answered with something that is not JSON',
-          cause,
-        });
-        return { data: null, error: failure, count: null, status: response.status };
-      }
-    }
     if (state.cardinality === 'many' || !Array.isArray(rows)) {
       return { data: rows as Out, error: null, count, status: response.status };
     }

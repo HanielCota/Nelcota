@@ -14,9 +14,10 @@ const ptBR = {
   copyUrl: 'Copiar endereço de {name}',
   open: 'Abrir painel',
   newProject: {
-    before: 'Novo projeto:',
+    title: 'Novo projeto',
+    subdomain: 'Num subdomínio deste servidor:',
     subdomainCommand: 'nelcota init --project nome',
-    middle: '(subdomínio) ou',
+    domain: 'Ou num domínio próprio:',
     domainCommand: 'nelcota init api.dominio.com',
   },
 }
@@ -34,9 +35,10 @@ const en: Messages<typeof ptBR> = {
   copyUrl: 'Copy address for {name}',
   open: 'Open panel',
   newProject: {
-    before: 'New project:',
+    title: 'New project',
+    subdomain: 'On a subdomain of this server:',
     subdomainCommand: 'nelcota init --project name',
-    middle: '(subdomain) or',
+    domain: 'Or on a domain of its own:',
     domainCommand: 'nelcota init api.domain.com',
   },
 }

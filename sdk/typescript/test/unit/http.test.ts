@@ -14,6 +14,11 @@ function client(mock: ReturnType<typeof mockFetch>, options: Parameters<typeof c
 }
 
 describe('retries', () => {
+  it('returns long Retry-After delays instead of retrying too early', async () => {
+    const mock = mockFetch(json({ code: 'rate_limited', message: 'wait' }, 429, { 'retry-after': '90' }));
+    expect((await client(mock).from('todos').select()).error?.retryAfter).toBe(90);
+    expect(mock.calls).toHaveLength(1);
+  });
   it('retries reads on 429 honouring Retry-After', async () => {
     vi.useFakeTimers();
     const mock = mockFetch(json({ code: 'rate_limited', message: 'slow down' }, 429, { 'retry-after': '2' }), json([]));
@@ -62,6 +67,41 @@ describe('retries', () => {
 });
 
 describe('failures without a response', () => {
+  it('returns errors for truncated JSON and file bodies and retries only reads', async () => {
+    const broken = () => new Response(new ReadableStream({ start(controller) { controller.error(new TypeError('connection lost')); } }));
+    const read = mockFetch(broken, json([]));
+    expect((await client(read).from('t').select()).error).toBeNull();
+    expect(read.calls).toHaveLength(2);
+    const write = mockFetch(broken);
+    expect((await client(write).from('t').insert({ a: 1 })).error?.code).toBe('network_error');
+    expect(write.calls).toHaveLength(1);
+    const file = mockFetch(broken);
+    expect((await client(file, { retries: 0 }).storage.from('files').download('a.txt')).error?.code).toBe('network_error');
+  });
+
+  it('classifies abort and timeout while reading a response body', async () => {
+    const fetchBody = async (_input: string | URL | Request, init?: RequestInit) => new Response(new ReadableStream({
+      start(controller) {
+        init?.signal?.addEventListener('abort', () => controller.error(new DOMException('aborted', 'AbortError')), { once: true });
+      },
+    }));
+    const timed = createClient('https://api.example.com', { fetch: fetchBody, timeout: 15, retries: 0 });
+    expect((await timed.from('t').select()).error?.code).toBe('timeout');
+    const controller = new AbortController();
+    const aborted = createClient('https://api.example.com', { fetch: fetchBody, retries: 0 });
+    const download = aborted.storage.from('files').download('a.txt', { signal: controller.signal });
+    setTimeout(() => controller.abort(), 15);
+    expect((await download).error?.code).toBe('aborted');
+  });
+
+  it('refuses invalid timeout and retry settings before sending', async () => {
+    const mock = mockFetch(json([]));
+    for (const options of [{ timeout: -1 }, { timeout: Infinity }, { retries: -1 }, { retries: 1.5 }]) {
+      expect(() => client(mock, options)).toThrow(NelcotaUsageError);
+    }
+    await expect(client(mock).from('t').select().timeout(NaN).execute()).rejects.toBeInstanceOf(NelcotaUsageError);
+    expect(mock.calls).toHaveLength(0);
+  });
   it('reports network errors, timeouts and aborts with client codes', async () => {
     const down = mockFetch(() => {
       throw new TypeError('fetch failed');
@@ -90,6 +130,11 @@ describe('failures without a response', () => {
 });
 
 describe('headers and tokens', () => {
+  it('omits caller-configured authorization on public auth endpoints', async () => {
+    const mock = mockFetch(json({ code: 'invalid_credentials', message: 'no' }, 400));
+    await client(mock, { headers: { authorization: 'Bearer caller-token' } }).auth.signInWithPassword({ email: 'a@x.com', password: 'pw' });
+    expect(mock.calls[0]!.headers.has('authorization')).toBe(false);
+  });
   it('sends only the bearer token and the content type it needs', async () => {
     const mock = mockFetch(json([]));
     await client(mock, { accessToken: () => 'tok' }).from('t').insert({ a: 1 });

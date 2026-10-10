@@ -39,11 +39,20 @@ export interface RequestSpec {
 
 const MAX_RETRY_WAIT_MS = 30_000;
 
+function nonNegativeInteger(value: number, name: string, maximum = Number.MAX_SAFE_INTEGER): void {
+  if (!Number.isSafeInteger(value) || value < 0 || value > maximum) {
+    throw new NelcotaUsageError(`${name} must be an integer between 0 and ${maximum}`);
+  }
+}
+
 /** Seconds from a `Retry-After` header (delay-seconds or HTTP date). */
 export function parseRetryAfter(value: string | null): number | undefined {
   if (value === null) return undefined;
   const trimmed = value.trim();
-  if (/^\d+$/.test(trimmed)) return Number(trimmed);
+  if (/^\d+$/.test(trimmed)) {
+    const seconds = Number(trimmed);
+    return Number.isSafeInteger(seconds) ? seconds : undefined;
+  }
   const date = Date.parse(trimmed);
   if (Number.isNaN(date)) return undefined;
   return Math.max(0, Math.ceil((date - Date.now()) / 1000));
@@ -54,8 +63,9 @@ export async function errorFromResponse(response: Response): Promise<NelcotaErro
   const retryAfter = parseRetryAfter(response.headers.get('retry-after'));
   let code = `http_${response.status}`;
   let message = response.statusText || `HTTP ${response.status}`;
+  const text = await response.text();
   try {
-    const body: unknown = JSON.parse(await response.text());
+    const body: unknown = JSON.parse(text);
     if (typeof body === 'object' && body !== null) {
       const record = body as Record<string, unknown>;
       if (typeof record['code'] === 'string') code = record['code'];
@@ -83,7 +93,7 @@ function sleep(ms: number, signal: AbortSignal | undefined): Promise<void> {
 }
 
 function backoff(attempt: number, retryAfter: number | undefined): number {
-  if (retryAfter !== undefined) return Math.min(retryAfter * 1000, MAX_RETRY_WAIT_MS);
+  if (retryAfter !== undefined) return retryAfter * 1000;
   // Full jitter: spreads clients that failed together.
   return Math.random() * Math.min(200 * 2 ** attempt, MAX_RETRY_WAIT_MS);
 }
@@ -95,6 +105,8 @@ export class HttpClient {
   readonly #base: string;
 
   constructor(options: HttpOptions) {
+    nonNegativeInteger(options.timeout, 'timeout', 2 ** 31 - 1);
+    nonNegativeInteger(options.retries, 'retries');
     this.url = options.url;
     this.#options = options;
     let end = options.url.href.length;
@@ -112,9 +124,17 @@ export class HttpClient {
    * Sends the request and returns the response when it is 2xx/3xx, or a
    * `NelcotaError` otherwise. Never throws for HTTP or network failures.
    */
-  async send(spec: RequestSpec): Promise<{ response: Response; error: null } | { response: null; error: NelcotaError }> {
+  async #request<T>(spec: RequestSpec, read: (response: Response) => Promise<T>): Promise<
+    { data: T; error: null; response: Response } | { data: null; error: NelcotaError; response: Response | null }
+  > {
+    const timeout = spec.timeout ?? this.#options.timeout;
+    nonNegativeInteger(timeout, 'timeout', 2 ** 31 - 1);
+    if (spec.signal?.aborted) {
+      return { data: null, response: null, error: clientError('aborted', 'The request was aborted') };
+    }
     const headers = new Headers(this.#options.headers);
     for (const [name, value] of Object.entries(spec.headers ?? {})) headers.set(name, value);
+    if (spec.auth === false) headers.delete('authorization');
 
     let token: string | null = null;
     if (typeof spec.auth === 'string') token = spec.auth;
@@ -123,6 +143,8 @@ export class HttpClient {
       assertTokenAllowed(token);
       headers.set('authorization', `Bearer ${token}`);
     }
+    const bearer = headers.get('authorization');
+    if (bearer?.toLowerCase().startsWith('bearer ')) assertTokenAllowed(bearer.slice(7));
 
     let body: BodyInit | null | undefined = spec.body;
     if (spec.json !== undefined) {
@@ -133,7 +155,6 @@ export class HttpClient {
 
     const idempotent = spec.method === 'GET' || spec.method === 'HEAD';
     const retries = idempotent ? this.#options.retries : 0;
-    const timeout = spec.timeout ?? this.#options.timeout;
     const href = this.href(spec.path, spec.query);
     const streaming = typeof ReadableStream !== 'undefined' && body instanceof ReadableStream;
 
@@ -150,50 +171,64 @@ export class HttpClient {
       try {
         const response = await this.#options.fetch(href, init);
         if (response.ok || (response.status >= 300 && response.status < 400)) {
-          return { response, error: null };
+          // Buffered reads happen in this attempt: body failures, cancellation
+          // and timeouts have the same result contract as failures in fetch.
+          return { data: await read(response), response, error: null };
         }
         failure = await errorFromResponse(response);
         const retryable = response.status === 429 || response.status === 503;
-        if (!retryable || attempt >= retries) return { response: null, error: failure };
-      } catch (cause) {
-        if (spec.signal?.aborted) {
-          return { response: null, error: clientError('aborted', 'The request was aborted', cause) };
+        // Return long Retry-After delays to the caller instead of retrying early.
+        if (!retryable || attempt >= retries || (failure.retryAfter ?? 0) * 1000 > MAX_RETRY_WAIT_MS) {
+          return { data: null, response: null, error: failure };
         }
-        if (cause instanceof DOMException && cause.name === 'TimeoutError') {
+      } catch (cause) {
+        if (cause instanceof NelcotaError) return { data: null, response: null, error: cause };
+        if (spec.signal?.aborted) {
+          return { data: null, response: null, error: clientError('aborted', 'The request was aborted', cause) };
+        }
+        if ((signal?.aborted && signal.reason?.name === 'TimeoutError') || (cause instanceof DOMException && cause.name === 'TimeoutError')) {
           failure = clientError('timeout', `No response within ${timeout} ms`, cause);
         } else {
           failure = clientError('network_error', 'The server could not be reached', cause);
         }
-        if (attempt >= retries) return { response: null, error: failure };
+        if (attempt >= retries) return { data: null, response: null, error: failure };
       }
       try {
         await sleep(backoff(attempt, failure.retryAfter), spec.signal);
       } catch (cause) {
-        return { response: null, error: clientError('aborted', 'The request was aborted', cause) };
+        return { data: null, response: null, error: clientError('aborted', 'The request was aborted', cause) };
       }
     }
   }
 
+  /** Raw streaming response. Later body reads belong to the caller. */
+  async send(spec: RequestSpec): Promise<{ response: Response; error: null } | { response: null; error: NelcotaError }> {
+    const result = await this.#request(spec, async (response) => response);
+    return result.error ? { response: null, error: result.error } : { response: result.data, error: null };
+  }
+
   /** `send` plus JSON decoding; 204 and empty bodies give `null`. */
   async json<T>(spec: RequestSpec): Promise<{ data: T; error: null; response: Response } | { data: null; error: NelcotaError; response: Response | null }> {
-    const { response, error } = await this.send(spec);
-    if (error) return { data: null, error, response: null };
-    const text = await response.text();
-    if (text === '') return { data: null as T, error: null, response };
-    try {
-      return { data: JSON.parse(text) as T, error: null, response };
-    } catch (cause) {
-      return {
-        data: null,
-        error: new NelcotaError({
+    return this.#request(spec, async (response) => {
+      const text = spec.method === 'HEAD' ? '' : await response.text();
+      if (text === '') return null as T;
+      try {
+        return JSON.parse(text) as T;
+      } catch (cause) {
+        throw new NelcotaError({
           status: response.status,
           code: 'invalid_response',
           message: 'The server answered with something that is not JSON',
           cause,
-        }),
-        response,
-      };
-    }
+        });
+      }
+    });
+  }
+
+  /** Buffered download with the same failure and retry contract as JSON. */
+  async blob(spec: RequestSpec): Promise<{ data: Blob; error: null } | { data: null; error: NelcotaError }> {
+    const result = await this.#request(spec, (response) => response.blob());
+    return result.error ? { data: null, error: result.error } : { data: result.data, error: null };
   }
 }
 

@@ -88,7 +88,7 @@
       <fieldset class="contents" disabled={saving} aria-busy={saving}>
         <ColumnFields bind:column {tables} mode={original ? 'edit' : 'add'} />
         {#if original && column.data_type.trim() !== original.data_type}
-          <p class="rounded-lg border bg-muted/40 px-4 py-3 text-xs text-muted-foreground">
+          <p class="rounded-2xl bg-well px-4 py-3 text-xs text-muted-foreground">
             {t('tables.columnSheet.conversionBefore')} <code>{original.name}::{column.data_type}</code>. {t('tables.columnSheet.conversionAfter')}
           </p>
         {/if}

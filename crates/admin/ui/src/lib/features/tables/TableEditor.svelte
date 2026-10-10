@@ -223,10 +223,10 @@
   }
 </script>
 
-<div class="flex h-full min-h-0">
+<div class="mx-auto flex h-full min-h-0 w-full max-w-page gap-3 px-4 pt-1 pb-4 sm:px-6 lg:px-8">
   <TableSidebar {tables} current={name} loading={tablesLoading} error={tablesError} onretry={loadTables} oncreate={() => (createOpen = true)} />
 
-  <section class={cn('min-w-0 flex-1 flex-col', name ? 'flex' : 'hidden lg:flex')}>
+  <section class={cn('min-w-0 flex-1 flex-col overflow-hidden rounded-3xl bg-card', name ? 'flex' : 'hidden lg:flex')}>
     {#if !name}
       <div class="grid flex-1 place-items-center p-8">
         <EmptyState title={t('tables.editor.noneOpen')} description={t('tables.editor.pickOne')}>
@@ -341,7 +341,7 @@
               {:else if viewing}
                 <p class="p-8 text-center text-sm text-muted-foreground">{t('tables.viewAs.hidden')}</p>
               {:else}
-                <GridState state="empty" insertable={data.table.insertable} oninsert={() => openSheet(null)} />
+                <GridState state="empty" table={name} insertable={data.table.insertable} oninsert={() => openSheet(null)} />
               {/if}
             {/if}
           {/if}

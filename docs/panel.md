@@ -13,7 +13,7 @@ in the chosen language by their error code.
 ## Several projects
 
 Each project has its own panel, on its own domain, showing only its data. At
-the top of the sidebar, the **project switcher** (current project name) lists
+the top left, next to the mascot, the **project switcher** (current project name) lists
 the other projects on the host and leads to "All projects": name, domain,
 state (up / down), version and a button to open each panel.
 
@@ -46,7 +46,21 @@ An SPA in **Svelte 5 + shadcn-svelte + Tailwind v4**, with **CodeMirror 6** in
 the SQL editor, Manrope for the interface and IBM Plex Mono for code. The build
 is embedded in the binary: no CDN and no Node in production (fonts too,
 because of the CSP `font-src 'self'`). Dark theme by default; theme and
-language are in the account menu, at the bottom of the sidebar.
+language are in the account menu, at the top right.
+
+The pages are pills across the top (on narrow screens, in their own row; on
+phones, in the menu). **Database** groups Tables, SQL and Migrations, with
+tabs between them inside each page; **User sign-in** is reached from the
+Users page. The project chip at the top left shows the project, whether it
+runs locally or on which host, and a dot for whether the server answers
+(checked every minute and when the window regains focus). Search (Ctrl K)
+sits beside the account chip. The
+**overview** leads with the API's traffic: requests in the last 24 hours,
+the share refused and the share that failed, then cards for tables (how
+many are protected), users (how many have signed in from the app) and
+refused calls, beside a chart of requests and refused calls over the last
+hour or day, with a table view. The counts are kept in memory per minute
+for 24 hours: restarting the server starts them again.
 
 RLS state shows as a colored badge: green (RLS with policies), amber (RLS on
 without policies) and red (table exposed without RLS).
@@ -65,15 +79,20 @@ without policies) and red (table exposed without RLS).
 | Read long values | "View full content" in long grid and SQL result cells; copy from the detail dialog |
 | Resize SQL results | drag the separator between the editor and results, or focus it and use the arrow keys. The split is remembered in the browser |
 | Export a SQL result | "Export" above each result → CSV or JSON |
-| Command palette | Ctrl+K (⌘K on Mac) or "Search…" in the top bar: pages, tables, saved queries, templates and actions |
+| Command palette | Ctrl+K (⌘K on Mac) or the search button at the top right: pages, tables, saved queries, templates and actions |
 | Create a table | "New table" in the table list: columns (type, default, PK, identity, UNIQUE, foreign key), RLS on by default and a GRANTs matrix. Shows the SQL before creating |
 | Edit the structure | the table's **Structure** tab (`/admin/tables/<name>/structure`): add, edit and delete columns; rename the table; description; turn RLS on/off; GRANTs per role; delete the table (by typing its name) |
 | Policies | search tables and filter their RLS status; "New policy" on each table, with templates (public read, signed-in users read, owner reads/creates/updates/deletes); edit and delete; "Enable RLS" on tables without it. Long expressions expand on demand |
 | service_role token | **API** page, expandable token section after the examples: issues a token with the chosen validity; shown once and never stored |
 | Create a user / reset a password | **Users** page: "New user" and "Reset password…" in each user's menu, with a password generator. Same rules as public signup. Accounts created here count as confirmed and the panel sends no invitations; end users can recover their own password by email when the project has SMTP configured ([schema-auth.md](schema-auth.md#password-recovery)) |
 | Generate migration | **Migrations** page: schema changes made in the panel (tables, columns, policies) that are not in any file yet, and the project's migrations (applied or only in the folder). "Generate migration" downloads `V<n>__<name>.sql` and registers it as applied in this database; the file goes into `migrations/` (see [deploy](deploy.md#changes-made-in-the-panel)) |
-| Profile photo | account menu, at the bottom of the sidebar: "Add photo…". The image is center-cropped and scaled to 256px in the browser; the server accepts PNG, JPEG or WebP up to 256 KB. It lives in the project's database (`nelcota.admin_avatar`, out of reach of the API roles), so it works in any browser, but it is per project |
+| Profile photo | account menu, at the top right: "Add photo…". The image is center-cropped and scaled to 256px in the browser; the server accepts PNG, JPEG or WebP up to 256 KB. It lives in the project's database (`nelcota.admin_avatar`, out of reach of the API roles), so it works in any browser, but it is per project |
 | Dates in the grid | `timestamptz` shows in the viewer's time zone and language; `timestamp` and `date` as stored. The exact value is in the tooltip, in edit mode and in exports |
+
+CSV exports protect spreadsheet imports: formula-like cells and headers receive
+a quoted tab prefix, including formulas hidden behind whitespace or control
+characters. Negative numeric literals keep their digits and numeric form.
+Use JSON export when you need the original text without this neutralization.
 
 | Page | What it has |
 |---|---|

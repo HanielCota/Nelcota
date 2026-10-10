@@ -56,18 +56,23 @@ pub(super) async fn start(
     Ok(state)
 }
 
-/// The sign-in behind a `state`, while it waits for the provider.
-pub(super) async fn pending(
-    tx: &Transaction<'_>,
-    state: &str,
-) -> Result<Option<Pending>, ApiError> {
+/// Claims the callback once, before contacting the provider. Clearing its
+/// verifier also makes a cancelled/failed exchange require a new authorize.
+pub(super) async fn claim(tx: &Transaction<'_>, state: &str) -> Result<Option<Pending>, ApiError> {
     if state.is_empty() || state.len() > 128 {
         return Ok(None);
     }
     let row = tx
         .query_opt(
-            "SELECT id, provider, provider_verifier, redirect_to FROM auth.flow_states
-             WHERE state_hash = $1 AND auth_code_hash IS NULL AND expires_at > now()",
+            "WITH pending AS (
+                 SELECT id, provider, provider_verifier, redirect_to FROM auth.flow_states
+                  WHERE state_hash = $1 AND auth_code_hash IS NULL
+                    AND provider_verifier <> '' AND expires_at > now()
+                  FOR UPDATE
+             )
+             UPDATE auth.flow_states f SET provider_verifier = ''
+               FROM pending p WHERE f.id = p.id
+             RETURNING p.id, p.provider, p.provider_verifier, p.redirect_to",
             &[&hash(state)],
         )
         .await
@@ -125,12 +130,28 @@ pub(super) async fn redeem(
     if code.is_empty() || code.len() > 128 {
         return Ok(None);
     }
+    let code_hash = hash(code);
+    // Match password/email-link login and inbox claims: account before code
+    // and session. A claim may delete the code while this account lock waits;
+    // the DELETE below rechecks its existence before starting any session.
+    let account = tx
+        .query_opt(
+            "SELECT u.id FROM auth.users u
+               JOIN auth.flow_states f ON f.user_id = u.id
+              WHERE f.auth_code_hash = $1 FOR UPDATE OF u",
+            &[&code_hash],
+        )
+        .await
+        .map_err(db_error)?;
+    if account.is_none() {
+        return Ok(None);
+    }
     let row = tx
         .query_opt(
             "DELETE FROM auth.flow_states
               WHERE auth_code_hash = $1
               RETURNING user_id, code_challenge, expires_at > now()",
-            &[&hash(code)],
+            &[&code_hash],
         )
         .await
         .map_err(db_error)?;

@@ -98,12 +98,8 @@ pub fn parse(text: &str) -> Vec<(String, String)> {
 
 /// Writes a file readable only by its owner (0600 on Unix).
 pub fn write_private(path: &Path, content: &str) -> anyhow::Result<()> {
-    fs::write(path, content).with_context(|| format!("could not write {}", path.display()))?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(path, fs::Permissions::from_mode(0o600))?;
-    }
+    crate::private_fs::write(path, content)
+        .with_context(|| format!("could not write {}", path.display()))?;
     Ok(())
 }
 

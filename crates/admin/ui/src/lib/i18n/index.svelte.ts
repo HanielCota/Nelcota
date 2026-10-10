@@ -134,8 +134,12 @@ export function errorMessage(error: unknown): string {
   if (error instanceof ApiError && error.code && hasMessage(`errors.${error.code}`)) {
     return translate(i18n.locale, `errors.${error.code}`, error.params)
   }
+  if (isNetworkError(error)) return translate(i18n.locale, 'errors.network')
   return error instanceof Error ? error.message : String(error)
 }
+
+/** A request that never reached the server (fetch rejects with a TypeError). */
+export const isNetworkError = (error: unknown) => error instanceof TypeError
 
 /** Locale for `Intl` formatters (dates, numbers). */
 export const intlLocale = () => i18n.locale

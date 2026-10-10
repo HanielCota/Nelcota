@@ -5,11 +5,25 @@ import { draftsAndFiles } from './draftsAndFiles'
 import { uploadsAndDetails } from './uploadsAndDetails'
 
 test.beforeEach(async ({ page }) => { await fixture(page) })
-for (const route of ['policies', 'migrations', 'storage', 'storage/documents', 'projects', 'connect', 'sign-in']) {
-  test(`${route} loads its generated contract without an error`, async ({ page }) => {
+const pageContracts = {
+  '': ['/overview', '/metrics', '/denied'],
+  policies: ['/policies'],
+  migrations: ['/migrations'],
+  storage: ['/storage'],
+  'storage/documents': ['/storage', '/storage/buckets/documents/objects'],
+  projects: ['/projects', '/projects/status'],
+  connect: ['/tables'],
+  'sign-in': ['/sign-in'],
+}
+for (const [route, endpoints] of Object.entries(pageContracts)) {
+  test(`${route || 'overview'} loads its generated contract without an error`, async ({ page }) => {
+    // Lazy modules and the Vite connection can outlive page readiness.
+    // Check the actual data contracts and rendered loading state instead.
+    const responses = endpoints.map(path => page.waitForResponse(response => new URL(response.url()).pathname === `/admin/api${path}`))
     await page.goto(`/admin/${route}`)
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
-    await page.waitForLoadState('networkidle')
+    await Promise.all(responses.map(async pending => (await pending).finished()))
+    await expect(page.locator('main [data-slot="skeleton"]')).toHaveCount(0)
     await expect(page.getByRole('alert')).toHaveCount(0)
   })
 }

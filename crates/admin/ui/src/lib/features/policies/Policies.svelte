@@ -7,9 +7,9 @@
   import Trash2 from '@lucide/svelte/icons/trash-2'
   import ShieldCheck from '@lucide/svelte/icons/shield-check'
   import Search from '@lucide/svelte/icons/search'
+  import Rows3 from '@lucide/svelte/icons/rows-3'
   import LoaderCircle from '@lucide/svelte/icons/loader-circle'
   import { Input } from '$lib/components/ui/input'
-  import * as Select from '$lib/components/ui/select'
   import { toast } from 'svelte-sonner'
   import PageHeader from '$lib/components/shared/PageHeader.svelte'
   import RecentlyBlocked from '$lib/features/policies/components/RecentlyBlocked.svelte'
@@ -36,9 +36,25 @@
   const loading = $derived(resource.loading)
   // Arriving from an overview warning (`?table=`) opens that table.
   let search = $state(route.query.get('table') ?? '')
-  let rlsFilter = $state('all')
+  type Filter = 'all' | 'enabled' | 'disabled' | 'attention'
+  const FILTERS: Filter[] = ['all', 'enabled', 'disabled', 'attention']
+  let rlsFilter = $state<Filter>('all')
   let enabling = $state<string | null>(null)
   const visible = $derived(data?.tables.filter((table) => table.name.toLowerCase().includes(search.trim().toLowerCase()) && (rlsFilter === 'all' || rlsFilter === 'enabled' && table.rls.enabled || rlsFilter === 'disabled' && !table.rls.enabled && table.rls.state !== 'view' || rlsFilter === 'attention' && ['danger', 'warn'].includes(table.rls.state))) ?? [])
+
+  const stats = $derived.by(() => {
+    const tables = data?.tables.filter((table) => table.rls.state !== 'view') ?? []
+    return {
+      tables: tables.length,
+      protected: tables.filter((table) => table.rls.enabled).length,
+      policies: tables.reduce((sum, table) => sum + table.policies.length, 0),
+      attention: tables.filter((table) => ['danger', 'warn'].includes(table.rls.state)).length,
+    }
+  })
+  const segment = (on: boolean) => [
+    'h-9 cursor-pointer rounded-full px-4 text-sm whitespace-nowrap transition-colors',
+    on ? 'bg-nav-active text-nav-active-foreground font-medium' : 'text-muted-foreground hover:text-foreground',
+  ]
 
   /** A policy in words; custom rules are named as such and keep their SQL in view. */
   function sentence(meaning: PolicyMeaning): string {
@@ -100,7 +116,7 @@
 
 </script>
 
-<div class="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-10 lg:py-10">
+<div class="mx-auto grid w-full max-w-page gap-6 px-4 pt-2 pb-12 *:min-w-0 sm:px-6 lg:px-8 [&>:first-child]:mb-0">
   <PageHeader title={t('policies.title')} description={t('policies.description')}>
     {#snippet actions()}<TechnicalToggle />{/snippet}
   </PageHeader>
@@ -112,31 +128,57 @@
     </div>
   {:else if data}
     {#if data.exposed_without_rls.length}
-      <Callout variant="danger" title={t('policies.exposed', { tables: data.exposed_without_rls.join(', ') })} class="mb-6">
+      <Callout variant="danger" title={t('policies.exposed', { tables: data.exposed_without_rls.join(', ') })}>
         {t('policies.exposedHint')}
         {#snippet actions()}<Button variant="outline" size="sm" onclick={() => (rlsFilter = 'attention')}><ShieldCheck data-icon="inline-start" aria-hidden="true" />{t('common.reviewAccess')}</Button>{/snippet}
       </Callout>
     {/if}
 
-    <RecentlyBlocked />
+    <!-- The page at a glance, in the overview's figure style. -->
+    <!-- Same columns as below: the last figure sits over the side column. -->
+    <div class="grid gap-4 sm:grid-cols-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_24rem] xl:gap-6">
+      <div class="grid gap-1 rounded-3xl bg-card p-5">
+        <p class="text-sm text-muted-foreground">{t('policies.stats.protected')}</p>
+        <p class="text-3xl font-semibold tracking-tight tabular-nums">{stats.protected}<span class="ml-1.5 text-base font-medium text-muted-foreground">{t('policies.stats.of', { count: stats.tables })}</span></p>
+      </div>
+      <div class="grid gap-1 rounded-3xl bg-card p-5">
+        <p class="text-sm text-muted-foreground">{t('policies.stats.policies')}</p>
+        <p class="text-3xl font-semibold tracking-tight tabular-nums">{stats.policies}</p>
+      </div>
+      <div class="grid gap-1 rounded-3xl bg-card p-5">
+        <p class="text-sm text-muted-foreground">{t('policies.stats.attention')}</p>
+        <p class={['text-3xl font-semibold tracking-tight tabular-nums', stats.attention > 0 && 'text-warning']}>{stats.attention}</p>
+      </div>
+    </div>
 
+    <div class="grid gap-6 *:min-w-0 xl:grid-cols-[minmax(0,1fr)_24rem] xl:items-start">
+    <div class="grid min-w-0 gap-4">
     {#if data.tables.length === 0}
       <EmptyState icon={ShieldCheck} title={t('policies.noTables')} description={t('policies.noTablesHint')}>{#snippet actions()}<Button href={href('/tables?create=true')}><Plus data-icon="inline-start" aria-hidden="true" />{t('tables.editor.newTable')}</Button>{/snippet}</EmptyState>
     {:else}
-      <div class="mb-4 grid gap-3 sm:flex sm:items-center">
-        <div class="relative min-w-0 flex-1"><Search class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" /><Input type="search" bind:value={search} aria-label={t('policies.search')} placeholder={t('policies.search')} class="pl-9" /></div>
-        <Select.Root type="single" bind:value={rlsFilter}><Select.Trigger class="w-full sm:w-48" aria-label={t('policies.filterLabel')}>{t(`policies.filters.${rlsFilter as 'all' | 'enabled' | 'disabled' | 'attention'}`)}</Select.Trigger><Select.Content>{#each ['all', 'enabled', 'disabled', 'attention'] as option (option)}<Select.Item value={option}>{t(`policies.filters.${option as 'all' | 'enabled' | 'disabled' | 'attention'}`)}</Select.Item>{/each}</Select.Content></Select.Root>
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex max-w-full items-center gap-1 overflow-x-auto rounded-full bg-card p-1" role="group" aria-label={t('policies.filterLabel')}>
+          {#each FILTERS as option (option)}
+            <button type="button" class={segment(rlsFilter === option)} aria-pressed={rlsFilter === option} onclick={() => (rlsFilter = option)}>{t(`policies.filters.${option}`)}</button>
+          {/each}
+        </div>
+        <div class="relative w-full sm:w-72"><Search class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" /><Input type="search" bind:value={search} aria-label={t('policies.search')} placeholder={t('policies.search')} class="rounded-full pl-10" /></div>
       </div>
       {#if !visible.length}<EmptyState icon={Search} title={t('common.noMatches')}>{#snippet actions()}<Button variant="outline" onclick={() => { search = ''; rlsFilter = 'all' }}>{t('common.clearFilters')}</Button>{/snippet}</EmptyState>{/if}
     {/if}
-    <div class="grid gap-4">
       {#each visible as table (table.name)}
-        <section class="@container overflow-hidden rounded-lg border bg-card">
-          <header class="flex flex-wrap items-center gap-3 border-b bg-muted/40 px-4 py-2.5">
-            <h2 class="text-sm font-semibold">
-              <a href={href(`/tables/${encodeURIComponent(table.name)}`)} class="hover:underline">{table.name}</a>
-            </h2>
-            <RlsBadge rls={table.rls} />
+        <section class="@container grid gap-4 rounded-3xl bg-card p-5">
+          <header class="flex flex-wrap items-center gap-3">
+            <span class="grid size-10 shrink-0 place-items-center rounded-full bg-well text-muted-foreground"><Rows3 class="size-[18px]" aria-hidden="true" /></span>
+            <div class="grid min-w-0 gap-0.5">
+              <div class="flex flex-wrap items-center gap-2">
+                <h2 class="text-base font-semibold">
+                  <a href={href(`/tables/${encodeURIComponent(table.name)}`)} class="hover:underline">{table.name}</a>
+                </h2>
+                <RlsBadge rls={table.rls} />
+              </div>
+              <p class="text-xs text-muted-foreground">{t('policies.count', { count: table.policies.length })}</p>
+            </div>
             <div class="ml-auto flex items-center gap-2">
               {#if !table.rls.enabled}
                 <Button variant="outline" size="sm" disabled={enabling !== null} onclick={() => enableRls(table.name)}>{#if enabling === table.name}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{:else}<ShieldCheck data-icon="inline-start" aria-hidden="true" />{/if}{t('policies.enableRls')}</Button>
@@ -145,7 +187,7 @@
             </div>
           </header>
           {#if table.policies.length === 0}
-            <p class="px-4 py-5 text-sm text-muted-foreground">
+            <p class="rounded-2xl bg-well px-4 py-3.5 text-sm text-muted-foreground">
               {#if table.rls.enabled}
                 {t('policies.noPoliciesRlsBefore')} <code class="text-xs text-foreground">service_role</code> {t('policies.noPoliciesRlsAfter')}
               {:else}
@@ -153,11 +195,11 @@
               {/if}
             </p>
           {:else}
-            <div class="divide-y">
+            <div class="grid gap-2">
               {#each table.policies as policy (policy.name)}
                 {@const meaning = describePolicy(policy)}
                 {@const showSql = technical.on || meaning.kind === 'custom'}
-                <div class={['grid grid-cols-[minmax(0,1fr)_auto] gap-3 px-4 py-3.5 text-sm', showSql && '@4xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,2fr)_auto] @4xl:items-start']}>
+                <div class={['grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-2xl bg-well px-4 py-3 text-sm', showSql && '@4xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,2fr)_auto] @4xl:items-start']}>
                   <div class="min-w-0">
                     <p class="break-words font-medium">
                       {sentence(meaning)}
@@ -174,10 +216,10 @@
                   </p>
                   <div class="col-start-1 grid min-w-0 gap-1 font-mono text-xs @4xl:col-start-auto">
                     {#if policy.using}
-                      {#if policy.using.length > 160}<details><summary class="cursor-pointer text-muted-foreground">USING · {t('common.details')}</summary><CodeBlock code={policy.using} wrap /></details>{:else}<p class="break-all"><span class="text-muted-foreground">using</span> {policy.using}</p>{/if}
+                      {#if policy.using.length > 160}<details><summary class="cursor-pointer text-muted-foreground">USING · {t('common.details')}</summary><CodeBlock code={policy.using} lang="sql" wrap /></details>{:else}<p class="break-words"><span class="text-muted-foreground">using</span> {policy.using}</p>{/if}
                     {/if}
                     {#if policy.check}
-                      {#if policy.check.length > 160}<details><summary class="cursor-pointer text-muted-foreground">WITH CHECK · {t('common.details')}</summary><CodeBlock code={policy.check} wrap /></details>{:else}<p class="break-all"><span class="text-muted-foreground">with check</span> {policy.check}</p>{/if}
+                      {#if policy.check.length > 160}<details><summary class="cursor-pointer text-muted-foreground">WITH CHECK · {t('common.details')}</summary><CodeBlock code={policy.check} lang="sql" wrap /></details>{:else}<p class="break-words"><span class="text-muted-foreground">with check</span> {policy.check}</p>{/if}
                     {/if}
                   </div>
                   {/if}
@@ -208,8 +250,11 @@
       {/each}
     </div>
 
+    <aside class="grid gap-4 xl:sticky xl:top-24">
+      <RecentlyBlocked />
+
     {#if data.anon_functions.length}
-      <section class="mt-8 rounded-lg border bg-card p-5">
+      <section class="rounded-3xl bg-card p-5">
         <h2 class="text-sm font-semibold">{t('policies.anonFunctions')}</h2>
         <p class="mt-2 font-mono text-xs">{data.anon_functions.join(', ')}</p>
         <p class="mt-3 text-sm text-muted-foreground">
@@ -218,6 +263,8 @@
         </p>
       </section>
     {/if}
+    </aside>
+    </div>
   {/if}
 </div>
 

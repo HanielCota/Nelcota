@@ -168,7 +168,7 @@ pub async fn begin_request<'a>(
     let tx = client.transaction().await?;
     let statement = tx
         .prepare_cached(
-            "SELECT set_config('role', $1, true), set_config('request.jwt.claims', $2, true)",
+            "SELECT set_config('role', $1, true), set_config('request.jwt.claims', $2, true), set_config('nelcota.response_bytes', '0', true)",
         )
         .await?;
     tx.execute(&statement, &[&claims.role().as_str(), &claims.as_json()])

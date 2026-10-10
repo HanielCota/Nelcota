@@ -9,7 +9,7 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { dirname, extname, join, normalize, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { chromium } from 'playwright-core';
+import { chromium, firefox, webkit } from 'playwright-core';
 
 const [api, serviceToken] = process.argv.slice(2);
 if (!api || !serviceToken) {
@@ -18,12 +18,20 @@ if (!api || !serviceToken) {
 }
 
 const dist = resolve(dirname(fileURLToPath(import.meta.url)), '../../dist');
+const examples = resolve(dirname(fileURLToPath(import.meta.url)), '../../examples');
 const page = '<!doctype html><meta charset="utf-8"><title>sdk smoke</title><body>smoke</body>';
 
 const server = createServer(async (request, response) => {
   const path = new URL(request.url ?? '/', 'http://x').pathname;
   if (path === '/' || path === '/app') {
     response.writeHead(200, { 'content-type': 'text/html' }).end(page);
+    return;
+  }
+  if (path === '/demo' || path === '/examples/browser.js') {
+    try {
+      const file = path === '/demo' ? 'browser.html' : 'browser.js';
+      response.writeHead(200, { 'content-type': file.endsWith('.html') ? 'text/html' : 'text/javascript' }).end(await readFile(join(examples, file)));
+    } catch { response.writeHead(404).end(); }
     return;
   }
   const file = normalize(join(dist, path.replace(/^\/dist\//, '/')));
@@ -41,10 +49,16 @@ const server = createServer(async (request, response) => {
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const origin = `http://127.0.0.1:${server.address().port}`;
 
-const browser = await chromium.launch(process.env.PLAYWRIGHT_CHROMIUM ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM } : {});
+const engine = process.env.NELCOTA_SDK_BROWSER ?? 'chromium';
+if (!['chromium', 'firefox', 'webkit'].includes(engine)) throw new Error(`Unknown browser: ${engine}`);
+const browser = await { chromium, firefox, webkit }[engine].launch(
+  engine === 'chromium' && process.env.PLAYWRIGHT_CHROMIUM ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM } : {},
+);
+console.log(`Browser: ${engine}`);
 let failed = false;
 try {
-  const tab = await browser.newPage();
+  const context = await browser.newContext();
+  const tab = await context.newPage();
   const failures = [];
   tab.on('console', (message) => {
     if (message.type() === 'error') failures.push(message.text());
@@ -114,6 +128,50 @@ try {
     console.log(`${ok ? 'ok  ' : 'FAIL'} ${key}: ${JSON.stringify(result[key])}${ok ? '' : ` (expected ${JSON.stringify(value)})`}`);
   }
   if (failures.length > 0) console.log(`console errors:\n  ${failures.join('\n  ')}`);
+
+  // Two actual pages share localStorage and Web Locks, rather than a mocked
+  // lock manager. Rotation must leave both pages with the same live session.
+  await tab.evaluate(async (api) => {
+    const { createClient } = await import('/dist/index.js');
+    globalThis.sdkClient = createClient(api, { auth: { autoRefresh: false } });
+    const signup = await globalThis.sdkClient.auth.signUp({ email: `tabs-${crypto.randomUUID()}@example.com`, password: 'browser-tabs-password' });
+    if (signup.error) throw signup.error;
+    const session = (await globalThis.sdkClient.auth.getSession()).data;
+    await globalThis.sdkClient.auth.setSession({ ...session, expires_at: Math.floor(Date.now() / 1000) + 5 });
+  }, api);
+  const other = await context.newPage();
+  await other.goto(`${origin}/app`);
+  await other.evaluate(async (api) => {
+    const { createClient } = await import('/dist/index.js');
+    globalThis.sdkClient = createClient(api, { auth: { autoRefresh: false } });
+  }, api);
+  const sessions = await Promise.all([tab, other].map((page) => page.evaluate(() => globalThis.sdkClient.auth.getSession())));
+  const shared = sessions.every((value) => value.error === null && value.data !== null)
+    && sessions[0].data.refresh_token === sessions[1].data.refresh_token;
+  failed ||= !shared;
+  console.log(`${shared ? 'ok  ' : 'FAIL'} refresh across two real tabs`);
+  await tab.evaluate(() => globalThis.sdkClient.auth.signOut());
+  await other.waitForFunction(async () => (await globalThis.sdkClient.auth.getSession()).data === null);
+  console.log('ok  sign-out broadcast to the other tab');
+  await Promise.all([tab, other].map((page) => page.evaluate(() => globalThis.sdkClient.dispose())));
+
+  await other.goto(`${origin}/demo`);
+  await other.getByLabel('URL da API').fill(api);
+  await other.getByLabel('Email', { exact: true }).fill(`demo-${Date.now()}-${engine}@example.com`);
+  await other.getByLabel('Senha', { exact: true }).fill('browser-demo-password');
+  await other.getByRole('button', { name: 'Criar conta', exact: true }).click();
+  await other.waitForFunction(() => document.querySelector('#result').textContent.includes('Conta criada'));
+  await other.getByLabel('Nota', { exact: true }).fill('Hello from the browser demo');
+  await other.getByRole('button', { name: 'Salvar nota', exact: true }).click();
+  await other.waitForFunction(() => document.querySelector('#result').textContent.includes('Hello from the browser demo'));
+  await other.getByLabel('Arquivo', { exact: true }).setInputFiles({ name: 'demo.txt', mimeType: 'text/plain', buffer: Buffer.from('demo contents') });
+  await other.getByRole('button', { name: 'Enviar arquivo', exact: true }).click();
+  await other.waitForFunction(() => document.querySelector('#result').textContent.includes('demo.txt'));
+  await other.getByRole('button', { name: 'Consultar notas', exact: true }).click();
+  await other.waitForFunction(() => document.querySelector('#result').textContent.includes('Hello from the browser demo'));
+  await other.getByRole('button', { name: 'Sair', exact: true }).click();
+  await other.waitForFunction(() => document.querySelector('#result').textContent === 'Você saiu.');
+  console.log('ok  runnable browser demo: signup, notes, upload and logout');
 } finally {
   await browser.close();
   server.close();

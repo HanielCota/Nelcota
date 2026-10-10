@@ -17,6 +17,7 @@ use std::sync::Arc;
 use axum::http::{Method, StatusCode};
 use common::*;
 use nelcota_core::{Config, Secret, config::StorageBackend};
+use serde_json::json;
 
 fn s3_config() -> Config {
     let var = |name: &str| std::env::var(name).unwrap_or_else(|_| panic!("set {name}"));
@@ -74,6 +75,62 @@ fn dechunk(mut raw: &[u8]) -> Vec<u8> {
     }
 }
 
+async fn signed_expiration(app: &TestApp, name: &str, body: &[u8]) {
+    let sign = format!("/storage/v1/object/sign/docs/{name}");
+    let reply = app
+        .post(&sign, Some(&service_token()), json!({ "expires_in": 2 }))
+        .await;
+    assert_eq!(reply.status, StatusCode::OK);
+    let signed = reply.body["signed_url"].as_str().unwrap();
+    let (status, headers, _) = app.bytes(Method::GET, signed, None, &[], vec![]).await;
+    assert_eq!(status, StatusCode::FOUND);
+    let presigned = headers["location"].to_str().unwrap();
+    let url = url::Url::parse(presigned).unwrap();
+    let ttl = url
+        .query_pairs()
+        .find(|(k, _)| k == "X-Amz-Expires")
+        .unwrap()
+        .1
+        .parse::<u64>()
+        .unwrap();
+    assert!(
+        (1..=2).contains(&ttl),
+        "S3 must inherit the grant's remaining time"
+    );
+    assert_eq!(fetch(presigned).await.2, body);
+    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    let (status, headers, _) = app.bytes(Method::GET, signed, None, &[], vec![]).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert!(
+        !headers.contains_key("location"),
+        "expired grants must not presign again"
+    );
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    for exp in [now, now - 1, now - 10, now - 29] {
+        let token = app
+            .keys
+            .sign(&json!({
+                "typ": "nelcota-storage-url", "bucket": "docs", "name": name, "exp": exp
+            }))
+            .unwrap();
+        let (status, headers, _) = app
+            .bytes(
+                Method::GET,
+                &format!("{sign}?token={token}"),
+                None,
+                &[],
+                vec![],
+            )
+            .await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "exp={exp}, now={now}");
+        assert!(!headers.contains_key("location"));
+    }
+}
+
 #[tokio::test]
 #[ignore = "needs an S3-compatible service (see the module docs)"]
 async fn files_on_s3() {
@@ -125,6 +182,9 @@ async fn files_on_s3() {
             head.to_ascii_lowercase().contains("content-disposition: "),
             "{head}"
         );
+        if name == "small.txt" {
+            signed_expiration(&app, name, &body).await;
+        }
 
         let (status, _, _) = app
             .bytes(Method::DELETE, &path, Some(&service), &[], vec![])

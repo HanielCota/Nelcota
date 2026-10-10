@@ -7,6 +7,9 @@
   import Copy from '@lucide/svelte/icons/copy'
   import CircleCheck from '@lucide/svelte/icons/circle-check'
   import CircleAlert from '@lucide/svelte/icons/circle-alert'
+  import Plus from '@lucide/svelte/icons/plus'
+  import CodeBlock from '$lib/components/shared/CodeBlock.svelte'
+  import mascot from '../../../assets/mascot.png'
   import { Button } from '$lib/components/ui/button'
   import { toast } from 'svelte-sonner'
   import PageHeader from '$lib/components/shared/PageHeader.svelte'
@@ -43,10 +46,10 @@
     }
   }
 
-  const host = (url: string | null) => (url ? url.replace(/^https?:\/\//, '') : '—')
+  const host = (url: string | null) => (url ? url.replace(/^https?:\/\//, '') : null)
 </script>
 
-<div class="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-10 lg:py-10">
+<div class="mx-auto grid w-full max-w-page gap-6 px-4 pt-2 pb-12 *:min-w-0 sm:px-6 lg:px-8 [&>:first-child]:mb-0">
   <PageHeader
     title={t('projects.title')}
     description={projects ? (sso ? t('projects.sso') : t('projects.separateLogin')) : undefined}
@@ -59,20 +62,26 @@
   {#if failure}<LoadError message={errorMessage(failure)} onretry={load} busy={refreshing} />{/if}
   {#if !projects && refreshing}
     <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      {#each [0, 1, 2] as i (i)}<Skeleton class="h-36 rounded-lg" />{/each}
+      {#each [0, 1, 2] as i (i)}<Skeleton class="h-40 rounded-3xl" />{/each}
     </div>
   {:else if projects}
     {#if projects.length === 0}<EmptyState icon={Boxes} title={t('projects.empty')} description={t('projects.emptyDescription')} />{/if}
-    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {#each projects as project (project.name)}
-        <div class={['flex flex-col rounded-lg border bg-card p-5', project.current && 'border-brand/40']}>
-          <div class="flex items-baseline justify-between gap-3">
-            <p class="flex min-w-0 items-center gap-2 font-medium"><Boxes class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" /><span class="truncate">{project.name}</span></p>
-            {#if project.current}<span class="shrink-0 text-xs text-muted-foreground">{t('projects.current')}</span>{/if}
+        <article class={['flex flex-col gap-4 rounded-3xl bg-card p-5', project.current && 'ring-1 ring-brand/40']}>
+          <div class="flex items-center gap-3">
+            <span class="grid size-11 shrink-0 place-items-center rounded-full bg-well"><img src={mascot} alt="" class="size-8 select-none" draggable="false" /></span>
+            <div class="grid min-w-0 flex-1">
+              <p class="truncate font-semibold">{project.name}</p>
+              <p class="flex min-w-0 items-center gap-1 font-mono text-xs text-muted-foreground">
+                <span class="truncate">{host(project.url) ?? (project.current ? location.host : '')}</span>
+                {#if project.url}<Button variant="ghost" size="icon-xs" aria-label={t('projects.copyUrl', { name: project.name })} onclick={() => copyText(project.url!)}><Copy aria-hidden="true" /></Button>{/if}
+              </p>
+            </div>
+            {#if project.current}<span class="shrink-0 rounded-full bg-brand/15 px-2.5 py-1 text-xs font-medium text-brand">{t('projects.current')}</span>{/if}
           </div>
-          <div class="mt-1 flex min-w-0 items-center gap-1"><p class="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">{host(project.url)}</p>{#if project.url}<Button variant="ghost" size="icon-xs" aria-label={t('projects.copyUrl', { name: project.name })} onclick={() => copyText(project.url!)}><Copy aria-hidden="true" /></Button>{/if}</div>
 
-          <div class="mt-5 flex items-center gap-2 text-sm">
+          <div class="flex items-center gap-2 rounded-2xl bg-well px-4 py-3 text-sm">
             {#if project.healthy}
               <CircleCheck class="size-4 text-brand" aria-hidden="true" />
               <span>{t('projects.up')}</span>
@@ -83,23 +92,25 @@
               <CircleAlert class="size-4 text-destructive" aria-hidden="true" />
               <span class="text-destructive">{t('projects.down')}</span>
             {/if}
-            {#if project.version}<span class="ml-auto font-mono text-xs text-muted-foreground">{project.version}</span>{/if}
+            {#if project.version}<span class="ml-auto font-mono text-xs text-muted-foreground">v{project.version.replace(/^v/, '')}</span>{/if}
           </div>
 
           {#if !project.current && project.url}
-            <Button variant="outline" class="mt-4 w-full" onclick={() => open(project)}>
+            <Button variant="outline" class="mt-auto w-full" onclick={() => open(project)}>
               {t('projects.open')}<ArrowUpRight />
             </Button>
           {/if}
-        </div>
+        </article>
       {/each}
-    </div>
 
-    <p class="mt-8 text-sm text-muted-foreground">
-      {t('projects.newProject.before')}
-      <code class="text-xs text-foreground">{t('projects.newProject.subdomainCommand')}</code>
-      {t('projects.newProject.middle')}
-      <code class="text-xs text-foreground">{t('projects.newProject.domainCommand')}</code>.
-    </p>
+      <!-- How to add one, as the last tile. -->
+      <article class="flex flex-col gap-3 rounded-3xl border-2 border-dashed border-border p-5">
+        <p class="flex items-center gap-2 font-semibold"><Plus class="size-4 text-muted-foreground" aria-hidden="true" />{t('projects.newProject.title')}</p>
+        <p class="text-sm text-muted-foreground">{t('projects.newProject.subdomain')}</p>
+        <CodeBlock code={t('projects.newProject.subdomainCommand')} lang="sh" />
+        <p class="text-sm text-muted-foreground">{t('projects.newProject.domain')}</p>
+        <CodeBlock code={t('projects.newProject.domainCommand')} lang="sh" />
+      </article>
+    </div>
   {/if}
 </div>

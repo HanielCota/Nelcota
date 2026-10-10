@@ -127,7 +127,7 @@ pub async fn respond(
 
     if state.store.is_s3() {
         let ttl = match access {
-            Access::Signed { secs } => PRESIGNED_TTL.min(Duration::from_secs(secs.max(1))),
+            Access::Signed { secs } => PRESIGNED_TTL.min(Duration::from_secs(secs)),
             _ => PRESIGNED_TTL,
         };
         let url = state

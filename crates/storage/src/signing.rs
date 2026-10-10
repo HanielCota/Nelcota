@@ -62,6 +62,13 @@ fn jsonwebtoken_now() -> u64 {
         .map_or(0, |d| d.as_secs())
 }
 
+fn remaining_secs(payload: &serde_json::Value, now: u64) -> Option<u64> {
+    payload["exp"]
+        .as_u64()?
+        .checked_sub(now)
+        .filter(|&secs| secs > 0)
+}
+
 pub(crate) async fn resolve(
     state: &StorageState,
     bucket: &str,
@@ -86,12 +93,29 @@ pub(crate) async fn resolve(
     if !matches {
         return Err(invalid());
     }
-    let secs = payload["exp"]
-        .as_u64()
-        .unwrap_or(0)
-        .saturating_sub(jsonwebtoken_now());
+    // File grants have explicit deadlines; API JWT clock leeway does not apply.
+    remaining_secs(&payload, jsonwebtoken_now()).ok_or_else(invalid)?;
     let object = db::object(&state.pool, bucket, &name)
         .await?
         .ok_or_else(object_not_found)?;
+    // A slow catalog lookup must not hand S3 an already expired grant.
+    let secs = remaining_secs(&payload, jsonwebtoken_now()).ok_or_else(invalid)?;
     Ok((object, secs))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn file_deadlines_have_no_clock_leeway() {
+        let payload = json!({ "exp": 100 });
+        assert_eq!(remaining_secs(&payload, 99), Some(1));
+        assert_eq!(remaining_secs(&payload, 100), None);
+        assert_eq!(remaining_secs(&payload, 101), None);
+        assert_eq!(remaining_secs(&payload, 129), None);
+        for malformed in [json!({}), json!({ "exp": -1 }), json!({ "exp": "100" })] {
+            assert_eq!(remaining_secs(&malformed, 99), None);
+        }
+    }
 }

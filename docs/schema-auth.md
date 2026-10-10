@@ -22,6 +22,19 @@ that).
 
 ### Password format
 
+Account emails use a simple mailbox address: a dot-atom ASCII local part (up
+to 64 bytes), a DNS domain with nonempty labels, and at most 254 bytes overall.
+Surrounding spaces are trimmed and the address is lowercased. Controls, display
+names, quoted local parts and consecutive dots are rejected before hashing or
+querying the database, using the same rule for public auth and panel accounts.
+International domains can use their ASCII/Punycode form. Existing malformed
+addresses are not renamed automatically; an administrator should verify
+ownership before repairing such a row in SQL.
+
+The server shares one bounded Argon2 worker budget between public auth, panel
+login and account administration. Panel login rate limits apply per client IP;
+forwarded headers are used only when `trust_proxy` is configured.
+
 ```
 $argon2id$v=19$m=19456,t=2,p=1$<salt base64>$<hash base64>
 ```
@@ -101,12 +114,23 @@ Provider sign-ins in progress; each row lives minutes.
 |---|---|---|
 | `state_hash` | `bytea` unique | **SHA-256** of the `state` sent to the provider |
 | `provider` | `text` | |
-| `provider_verifier` | `text` | PKCE verifier toward the provider; cleared once used |
+| `provider_verifier` | `text` | PKCE verifier toward the provider; atomically cleared when claiming the callback, before HTTP exchange |
 | `code_challenge` | `text` | the app's S256 challenge |
 | `redirect_to` | `text` | the app page to return to |
 | `auth_code_hash` | `bytea` unique | **SHA-256** of the code handed to the app |
 | `user_id` | `uuid` → `auth.users` | set when the provider answers |
 | `created_at`, `expires_at` | `timestamptz` | 10 minutes at the provider, then 5 to redeem the code |
+
+Only one callback can claim a state, even while the provider is still
+responding. Failed or cancelled exchanges require a new `/authorize`; no
+database transaction remains open during provider HTTP requests. Callback
+requests have a separate per-IP budget from `/authorize`.
+
+In-memory limiters track at most 50,000 keys. At capacity they reject new
+keys with `429` and a one-second retry hint, while existing keys keep their
+independent quotas. Cleanup runs at most once per second under capacity
+pressure and removes only keys idle since their last accepted request for
+a full minute, enough to recover the complete GCRA burst.
 
 ## Endpoints
 
@@ -215,6 +239,12 @@ with "Confirm email" on the panel's Users page (or `UPDATE auth.users SET
 email_confirmed_at = now()`) if they should keep signing in. Accounts created
 in the panel are confirmed from the start.
 
+When recovery first confirms an account, it removes provider identities and
+pending OAuth/email codes established before that inbox proof, revokes previous
+sessions and installs the owner's new password in the same transaction.
+Recovery of an already confirmed account preserves its linked providers while
+still changing the password and revoking the existing sessions.
+
 ## Magic link
 
 Passwordless sign-in for existing accounts, on when its page is configured:
@@ -229,6 +259,15 @@ NELCOTA_MAGIC_LINK_URL=https://app.shop.com/signed-in
    minutes.
 2. The page calls `POST /auth/v1/verify {type: "magiclink", token}` and gets a
    session; the email counts as confirmed.
+
+On the first proof of inbox ownership, a magic link clears any password from
+the unconfirmed signup and revokes its earlier sessions, provider identities,
+pending OAuth codes and email links. Someone else may have registered that
+address. The inbox owner can set
+a new password through recovery. Already confirmed accounts keep their
+password and sessions; signup confirmation still approves its signup password.
+Revoked sessions cannot refresh, while previously issued access JWTs retain
+their normal expiry (as for logout and password recovery).
 
 It does not create accounts: an email request would otherwise let anyone
 reserve addresses before their owners sign up. Same guarantees as recovery:
@@ -275,7 +314,8 @@ Which account opens:
 - an email the provider **verified** that matches a confirmed account: that
   account, which gains the identity (its password keeps working);
 - a verified email that matches an **unconfirmed** account: the verified owner
-  takes it over; the password, sessions and links set before are removed,
+  takes it over; the previous password, sessions, provider identities and
+  pending email/OAuth codes are removed, then the verified identity is linked,
   since whoever created it may not own the address;
 - an unverified email that matches an account: refused (`email_conflict`);
 - no account: a new one without password, confirmed when the provider verified

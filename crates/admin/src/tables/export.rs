@@ -110,11 +110,33 @@ fn csv_line<'a>(values: impl Iterator<Item = Option<&'a str>>) -> String {
 }
 
 fn csv_field(value: &str) -> String {
-    if value.contains([',', '"', '\n', '\r']) || value.starts_with(' ') || value.ends_with(' ') {
+    if spreadsheet_formula(value) {
+        // A quoted tab prefix makes this a text cell in Excel. CSV quoting
+        // alone does not stop formulas. JSON export preserves the original.
+        format!("\"\t{}\"", value.replace('"', "\"\""))
+    } else if value.contains([',', '"', '\n', '\r'])
+        || value.starts_with(char::is_whitespace)
+        || value.ends_with(char::is_whitespace)
+    {
         format!("\"{}\"", value.replace('"', "\"\""))
     } else {
         value.to_owned()
     }
+}
+
+fn spreadsheet_formula(value: &str) -> bool {
+    // Preserve negative numeric literals without parsing through f64 (numeric
+    // may have more digits than it can represent). No expression is allowed.
+    if value.starts_with('-')
+        && serde_json::from_str::<&serde_json::value::RawValue>(value)
+            .is_ok_and(|raw| raw.get() == value)
+    {
+        return false;
+    }
+    let significant =
+        value.trim_start_matches(|c: char| c.is_whitespace() || c.is_control() || c == '\u{feff}');
+    value.starts_with(['\t', '\r', '\n'])
+        || significant.starts_with(['=', '+', '-', '@', '＝', '＋', '－', '＠'])
 }
 
 /// Safe file name for `Content-Disposition`.
@@ -214,6 +236,61 @@ mod tests {
         assert_eq!(
             csv_line([Some("1"), None, Some("x")].into_iter()),
             "1,,x\r\n"
+        );
+    }
+
+    #[test]
+    fn csv_neutralizes_formulas_and_control_prefixes() {
+        for value in [
+            "=1+1",
+            "+1+1",
+            "-1+1",
+            "@SUM(1,1)",
+            " =1+1",
+            "\t=1+1",
+            "\r=1+1",
+            "\n=1+1",
+            "\u{feff}=1+1",
+            "\0=1+1",
+            "＝1+1",
+            "＋1+1",
+            "－1+1",
+            "＠SUM(1,1)",
+            "=HYPERLINK(\"https://example.com\",\"open\")",
+        ] {
+            assert_eq!(
+                csv_field(value),
+                format!("\"\t{}\"", value.replace('"', "\"\""))
+            );
+        }
+        for number in [
+            "-1",
+            "-0.50",
+            "-1e-3",
+            "-123456789012345678901234567890.123456789",
+        ] {
+            assert_eq!(csv_field(number), number, "negative numeric stays numeric");
+        }
+    }
+
+    #[test]
+    fn csv_protects_headers_and_json_keeps_original_values() {
+        let encoder = Encoder {
+            format: Format::Csv,
+            columns: vec!["=header".into()],
+        };
+        assert_eq!(encoder.header(), "\u{feff}\"\t=header\"\r\n");
+        assert_eq!(
+            encoder.row(0, r#"{"=header":"=1+1"}"#).unwrap(),
+            "\"\t=1+1\"\r\n"
+        );
+        let encoder = Encoder {
+            format: Format::Json,
+            columns: vec![],
+        };
+        assert_eq!(
+            encoder.row(0, r#"{"value":"=1+1"}"#).unwrap(),
+            "\n  {\"value\":\"=1+1\"}"
         );
     }
 

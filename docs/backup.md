@@ -22,6 +22,13 @@ before uploading the dump. Later replacements and deletions cannot change an
 older snapshot. Keep each dump together with its file directory; `--keep` prunes
 both locally. Configure remote lifecycle rules for both members of the pair.
 
+On Unix, dumps, snapshot files, manifests and environment files are created
+with mode **0600**, before writing data. Backup and archive directories use
+**0700**. Copies retain the private policy rather than the source's mode;
+downloads run with umask 077 and their bundles are sealed afterward. Existing
+environment files are restricted before overwriting them. Windows keeps the
+filesystem's ACL policy; Unix modes are not simulated there.
+
 The dump uses `pg_dump`'s custom format: it includes schema, data, RLS
 policies, functions and the `auth` schema (users with their argon2id hashes).
 Cluster roles (`anon`, `authenticated`...) are not in the dump, but Nelcota's

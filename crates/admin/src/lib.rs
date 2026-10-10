@@ -18,6 +18,7 @@ pub mod contracts;
 mod ddl;
 mod denied;
 mod error;
+mod metrics;
 mod middleware;
 mod migrations;
 mod overview;
@@ -35,6 +36,7 @@ mod tokens;
 mod users;
 
 pub use denied::{DeniedLog, now_rfc3339};
+pub use metrics::{Area, Metrics};
 pub use migrations::default_dir as default_migrations_dir;
 pub use projects::HostLink;
 pub use sql::{SqlBusy, SqlExecutor};
@@ -64,6 +66,7 @@ pub fn router(state: AdminState) -> Router {
         .route("/admin/api/typescript", get(connect::typescript))
         .route("/admin/api/sign-in", get(sign_in::get))
         .route("/admin/api/denied", get(denied::list))
+        .route("/admin/api/metrics", get(metrics::get))
         .route(
             "/admin/api/tables",
             get(tables::tables).post(tables::create),

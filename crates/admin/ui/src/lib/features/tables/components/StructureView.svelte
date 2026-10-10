@@ -78,9 +78,9 @@
 
 {#if error}<div class="px-6 pt-6"><LoadError message={error} onretry={load} busy={loading} /></div>{/if}
 {#if !structure && loading}
-  <div class="mx-auto grid max-w-5xl gap-6 p-6 lg:p-8"><Skeleton class="h-72 rounded-lg" /><Skeleton class="h-36 rounded-lg" /></div>
+  <div class="mx-auto grid max-w-5xl gap-6 p-6 lg:p-8"><Skeleton class="h-72 rounded-3xl" /><Skeleton class="h-36 rounded-3xl" /></div>
 {:else if structure}
-  <div class="mx-auto grid max-w-5xl gap-6 p-6 lg:p-8">
+  <div class="mx-auto grid max-w-5xl gap-4 p-4 *:min-w-0 sm:p-6 lg:p-8">
     <StructureColumns
       {structure}
       onadd={() => openColumn(null)}

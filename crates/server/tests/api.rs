@@ -1048,7 +1048,10 @@ async fn embeds_nest_and_take_their_own_filters_order_and_paging() {
     assert_eq!(
         body,
         json!([
-            { "name": "Ana", "orders": [{ "id": 12, "total": 80.0 }, { "id": 10, "total": 30.0 }] },
+            { "name": "Ana", "orders": [
+                { "id": 12, "total": serde_json::from_str::<Value>("80.00").unwrap() },
+                { "id": 10, "total": serde_json::from_str::<Value>("30.00").unwrap() }
+            ] },
             { "name": "Bia", "orders": [] },
         ])
     );

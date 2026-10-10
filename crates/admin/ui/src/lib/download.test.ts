@@ -18,6 +18,20 @@ describe('CSV', () => {
   it('keeps line breaks inside the field', () => {
     expect(toCsv(['t'], [['line 1\nline 2']])).toContain('"line 1\nline 2"')
   })
+
+  it.each([
+    '=1+1', '+1+1', '-1+1', '@SUM(1,1)', ' =1+1', '\t=1+1', '\r=1+1', '\n=1+1',
+    '\uFEFF=1+1', '\0=1+1', '＝1+1', '＋1+1', '－1+1', '＠SUM(1,1)',
+    '=HYPERLINK("https://example.com","open")',
+  ])('neutralizes a spreadsheet formula %j', (value) => {
+    const escaped = `"\t${value.replaceAll('"', '""')}"`
+    expect(toCsv([value], [[value]])).toBe(`\uFEFF${escaped}\r\n${escaped}\r\n`)
+  })
+
+  it('preserves negative numeric literals without rounding', () => {
+    const values = ['-1', '-0.50', '-1e-3', '-123456789012345678901234567890.123456789']
+    expect(toCsv(['n'], values.map((v) => [v]))).toBe(`\uFEFFn\r\n${values.join('\r\n')}\r\n`)
+  })
 })
 
 describe('JSON', () => {
@@ -27,5 +41,9 @@ describe('JSON', () => {
       { id: '1', price: '2.50' },
       { id: '2', price: null },
     ])
+  })
+
+  it('preserves formula text for lossless data export', () => {
+    expect(JSON.parse(toJson(['=header'], [['=1+1']]))).toEqual([{ '=header': '=1+1' }])
   })
 })

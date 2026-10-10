@@ -114,7 +114,7 @@ pub fn create(host: &Host, new: &NewProject) -> anyhow::Result<()> {
         bail!("a project already exists at {}", dir.display());
     }
     fs::create_dir_all(dir.join("migrations"))?;
-    fs::create_dir_all(dir.join("backups"))?;
+    crate::private_fs::dir(&dir.join("backups"))?;
 
     let postgres_password = util::secret(40);
     // On Docker, Postgres is the `postgres` service; on systemd, the local
@@ -202,7 +202,7 @@ pub fn create(host: &Host, new: &NewProject) -> anyhow::Result<()> {
 /// The app container runs as 65532 (see the Dockerfile) and must own the
 /// directory its files go to.
 fn create_storage_dir(path: &std::path::Path) -> anyhow::Result<()> {
-    fs::create_dir_all(path)?;
+    crate::private_fs::dir(path)?;
     #[cfg(unix)]
     std::os::unix::fs::chown(path, Some(65532), Some(65532))?;
     Ok(())

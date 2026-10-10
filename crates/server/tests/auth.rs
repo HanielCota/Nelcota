@@ -698,8 +698,7 @@ async fn magic_link_signs_in_existing_accounts_and_confirms_the_email() {
     assert_eq!(sent[1].subject, "Your sign-in link");
     let token = link_token(&sent[1], MAGIC_LINK_URL, "magiclink");
 
-    // Each kind is its own link: a magic link does not confirm a signup nor
-    // reset a password.
+    // Tokens are bound to their kind; using a magic link as signup/recovery fails.
     assert_eq!(
         verify_link(&app, "signup", &token).await.body["code"],
         "invalid_grant"
@@ -723,12 +722,113 @@ async fn magic_link_signs_in_existing_accounts_and_confirms_the_email() {
         login(&app, "ivo@example.com", "strong-pass-123")
             .await
             .status,
-        StatusCode::OK
+        StatusCode::BAD_REQUEST,
+        "the password from the unverified signup is no longer trusted"
+    );
+    let password: Option<String> = app
+        .admin_client
+        .query_one(
+            "SELECT encrypted_password FROM auth.users WHERE email = 'ivo@example.com'",
+            &[],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    assert!(password.is_none());
+    let signup_token = link_token(&sent[0], CONFIRMATION_URL, "signup");
+    assert_eq!(
+        verify_link(&app, "signup", &signup_token).await.body["code"],
+        "invalid_grant"
     );
     assert_eq!(
         verify_link(&app, "magiclink", &token).await.body["code"],
         "invalid_grant",
         "the link works only once"
+    );
+}
+
+#[tokio::test]
+async fn magic_link_of_a_confirmed_account_preserves_password_and_existing_session() {
+    let app = spawn_confirming().await;
+    signup(&app, "confirmed@example.com", "strong-pass-123").await;
+    let signup_token = link_token(&app.outbox.wait_for(1).await[0], CONFIRMATION_URL, "signup");
+    let original = verify_link(&app, "signup", &signup_token).await;
+    assert_eq!(original.status, StatusCode::OK);
+    magic_link(&app, "confirmed@example.com").await;
+    let token = link_token(
+        &app.outbox.wait_for(2).await[1],
+        MAGIC_LINK_URL,
+        "magiclink",
+    );
+    assert_eq!(
+        verify_link(&app, "magiclink", &token).await.status,
+        StatusCode::OK
+    );
+    assert_eq!(
+        login(&app, "confirmed@example.com", "strong-pass-123")
+            .await
+            .status,
+        StatusCode::OK
+    );
+    assert_eq!(
+        app.post(
+            "/auth/v1/token?grant_type=refresh_token",
+            None,
+            json!({"refresh_token": original.body["refresh_token"]})
+        )
+        .await
+        .status,
+        StatusCode::OK
+    );
+}
+
+#[tokio::test]
+async fn magic_link_claim_revokes_preverification_sessions_and_pending_links() {
+    // With confirmation disabled, signup can have created sessions before the
+    // first proof of inbox ownership. Those must not survive a later claim.
+    let app = TestApp::spawn().await;
+    let previous = signup(&app, "claimed@example.com", "attacker-pass-123").await;
+    assert_eq!(previous.status, StatusCode::CREATED);
+    recover(&app, "claimed@example.com").await;
+    let recovery = link_token(&app.outbox.wait_for(1).await[0], RECOVERY_URL, "recovery");
+    magic_link(&app, "claimed@example.com").await;
+    let token = link_token(
+        &app.outbox.wait_for(2).await[1],
+        MAGIC_LINK_URL,
+        "magiclink",
+    );
+    let owner = verify_link(&app, "magiclink", &token).await;
+    assert_eq!(owner.status, StatusCode::OK);
+    assert_eq!(owner.body["user"]["id"], previous.body["user"]["id"]);
+    assert_eq!(
+        login(&app, "claimed@example.com", "attacker-pass-123")
+            .await
+            .body["code"],
+        "invalid_grant"
+    );
+    assert_eq!(
+        app.post(
+            "/auth/v1/token?grant_type=refresh_token",
+            None,
+            json!({"refresh_token": previous.body["refresh_token"]})
+        )
+        .await
+        .body["code"],
+        "invalid_grant"
+    );
+    assert_eq!(
+        verify(&app, &recovery, "attacker-pass-456").await.body["code"],
+        "invalid_grant"
+    );
+    assert_eq!(
+        app.post(
+            "/auth/v1/token?grant_type=refresh_token",
+            None,
+            json!({"refresh_token": owner.body["refresh_token"]})
+        )
+        .await
+        .status,
+        StatusCode::OK
     );
 }
 
