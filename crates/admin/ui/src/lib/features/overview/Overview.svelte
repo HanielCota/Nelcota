@@ -148,24 +148,27 @@
 {/snippet}
 
 <div class="grid gap-6 mx-auto w-full max-w-page px-4 pt-2 pb-12 sm:px-6 lg:px-8">
-  <nav class="flex flex-wrap justify-end gap-2" aria-label={t('overview.quickActions')}>
-    <Button size="sm" href={href('/tables?create=true')}><Plus data-icon="inline-start" aria-hidden="true" />{t('tables.editor.newTable')}</Button>
-    <Button variant="outline" size="sm" href={href('/users?create=true')}><UserPlus data-icon="inline-start" aria-hidden="true" />{t('users.new')}</Button>
-    <Button variant="outline" size="sm" href={href('/connect')}><Plug data-icon="inline-start" aria-hidden="true" />{t('connect.start')}</Button>
-  </nav>
-  <!-- Headline: the page's name and the period's traffic. -->
-  <section class="grid gap-8 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
-    <h1 class="max-w-xl text-5xl leading-[1.02] font-semibold tracking-[-0.035em]">{t('overview.title')}</h1>
+  <!-- Headline: the page's name with its shortcuts under it, and the
+       period's traffic. On phones everything stacks, left-aligned. -->
+  <section class="grid gap-6 sm:gap-8 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
+    <div class="grid gap-4">
+      <h1 class="max-w-xl text-4xl leading-[1.02] font-semibold tracking-[-0.035em] sm:text-5xl">{t('overview.title')}</h1>
+      <nav class="flex flex-wrap gap-2" aria-label={t('overview.quickActions')}>
+        <Button size="sm" href={href('/tables?create=true')}><Plus data-icon="inline-start" aria-hidden="true" />{t('tables.editor.newTable')}</Button>
+        <Button variant="outline" size="sm" href={href('/users?create=true')}><UserPlus data-icon="inline-start" aria-hidden="true" />{t('users.new')}</Button>
+        <Button variant="outline" size="sm" href={href('/connect')}><Plug data-icon="inline-start" aria-hidden="true" />{t('connect.start')}</Button>
+      </nav>
+    </div>
     {#if traffic}
-      <!-- Labels share the top line and figures share the bottom line; in one
-           column on phones, each label stays above its figure. -->
-      <div class="grid gap-x-12 gap-y-2 sm:grid-cols-[auto_minmax(0,16rem)_minmax(0,16rem)] sm:items-end">
-        <p class="text-sm text-muted-foreground sm:col-start-1 sm:row-start-1">{t('overview.hero.requests')}</p>
-        <p class="mb-4 text-5xl leading-none font-semibold tracking-[-0.035em] sm:col-start-1 sm:row-start-2 sm:mb-0">{fmt.format(traffic.totals.requests)}</p>
-        <p class="text-sm text-muted-foreground sm:col-start-2 sm:row-start-1">{t('overview.hero.refused')}</p>
-        <div class="mb-4 sm:col-start-2 sm:row-start-2 sm:mb-0"><Meter label={t('overview.hero.refused')} part={traffic.totals.refused} whole={traffic.totals.requests} {format} /></div>
-        <p class="text-sm text-muted-foreground sm:col-start-3 sm:row-start-1">{t('overview.hero.errors')}</p>
-        <div class="sm:col-start-3 sm:row-start-2"><Meter label={t('overview.hero.errors')} part={traffic.totals.errors} whole={traffic.totals.requests} {format} /></div>
+      <!-- Labels share the top line and figures share the bottom line; on
+           phones the total takes a row and the two meters share the next. -->
+      <div class="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-[auto_minmax(0,16rem)_minmax(0,16rem)] sm:items-end sm:gap-x-12">
+        <p class="col-span-2 text-sm text-muted-foreground sm:col-span-1 sm:col-start-1 sm:row-start-1">{t('overview.hero.requests')}</p>
+        <p class="col-span-2 mb-4 text-4xl leading-none font-semibold tracking-[-0.035em] tabular-nums sm:col-span-1 sm:col-start-1 sm:row-start-2 sm:mb-0 sm:text-5xl">{fmt.format(traffic.totals.requests)}</p>
+        <p class="col-start-1 row-start-3 text-sm text-muted-foreground sm:col-start-2 sm:row-start-1">{t('overview.hero.refused')}</p>
+        <div class="col-start-1 row-start-4 sm:col-start-2 sm:row-start-2"><Meter label={t('overview.hero.refused')} part={traffic.totals.refused} whole={traffic.totals.requests} {format} /></div>
+        <p class="col-start-2 row-start-3 text-sm text-muted-foreground sm:col-start-3 sm:row-start-1">{t('overview.hero.errors')}</p>
+        <div class="col-start-2 row-start-4 sm:col-start-3 sm:row-start-2"><Meter label={t('overview.hero.errors')} part={traffic.totals.errors} whole={traffic.totals.requests} {format} /></div>
       </div>
     {:else if metrics.loading}
       <Skeleton class="h-16 w-[40rem] max-w-full rounded-2xl" />
@@ -243,7 +246,7 @@
 
     <article class={['grid min-w-0 content-start gap-4', card]}>
       <div class="flex flex-wrap items-center gap-2">
-        <div class="flex max-w-full items-center gap-2 overflow-x-auto" role="group" aria-label={t('overview.filters.label')}>
+        <div class="flex max-w-full flex-wrap items-center gap-2" role="group" aria-label={t('overview.filters.label')}>
           <button type="button" class={filter(show === 'all')} aria-pressed={show === 'all'} onclick={() => (show = 'all')}>{t('overview.filters.all')}</button>
           <button type="button" class={filter(show === 'requests')} aria-pressed={show === 'requests'} onclick={() => (show = 'requests')}>
             <span class="mr-1.5 inline-block size-2 rounded-full bg-chart-1 align-middle" aria-hidden="true"></span>{t('overview.filters.requests')}

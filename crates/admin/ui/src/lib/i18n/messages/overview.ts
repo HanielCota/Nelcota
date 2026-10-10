@@ -30,6 +30,8 @@ const ptBR = {
     requests: 'Requisições no período',
     refused: 'Recusadas',
     errors: 'Erros do servidor',
+    ofTotal: 'de {whole} · {percent}',
+    share: '{part} de {whole} ({percent})',
   },
   cards: {
     database: 'Banco de dados',
@@ -131,6 +133,8 @@ const en: Messages<typeof ptBR> = {
     requests: 'Requests in the period',
     refused: 'Refused',
     errors: 'Server errors',
+    ofTotal: 'of {whole} · {percent}',
+    share: '{part} of {whole} ({percent})',
   },
   cards: {
     database: 'Database',
