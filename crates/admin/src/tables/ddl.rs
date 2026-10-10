@@ -14,6 +14,7 @@ use crate::{
     apply::{ChangeKind, apply},
     ddl::{
         BASE_TYPES,
+        policy::{self, PolicyDef},
         table::{self, AlterAction, Context, CreateTable},
     },
     tables::catalog::table_or_404,
@@ -47,6 +48,9 @@ pub async fn types(State(state): State<AdminState>) -> ApiResult<crate::contract
 #[derive(Deserialize)]
 pub struct CreateRequest {
     table: CreateTable,
+    /// Initial access rules are created atomically with the table.
+    #[serde(default)]
+    policies: Vec<PolicyDef>,
     #[serde(default)]
     preview: bool,
 }
@@ -58,13 +62,16 @@ pub async fn create(
 ) -> ApiResult<crate::contracts::DdlResult> {
     let schema = state.catalog.get().schema.clone();
     let enums = enums(&*state.db.get().await?, &schema).await?;
-    let statements = table::create(
+    let mut statements = table::create(
         &Context {
             schema: &schema,
             enums: &enums,
         },
         &body.table,
     )?;
+    for definition in &body.policies {
+        statements.extend(policy::create(&schema, &body.table.name, definition)?);
+    }
     apply(
         &state,
         statements,

@@ -18,6 +18,8 @@
   import CircleCheck from '@lucide/svelte/icons/circle-check'
   import CircleAlert from '@lucide/svelte/icons/circle-alert'
   import LoaderCircle from '@lucide/svelte/icons/loader-circle'
+  import ChevronRight from '@lucide/svelte/icons/chevron-right'
+  import ShieldCheck from '@lucide/svelte/icons/shield-check'
   import { toast } from 'svelte-sonner'
   import PageHeader from '$lib/components/shared/PageHeader.svelte'
   import BucketAccess from '$lib/features/storage/components/BucketAccess.svelte'
@@ -63,6 +65,7 @@
   let dragging = $state(false)
   let dragDepth = 0
   const prefix = $derived(route.query.get('prefix') ?? '')
+  const trail = $derived(folderTrail(prefix))
   const base = $derived(`/storage/buckets/${enc(bucket)}`)
   const folderHref = (p: string) => href(`/storage/${enc(bucket)}${p ? `?prefix=${enc(p)}` : ''}`)
   const fileHref = (name: string) => `/admin/api${base}/file?${new URLSearchParams({ name })}`
@@ -121,25 +124,38 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="mx-auto w-full max-w-page px-4 pt-2 pb-12 sm:px-6 lg:px-8" ondragenter={(event) => { if (event.dataTransfer?.types.includes('Files')) { event.preventDefault(); dragDepth++; dragging = true } }} ondragleave={() => { dragDepth = Math.max(0, dragDepth - 1); if (!dragDepth) dragging = false }} ondragover={(event) => { if (event.dataTransfer?.types.includes('Files')) event.preventDefault() }} ondrop={dropped}>
+  <nav class="mb-4 flex flex-wrap items-center gap-2 text-sm [overflow-wrap:anywhere]" aria-label={t('storage.browser.path')}>
+    <a class="text-muted-foreground hover:text-foreground hover:underline" href={href('/storage')}>{t('storage.title')}</a>
+    <ChevronRight class="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+    {#if prefix}<a class="font-mono text-muted-foreground hover:text-foreground hover:underline" href={folderHref('')}>{bucket}</a>
+    {:else}<span class="font-mono" aria-current="page">{bucket}</span>{/if}
+    {#each trail as folder, index (folder.prefix)}
+      <ChevronRight class="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+      {#if index === trail.length - 1}<span class="font-mono" aria-current="page">{folder.name}</span>
+      {:else}<a class="font-mono text-muted-foreground hover:text-foreground hover:underline" href={folderHref(folder.prefix)}>{folder.name}</a>{/if}
+    {/each}
+  </nav>
   <PageHeader
     title={bucket}
     description={info ? `${info.bucket.public ? t('storage.public') : t('storage.private')} · ${size(info.bucket.bytes)}` : undefined}
   >
     {#snippet actions()}
       {#if info}
-        <input bind:this={picker} type="file" multiple class="hidden" onchange={picked} />
+        <input bind:this={picker} type="file" multiple accept={info.bucket.allowed_mime_types?.join(',')} class="hidden" onchange={picked} />
         <Button disabled={uploading !== null} onclick={() => picker?.click()}>
           {#if uploading}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{:else}<Upload data-icon="inline-start" aria-hidden="true" />{/if}
           {uploading ? t('storage.browser.uploading', uploading) : t('storage.browser.upload')}
         </Button>
+        <Button variant="outline" href="#bucket-access" aria-label={t('storage.browser.access')}><ShieldCheck data-icon="inline-start" aria-hidden="true" /><span class="sm:hidden">{t('storage.browser.accessShort')}</span><span class="hidden sm:inline">{t('storage.browser.access')}</span></Button>
       {/if}
     {/snippet}
   </PageHeader>
 
   {#if infoError}<LoadError message={infoError} onretry={loadInfo} busy={infoLoading} />{/if}
   {#if error}<LoadError message={error} onretry={() => load()} busy={loading} />{/if}
+  <div class="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+  <section class="min-w-0" aria-label={t('storage.browser.files')}>
   {#if info}
-    <BucketAccess {bucket} />
     <button type="button" disabled={uploading !== null} class={['mb-4 flex w-full cursor-pointer flex-col items-center gap-2 rounded-3xl border-2 border-dashed border-border bg-card px-4 py-6 text-sm text-muted-foreground transition-colors hover:border-brand/50 hover:text-foreground disabled:cursor-wait', dragging && 'border-brand bg-brand/5 text-brand']} onclick={() => picker?.click()}><Upload class="size-5" aria-hidden="true" />{t('storage.browser.dropHint')}</button>
   {/if}
   {#if queue.length}
@@ -158,15 +174,6 @@
       {/snippet}
     </EmptyState>
   {:else}
-    <nav class="mb-3 flex flex-wrap items-center gap-1 font-mono text-sm" aria-label={t('storage.browser.path')}>
-      <a class="text-muted-foreground hover:text-foreground hover:underline" href={folderHref('')}>{bucket}</a>
-      {#each folderTrail(prefix) as folder (folder.prefix)}
-        <span class="text-muted-foreground">/</span>
-        <a class="text-muted-foreground hover:text-foreground hover:underline" href={folderHref(folder.prefix)}>{folder.name}</a>
-      {/each}
-      <span class="text-muted-foreground">/</span>
-    </nav>
-
     {#if files === null}
       {#if loading}<Skeleton class="h-48 rounded-3xl" />{/if}
     {:else if files.length === 0 && folders.length === 0}
@@ -182,10 +189,10 @@
           <Table.Header>
             <Table.Row class="hover:bg-transparent">
               <Table.Head>{t('storage.browser.columns.name')}</Table.Head>
-              <Table.Head class="w-24 text-right md:w-auto">{t('storage.browser.columns.size')}</Table.Head>
-              <Table.Head class="hidden md:table-cell">{t('storage.browser.columns.type')}</Table.Head>
-              <Table.Head class="hidden md:table-cell">{t('storage.browser.columns.updated')}</Table.Head>
-              <Table.Head class="w-12"><span class="sr-only">{t('common.actions')}</span></Table.Head>
+              <Table.Head class="w-20 text-right 2xl:w-auto">{t('storage.browser.columns.size')}</Table.Head>
+              <Table.Head class="hidden 2xl:table-cell">{t('storage.browser.columns.type')}</Table.Head>
+              <Table.Head class="hidden md:table-cell xl:hidden 2xl:table-cell">{t('storage.browser.columns.updated')}</Table.Head>
+              <Table.Head class="w-24"><span class="sr-only">{t('common.actions')}</span></Table.Head>
             </Table.Row>
           </Table.Header>
           <Table.Body>
@@ -196,7 +203,7 @@
                     <Folder class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" /><span class="truncate">{folder}/</span>
                   </a>
                 </Table.Cell>
-                <Table.Cell></Table.Cell><Table.Cell class="hidden md:table-cell"></Table.Cell><Table.Cell class="hidden md:table-cell"></Table.Cell><Table.Cell></Table.Cell>
+                <Table.Cell></Table.Cell><Table.Cell class="hidden 2xl:table-cell"></Table.Cell><Table.Cell class="hidden md:table-cell xl:hidden 2xl:table-cell"></Table.Cell><Table.Cell></Table.Cell>
               </Table.Row>
             {/each}
             {#each files as file (file.id)}
@@ -204,16 +211,19 @@
               <Table.Row>
                 <Table.Cell class="max-w-0 font-medium"><button type="button" class="flex w-full min-w-0 cursor-pointer items-center gap-2 text-left hover:text-brand" onclick={() => showPreview(file)} title={file.name}><Icon class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" /><span class="truncate">{baseName(file.name)}</span></button></Table.Cell>
                 <Table.Cell class="text-right font-mono text-xs tabular-nums">{size(file.size)}</Table.Cell>
-                <Table.Cell class="hidden font-mono text-xs text-muted-foreground md:table-cell">{file.mime_type}</Table.Cell>
-                <Table.Cell class="hidden text-muted-foreground md:table-cell">{date.format(new Date(file.updated_at))}</Table.Cell>
+                <Table.Cell class="hidden font-mono text-xs text-muted-foreground 2xl:table-cell">{file.mime_type}</Table.Cell>
+                <Table.Cell class="hidden text-muted-foreground md:table-cell xl:hidden 2xl:table-cell">{date.format(new Date(file.updated_at))}</Table.Cell>
                 <Table.Cell class="text-right">
+                  <div class="flex items-center justify-end gap-1">
+                  <Button variant="ghost" size="icon-sm" href={fileHref(file.name)} download title={t('storage.browser.downloadFile', { name: baseName(file.name) })} aria-label={t('storage.browser.downloadFile', { name: baseName(file.name) })}><Download aria-hidden="true" /></Button>
                   <DropdownMenu.Root>
                     <DropdownMenu.Trigger>
                       {#snippet child({ props })}
-                        <Button variant="ghost" size="icon-sm" aria-label={t('common.actionsFor', { name: baseName(file.name) })} {...props}><Ellipsis /></Button>
+                        <Button variant="ghost" size="icon-sm" aria-label={t('common.actionsFor', { name: baseName(file.name) })} {...props}><Ellipsis aria-hidden="true" /></Button>
                       {/snippet}
                     </DropdownMenu.Trigger>
                     <DropdownMenu.Content align="end" class="w-52">
+                      <DropdownMenu.Group>
                       <DropdownMenu.Item onclick={() => showPreview(file)}><Eye aria-hidden="true" />{t('storage.browser.preview')}</DropdownMenu.Item>
                       <DropdownMenu.Item>
                         {#snippet child({ props })}
@@ -232,7 +242,9 @@
                         <Copy aria-hidden="true" />
                         {t('storage.browser.copyPath')}
                       </DropdownMenu.Item>
+                      </DropdownMenu.Group>
                       <DropdownMenu.Separator />
+                      <DropdownMenu.Group>
                       <DropdownMenu.Item
                         variant="destructive"
                         onclick={() => {
@@ -240,8 +252,10 @@
                           removeOpen = true
                         }}><Trash2 aria-hidden="true" />{t('storage.browser.delete')}</DropdownMenu.Item
                       >
+                      </DropdownMenu.Group>
                     </DropdownMenu.Content>
                   </DropdownMenu.Root>
+                  </div>
                 </Table.Cell>
               </Table.Row>
             {/each}
@@ -255,6 +269,9 @@
       {/if}
     {/if}
   {/if}
+  </section>
+  {#if info}<aside class="min-w-0 xl:sticky xl:top-4"><BucketAccess {bucket} /></aside>{/if}
+  </div>
 </div>
 
 {#if preview}<FilePreviewDialog bind:open={previewOpen} file={preview} url={fileHref(preview.name)} />{/if}

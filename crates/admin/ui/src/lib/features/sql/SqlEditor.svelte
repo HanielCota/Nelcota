@@ -1,4 +1,5 @@
 <script lang="ts">
+  import DatabaseTabs from '$lib/components/shared/DatabaseTabs.svelte'
   import { onMount, onDestroy } from 'svelte'
   import { Button } from '$lib/components/ui/button'
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu'
@@ -161,7 +162,8 @@
 
 <svelte:window onkeydown={onKeydown} />
 
-<div class="mx-auto flex h-full min-h-0 w-full max-w-page gap-3 px-4 pt-1 pb-4 sm:px-6 lg:px-8">
+<div class="mx-auto flex h-full min-h-0 w-full max-w-page flex-col gap-3 px-4 pt-1 pb-4 sm:px-6 lg:flex-row lg:px-8">
+  <div class="shrink-0 lg:hidden"><DatabaseTabs /></div>
   <SqlSidebar onrename={(query) => openDialog({ mode: 'rename', query })} ondelete={askDelete} ondeleteDraft={(draft) => { toDeleteDraft = draft; deleteDraftOpen = true }} />
 
   <div class="flex min-w-0 flex-1 flex-col overflow-hidden rounded-3xl bg-card">
@@ -186,24 +188,32 @@
           </DropdownMenu.Trigger>
           <DropdownMenu.Content align="end" class="w-64">
             {#if sqlStore.saved.length}
+              <DropdownMenu.Group>
               <DropdownMenu.Label class="text-xs text-muted-foreground">{t('sql.editor.saved')}</DropdownMenu.Label>
               {#each sqlStore.sorted as query (query.id)}
                 <DropdownMenu.Item onclick={() => sqlStore.openSaved(query.id)}><FileCode aria-hidden="true" />{query.name}</DropdownMenu.Item>
               {/each}
+              </DropdownMenu.Group>
               <DropdownMenu.Separator />
             {/if}
             {#if sqlStore.looseDrafts.length}
+              <DropdownMenu.Group>
               <DropdownMenu.Label class="text-xs text-muted-foreground">{t('sql.editor.drafts')}</DropdownMenu.Label>
               {#each sqlStore.looseDrafts as draft (draft.id)}
                 <DropdownMenu.Item onclick={() => sqlStore.openDraft(draft.id)}><FileCode aria-hidden="true" /><span class="truncate">{draftName(draft.sql)}</span></DropdownMenu.Item>
               {/each}
+              </DropdownMenu.Group>
               <DropdownMenu.Separator />
             {/if}
+            <DropdownMenu.Group>
             <DropdownMenu.Item onclick={() => sqlStore.open('')}><FileCode aria-hidden="true" />{t('sql.editor.newQuery')}</DropdownMenu.Item>
+            </DropdownMenu.Group>
+            <DropdownMenu.Group>
             <DropdownMenu.Label class="text-xs text-muted-foreground">{t('sql.editor.templates')}</DropdownMenu.Label>
             {#each SQL_SNIPPETS as snippet (snippet.label)}
               <DropdownMenu.Item onclick={() => sqlStore.open(t(snippet.sql))}><FileCode aria-hidden="true" />{t(snippet.label)}</DropdownMenu.Item>
             {/each}
+            </DropdownMenu.Group>
           </DropdownMenu.Content>
         </DropdownMenu.Root>
         <DropdownMenu.Root>

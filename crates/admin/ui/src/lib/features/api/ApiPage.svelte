@@ -2,6 +2,7 @@
   import { onMount, untrack } from 'svelte'
   import * as Select from '$lib/components/ui/select'
   import BookOpen from '@lucide/svelte/icons/book-open'
+  import Plug from '@lucide/svelte/icons/plug'
   import ArrowUpRight from '@lucide/svelte/icons/arrow-up-right'
   import Globe from '@lucide/svelte/icons/globe'
   import UserRound from '@lucide/svelte/icons/user-round'
@@ -116,17 +117,15 @@
 <div class="mx-auto grid w-full max-w-page gap-6 px-4 pt-2 pb-12 *:min-w-0 sm:px-6 lg:px-8 [&>:first-child]:mb-0">
   <PageHeader title={t('connect.title')} description={t('connect.description')}>
     {#snippet actions()}
+      <Button href="#api-sdk"><Plug data-icon="inline-start" aria-hidden="true" />{t('connect.start')}</Button>
       <Button variant="outline" href="/rest/v1/" target="_blank" rel="noopener">
-        <BookOpen />{t('connect.openapi')}<ArrowUpRight class="text-muted-foreground" />
+        <BookOpen data-icon="inline-start" aria-hidden="true" />{t('connect.openapi')}<ArrowUpRight data-icon="inline-end" aria-hidden="true" />
       </Button>
     {/snippet}
   </PageHeader>
 
   <div class="grid gap-6 *:min-w-0">
-    <!-- Sections as pills under the title, like the other pages' tabs; the one
-         in view is lit while scrolling. -->
-    <!-- Sticks to the top of the scrolling area on a strip of page colour, so
-         the cards pass under it instead of showing above it. -->
+    <!-- Keep the active section visible while scrolling through the cards. -->
     <div class="sticky top-0 z-10 -my-3 bg-background/90 py-3 backdrop-blur">
     <nav class="flex w-fit max-w-full gap-1 overflow-x-auto rounded-full bg-card p-1" aria-label={t('connect.navigation')}>
       {#each sections as section (section.id)}
@@ -230,17 +229,19 @@
           </nav>
           {#if topic === 'tables' && tables.length}
             <Select.Root type="single" value={table} onValueChange={(table) => choose({ table })}>
-              <Select.Trigger class="w-52 rounded-full font-mono text-xs" aria-label={t('connect.table')}>{table}</Select.Trigger>
+              <Select.Trigger class="w-52 max-w-full rounded-full font-mono text-xs" aria-label={t('connect.table')}><span class="truncate">{table}</span></Select.Trigger>
               <Select.Content>
+                <Select.Group>
                 {#each tables as t (t.name)}
                   <Select.Item value={t.name} class="font-mono text-xs">{t.name}</Select.Item>
                 {/each}
+                </Select.Group>
               </Select.Content>
             </Select.Root>
           {/if}
-          <nav class="flex h-10 items-center gap-1 rounded-full bg-well p-1 sm:ml-auto" aria-label={t('connect.language')}>
-            <button type="button" class={tab(lang === 'ts')} aria-pressed={lang === 'ts'} onclick={() => choose({ lang: 'ts' })}
-              ><LangMark lang="ts" />{t('connect.sdkLabel')}</button
+          <nav class="flex max-w-full flex-wrap items-center gap-1 rounded-xl bg-well p-1 sm:ml-auto sm:rounded-full" aria-label={t('connect.language')}>
+            <button type="button" class={tab(lang === 'ts')} aria-label={t('connect.sdkLabel')} aria-pressed={lang === 'ts'} onclick={() => choose({ lang: 'ts' })}
+              ><LangMark lang="ts" /><span class="sm:hidden">SDK</span><span class="hidden sm:inline">{t('connect.sdkLabel')}</span></button
             >
             <button type="button" class={tab(lang === 'curl')} aria-pressed={lang === 'curl'} onclick={() => choose({ lang: 'curl' })}
               ><LangMark lang="curl" />curl</button

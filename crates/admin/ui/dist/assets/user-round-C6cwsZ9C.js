@@ -1,1 +1,0 @@
-import{D as e,O as t,y as n}from"./api-D7w_tm9R.js";var r=new Set([`$$slots`,`$$events`,`$$legacy`]);function i(i,a){let o=e(a,r),s={name:`user-round`,size:24,node:[[`circle`,{cx:`12`,cy:`8`,r:`5`}],[`path`,{d:`M20 21a8 8 0 0 0-16 0`}]],aliases:[`user-2`]};n(i,t(()=>o,{get icon(){return s}}))}export{i as t};

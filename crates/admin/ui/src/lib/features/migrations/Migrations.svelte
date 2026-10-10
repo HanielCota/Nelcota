@@ -15,7 +15,7 @@
   import * as Dialog from '$lib/components/ui/dialog'
   import { Button } from '$lib/components/ui/button'
   import { Input } from '$lib/components/ui/input'
-  import { Label } from '$lib/components/ui/label'
+  import * as Field from '$lib/components/ui/field'
   import { Skeleton } from '$lib/components/ui/skeleton'
   import { toast } from 'svelte-sonner'
   import PageHeader from '$lib/components/shared/PageHeader.svelte'
@@ -277,17 +277,17 @@
           {t('migrations.dialog.description', { count: data?.pending.length ?? 0 })}
         </Dialog.Description>
       </Dialog.Header>
-      <div class="grid gap-2">
-        <Label for="migration-name">{t('common.name')}</Label>
-        <Input id="migration-name" bind:value={name} maxlength={60} autocomplete="off" aria-invalid={!validName} />
-        <p class="text-sm text-muted-foreground">
-          {#if validName}
+      <Field.Group>
+      <Field.Field data-invalid={!validName}>
+        <Field.Label for="migration-name">{t('common.name')}</Field.Label>
+        <Input id="migration-name" name="migration-name" bind:value={name} maxlength={60} autocomplete="off" spellcheck={false} aria-invalid={!validName} aria-describedby="migration-name-hint" />
+          {#if validName}<Field.Description id="migration-name-hint">
             {t('migrations.dialog.file')} <span class="font-mono">V{data?.next_version}__{name}.sql</span>
-          {:else}
+          </Field.Description>{:else}<Field.Error id="migration-name-hint">
             {t('migrations.dialog.nameRule')}
-          {/if}
-        </p>
-      </div>
+          </Field.Error>{/if}
+      </Field.Field>
+      </Field.Group>
       <Dialog.Footer>
         <Button variant="outline" disabled={saving} onclick={guard.request}>{t('common.cancel')}</Button>
         <Button type="submit" disabled={!validName || saving}>{#if saving}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{:else}<FilePlus data-icon="inline-start" aria-hidden="true" />{/if}{saving ? t('migrations.dialog.generating') : t('migrations.dialog.submit')}</Button>

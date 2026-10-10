@@ -2,6 +2,10 @@
   import { onMount } from 'svelte'
   import * as Table from '$lib/components/ui/table'
   import { Skeleton } from '$lib/components/ui/skeleton'
+  import { Button } from '$lib/components/ui/button'
+  import Plus from '@lucide/svelte/icons/plus'
+  import UserPlus from '@lucide/svelte/icons/user-plus'
+  import Plug from '@lucide/svelte/icons/plug'
   import TechnicalToggle from '$lib/shared/schema/components/TechnicalToggle.svelte'
   import LoadError from '$lib/components/shared/LoadError.svelte'
   import TrafficChart from '$lib/features/overview/components/TrafficChart.svelte'
@@ -144,6 +148,11 @@
 {/snippet}
 
 <div class="grid gap-6 mx-auto w-full max-w-page px-4 pt-2 pb-12 sm:px-6 lg:px-8">
+  <nav class="flex flex-wrap justify-end gap-2" aria-label={t('overview.quickActions')}>
+    <Button size="sm" href={href('/tables?create=true')}><Plus data-icon="inline-start" aria-hidden="true" />{t('tables.editor.newTable')}</Button>
+    <Button variant="outline" size="sm" href={href('/users?create=true')}><UserPlus data-icon="inline-start" aria-hidden="true" />{t('users.new')}</Button>
+    <Button variant="outline" size="sm" href={href('/connect')}><Plug data-icon="inline-start" aria-hidden="true" />{t('connect.start')}</Button>
+  </nav>
   <!-- Headline: the page's name and the period's traffic. -->
   <section class="grid gap-8 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
     <h1 class="max-w-xl text-5xl leading-[1.02] font-semibold tracking-[-0.035em]">{t('overview.title')}</h1>

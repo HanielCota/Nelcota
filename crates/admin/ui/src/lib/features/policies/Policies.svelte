@@ -9,7 +9,7 @@
   import Search from '@lucide/svelte/icons/search'
   import Rows3 from '@lucide/svelte/icons/rows-3'
   import LoaderCircle from '@lucide/svelte/icons/loader-circle'
-  import { Input } from '$lib/components/ui/input'
+  import SearchField from '$lib/components/shared/SearchField.svelte'
   import { toast } from 'svelte-sonner'
   import PageHeader from '$lib/components/shared/PageHeader.svelte'
   import RecentlyBlocked from '$lib/features/policies/components/RecentlyBlocked.svelte'
@@ -26,7 +26,7 @@
   import { RemoteResource } from '$lib/remote-resource.svelte'
   import { api } from '$lib/api'
   import { ddl, toPolicyDef, type PolicyDef } from '$lib/shared/schema/ddl'
-  import { href, route } from '$lib/router.svelte'
+  import { href, navigate, route } from '$lib/router.svelte'
   import type { PoliciesData } from '$lib/types'
   import { errorMessage, t } from '$lib/i18n/index.svelte'
 
@@ -34,11 +34,27 @@
   const data = $derived(resource.data)
   const error = $derived(resource.error ? errorMessage(resource.error) : '')
   const loading = $derived(resource.loading)
-  // Arriving from an overview warning (`?table=`) opens that table.
-  let search = $state(route.query.get('table') ?? '')
+  // Keep filters in the URL, including links from overview warnings (`?table=`).
+  const appliedSearch = $derived(route.query.get('q') ?? route.query.get('table') ?? '')
+  let search = $state('')
   type Filter = 'all' | 'enabled' | 'disabled' | 'attention'
   const FILTERS: Filter[] = ['all', 'enabled', 'disabled', 'attention']
-  let rlsFilter = $state<Filter>('all')
+  const rlsFilter = $derived<Filter>(FILTERS.find(filter => filter === route.query.get('filter')) ?? 'all')
+  $effect(() => { search = appliedSearch })
+  let debounce: ReturnType<typeof setTimeout>
+  $effect(() => () => clearTimeout(debounce))
+
+  function setFilters(filter: Filter, query = search, replace = false) {
+    clearTimeout(debounce)
+    const params = new URLSearchParams()
+    if (query.trim()) params.set('q', query.trim())
+    if (filter !== 'all') params.set('filter', filter)
+    navigate(`/policies${params.size ? `?${params}` : ''}`, replace)
+  }
+  function onSearch() {
+    clearTimeout(debounce)
+    debounce = setTimeout(() => setFilters(rlsFilter, search, true), 250)
+  }
   let enabling = $state<string | null>(null)
   const visible = $derived(data?.tables.filter((table) => table.name.toLowerCase().includes(search.trim().toLowerCase()) && (rlsFilter === 'all' || rlsFilter === 'enabled' && table.rls.enabled || rlsFilter === 'disabled' && !table.rls.enabled && table.rls.state !== 'view' || rlsFilter === 'attention' && ['danger', 'warn'].includes(table.rls.state))) ?? [])
 
@@ -130,7 +146,7 @@
     {#if data.exposed_without_rls.length}
       <Callout variant="danger" title={t('policies.exposed', { tables: data.exposed_without_rls.join(', ') })}>
         {t('policies.exposedHint')}
-        {#snippet actions()}<Button variant="outline" size="sm" onclick={() => (rlsFilter = 'attention')}><ShieldCheck data-icon="inline-start" aria-hidden="true" />{t('common.reviewAccess')}</Button>{/snippet}
+        {#snippet actions()}<Button variant="outline" size="sm" onclick={() => setFilters('attention')}><ShieldCheck data-icon="inline-start" aria-hidden="true" />{t('common.reviewAccess')}</Button>{/snippet}
       </Callout>
     {/if}
 
@@ -159,12 +175,12 @@
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div class="flex max-w-full items-center gap-1 overflow-x-auto rounded-full bg-card p-1" role="group" aria-label={t('policies.filterLabel')}>
           {#each FILTERS as option (option)}
-            <button type="button" class={segment(rlsFilter === option)} aria-pressed={rlsFilter === option} onclick={() => (rlsFilter = option)}>{t(`policies.filters.${option}`)}</button>
+            <button type="button" class={segment(rlsFilter === option)} aria-pressed={rlsFilter === option} onclick={() => setFilters(option)}>{t(`policies.filters.${option}`)}</button>
           {/each}
         </div>
-        <div class="relative w-full sm:w-72"><Search class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" /><Input type="search" bind:value={search} aria-label={t('policies.search')} placeholder={t('policies.search')} class="rounded-full pl-10" /></div>
+        <div class="w-full sm:w-72"><SearchField bind:value={search} oninput={onSearch} label={t('policies.search')} /></div>
       </div>
-      {#if !visible.length}<EmptyState icon={Search} title={t('common.noMatches')}>{#snippet actions()}<Button variant="outline" onclick={() => { search = ''; rlsFilter = 'all' }}>{t('common.clearFilters')}</Button>{/snippet}</EmptyState>{/if}
+      {#if !visible.length}<EmptyState icon={Search} title={t('common.noMatches')}>{#snippet actions()}<Button variant="outline" onclick={() => setFilters('all', '')}>{t('common.clearFilters')}</Button>{/snippet}</EmptyState>{/if}
     {/if}
       {#each visible as table (table.name)}
         <section class="@container grid gap-4 rounded-3xl bg-card p-5">
@@ -268,7 +284,7 @@
   {/if}
 </div>
 
-<PolicySheet bind:open={sheetOpen} table={sheetTable} original={editing} onsaved={load} />
+<PolicySheet bind:open={sheetOpen} table={sheetTable} original={editing} existingNames={data?.tables.find(table => table.name === sheetTable)?.policies.map(policy => policy.name) ?? []} onsaved={load} />
 {#if toDelete}
   <ConfirmDialog
     bind:open={deleteOpen}

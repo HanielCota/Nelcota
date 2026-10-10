@@ -1,6 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import Info from '@lucide/svelte/icons/info'
+  import BookOpen from '@lucide/svelte/icons/book-open'
+  import { Button } from '$lib/components/ui/button'
+  import { href } from '$lib/router.svelte'
   import { Skeleton } from '$lib/components/ui/skeleton'
   import PageHeader from '$lib/components/shared/PageHeader.svelte'
   import PillTabs from '$lib/components/shared/PillTabs.svelte'
@@ -39,7 +42,9 @@
 </script>
 
 <div class="mx-auto grid w-full max-w-page gap-6 px-4 pt-2 pb-12 *:min-w-0 sm:px-6 lg:px-8">
-  <PageHeader title={t('signIn.title')} description={t('signIn.description')} />
+  <PageHeader title={t('signIn.title')} description={t('signIn.description')}>
+    {#snippet actions()}<Button variant="outline" href={href('/connect?topic=auth')}><BookOpen data-icon="inline-start" aria-hidden="true" />{t('signIn.examples')}</Button>{/snippet}
+  </PageHeader>
   <div class="-mt-6"><PillTabs label={t('shell.pages.users')} current={'/sign-in'} tabs={[{ path: '/users', label: t('shell.pages.users') }, { path: '/sign-in', label: t('shell.pages.userSignIn') }]} /></div>
 
   {#if resource.error}
@@ -87,7 +92,7 @@
           <p class="text-sm text-muted-foreground">{t('signIn.providers.pages')}</p>
           {#if settings.redirect_urls.length}
             <ul class="flex flex-wrap gap-2">
-              {#each settings.redirect_urls as url (url)}<li><code class="rounded-full bg-well px-3 py-1 text-xs">{url}</code></li>{/each}
+              {#each settings.redirect_urls as url (url)}<li class="max-w-full"><code class="block rounded-full bg-well px-3 py-1 text-xs break-all">{url}</code></li>{/each}
             </ul>
           {:else}
             <p class="text-sm text-warning">{t('signIn.providers.noPages')}</p>
