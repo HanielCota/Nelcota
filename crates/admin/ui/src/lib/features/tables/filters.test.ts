@@ -45,11 +45,11 @@ group('form operators', () => {
   it('describes the filter in the chosen language', () => {
     const pt = (key: string) => translate('pt-BR', key)
     expect(describe(fromUi('price', 'gte', '10'), pt)).toBe('price maior ou igual a 10')
-    expect(describe(fromUi('email', 'notnull', ''), pt)).toBe('email não é NULL')
+    expect(describe(fromUi('email', 'notnull', ''), pt)).toBe('email não está vazio')
     expect(describe({ column: 'n', op: 'eq', value: '0', not: true }, pt)).toBe('n não igual a 0')
     const en = (key: string) => translate('en', key)
     expect(describe(fromUi('price', 'gte', '10'), en)).toBe('price greater than or equal to 10')
-    expect(describe(fromUi('email', 'notnull', ''), en)).toBe('email is not NULL')
+    expect(describe(fromUi('email', 'notnull', ''), en)).toBe('email is not empty')
     expect(describe({ column: 'n', op: 'eq', value: '0', not: true }, en)).toBe('n not equal to 0')
   })
 })

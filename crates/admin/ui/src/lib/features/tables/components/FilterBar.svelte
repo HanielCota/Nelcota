@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { untrack } from 'svelte'
+  import { tick, untrack } from 'svelte'
   import * as Select from '$lib/components/ui/select'
   import { Button } from '$lib/components/ui/button'
   import { Input } from '$lib/components/ui/input'
@@ -44,18 +44,43 @@
   }
   const complete = (r: Row) => r.column !== '' && (!needsValue(r.op) || r.value !== '')
 
-  function apply(event: SubmitEvent) {
+  // A filter left without its value used to be dropped silently on Apply,
+  // so the grid ignored what the person thought they had asked for.
+  let attempted = $state(false)
+  const missingValue = (r: Row) => attempted && !complete(r) && rows.some(complete)
+  let form = $state<HTMLFormElement>()
+
+  async function apply(event: SubmitEvent) {
     event.preventDefault()
+    // Only blank rows (nothing typed anywhere): same as clearing.
+    if (rows.some(complete) && !rows.every(complete)) {
+      attempted = true
+      await tick()
+      form?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus()
+      return
+    }
     onapply(rows.filter(complete).map((r) => fromUi(r.column, r.op, r.value)))
   }
 </script>
 
-<form class="grid gap-2.5 border-b bg-muted/40 px-4 py-4" onsubmit={apply}>
+<!-- Phones: column, operator and value stack full width; wider screens keep one line per filter. -->
+<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+<form
+  bind:this={form}
+  class="grid gap-3 border-b bg-muted/40 px-4 py-4"
+  onsubmit={apply}
+  onkeydown={(event) => {
+    if (event.key === 'Escape' && !event.defaultPrevented) onclose()
+  }}
+  aria-label={t('tables.toolbar.filter')}
+>
   {#each rows as row, i (row.key)}
-    <div class="flex flex-wrap items-center gap-2">
-      <span class="w-12 text-right text-xs text-muted-foreground">{i === 0 ? t('tables.filters.where') : t('tables.filters.and')}</span>
+    {@const invalid = missingValue(row)}
+    <div class="flex items-start gap-2">
+      <span class="w-10 shrink-0 pt-2.5 text-right text-xs text-muted-foreground sm:w-12">{i === 0 ? t('tables.filters.where') : t('tables.filters.and')}</span>
+      <div class="grid min-w-0 flex-1 gap-2 sm:flex sm:flex-none sm:flex-wrap sm:items-start">
       <Select.Root type="single" bind:value={row.column}>
-        <Select.Trigger aria-label={t('tables.filters.column')} class="w-48 font-mono text-xs">{row.column || t('tables.filters.column')}</Select.Trigger>
+        <Select.Trigger aria-label={t('tables.filters.column')} class="w-full font-mono text-xs sm:w-48">{row.column || t('tables.filters.column')}</Select.Trigger>
         <Select.Content>
           {#each columns as column (column.name)}
             <Select.Item value={column.name} class="font-mono text-xs">{column.name}</Select.Item>
@@ -63,7 +88,7 @@
         </Select.Content>
       </Select.Root>
       <Select.Root type="single" bind:value={row.op}>
-        <Select.Trigger aria-label={t('tables.filters.operator')} class="w-44 text-sm">{opLabel(row.op)}</Select.Trigger>
+        <Select.Trigger aria-label={t('tables.filters.operator')} class="w-full text-sm sm:w-48">{opLabel(row.op)}</Select.Trigger>
         <Select.Content>
           {#each UI_OPERATORS as op (op.value)}
             <Select.Item value={op.value}>{t(op.label)}</Select.Item>
@@ -71,12 +96,25 @@
         </Select.Content>
       </Select.Root>
       {#if needsValue(row.op)}
-        <Input bind:value={row.value} aria-label={t('tables.filters.value')} placeholder={t('tables.filters.value')} class="w-56 font-mono text-xs" />
+        <div class="grid gap-1 sm:w-56">
+          <Input
+            bind:value={row.value}
+            aria-label={t('tables.filters.value')}
+            placeholder={t('tables.filters.value')}
+            class="w-full font-mono text-xs"
+            aria-invalid={invalid || undefined}
+            aria-describedby={invalid ? `filter-${row.key}-error` : undefined}
+          />
+          {#if invalid}<p id={`filter-${row.key}-error`} class="px-1 text-xs text-destructive">{t('tables.filters.needsValue')}</p>{/if}
+        </div>
       {/if}
+      </div>
       <Button
         variant="ghost"
         size="icon-sm"
+        class="mt-0.5 shrink-0"
         aria-label={t('tables.filters.remove')}
+        title={t('tables.filters.remove')}
         onclick={() => (rows = rows.filter((r) => r.key !== row.key))}
       >
         <X />
@@ -84,7 +122,7 @@
     </div>
   {/each}
 
-  <div class="mt-1 flex flex-wrap items-center gap-2 pl-14">
+  <div class="mt-1 flex flex-wrap items-center gap-2 sm:pl-14">
     <Button variant="outline" size="sm" onclick={() => (rows = [...rows, blankRow()])}>
       <Plus />{t('tables.filters.add')}
     </Button>
