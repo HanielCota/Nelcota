@@ -328,6 +328,7 @@
       {:else if 'error' in response}
         <div class="p-4" role="alert">
           <div class="rounded-2xl bg-destructive/10 px-4 py-3 text-sm">
+            <p class="mb-1 font-medium text-destructive">{t('sql.results.failed')}</p>
             <p class="font-mono text-xs leading-relaxed text-destructive">
               {#if response.error.code}{response.error.code}:{' '}{/if}{response.error.message}
             </p>
@@ -381,13 +382,17 @@
                   <tr class="hover:bg-muted/40">
                     {#each row as cell, c (c)}
                       <td class="max-w-96 truncate border-r border-b px-3 py-2 font-mono text-xs" title={cell ?? 'NULL'}>
-                        <div class="flex items-center gap-2"><span class="min-w-0 flex-1 truncate">{#if cell === null}<span class="text-muted-foreground italic">NULL</span>{:else}{cell}{/if}</span>{#if cell && (cell.length > 80 || cell.includes('\n'))}<Button variant="ghost" size="icon-xs" aria-label={t('common.details')} onclick={() => { detail = { title: result.columns[c], value: cell }; detailOpen = true }}><Maximize2 aria-hidden="true" /></Button>{/if}</div>
+                        <div class="flex items-center gap-2"><span class="min-w-0 flex-1 truncate">{#if cell === null}<span class="text-3xs text-muted-foreground/80">NULL</span>{:else}{cell}{/if}</span>{#if cell && (cell.length > 80 || cell.includes('\n'))}<Button variant="ghost" size="icon-xs" aria-label={t('common.details')} onclick={() => { detail = { title: result.columns[c], value: cell }; detailOpen = true }}><Maximize2 aria-hidden="true" /></Button>{/if}</div>
                       </td>
                     {/each}
                   </tr>
                 {/each}
               </tbody>
             </table>
+            {#if result.rows.length === 0}
+              <!-- Headers alone looked like a rendering glitch; say the query just matched nothing. -->
+              <p class="border-b px-4 py-6 text-center text-sm text-muted-foreground">{t('sql.results.noMatchingRows')}</p>
+            {/if}
           {/if}
         {/each}
       {/if}
