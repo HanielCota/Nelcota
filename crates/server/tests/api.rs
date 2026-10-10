@@ -1237,7 +1237,32 @@ async fn cors_exposes_what_a_browser_client_reads() {
         "last-modified",
         "retry-after",
         "preference-applied",
+        "x-request-id",
     ] {
         assert!(exposed.contains(name), "{name} not exposed: {exposed}");
     }
+}
+
+#[tokio::test]
+async fn every_response_carries_a_request_id() {
+    let app = TestApp::spawn().await;
+    // A new id per request when the caller sends none...
+    let first = app
+        .request(Method::GET, "/rest/v1/products?select=id", None, None)
+        .await;
+    let second = app.request(Method::GET, "/nope", None, None).await;
+    let id = |reply: &Reply| reply.headers["x-request-id"].to_str().unwrap().to_owned();
+    assert_eq!(id(&first).len(), 36, "a UUID");
+    assert_ne!(id(&first), id(&second));
+    // ...and the caller's own (a proxy in front) is kept.
+    let reply = app
+        .request_with(
+            Method::GET,
+            "/rest/v1/products?select=id",
+            None,
+            None,
+            &[("x-request-id", "from-the-proxy")],
+        )
+        .await;
+    assert_eq!(id(&reply), "from-the-proxy");
 }

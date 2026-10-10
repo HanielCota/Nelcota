@@ -21,6 +21,7 @@ use std::sync::Arc;
 use tower_http::{
     compression::CompressionLayer,
     cors::{Any, CorsLayer},
+    request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer},
     timeout::TimeoutLayer,
     trace::TraceLayer,
 };
@@ -73,6 +74,7 @@ pub fn app(
             header::IF_NONE_MATCH,
             header::IF_RANGE,
             HeaderName::from_static("prefer"),
+            REQUEST_ID,
         ])
         // What a browser client needs to read: paging totals, file metadata,
         // the applied preferences and how long to wait after a 429.
@@ -83,6 +85,7 @@ pub fn app(
             header::LAST_MODIFIED,
             header::RETRY_AFTER,
             HeaderName::from_static("preference-applied"),
+            REQUEST_ID,
         ]);
 
     let verifier = state.verifier.clone();
@@ -124,11 +127,49 @@ pub fn app(
         ));
     }
     router
-        .layer(cors)
+        .layer(middleware::from_fn(access_log))
         // Query strings can contain signed download tokens. Record paths only.
-        .layer(TraceLayer::new_for_http().make_span_with(|request: &Request| {
-            tracing::debug_span!("request", method = %request.method(), path = %request.uri().path())
-        }))
+        .layer(
+            TraceLayer::new_for_http().make_span_with(|request: &Request| {
+                let request_id = request
+                    .headers()
+                    .get(&REQUEST_ID)
+                    .and_then(|v| v.to_str().ok())
+                    .unwrap_or_default();
+                tracing::info_span!(
+                    "request",
+                    method = %request.method(),
+                    path = %request.uri().path(),
+                    request_id,
+                )
+            }),
+        )
+        .layer(cors)
+        // Every response carries `x-request-id`: the caller's own (from a
+        // proxy in front) or a new UUID, also recorded in the request's span.
+        .layer(PropagateRequestIdLayer::new(REQUEST_ID))
+        .layer(SetRequestIdLayer::new(REQUEST_ID, MakeRequestUuid))
+}
+
+/// Header that identifies a request in the logs and in its response.
+const REQUEST_ID: HeaderName = HeaderName::from_static("x-request-id");
+
+/// One INFO line per response: method, path (never the query string, which
+/// can carry signed download tokens), status and time to the response head.
+/// Health probes log at DEBUG so they do not drown the rest.
+async fn access_log(request: Request, next: Next) -> Response {
+    let method = request.method().clone();
+    let path = request.uri().path().to_owned();
+    let started = std::time::Instant::now();
+    let response = next.run(request).await;
+    let status = response.status().as_u16();
+    let latency_ms = started.elapsed().as_secs_f64() * 1000.0;
+    if path == "/health" {
+        tracing::debug!(%method, path, status, latency_ms, "response");
+    } else {
+        tracing::info!(%method, path, status, latency_ms, "response");
+    }
+    response
 }
 
 /// Where API traffic is recorded for the panel.
