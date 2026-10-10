@@ -20,7 +20,7 @@ pub struct Bucket {
     pub updated_at: String,
 }
 
-/// PUT replaces the complete settings; omitted limits are cleared.
+/// Settings for a new bucket. `Default` is a private bucket without limits.
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct BucketSettings {
     pub public: bool,
@@ -29,11 +29,49 @@ pub struct BucketSettings {
 }
 impl BucketSettings {
     fn validate(&self) -> Result<()> {
-        if self.file_size_limit == Some(0) {
-            return Err(Error::Usage("file_size_limit must be positive".into()));
-        }
-        Ok(())
+        validate_limit(self.file_size_limit)
     }
+}
+
+/// The complete settings `update_bucket` writes. A PUT replaces every setting,
+/// so this type has no `Default`: a `None` limit always clears that limit on
+/// purpose. To change one setting, start from the current bucket:
+///
+/// ```no_run
+/// # async fn example(storage: nelcota_client::storage::StorageClient) -> nelcota_client::Result<()> {
+/// use nelcota_client::storage::BucketUpdate;
+/// let current = storage.get_bucket("avatars").await?;
+/// storage.update_bucket("avatars", BucketUpdate { public: true, ..current.into() }).await?;
+/// # Ok(()) }
+/// ```
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct BucketUpdate {
+    pub public: bool,
+    /// Bytes; `None` clears the limit.
+    pub file_size_limit: Option<u64>,
+    /// `image/png`, `image/*`...; `None` allows any type.
+    pub allowed_mime_types: Option<Vec<String>>,
+}
+impl From<Bucket> for BucketUpdate {
+    fn from(bucket: Bucket) -> Self {
+        Self {
+            public: bucket.public,
+            file_size_limit: bucket.file_size_limit,
+            allowed_mime_types: bucket.allowed_mime_types,
+        }
+    }
+}
+impl From<&Bucket> for BucketUpdate {
+    fn from(bucket: &Bucket) -> Self {
+        bucket.clone().into()
+    }
+}
+
+fn validate_limit(limit: Option<u64>) -> Result<()> {
+    if limit == Some(0) {
+        return Err(Error::Usage("file_size_limit must be positive".into()));
+    }
+    Ok(())
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -65,18 +103,62 @@ pub struct Listing {
     pub objects: Vec<ListedObject>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct UploadOptions {
-    pub content_type: String,
+    /// `None` guesses from the name's extension (see [`guess_content_type`]),
+    /// falling back to `application/octet-stream`. The server checks the type
+    /// against the bytes and the bucket's allowed MIME types.
+    pub content_type: Option<String>,
+    /// Replace a file with the same name instead of failing with `object_exists`.
     pub upsert: bool,
 }
-impl Default for UploadOptions {
-    fn default() -> Self {
-        Self {
-            content_type: "application/octet-stream".into(),
-            upsert: false,
-        }
+
+/// Common extensions and their MIME types, for uploads without an explicit type.
+const CONTENT_TYPES: &[(&str, &str)] = &[
+    ("avif", "image/avif"),
+    ("css", "text/css"),
+    ("csv", "text/csv"),
+    ("gif", "image/gif"),
+    ("gz", "application/gzip"),
+    ("htm", "text/html"),
+    ("html", "text/html"),
+    ("ico", "image/vnd.microsoft.icon"),
+    ("jpeg", "image/jpeg"),
+    ("jpg", "image/jpeg"),
+    ("js", "text/javascript"),
+    ("json", "application/json"),
+    ("md", "text/markdown"),
+    ("mjs", "text/javascript"),
+    ("mov", "video/quicktime"),
+    ("mp3", "audio/mpeg"),
+    ("mp4", "video/mp4"),
+    ("ogg", "audio/ogg"),
+    ("pdf", "application/pdf"),
+    ("png", "image/png"),
+    ("svg", "image/svg+xml"),
+    ("txt", "text/plain"),
+    ("wasm", "application/wasm"),
+    ("wav", "audio/wav"),
+    ("webm", "video/webm"),
+    ("webp", "image/webp"),
+    ("woff2", "font/woff2"),
+    ("xml", "application/xml"),
+    ("zip", "application/zip"),
+];
+
+/// The MIME type for an object name's extension (`a/b.PNG` → `image/png`),
+/// or `None` for an unknown or missing extension.
+pub fn guess_content_type(name: &str) -> Option<&'static str> {
+    let file = name.rsplit('/').next().unwrap_or(name);
+    let (stem, extension) = file.rsplit_once('.')?;
+    if stem.is_empty() {
+        return None;
     }
+    let extension = extension.to_ascii_lowercase();
+    CONTENT_TYPES
+        .iter()
+        .find(|(known, _)| *known == extension)
+        .map(|(_, mime)| *mime)
 }
 
 #[derive(Clone, Debug, Default)]
@@ -138,9 +220,10 @@ impl StorageClient {
             .await
             .map(|r| r.data)
     }
-    pub async fn update_bucket(&self, id: &str, settings: BucketSettings) -> Result<Bucket> {
+    /// Replaces every setting of the bucket; see [`BucketUpdate`].
+    pub async fn update_bucket(&self, id: &str, settings: BucketUpdate) -> Result<Bucket> {
         encoding::bucket(id)?;
-        settings.validate()?;
+        validate_limit(settings.file_size_limit)?;
         self.client
             .json::<Bucket>(
                 Spec::new(Method::PUT, format!("/storage/v1/bucket/{id}"))
@@ -188,10 +271,14 @@ impl BucketFiles {
             },
             self.path("", name)?,
         );
-        let content_type = HeaderValue::from_str(&options.content_type)
-            .map_err(|_| Error::Usage("invalid content type header".into()))?;
-        if !options
+        let content_type = options
             .content_type
+            .as_deref()
+            .or_else(|| guess_content_type(name))
+            .unwrap_or("application/octet-stream");
+        let header = HeaderValue::from_str(content_type)
+            .map_err(|_| Error::Usage("invalid content type header".into()))?;
+        if !content_type
             .split(';')
             .next()
             .unwrap_or_default()
@@ -199,7 +286,7 @@ impl BucketFiles {
         {
             return Err(Error::Usage("content type requires type/subtype".into()));
         }
-        spec.headers.insert(CONTENT_TYPE, content_type);
+        spec.headers.insert(CONTENT_TYPE, header);
         spec.body = Some(body.into());
         spec.timeout = Some(Duration::ZERO);
         self.client.json::<StoredObject>(spec).await.map(|r| r.data)

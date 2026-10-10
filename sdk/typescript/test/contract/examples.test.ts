@@ -8,7 +8,7 @@ import { createExampleServer } from '../../examples/server.mjs';
 describe.skipIf(skip)('published examples against the server', () => {
   it('runs the Node signup, CRUD and upload/download example', async () => {
     const result = await runExample({ url: URL_, email: `demo-${randomUUID()}@example.com`, password: 'node-example-password', signUp: true });
-    expect(result.note.body).toBe('Hello from Node');
+    expect(result.note['body']).toBe('Hello from Node');
     expect(result.downloaded).toBe('Hello from Node');
   });
 

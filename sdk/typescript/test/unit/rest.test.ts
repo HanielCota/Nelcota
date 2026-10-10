@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createClient, escapeLike, NelcotaUsageError } from '../../src/index.js';
-import { countFromRange } from '../../src/rest/query.js';
+import { createClient, escapeLike, NelcotaUsageError, unwrap } from '../../src/index.js';
+import { countFromRange, rangeFromHeader } from '../../src/rest/query.js';
 import { empty, json, mockFetch } from './helpers.js';
 
 function client(...replies: Parameters<typeof mockFetch>) {
@@ -127,6 +127,64 @@ describe('reads', () => {
     expect(countFromRange('0-19/*')).toBeNull();
     expect(countFromRange('*/0')).toBe(0);
     expect(countFromRange(null)).toBeNull();
+    expect(rangeFromHeader('20-39/137')).toEqual({ from: 20, to: 39 });
+    expect(rangeFromHeader('0-0/*')).toEqual({ from: 0, to: 0 });
+    expect(rangeFromHeader('*/0')).toBeNull();
+    expect(rangeFromHeader(null)).toBeNull();
+  });
+
+  it('exposes the returned range so truncation is visible', async () => {
+    const { nelcota, calls } = client(json([{ id: 1 }, { id: 2 }], 200, { 'content-range': '10-11/40' }));
+    const result = await nelcota.from('todos').select('id', { count: 'exact' }).limit(2).offset(10);
+    expect(result).toMatchObject({ count: 40, range: { from: 10, to: 11 } });
+    expect(query(calls[0]!.url)).toEqual([['select', 'id'], ['limit', '2'], ['offset', '10']]);
+    expect(nelcota.from('todos').select().offset(3).offset(5).toString()).toBe('select=*&offset=5');
+    expect(nelcota.from('todos').select().offset(2, { referencedTable: 'items' }).toString()).toBe('select=*&items.offset=2');
+    expect(() => nelcota.from('todos').select().offset(-1)).toThrow(NelcotaUsageError);
+    expect((await client(empty(201)).nelcota.from('todos').insert({ id: 1 })).range).toBeNull();
+  });
+
+  it('pages through every row until an empty page', async () => {
+    const pages = [[{ id: 1 }, { id: 2 }], [{ id: 3 }], []];
+    const { nelcota, calls } = client(() => json(pages.shift()));
+    const seen: unknown[] = [];
+    for await (const page of nelcota.from('todos').select('id').order('id').offset(4).pages(2)) seen.push(page);
+    expect(seen).toEqual([[{ id: 1 }, { id: 2 }], [{ id: 3 }]]);
+    // A short page does not end the walk: the server may cap pages below `size`.
+    expect(calls.map((c) => [c.url.searchParams.get('offset'), c.url.searchParams.get('limit')])).toEqual([['4', '2'], ['6', '2'], ['7', '2']]);
+  });
+
+  it('throwOnError() throws the error and keeps successes as results', async () => {
+    const failing = client(json({ code: 'db_error', message: 'nope', sqlstate: '42501' }, 403));
+    await expect(failing.nelcota.from('todos').select().throwOnError()).rejects.toMatchObject({ name: 'NelcotaError', code: 'db_error', sqlstate: '42501' });
+    await expect(failing.nelcota.from('todos').select().throwOnError().execute()).rejects.toMatchObject({ status: 403 });
+
+    const { nelcota } = client(json([{ id: 1 }], 200, { 'content-range': '0-0/*' }));
+    const { data, error } = await nelcota.from('todos').select('id').throwOnError().eq('id', 1);
+    expect(error).toBeNull();
+    expect(data).toEqual([{ id: 1 }]);
+    await expect(nelcota.from('todos').select('id').throwOnError().single()).resolves.toMatchObject({ data: { id: 1 } });
+
+    const many = client(json([{ id: 1 }, { id: 2 }]));
+    await expect(many.nelcota.from('todos').select().single().throwOnError()).rejects.toMatchObject({ code: 'not_single' });
+  });
+
+  it('unwrap() returns the data or throws the error', async () => {
+    const { nelcota } = client(json([{ id: 1 }]));
+    expect(unwrap(await nelcota.from('todos').select())).toEqual([{ id: 1 }]);
+    const failing = client(json({ code: 'invalid_credentials', message: 'no' }, 400));
+    const result = await failing.nelcota.auth.signInWithPassword({ email: 'a@x.com', password: 'pw' });
+    expect(() => unwrap(result)).toThrow(expect.objectContaining({ code: 'invalid_credentials' }));
+  });
+
+  it('throws page errors and refuses pages() outside reads', async () => {
+    const { nelcota } = client(json({ code: 'rate_limited', message: 'slow down' }, 400));
+    await expect(async () => {
+      for await (const _ of nelcota.from('todos').select().pages(10)) void _;
+    }).rejects.toMatchObject({ code: 'rate_limited' });
+    await expect(nelcota.from('todos').select().pages(0).next()).rejects.toThrow(NelcotaUsageError);
+    const head = nelcota.from('todos').select('*', { head: true }) as unknown as { pages(size: number): AsyncGenerator };
+    await expect(head.pages(1).next()).rejects.toThrow(NelcotaUsageError);
   });
 
   it('returns server errors as values', async () => {

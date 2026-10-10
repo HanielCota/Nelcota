@@ -125,6 +125,12 @@ impl Client {
             value.set_sensitive(true);
             spec.headers.insert(AUTHORIZATION, value);
         }
+        // Per-request headers win over the client's default ones.
+        let mut headers = self.inner.headers.clone();
+        for (name, value) in &spec.headers {
+            headers.insert(name.clone(), value.clone());
+        }
+        spec.headers = headers;
         let mut url = self.url(&spec.path)?;
         url.query_pairs_mut().extend_pairs(&spec.params);
         let timeout = self
@@ -166,12 +172,13 @@ impl Client {
                         code: value["code"]
                             .as_str()
                             .map(str::to_owned)
-                            .unwrap_or_else(|| format!("http_{status}")),
+                            .unwrap_or_else(|| crate::error::code_for_status(status)),
                         message: value["message"]
                             .as_str()
                             .unwrap_or("HTTP request failed")
                             .to_owned(),
                         retry_after,
+                        db: crate::error::DbErrorInfo::from_body(&value),
                     });
                 }
                 let data = if buffered {

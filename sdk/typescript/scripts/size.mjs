@@ -22,12 +22,13 @@ if (tsc.status !== 0) process.exit(tsc.status ?? 1);
 process.on('exit', () => rmSync(dist, { recursive: true, force: true }));
 
 const BUDGETS = {
-  // Includes shared cancellation and explicit row/bucket contract validation.
-  'index.js': 13_000,
+  // Includes shared cancellation, explicit row/bucket contract validation and
+  // the optional Postgres error fields, pages() and throwOnError()/unwrap().
+  'index.js': 13_650,
   // Standalone factories include HTTP and keep the other feature modules out.
-  'rest/index.js': 8_000,
-  'auth/index.js': 7_500,
-  'storage/index.js': 6_000,
+  'rest/index.js': 8_500,
+  'auth/index.js': 7_800,
+  'storage/index.js': 6_350,
 };
 
 function closure(entry, seen = new Set()) {

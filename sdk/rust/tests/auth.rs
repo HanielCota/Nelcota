@@ -208,3 +208,44 @@ async fn custom_storage_restores_sessions_and_background_refresh_stops_on_drop()
     assert_eq!(count.load(Ordering::SeqCst), 1);
     server_task.abort();
 }
+
+#[tokio::test]
+async fn file_storage_round_trips_atomically_and_privately() {
+    use nelcota_client::auth::{FileStorage, SessionStorage};
+    let dir = std::env::temp_dir().join(format!(
+        "nelcota-sdk-file-storage-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    let store = FileStorage::new(dir.join("nested").join("session.json"));
+    assert!(store.load().await.unwrap().is_none());
+    store.save(Some(&session("a0", "r0"))).await.unwrap();
+    store.save(Some(&session("a1", "r1"))).await.unwrap();
+    assert_eq!(store.load().await.unwrap(), Some(session("a1", "r1")));
+    let entries: Vec<_> = std::fs::read_dir(dir.join("nested"))
+        .unwrap()
+        .map(|e| e.unwrap().file_name())
+        .collect();
+    assert_eq!(entries, vec![std::ffi::OsString::from("session.json")]);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = std::fs::metadata(store.path())
+            .unwrap()
+            .permissions()
+            .mode();
+        assert_eq!(mode & 0o777, 0o600);
+    }
+    store.save(None).await.unwrap();
+    store.save(None).await.unwrap();
+    assert!(store.load().await.unwrap().is_none());
+    std::fs::write(store.path(), "not json").unwrap();
+    assert_eq!(
+        store.load().await.unwrap_err().code(),
+        "session_storage_error"
+    );
+    std::fs::remove_dir_all(&dir).unwrap();
+}

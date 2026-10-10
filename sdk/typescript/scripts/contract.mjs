@@ -126,7 +126,7 @@ try {
     stdio: ['pipe', 'inherit', 'inherit'],
   });
   run('docker', ['exec', '-i', PG, 'psql', '-q', '-v', 'ON_ERROR_STOP=1', '-U', 'postgres'], {
-    input: readFileSync(join(root, 'examples/schema.sql')),
+    input: readFileSync(join(root, '../../examples/notes.sql')),
     stdio: ['pipe', 'inherit', 'inherit'],
   });
 

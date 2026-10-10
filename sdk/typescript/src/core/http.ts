@@ -59,23 +59,54 @@ export function parseRetryAfter(value: string | null): number | undefined {
   return Math.max(0, Math.ceil((date - Date.now()) / 1000));
 }
 
-/** The server's `{ code, message }`, or a generic error from the status. */
+/**
+ * The code for an error response without a JSON body (a HEAD request, a
+ * proxy page): the common statuses keep a meaningful code, the rest get
+ * `http_<status>`.
+ */
+export function codeForStatus(status: number): string {
+  switch (status) {
+    case 401: return 'unauthorized';
+    case 403: return 'forbidden';
+    case 404: return 'not_found';
+    case 429: return 'rate_limited';
+    case 503: return 'unavailable';
+    default: return `http_${status}`;
+  }
+}
+
+function optionalString(record: Record<string, unknown>, key: string): string | undefined {
+  const value = record[key];
+  return typeof value === 'string' ? value : undefined;
+}
+
+/** The server's `{ code, message, ... }`, or a generic error from the status. */
 export async function errorFromResponse(response: Response): Promise<NelcotaError> {
   const retryAfter = parseRetryAfter(response.headers.get('retry-after'));
-  let code = `http_${response.status}`;
+  let code = codeForStatus(response.status);
   let message = response.statusText || `HTTP ${response.status}`;
+  let record: Record<string, unknown> = {};
   const text = await response.text();
   try {
     const body: unknown = JSON.parse(text);
-    if (typeof body === 'object' && body !== null) {
-      const record = body as Record<string, unknown>;
-      if (typeof record['code'] === 'string') code = record['code'];
-      if (typeof record['message'] === 'string') message = record['message'];
+    if (typeof body === 'object' && body !== null && !Array.isArray(body)) {
+      record = body as Record<string, unknown>;
+      code = optionalString(record, 'code') ?? code;
+      message = optionalString(record, 'message') ?? message;
     }
   } catch {
     // Not JSON (a proxy page, an empty body): keep the generic error.
   }
-  return new NelcotaError({ status: response.status, code, message, retryAfter });
+  return new NelcotaError({
+    status: response.status,
+    code,
+    message,
+    retryAfter,
+    sqlstate: optionalString(record, 'sqlstate'),
+    details: optionalString(record, 'details'),
+    hint: optionalString(record, 'hint'),
+    constraint: optionalString(record, 'constraint'),
+  });
 }
 
 function sleep(ms: number, signal: AbortSignal | undefined): Promise<void> {

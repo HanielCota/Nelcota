@@ -22,8 +22,9 @@ npm install /caminho/nelcota-client-0.1.0.tgz
 
 ## 2. Prepare os dados
 
-Execute [examples/schema.sql](../examples/schema.sql) pelo editor SQL ou como
-migração. Ele cria `notes` e o bucket privado `files`. Cada usuário acessa suas
+Execute [examples/notes.sql](https://github.com/HanielCota/Nelcota/blob/main/examples/notes.sql) pelo editor SQL do painel ou copie-o para
+`migrations/` e rode `nelcota migrate`. Ele cria `notes` e o bucket privado
+`files`, e pode ser executado mais de uma vez. Cada usuário acessa suas
 próprias notas e arquivos, conforme as políticas do Postgres.
 
 ## 3. Crie o cliente e entre

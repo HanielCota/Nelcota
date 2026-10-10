@@ -12,7 +12,7 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 
 Before the first crates.io release, use a path dependency on `sdk/rust`.
-Requires Rust 1.99+. Full support targets the current repository build.
+Requires Rust 1.88+ (checked in CI). Full support targets the current repository build.
 
 | SDK | Server baseline | Support |
 |---|---|---|
@@ -84,6 +84,11 @@ for zero rows (decode to `Option<T>`). Use `head().count_exact().execute::<()>()
 for count-only reads. Update/delete require a parent filter before any HTTP is
 sent. Exact counts scan all matching rows; only request them when needed.
 
+Each read returns at most `NELCOTA_MAX_ROWS` rows (1000 by default), even
+without `limit`. Page with `range(start, end)` or `limit` + `offset`, ordered
+by a unique column, until a page comes back empty; `count_exact()` gives the
+total when you need it.
+
 ## Auth
 
 ```rust,no_run
@@ -102,8 +107,22 @@ drop(background);
 # Ok(()) }
 ```
 
-Session storage defaults to memory. Implement `auth::SessionStorage` for a
-keychain, encrypted file or per-request cookie store. Clones share one session,
+Session storage defaults to memory. For a CLI or desktop app,
+`auth::FileStorage::new(path)` keeps the session in a JSON file, written
+atomically and readable by its owner only (0600 on Unix). Implement
+`auth::SessionStorage` for a keychain, encrypted file or per-request cookie
+store.
+
+```rust,no_run
+# fn example() -> nelcota_client::Result<()> {
+use std::sync::Arc;
+use nelcota_client::{Client, auth::FileStorage};
+let client = Client::builder("https://api.example.com")
+    .session_storage(Arc::new(FileStorage::new("/home/ana/.config/notes/session.json")))
+    .build()?;
+# Ok(()) }
+```
+ Clones share one session,
 lifecycle lock and refresh result. Independent clients/processes sharing a
 persistent store need external coordination: the store interface alone does
 not serialize refresh. A spent refresh token terminates its server session.
@@ -144,8 +163,9 @@ Session, flow and link Debug implementations omit secret tokens.
 use nelcota_client::storage::{UploadOptions, OpenOptions, ListOptions};
 let files = client.storage().from("avatars")?;
 let name = format!("{user_id}/me.txt");
-files.upload(&name, "hello", UploadOptions {
-    content_type:"text/plain".into(), ..Default::default()
+files.upload(&name, "hello", UploadOptions::default()).await?; // text/plain, from .txt
+files.upload("logo", "<svg/>", UploadOptions {
+    content_type: Some("image/svg+xml".into()), upsert: true,
 }).await?;
 let bytes = files.download(&name).await?;
 let response = files.open(&name, OpenOptions { range:Some((0,Some(3))), ..Default::default() }).await?;
@@ -156,7 +176,10 @@ files.remove(&name).await?;
 # Ok(()) }
 ```
 
-`upload_reader` streams a Tokio reader. `open` returns a streaming
+Without an explicit `content_type`, uploads guess it from the name's extension
+(`json`, `csv`, `txt`, `html`, `css`, `js`, `svg`, `png`, `jpg`, `gif`, `webp`,
+`pdf`, `mp4` and other common types; see `storage::guess_content_type`) and
+fall back to `application/octet-stream`. `upload_reader` streams a Tokio reader. `open` returns a streaming
 `reqwest::Response`; handle 206, 304, ETag and stream failures yourself after it
 returns. `download` buffers the file and reports body failures in its Result.
 Uploads/downloads default to no deadline; scope a `RequestOptions` timeout when
@@ -165,8 +188,20 @@ Object names are NFC-normalized and encoded per segment. Empty/dot segments,
 backslashes and control characters are rejected.
 
 Buckets support list/get/create/update/delete, usually with `service_role`.
-`update_bucket` replaces all settings. Authorization belongs to server RLS;
-a `service_role` token bypasses it and belongs only in a trusted application.
+`update_bucket` replaces all settings, so it takes a `BucketUpdate`, which has
+no `Default`: every field is explicit, and `None` clears a limit on purpose.
+Start from the current bucket to change one setting:
+
+```rust,no_run
+# async fn example(client: nelcota_client::Client) -> nelcota_client::Result<()> {
+use nelcota_client::storage::BucketUpdate;
+let current = client.storage().get_bucket("avatars").await?;
+client.storage().update_bucket("avatars", BucketUpdate { public: true, ..current.into() }).await?;
+# Ok(()) }
+```
+
+Authorization belongs to server RLS; a `service_role` token bypasses it and
+belongs only in a trusted application.
 
 ## Rust schema types
 
@@ -194,7 +229,27 @@ requiring a DB connection when compiling consumer applications.
 Other variants distinguish invalid input, network, timeout, cancellation,
 invalid response, cardinality and session storage failures. No panic is used
 for caller configuration or HTTP failures. Signed request URLs are omitted
-from transport error text.
+from transport error text. A response without a JSON body (a `head()` count, a
+proxy page) gets `unauthorized`, `forbidden`, `not_found`, `rate_limited`,
+`unavailable` or `http_<status>` as its code.
+
+When the server reports them, `sqlstate()`, `details()`, `hint()` and
+`constraint()` expose what Postgres said about a `db_error`; older servers send
+none. Helpers classify common cases: `is_not_found()`, `is_conflict()`,
+`is_unique_violation()`, `is_rate_limited()`, `is_unauthorized()`,
+`is_forbidden()` and `is_retryable()`.
+
+```rust,no_run
+# async fn example(client: nelcota_client::Client) -> nelcota_client::Result<()> {
+use serde_json::json;
+match client.from("notes").insert(&json!({"slug":"a"})).execute::<()>().await {
+    Err(error) if error.is_unique_violation() => {
+        println!("taken ({:?})", error.constraint());
+    }
+    other => { other?; }
+}
+# Ok(()) }
+```
 
 Only GET/HEAD retry network/body-read failures and 429/503, default two retries.
 The backoff has jitter and respects Retry-After (seconds or HTTP date); a delay
@@ -204,9 +259,17 @@ buffered body; refresh and backoff are separate. Drop a request future or use
 `CancellationToken` to cancel; an already accepted server write cannot be undone
 by cancelling the client. Raw stream lifetime is managed by reqwest/caller.
 
-Custom `http_client` instances must disable their own auth/mutation retries.
+`Client::builder(url).header("x-app", "notes")` adds a header to every request;
+`build` refuses invalid headers and `Authorization`, which comes from
+`access_token` or the session. Custom `http_client` instances must disable
+their own auth/mutation retries.
 The default client uses explicit rustls/ring and Mozilla roots without a global
 crypto-provider initialization. It can be reused across tasks.
 
+Start with the [quickstart](https://github.com/HanielCota/Nelcota/blob/main/docs/quickstart.md)
+(local server, migration, generated types). The examples in `examples/` use
+the shared [examples/notes.sql](https://github.com/HanielCota/Nelcota/blob/main/examples/notes.sql)
+schema. Empty results, 401/403 or a 1000-row cap? See
+[troubleshooting](https://github.com/HanielCota/Nelcota/blob/main/docs/troubleshooting.md).
 Portuguese guide: [quickstart.pt-BR.md](docs/quickstart.pt-BR.md).
 Contract: [contract.md](docs/contract.md). Release: [releasing.md](docs/releasing.md).

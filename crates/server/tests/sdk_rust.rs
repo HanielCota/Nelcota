@@ -4,7 +4,7 @@ use common::*;
 use nelcota_client::{
     Client,
     rest::{Condition, IsValue, Order, UpsertOptions},
-    storage::{BucketSettings, ListOptions, OpenOptions, UploadOptions},
+    storage::{BucketSettings, BucketUpdate, ListOptions, OpenOptions, UploadOptions},
 };
 use serde_json::{Value, json};
 use std::net::SocketAddr;
@@ -433,7 +433,7 @@ async fn storage_streams_ranges_signed_urls_buckets_and_rls() {
     let files = a.storage().from("docs").unwrap();
     let name = format!("{}/notes/cafe\u{0301} world?#.txt", live.app.user_a);
     let options = || UploadOptions {
-        content_type: "text/plain".into(),
+        content_type: Some("text/plain".into()),
         upsert: false,
     };
     let object = files
@@ -590,7 +590,14 @@ async fn storage_streams_ranges_signed_urls_buckets_and_rls() {
     assert!(
         !admin
             .storage()
-            .update_bucket("sdk-public", BucketSettings::default())
+            .update_bucket(
+                "sdk-public",
+                BucketUpdate {
+                    public: false,
+                    file_size_limit: None,
+                    allowed_mime_types: None,
+                },
+            )
             .await
             .unwrap()
             .public

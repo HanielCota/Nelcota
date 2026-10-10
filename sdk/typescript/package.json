@@ -47,7 +47,8 @@
     "README.md",
     "LICENSE",
     "CHANGELOG.md",
-    "docs",
+    "docs/contract.md",
+    "docs/quickstart.pt-BR.md",
     "examples"
   ],
   "publishConfig": {
