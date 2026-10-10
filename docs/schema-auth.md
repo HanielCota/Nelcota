@@ -180,7 +180,10 @@ expired, already used or other-kind link), `400 unsupported_type`.
 
 Password: 8 to 256 characters. Rate limit:
 `NELCOTA_AUTH_RATE_LIMIT_PER_MINUTE` per IP (default 30) and the same limit
-per email on login.
+per email on password login. Refreshes and PKCE redemptions
+(`grant_type=refresh_token` / `pkce`) draw from a separate per-IP budget of
+10 times that (300 by default), so open tabs refreshing do not use up the
+password sign-in budget of everyone behind the same IP.
 
 ## Password recovery
 

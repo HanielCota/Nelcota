@@ -105,6 +105,11 @@ async fn serve(config: Config) -> anyhow::Result<()> {
         keys: keys.clone(),
         passwords: passwords.clone(),
         limiter: Arc::new(RateLimiter::new(config.auth_rate_limit_per_minute)),
+        session_limiter: Arc::new(RateLimiter::new(
+            config
+                .auth_rate_limit_per_minute
+                .saturating_mul(nelcota_auth::SESSION_RATE_LIMIT_FACTOR),
+        )),
         settings: Arc::new(AuthSettings {
             issuer: config.jwt_issuer.clone(),
             access_ttl_secs: config.jwt_expiry_secs,

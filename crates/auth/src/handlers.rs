@@ -4,7 +4,7 @@ use crate::{
     error::unsupported_type,
     links::{self, LinkKind},
     oauth,
-    rate_limit::limit,
+    rate_limit::{limit, limit_sessions},
     request::{PeerAddr, client_ip, ip_key, user_agent},
     sessions,
     verify::{self, VerifyBody},
@@ -85,7 +85,13 @@ async fn token(
     Json(body): Json<TokenBody>,
 ) -> Result<Json<Value>, ApiError> {
     let ip = client_ip(state.settings.trust_proxy, &headers, peer);
-    limit(&state, &format!("token:{}", ip_key(ip)))?;
+    // Password guessing gets the tight per-IP budget. Refreshes and code
+    // redemptions only work with a secret already in hand, and every open tab
+    // refreshes on its own, so they draw from a separate, larger budget.
+    match query.grant_type.as_str() {
+        "password" => limit(&state, &format!("token:{}", ip_key(ip)))?,
+        _ => limit_sessions(&state, &format!("refresh:{}", ip_key(ip)))?,
+    }
 
     let session = match query.grant_type.as_str() {
         "password" => {

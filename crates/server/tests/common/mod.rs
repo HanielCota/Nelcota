@@ -304,6 +304,11 @@ impl TestApp {
             keys: keys.clone(),
             passwords,
             limiter: Arc::new(RateLimiter::new(options.rate_limit_per_minute)),
+            session_limiter: Arc::new(RateLimiter::new(
+                options
+                    .rate_limit_per_minute
+                    .saturating_mul(nelcota_auth::SESSION_RATE_LIMIT_FACTOR),
+            )),
             settings: Arc::new(AuthSettings {
                 issuer: "nelcota-test".into(),
                 access_ttl_secs: options.access_ttl_secs,

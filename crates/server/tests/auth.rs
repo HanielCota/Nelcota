@@ -349,6 +349,33 @@ async fn rate_limit_on_login() {
     assert!(blocked.headers.contains_key(header::RETRY_AFTER));
 }
 
+#[tokio::test]
+async fn refresh_has_its_own_rate_limit_budget() {
+    let app = TestApp::spawn_with(Options {
+        rate_limit_per_minute: 3,
+        ..Options::default()
+    })
+    .await;
+    let session = signup(&app, "tabs@example.com", "strong-pass-123")
+        .await
+        .body;
+    // More refreshes than the password budget allows...
+    let mut token = str_field(&session, "refresh_token").to_owned();
+    for _ in 0..5 {
+        let reply = refresh(&app, &token).await;
+        assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+        token = str_field(&reply.body, "refresh_token").to_owned();
+    }
+    // ...leave password sign-in untouched, and the reverse.
+    for _ in 0..3 {
+        let reply = login(&app, "tabs@example.com", "strong-pass-123").await;
+        assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+    }
+    let blocked = login(&app, "tabs@example.com", "strong-pass-123").await;
+    assert_eq!(blocked.status, StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(refresh(&app, &token).await.status, StatusCode::OK);
+}
+
 /// The `auth.*` tables are not accessible to the API roles.
 #[tokio::test]
 async fn api_roles_cannot_read_the_auth_schema() {
