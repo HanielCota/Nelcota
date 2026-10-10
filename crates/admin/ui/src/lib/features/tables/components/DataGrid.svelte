@@ -257,17 +257,30 @@
               <div class="flex items-center gap-1 bg-card p-0.5 ring-2 ring-brand ring-inset" onfocusout={(event) => {
                 if (!event.currentTarget.contains(event.relatedTarget as Node | null)) editing = null
               }}>
-                <input
-                  id="inline-editor"
-                  class={[
-                    'w-full min-w-0 bg-transparent px-2.5 py-1.5 text-xs outline-none',
-                    monospace(kind) && 'font-mono',
-                    alignRight(kind) && 'text-right',
-                  ]}
-                  bind:value={draft}
-                  onkeydown={onEditorKey}
-                  aria-label={t('tables.grid.edit', { column: column.name })}
-                />
+                {#if editing.original?.includes('\n')}
+                  <!-- Multi-line text: an <input> would flatten the line breaks.
+                       Enter saves, Shift+Enter adds a line. -->
+                  <textarea
+                    id="inline-editor"
+                    rows="4"
+                    class={['w-full min-w-0 resize-y bg-transparent px-2.5 py-1.5 text-xs outline-none', monospace(kind) && 'font-mono']}
+                    bind:value={draft}
+                    onkeydown={onEditorKey}
+                    aria-label={t('tables.grid.edit', { column: column.name })}
+                  ></textarea>
+                {:else}
+                  <input
+                    id="inline-editor"
+                    class={[
+                      'w-full min-w-0 bg-transparent px-2.5 py-1.5 text-xs outline-none',
+                      monospace(kind) && 'font-mono',
+                      alignRight(kind) && 'text-right',
+                    ]}
+                    bind:value={draft}
+                    onkeydown={onEditorKey}
+                    aria-label={t('tables.grid.edit', { column: column.name })}
+                  />
+                {/if}
                 {#if column.nullable}
                   <button
                     class="shrink-0 cursor-pointer rounded border border-border-strong bg-muted px-1.5 py-0.5 font-mono text-3xs text-muted-foreground hover:text-foreground"
