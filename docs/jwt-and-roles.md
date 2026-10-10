@@ -104,10 +104,13 @@ CREATE POLICY owner ON public.todos
 
 | Situation | Status |
 |---|---|
-| Invalid or expired JWT, or unknown role | 401 `invalid_token` |
-| `anon` without permission on the table | 401 |
-| `authenticated` without permission / policy violated on write | 403 |
-| Table does not exist | 404 |
+| Invalid or expired JWT, unknown role or a scheme other than Bearer | 401 `invalid_token` |
+| `anon` without permission on the table | 401 `db_error` (`sqlstate` `42501`) |
+| `authenticated` without permission / policy violated on write | 403 `db_error` (`sqlstate` `42501`) |
+| Table does not exist | 404 `not_found` |
+
+The body is the API's error JSON (`code`, `message` and, for database errors,
+`sqlstate`/`details`/`hint`/`constraint`); see [api.md](api.md#errors).
 
 Every 401 carries `WWW-Authenticate`: `Bearer error="invalid_token"` when a
 token was presented and rejected, plain `Bearer` when the request had no
