@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.1.0 — 2026-10-10
+
+First npm release. Changes since the release candidate:
 
 - Add `auth.updateUser({ password?, currentPassword?, data? })` for the new
   `PUT /auth/v1/user`: change the password (other sessions end) or merge
@@ -30,7 +32,7 @@
 - Add regressions for cancellation, result types, cardinality and bucket limits
   against both mock transports and the production HTTP/Postgres contract.
 
-## 0.1.0 — Initial release candidate
+## 0.1.0 release candidate
 
 - JavaScript ESM and TypeScript declarations with no runtime dependencies.
 - REST queries, writes, upserts, filters, embeds, pagination, counts and RPC.

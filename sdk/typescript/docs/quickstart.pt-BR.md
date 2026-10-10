@@ -2,7 +2,6 @@
 
 O mesmo pacote funciona em JavaScript e TypeScript. Use um servidor Nelcota
 com os recursos descritos na [matriz de compatibilidade](../README.md#compatibility).
-Antes da publicação no npm, instale o arquivo gerado por `npm pack`.
 
 ## 1. Instale
 
@@ -10,7 +9,7 @@ Antes da publicação no npm, instale o arquivo gerado por `npm pack`.
 npm install @nelcota/client
 ```
 
-Para experimentar o código deste repositório:
+Para experimentar uma versão ainda não publicada, direto deste repositório:
 
 ```sh
 cd sdk/typescript

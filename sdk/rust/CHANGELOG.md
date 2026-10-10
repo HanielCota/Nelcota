@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0 (unreleased)
+## 0.1.0 — 2026-10-10
 
 - `AuthClient::update_user(UserUpdate)` for the new `PUT /auth/v1/user`:
   change the password (other sessions end) or merge `user_metadata`. Needs a
