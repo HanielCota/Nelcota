@@ -23,11 +23,16 @@ describe('sign-in options', () => {
   })
 
   it('names the variables that turn an option on, only while it is off', () => {
-    const [password, confirmation, recovery, magic] = signInOptions(settings())
-    expect(password).toEqual({ id: 'password', on: true, variables: [] })
+    const [, confirmation, recovery, magic] = signInOptions(settings())
     expect(recovery.variables).toEqual(['NELCOTA_SMTP_URL', 'NELCOTA_SMTP_FROM', 'NELCOTA_PASSWORD_RECOVERY_URL'])
     expect(confirmation.variables.at(-1)).toBe('NELCOTA_EMAIL_CONFIRMATION_URL')
     expect(magic.variables).toContain('NELCOTA_SMTP_URL')
+  })
+
+  it('open sign-up says how to turn it off while on, and on while off', () => {
+    expect(signInOptions(settings())[0]).toEqual({ id: 'password', on: true, change: 'disable', variables: ['NELCOTA_SIGNUP_ENABLED=false'] })
+    expect(signInOptions(settings({ signup_enabled: false }))[0]).toEqual({ id: 'password', on: false, change: 'enable', variables: ['NELCOTA_SIGNUP_ENABLED=true'] })
+    expect(signInOptions(settings({ providers: { google: true, github: false } }))[4].variables).toEqual([])
   })
 
   it('with email on, only the missing page is asked for', () => {

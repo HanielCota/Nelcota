@@ -10,8 +10,8 @@
   import { envSnippet, type OptionId, type SignInOption } from '$lib/features/sign-in/sign-in-options'
   import { t } from '$lib/i18n/index.svelte'
 
-  // One way to sign in: what it does, whether it is on and, while it is off,
-  // the .env lines that turn it on, folded away until asked for.
+  // One way to sign in: what it does, whether it is on and the .env lines that
+  // change that, folded away until asked for.
   let { option }: { option: SignInOption } = $props()
   let open = $state(false)
 
@@ -33,7 +33,7 @@
 
   <div class="grid gap-1">
     <h3 class="text-base font-semibold">{t(`signIn.options.${option.id}.title`)}</h3>
-    <p class="text-sm text-muted-foreground">{t(`signIn.options.${option.id}.text`)}</p>
+    <p class="text-sm text-muted-foreground">{option.id === 'password' ? t(option.on ? 'signIn.options.password.textOn' : 'signIn.options.password.textOff') : t(`signIn.options.${option.id}.text`)}</p>
   </div>
 
   {#if option.variables.length}
@@ -45,12 +45,12 @@
         aria-controls={panel}
         onclick={() => (open = !open)}
       >
-        {t('signIn.howTo')}
+        {option.change === 'disable' ? t('signIn.howToOff') : t('signIn.howTo')}
         <ChevronDown class={['size-4 transition-transform', open && 'rotate-180']} aria-hidden="true" />
       </button>
       {#if open}
         <div id={panel} class="grid gap-2">
-          <p class="text-xs text-muted-foreground">{t('signIn.envHint')}</p>
+          <p class="text-xs text-muted-foreground">{option.change === 'disable' ? t('signIn.envHintOff') : t('signIn.envHint')}</p>
           <CodeBlock code={envSnippet(option.variables)} label={t('signIn.copyEnv')} lang="env" wrap />
         </div>
       {/if}
