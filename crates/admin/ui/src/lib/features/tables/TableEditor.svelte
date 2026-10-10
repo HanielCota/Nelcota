@@ -1,7 +1,5 @@
 <script lang="ts">
   import { onMount, untrack } from 'svelte'
-  import { Button } from '$lib/components/ui/button'
-  import Plus from '@lucide/svelte/icons/plus'
   import ShieldAlert from '@lucide/svelte/icons/shield-alert'
   import KeyRound from '@lucide/svelte/icons/key-round'
   import Eye from '@lucide/svelte/icons/eye'
@@ -18,7 +16,8 @@
   import FilterBar from '$lib/features/tables/components/FilterBar.svelte'
   import CreateTableSheet from '$lib/features/tables/components/CreateTableSheet.svelte'
   import StructureView from '$lib/features/tables/components/StructureView.svelte'
-  import EmptyState from '$lib/components/shared/EmptyState.svelte'
+  import TablesHome from '$lib/features/tables/components/TablesHome.svelte'
+  import { readText, write } from '$lib/local-storage'
   import { api, enc, ApiError } from '$lib/api'
   import type { RunAsLabels, Viewer } from '$lib/shared/run-as'
   import { RemoteResource } from '$lib/remote-resource.svelte'
@@ -100,6 +99,15 @@
   // browser's back button works. The text key avoids reloading without a real change.
   const filters = $derived(parseFilters(route.query))
   const filtersKey = $derived(filtersToSearch(filters))
+
+  // The last table opened in this browser, offered again on the list page.
+  const LAST_TABLE = 'nelcota:tables-last'
+  let lastTable = $state<string | null>(readText(LAST_TABLE, '') || null)
+  $effect(() => {
+    if (!name || name === lastTable) return
+    lastTable = name
+    write(LAST_TABLE, name)
+  })
 
   async function loadTables() {
     await tablesResource.load(signal => api.get<TablesResponse>('/tables', { signal }))
@@ -228,13 +236,7 @@
 
   <section class={cn('min-w-0 flex-1 flex-col overflow-hidden rounded-3xl bg-card', name ? 'flex' : 'hidden lg:flex')}>
     {#if !name}
-      <div class="grid flex-1 place-items-center p-8">
-        <EmptyState title={t('tables.editor.noneOpen')} description={t('tables.editor.pickOne')}>
-          {#snippet actions()}
-            <Button variant="outline" onclick={() => (createOpen = true)}><Plus />{t('tables.editor.newTable')}</Button>
-          {/snippet}
-        </EmptyState>
-      </div>
+      <TablesHome {tables} loading={tablesLoading} last={lastTable} oncreate={() => (createOpen = true)} />
     {:else}
       <TableToolbar
         {name}
