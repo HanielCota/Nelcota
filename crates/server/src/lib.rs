@@ -15,6 +15,7 @@ use axum::{
 use deadpool_postgres::Pool;
 use nelcota_api::{ApiSettings, Catalog, CatalogHandle};
 use nelcota_auth::{AuthState, SharedVerifier};
+use nelcota_core::{ApiError, ErrorInfo};
 use serde_json::json;
 use std::sync::Arc;
 use tower_http::{
@@ -111,6 +112,9 @@ pub fn app(
             router = router.merge(nelcota_admin::upload_router(admin));
         }
     }
+    router = router
+        .fallback(not_found)
+        .layer(middleware::from_fn(json_errors));
     // API traffic feeds the panel's overview charts and its "Recently
     // blocked" list.
     if let Some(observed) = observed {
@@ -176,7 +180,7 @@ async fn observe(
         ),
         Some(Err(_)) => ("invalid_token".to_owned(), None, None),
     };
-    let info = response.extensions().get::<nelcota_core::ErrorInfo>();
+    let info = response.extensions().get::<ErrorInfo>();
     observed
         .denied
         .record(nelcota_admin::contracts::DeniedRequest {
@@ -193,6 +197,84 @@ async fn observe(
             user_id,
             email,
         });
+    response
+}
+
+/// Unknown route: the same JSON error as everything else.
+async fn not_found() -> ApiError {
+    ApiError::new(StatusCode::NOT_FOUND, "not_found", "route not found")
+}
+
+/// Turns any error response that is not already an [`ApiError`] (axum's 405
+/// and plain-text rejections, the body limit's 413, the request timeout's
+/// 504) into the API's `{"code", "message"}` JSON. The panel's routes keep
+/// their own error shape.
+async fn json_errors(request: Request, next: Next) -> Response {
+    let panel = request.uri().path().starts_with("/admin");
+    let response = next.run(request).await;
+    if panel
+        || response.status().as_u16() < 400
+        || response.extensions().get::<ErrorInfo>().is_some()
+    {
+        return response;
+    }
+    let (parts, body) = response.into_parts();
+    let status = parts.status;
+    // axum's rejections explain themselves in a short plain-text body.
+    let text = if parts.headers.contains_key(header::CONTENT_ENCODING) {
+        None
+    } else {
+        axum::body::to_bytes(body, 4096)
+            .await
+            .ok()
+            .and_then(|bytes| String::from_utf8(bytes.to_vec()).ok())
+            .map(|text| text.trim().to_owned())
+            .filter(|text| !text.is_empty())
+    };
+    let (code, default) = match status {
+        StatusCode::BAD_REQUEST => ("bad_request", "bad request"),
+        StatusCode::NOT_FOUND => ("not_found", "route not found"),
+        StatusCode::METHOD_NOT_ALLOWED => (
+            "method_not_allowed",
+            "this method is not allowed on this route",
+        ),
+        StatusCode::PAYLOAD_TOO_LARGE => (
+            "payload_too_large",
+            "the request body exceeds the size limit",
+        ),
+        StatusCode::UNSUPPORTED_MEDIA_TYPE => {
+            ("unsupported_media_type", "unsupported Content-Type")
+        }
+        StatusCode::RANGE_NOT_SATISFIABLE => (
+            "range_not_satisfiable",
+            "the requested range is not satisfiable",
+        ),
+        StatusCode::UNPROCESSABLE_ENTITY => ("invalid_body", "invalid request body"),
+        StatusCode::GATEWAY_TIMEOUT => (
+            "timeout",
+            "the request took longer than the server's request timeout",
+        ),
+        StatusCode::SERVICE_UNAVAILABLE => ("unavailable", "service unavailable"),
+        status if status.is_server_error() => ("internal", "internal error"),
+        _ => ("bad_request", "the request was refused"),
+    };
+    let message = match (status, text) {
+        // The timeout and server errors never echo a body.
+        (StatusCode::GATEWAY_TIMEOUT, _) => default.to_owned(),
+        (status, _) if status.is_server_error() => default.to_owned(),
+        (_, Some(text)) => text,
+        (_, None) => default.to_owned(),
+    };
+    let mut response = ApiError::new(status, code, message).into_response();
+    // Keep what the original said besides its body (`Allow` on a 405,
+    // `Content-Range` on a 416).
+    let own: Vec<HeaderName> = response.headers().keys().cloned().collect();
+    for (name, value) in &parts.headers {
+        if !own.contains(name) && name != header::CONTENT_LENGTH && name != header::CONTENT_ENCODING
+        {
+            response.headers_mut().append(name.clone(), value.clone());
+        }
+    }
     response
 }
 
@@ -213,5 +295,39 @@ async fn health(State(pool): State<Pool>) -> impl IntoResponse {
             StatusCode::SERVICE_UNAVAILABLE,
             Json(json!({ "status": "unavailable", "version": version })),
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::body::Body;
+    use tower::ServiceExt;
+
+    #[tokio::test]
+    async fn request_timeout_answers_json() {
+        let router = Router::new()
+            .route(
+                "/slow",
+                get(|| async {
+                    tokio::time::sleep(Duration::from_secs(5)).await;
+                    "late"
+                }),
+            )
+            .layer(TimeoutLayer::with_status_code(
+                StatusCode::GATEWAY_TIMEOUT,
+                Duration::from_millis(10),
+            ))
+            .layer(middleware::from_fn(json_errors));
+        let response = router
+            .oneshot(Request::get("/slow").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::GATEWAY_TIMEOUT);
+        let bytes = axum::body::to_bytes(response.into_body(), 1 << 16)
+            .await
+            .unwrap();
+        let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(body["code"], "timeout");
     }
 }
