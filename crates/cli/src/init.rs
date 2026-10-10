@@ -223,7 +223,7 @@ fn create_host(
         "host.env\nprojects/*/.env\nprojects/*/backups/\narchive/\n",
     )?;
     if !args.local {
-        machine::setup(host, s3.is_some(), args.firewall);
+        machine::setup(host, args.firewall);
     }
     let shown = (manifest.panel_login == crate::host::PanelLogin::Shared).then_some(shared);
     Ok((manifest, shown))

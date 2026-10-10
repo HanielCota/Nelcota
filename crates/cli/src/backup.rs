@@ -5,6 +5,7 @@ use anyhow::{Context, bail};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 mod remote;
+pub(crate) use remote::s3_configured;
 mod workflow;
 #[cfg(test)]
 pub(crate) use workflow::prune;

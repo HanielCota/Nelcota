@@ -129,8 +129,10 @@ pub enum Command {
         #[arg(long)]
         dry_run: bool,
     },
-    /// Dumps the database to backups/ (and uploads it to S3 with --upload).
+    /// Dumps the database to backups/ and uploads it to S3 when host.env has a bucket.
     Backup {
+        /// Requires the S3 upload (fails if host.env has no bucket). Without it,
+        /// the dump is uploaded whenever the bucket is configured.
         #[arg(long)]
         upload: bool,
         /// Keeps only the N most recent local dumps.
@@ -424,6 +426,8 @@ pub fn run(cli: Cli) -> anyhow::Result<Outcome> {
             } else {
                 vec![host.select(&manifest, selection)?]
             };
+            // S3 added to host.env after `init` is picked up without editing the cron.
+            let upload = upload || backup::s3_configured(&host);
             let mut failed = Vec::new();
             for project in &targets {
                 // A project with a problem does not stop the others from being backed up.
