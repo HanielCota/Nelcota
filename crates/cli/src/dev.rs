@@ -106,9 +106,24 @@ pub fn saved_config(root: &Path) -> anyhow::Result<Option<Config>> {
     Ok(load_state(root)?.map(|s| config_for(root, &s, ([127, 0, 0, 1], 8000).into())))
 }
 
-pub fn run(root: &Path, args: DevArgs) -> anyhow::Result<Outcome> {
-    let state = match load_state(root)? {
-        Some(state) => state,
+const DEFAULT_DB_PORT: u16 = 54322;
+
+/// The saved state (created on the first run). An explicit `--db-port`
+/// different from the saved one replaces it and is saved for the next runs.
+fn prepare_state(root: &Path, db_port: Option<u16>) -> anyhow::Result<DevState> {
+    match load_state(root)? {
+        Some(mut state) => {
+            if let Some(port) = db_port.filter(|port| *port != state.db_port) {
+                util::warn(&format!(
+                    "development Postgres moves from port {} to {port}: a new container \
+                     (nelcota-dev-postgres-{port}) with its own data; the old one is left as is",
+                    state.db_port
+                ));
+                state.db_port = port;
+                save_state(root, &state)?;
+            }
+            Ok(state)
+        }
         None => {
             let admin_password = util::secret(18);
             let admin_password_hash = nelcota_auth::hash_password(&admin_password)
@@ -117,15 +132,19 @@ pub fn run(root: &Path, args: DevArgs) -> anyhow::Result<Outcome> {
                 postgres_password: util::secret(24),
                 authenticator_password: util::secret(24),
                 jwt_private_key: nelcota_auth::generate_ed25519_private_key(),
-                db_port: args.db_port,
+                db_port: db_port.unwrap_or(DEFAULT_DB_PORT),
                 admin_email: "admin@localhost".into(),
                 admin_password,
                 admin_password_hash,
             };
             save_state(root, &state)?;
-            state
+            Ok(state)
         }
-    };
+    }
+}
+
+pub fn run(root: &Path, args: DevArgs) -> anyhow::Result<Outcome> {
+    let state = prepare_state(root, args.db_port)?;
 
     let container = format!("nelcota-dev-postgres-{}", state.db_port);
     step(&format!("Development Postgres ({container})"));
@@ -233,5 +252,22 @@ mod tests {
                 0o600
             );
         }
+    }
+
+    #[test]
+    fn an_explicit_db_port_is_honored_and_saved() {
+        let root = tempfile::tempdir().unwrap();
+        let first = prepare_state(root.path(), None).unwrap();
+        assert_eq!(first.db_port, DEFAULT_DB_PORT);
+        assert_eq!(
+            prepare_state(root.path(), None).unwrap().db_port,
+            DEFAULT_DB_PORT
+        );
+
+        let moved = prepare_state(root.path(), Some(55000)).unwrap();
+        assert_eq!(moved.db_port, 55000);
+        assert_eq!(moved.postgres_password, first.postgres_password);
+        // Saved: later runs without the flag keep the new port.
+        assert_eq!(prepare_state(root.path(), None).unwrap().db_port, 55000);
     }
 }

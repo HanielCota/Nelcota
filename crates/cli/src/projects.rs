@@ -3,7 +3,7 @@
 
 use std::fs;
 
-use anyhow::bail;
+use anyhow::{Context, bail};
 
 use crate::{
     backup, caddy,
@@ -31,12 +31,18 @@ pub fn list(host: &Host) -> anyhow::Result<()> {
         println!("No projects. Create one with `nelcota init`.");
         return Ok(());
     }
-    lifecycle::status(&manifest, &host.projects(&manifest))
+    lifecycle::status(host, &manifest, &host.projects(&manifest))
 }
 
 /// `nelcota remove -p <name>`: final backup in `archive/`, containers and data
 /// deleted, project out of Caddy and the registry.
-pub fn remove(host: &Host, name: &str, yes: bool, keep_files: bool) -> anyhow::Result<()> {
+pub fn remove(
+    host: &Host,
+    name: &str,
+    yes: bool,
+    keep_files: bool,
+    no_backup: bool,
+) -> anyhow::Result<()> {
     naming::validate_project_name(name)?;
     let mut manifest = host.require()?;
     let Some(entry) = manifest.projects.iter().find(|p| p.name == name).cloned() else {
@@ -45,15 +51,34 @@ pub fn remove(host: &Host, name: &str, yes: bool, keep_files: bool) -> anyhow::R
     if !yes
         && !(util::interactive()
             && util::confirm(&format!(
-                "Remove the project {name} ({})? A final backup goes to archive/ and the data is deleted.",
-                entry.domain
+                "Remove the project {name} ({})? {} and the data is deleted.",
+                entry.domain,
+                if no_backup {
+                    "There is NO final backup (--no-backup)"
+                } else {
+                    "A final backup goes to archive/"
+                }
             )))
     {
         bail!("removal cancelled (use --yes to skip the question)");
     }
 
     let project = host.project(&manifest, &entry);
-    if project.health(Service::Postgres).is_some() {
+    if no_backup {
+        warn("--no-backup: removing without a final backup");
+    } else {
+        if project.health(Service::Postgres).as_deref() != Some("healthy") {
+            step(&format!(
+                "Starting the {name} Postgres for the final backup"
+            ));
+            project
+                .start(&[Service::Postgres])
+                .and_then(|()| project.wait_healthy(Service::Postgres, lifecycle::HEALTH_TIMEOUT))
+                .context(
+                    "could not start Postgres for the final backup; nothing was removed \
+                     (fix it, or pass --no-backup to remove without one)",
+                )?;
+        }
         let dump = backup::run(host, &project, false, None)?;
         fs::create_dir_all(host.archive_dir())?;
         let archived = host
@@ -61,8 +86,6 @@ pub fn remove(host: &Host, name: &str, yes: bool, keep_files: bool) -> anyhow::R
             .join(dump.file_name().unwrap_or_default());
         crate::backup::archive(&dump, &archived)?;
         ok(&format!("final backup at {}", archived.display()));
-    } else {
-        warn("Postgres stopped: removing without a final backup");
     }
     match manifest.runtime {
         Runtime::Docker if project.exists() => lifecycle::down(&project, true)?,
@@ -99,13 +122,16 @@ pub fn set_panel_login(host: &Host, mode: PanelLogin) -> anyhow::Result<()> {
         mode.as_str()
     ));
     let generated = panel_login::switch(host, &mut manifest, mode)?;
-    registry::write(host, &manifest)?;
-    lifecycle::recreate_apps(&host.projects(&manifest))?;
+    // The new hashes are already written: show the passwords before a restart
+    // can fail, or they would be lost.
     if mode == PanelLogin::Shared {
         println!();
         println!("Single sign-on on: use the host email and password on any panel.");
         println!("(Forgot the password? `nelcota admin-password`.)");
     }
     panel_login::print(&generated);
+    println!();
+    registry::write(host, &manifest)?;
+    lifecycle::recreate_apps(&host.projects(&manifest))?;
     Ok(())
 }

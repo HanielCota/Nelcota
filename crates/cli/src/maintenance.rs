@@ -33,6 +33,25 @@ impl<'a> Maintenance<'a> {
         Ok(guard)
     }
 
+    /// Like [`Maintenance::enter`], but also takes over a gate left closed by
+    /// a failed upgrade or restore: a restore is how such a project recovers.
+    pub(crate) fn hold(host: &'a Host, project: &'a Project) -> anyhow::Result<Self> {
+        let marker = project.path(MARKER);
+        fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(&marker)
+            .context("could not close the maintenance gate")?;
+        let guard = Self {
+            host,
+            project,
+            marker,
+        };
+        guard.apply()?;
+        Ok(guard)
+    }
+
     fn apply(&self) -> anyhow::Result<()> {
         let manifest = self.host.require()?;
         caddy::write(self.host, &manifest)?;

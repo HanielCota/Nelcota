@@ -8,7 +8,7 @@ use crate::{
     envfile::write_private,
     host::{Host, Manifest, ProjectEntry, Runtime},
     machine, naming, native, panel_login, registry, scaffold,
-    util::{self, ask, interactive, ok, step, warn},
+    util::{self, ask, ask_secret, interactive, ok, step, warn},
 };
 
 struct S3 {
@@ -20,13 +20,9 @@ struct S3 {
 }
 
 pub fn run(host: &Host, args: InitArgs) -> anyhow::Result<()> {
-    let creating_host = !host.exists();
-    let mut host_password = None;
-    let mut manifest = if creating_host {
-        let (manifest, password) = create_host(host, &args)?;
-        host_password = password;
-        manifest
-    } else {
+    // Validate every argument before writing anything: a rejected first call
+    // must not leave a half-created host behind.
+    let existing = if host.exists() {
         let manifest = host.manifest()?;
         if args.local && !manifest.local {
             bail!("this host is not local; --local only applies when the host is created");
@@ -37,37 +33,49 @@ pub fn run(host: &Host, args: InitArgs) -> anyhow::Result<()> {
                  use a Docker host (nelcota init on another folder or machine) for more"
             );
         }
-        manifest
+        Some(manifest)
+    } else {
+        None
     };
-
-    if let Some(base) = &args.base_domain {
-        let base = base.trim().trim_end_matches('.').to_lowercase();
-        if !naming::is_valid_domain(&base) {
-            bail!("invalid base domain: {base}");
-        }
-        manifest.base_domain = Some(base);
-    }
-
+    let base_domain = match &args.base_domain {
+        Some(base) => Some(normalize_base_domain(base)?),
+        None => existing.as_ref().and_then(|m| m.base_domain.clone()),
+    };
+    let local = existing.as_ref().map_or(args.local, |m| m.local);
     let (name, domain) = naming::resolve(
         args.domain.as_deref(),
         args.project.as_deref(),
-        manifest.base_domain.as_deref(),
-        manifest.local,
+        base_domain.as_deref(),
+        local,
     )?;
-    if manifest.projects.iter().any(|p| p.name == name) {
+    let projects = existing.as_ref().map_or(&[][..], |m| m.projects.as_slice());
+    if projects.iter().any(|p| p.name == name) {
         bail!("a project named '{name}' already exists (use --project for another name)");
     }
-    if manifest.projects.iter().any(|p| p.domain == domain) {
+    if projects.iter().any(|p| p.domain == domain) {
         bail!("the domain {domain} is already used by another project");
     }
+    let ram = checks::total_ram_mb().unwrap_or(2048);
+    let profile = scaffold::choose_profile(args.profile.as_deref(), ram, projects.len() + 1)?;
+    if existing.is_none() {
+        validate_s3_flags(&args)?;
+    }
+
+    let mut host_password = None;
+    let mut manifest = match existing {
+        Some(manifest) => manifest,
+        None => {
+            let (manifest, password) = create_host(host, &args)?;
+            host_password = password;
+            manifest
+        }
+    };
+    manifest.base_domain = base_domain;
 
     step(&format!("Project \"{name}\" at {domain}"));
     if !manifest.local && !args.skip_checks {
         checks::dns(&domain);
     }
-    let ram = checks::total_ram_mb().unwrap_or(2048);
-    let profile =
-        scaffold::choose_profile(args.profile.as_deref(), ram, manifest.projects.len() + 1)?;
     ok(&format!("Postgres profile: {profile}"));
 
     let entry = ProjectEntry { name, domain };
@@ -116,6 +124,36 @@ pub fn run(host: &Host, args: InitArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
+fn normalize_base_domain(base: &str) -> anyhow::Result<String> {
+    let base = base.trim().trim_end_matches('.').to_lowercase();
+    if !naming::is_valid_domain(&base) {
+        bail!("invalid base domain: {base}");
+    }
+    Ok(base)
+}
+
+/// The `--s3-*` flags configure the bucket together or not at all.
+fn validate_s3_flags(args: &InitArgs) -> anyhow::Result<()> {
+    let flags = [
+        ("--s3-endpoint", &args.s3_endpoint),
+        ("--s3-bucket", &args.s3_bucket),
+        ("--s3-access-key", &args.s3_access_key),
+        ("--s3-secret-key", &args.s3_secret_key),
+    ];
+    let missing: Vec<&str> = flags
+        .iter()
+        .filter(|(_, value)| value.is_none())
+        .map(|(flag, _)| *flag)
+        .collect();
+    if !missing.is_empty() && missing.len() < flags.len() {
+        bail!(
+            "remote backup needs every S3 flag; missing: {}",
+            missing.join(", ")
+        );
+    }
+    Ok(())
+}
+
 /// First time: checks, host secrets, Caddy and machine setup.
 fn create_host(
     host: &Host,
@@ -131,7 +169,7 @@ fn create_host(
         if args.runtime == Runtime::Docker {
             checks::docker()?;
         }
-        checks::ports();
+        checks::ports()?;
         match checks::total_ram_mb() {
             Some(mb) => ok(&format!("RAM: {mb} MB")),
             None => warn("could not measure RAM; assuming 2 GB"),
@@ -185,7 +223,7 @@ fn create_host(
         "host.env\nprojects/*/.env\nprojects/*/backups/\narchive/\n",
     )?;
     if !args.local {
-        machine::setup(host, s3.is_some(), args.firewall);
+        machine::setup(host, args.firewall);
     }
     let shown = (manifest.panel_login == crate::host::PanelLogin::Shared).then_some(shared);
     Ok((manifest, shown))
@@ -225,7 +263,92 @@ fn backup_destination(args: &InitArgs) -> Option<S3> {
         endpoint,
         bucket: ask("Bucket", "nelcota-backups"),
         access_key: ask("Access key", ""),
-        secret_key: ask("Secret key", ""),
+        secret_key: ask_secret("Secret key (not shown)"),
         region: ask("Region", &args.s3_region),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::Parser;
+
+    fn init_args(argv: &[&str]) -> InitArgs {
+        let cli = crate::Cli::try_parse_from(argv).unwrap();
+        match cli.command {
+            Some(crate::Command::Init(args)) => *args,
+            _ => unreachable!(),
+        }
+    }
+
+    #[test]
+    fn rejected_arguments_leave_no_host_behind() {
+        let root = tempfile::tempdir().unwrap();
+        let dir = root.path().join("host");
+        let host = Host::new(&dir);
+        for argv in [
+            &["nelcota", "init", "not a domain", "--skip-checks"][..],
+            &["nelcota", "init", "--project", "shop", "--skip-checks"],
+            &[
+                "nelcota",
+                "init",
+                "--local",
+                "--project",
+                "Bad!",
+                "--skip-checks",
+            ],
+            &[
+                "nelcota",
+                "init",
+                "--project",
+                "shop",
+                "--base-domain=bad_domain",
+                "--skip-checks",
+            ],
+            &[
+                "nelcota",
+                "init",
+                "--local",
+                "--project",
+                "shop",
+                "--profile",
+                "3gb",
+                "--skip-checks",
+            ],
+            &[
+                "nelcota",
+                "init",
+                "--local",
+                "--project",
+                "shop",
+                "--s3-endpoint",
+                "https://s3.example.com",
+                "--skip-checks",
+            ],
+        ] {
+            assert!(run(&host, init_args(argv)).is_err(), "{argv:?}");
+            assert!(!dir.exists(), "{argv:?} created {}", dir.display());
+        }
+    }
+
+    #[test]
+    fn s3_flags_go_together() {
+        assert!(validate_s3_flags(&init_args(&["nelcota", "init"])).is_ok());
+        let all = init_args(&[
+            "nelcota",
+            "init",
+            "--s3-endpoint",
+            "e",
+            "--s3-bucket",
+            "b",
+            "--s3-access-key",
+            "a",
+            "--s3-secret-key",
+            "s",
+        ]);
+        assert!(validate_s3_flags(&all).is_ok());
+        let partial = init_args(&["nelcota", "init", "--s3-bucket", "b"]);
+        let err = validate_s3_flags(&partial).unwrap_err().to_string();
+        assert!(err.contains("--s3-endpoint") && !err.contains("--s3-bucket,"));
+    }
 }

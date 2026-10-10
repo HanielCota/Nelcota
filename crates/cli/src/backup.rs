@@ -5,10 +5,11 @@ use anyhow::{Context, bail};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 mod remote;
+pub(crate) use remote::s3_configured;
 mod workflow;
 #[cfg(test)]
 pub(crate) use workflow::prune;
-pub(crate) use workflow::{backup as run, restore, restore_dump};
+pub(crate) use workflow::{backup as run, latest, restore, restore_dump};
 
 use std::{
     fs,

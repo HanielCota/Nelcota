@@ -4,20 +4,33 @@
 
 ```sh
 nelcota -p shop backup            # pg_dump -Fc → projects/shop/backups/nelcota-shop-<date>.dump
-nelcota -p shop backup --upload   # and uploads it to the configured S3-compatible storage (s3://<bucket>/shop/)
-nelcota backup --all --keep 7     # every project; keeps the 7 most recent local dumps
+                                  # (+ s3://<bucket>/shop/ when host.env has a bucket)
+nelcota -p shop backup --upload   # requires the upload: fails if host.env has no bucket
+nelcota backup --all --keep 7     # every project; keeps the 7 most recent local dumps (--keep ≥ 1)
 ```
 
+`backup` uploads on its own whenever the S3 variables are in `host.env`, so
+adding a bucket after `init` needs no other change. `--upload` forces it and
+fails without one.
+
 The first `init` (as root) installs a daily cron job at 03:00
-(`/etc/cron.d/nelcota-backup`) running `backup --all`, plus `--upload` when S3
-is configured. A broken project does not stop the others from being backed up.
+(`/etc/cron.d/nelcota-backup`):
+
+```
+0 3 * * * root '/usr/local/bin/nelcota' -C '/opt/nelcota' backup --all --keep 7 >> /var/log/nelcota-backup.log 2>&1
+```
+
+A broken project does not stop the others from being backed up; the command
+lists the failures and exits non-zero. `nelcota status` shows the age of each
+project's last backup, and `nelcota doctor` reports a missing cron job or a
+backup older than 26 hours.
 
 With disk storage, every dump has a sibling `<dump>.files/` directory containing
 the immutable object versions and a SHA-256 manifest. The dump and file list
 share one exported Postgres snapshot. A SHARE lock on `storage.objects` prevents
 metadata changes during capture; reads continue, but file writes may wait.
 
-`--upload` publishes that directory to `s3://<bucket>/<project>/<dump>.files/`
+The upload publishes that directory to `s3://<bucket>/<project>/<dump>.files/`
 before uploading the dump. Later replacements and deletions cannot change an
 older snapshot. Keep each dump together with its file directory; `--keep` prunes
 both locally. Configure remote lifecycle rules for both members of the pair.
@@ -61,9 +74,20 @@ host). Configure whatever retention (lifecycle) you want on the bucket.
 nelcota -p shop restore projects/shop/backups/nelcota-shop-20261006T030000Z.dump
 ```
 
-The restore stops the app, runs `pg_restore --clean --if-exists` in **a single
-transaction** (if anything fails, the database stays as it was) and starts the
-app again.
+The restore asks for confirmation (`--yes` skips it), puts the project's
+Caddy site in maintenance (HTTP 503 with `Retry-After`), stops the app and
+takes a **safety backup** of the current state, printing its path. Then it
+runs `pg_restore --clean --if-exists` in **a single transaction** (if anything
+fails, the database stays as it was), starts the app and reopens traffic once
+it is healthy. If the app does not become healthy, the site stays in
+maintenance and the error shows how to go back:
+
+```sh
+nelcota -p shop restore projects/shop/backups/<safety dump> --yes
+```
+
+A restore also takes over a maintenance gate left closed by a failed upgrade
+or restore, since it is how such a project recovers.
 
 Use `--files` to restore the matching disk snapshot. It uses the local sibling
 directory when present, otherwise fetches that dump's snapshot from the backup
@@ -89,7 +113,9 @@ The acceptance test (`scripts/acceptance.sh --local`) takes a backup, writes
 more data, restores and checks that the state went back to the backup's.
 
 When a project is removed (`nelcota -p <name> remove`), a final backup is kept
-in `archive/`, in the host folder.
+in `archive/`, in the host folder. If its Postgres is stopped, `remove` starts
+it for the backup and refuses to delete anything when it cannot;
+`--no-backup` removes without one.
 Disk snapshots are archived alongside the final dump.
 
 ## PITR (point-in-time recovery)
@@ -112,7 +138,7 @@ nelcota -p shop pitr disable                                   # stops archiving
   Postgres image (`postgres/Dockerfile`: the official `postgres:17-alpine` plus
   the Alpine package, so the data directory is unchanged). Everything goes to
   `s3://<bucket>/<project>/pitr/`, beside the dumps.
-- It needs the S3 settings in `host.env` (the same ones as `backup --upload`).
+- It needs the S3 settings in `host.env` (the same ones the backup upload uses).
   pgBackRest only talks to S3 over HTTPS. For your own MinIO/SeaweedFS with a
   self-signed certificate, add `NELCOTA_BACKUP_S3_VERIFY_TLS=false`; for
   storage that needs path-style URLs, `NELCOTA_BACKUP_S3_URI_STYLE=path`.

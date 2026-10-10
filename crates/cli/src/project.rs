@@ -112,7 +112,7 @@ impl Project {
         }
     }
 
-    pub fn logs(&self, follow: bool, service: Option<&str>) -> anyhow::Result<()> {
+    pub fn logs(&self, follow: bool, service: Option<Service>) -> anyhow::Result<()> {
         services::for_project(self).logs(follow, service)
     }
 

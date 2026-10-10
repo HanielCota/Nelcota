@@ -104,7 +104,7 @@ pub fn ensure_network() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn running(host: &Host) -> bool {
+pub(crate) fn running(host: &Host) -> bool {
     compose_command(&host.caddy_dir())
         .args(["ps", "-q", "caddy"])
         .output()
@@ -161,6 +161,29 @@ pub fn reload(host: &Host, runtime: Runtime) -> anyhow::Result<()> {
     }
     ok("caddy reloaded");
     Ok(())
+}
+
+/// The shared proxy's logs (certificates, routing errors).
+pub fn logs(host: &Host, runtime: Runtime, follow: bool) -> anyhow::Result<()> {
+    let mut command = match runtime {
+        Runtime::Docker => {
+            let mut command = compose_command(&host.caddy_dir());
+            command.args(["logs", "--tail", "200"]);
+            command
+        }
+        Runtime::Systemd => {
+            let mut command = Command::new("journalctl");
+            command.args(["--no-pager", "-n", "200", "-u", "caddy"]);
+            command
+        }
+    };
+    if follow {
+        command.arg("-f");
+    }
+    if runtime == Runtime::Docker {
+        command.arg("caddy");
+    }
+    crate::project::run(&mut command, "caddy logs")
 }
 
 pub fn down(host: &Host, runtime: Runtime, volumes: bool) -> anyhow::Result<()> {

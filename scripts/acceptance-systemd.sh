@@ -100,8 +100,8 @@ body=$(curl_ https://shop.localhost/rest/v1/notes -H "authorization: Bearer $tok
 echo "$body" | grep -q "before the backup" || fail "restore lost data"
 if echo "$body" | grep -q "after the backup"; then fail "restore did not go back"; fi
 
-say "upgrade (same version: swaps the binary, keeps the previous one)"
-n -p shop upgrade
+say "upgrade --reinstall (same version: swaps the binary, keeps the previous one)"
+n -p shop upgrade --reinstall
 vps test -f /usr/local/lib/nelcota/nelcota.previous || fail "no previous binary"
 curl_ https://shop.localhost/health; echo
 

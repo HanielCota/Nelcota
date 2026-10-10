@@ -28,6 +28,10 @@ case "$(uname -m)" in
   *) die "unsupported architecture: $(uname -m)" ;;
 esac
 
+for tool in curl sha256sum; do
+  command -v "$tool" >/dev/null 2>&1 || die "$tool not found (apt install curl coreutils, or your distribution's equivalent)"
+done
+
 SUDO=""
 if [ "$(id -u)" -ne 0 ]; then
   command -v sudo >/dev/null 2>&1 && SUDO="sudo" || die "run as root (or install sudo)"
@@ -65,6 +69,8 @@ fi
 cat <<'MSG'
 
 Next steps:
+  mkdir -p /opt/nelcota && cd /opt/nelcota   # the host folder
   nelcota init api.yourdomain.com    # point DNS (A record) at this machine first
   nelcota up
+  nelcota doctor                     # checks DNS, ports, backups and health
 MSG

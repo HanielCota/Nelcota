@@ -7,10 +7,14 @@ curl -fsSL https://nelcota.com/install | sh     # binary (with checksum) + Docke
 mkdir -p /opt/nelcota && cd /opt/nelcota
 nelcota init api.yourdomain.com                 # creates the host and the first project
 nelcota up                                      # starts projects + Caddy, waits for the healthcheck
+nelcota doctor                                  # optional: checks DNS, ports, backups and health
 ```
 
 First create a DNS **A** record for the domain pointing at the VPS IP. Caddy
-issues the certificate on its own on the first request.
+issues the certificate on its own on the first request. After starting
+everything, `up` polls `https://<domain>/health` for up to a minute; if the
+public URL does not answer, it lists what to check (DNS, firewall, Caddy logs)
+and exits non-zero. Local hosts (`--local`) skip this check.
 
 Without `curl | sh`: download `nelcota-<architecture>` and
 `nelcota-<architecture>.sha256` from the releases page, run `sha256sum -c` and
@@ -61,6 +65,27 @@ The project name comes from the domain (`api.shop.com` → `shop`), or from
 `--project`. It shows up in the panel's project switcher and in the commands'
 `-p`.
 
+Every argument is validated before anything is written, so a rejected `init`
+leaves no half-created host behind.
+
+### `init` flags
+
+| Flag | What it does |
+|---|---|
+| `--project <name>` | project name (default: derived from the domain) |
+| `--base-domain <domain>` | saves the host's base domain: `--project shop` becomes `shop.<base>` |
+| `--local` | local host without a public domain (`https://<project>.localhost`, internal certificate); only when the host is created |
+| `--panel-login shared\|per-project` | panel login mode when the host is created (default `shared`) |
+| `--email <email>` | administrator email (default `admin@<domain>`) |
+| `-y`, `--yes` | asks no questions (defaults and flags only) |
+| `--image <image>` | app image (default `ghcr.io/hanielcota/nelcota-server`, or `NELCOTA_IMAGE`) |
+| `--version <tag>` | image tag (default: the CLI's version) |
+| `--profile 1gb\|2gb\|4gb\|8gb` | Postgres profile (default: by the RAM split across the projects) |
+| `--s3-endpoint`, `--s3-bucket`, `--s3-access-key`, `--s3-secret-key`, `--s3-region` | backup bucket, written to `host.env` (all four or none; region defaults to `us-east-1`). Without them, an interactive `init` asks, reading the secret key without echo |
+| `--runtime docker\|systemd` | how projects run (only when the host is created; see below) |
+| `--firewall` | configures `ufw` (SSH, 80 and 443) |
+| `--skip-checks` | skips the Docker, ports, RAM and DNS checks |
+
 ## Commands
 
 With a single project, `-p` is optional. With several, commands that act on a
@@ -69,18 +94,19 @@ project ask for `-p <name>`.
 | Command | What it does |
 |---|---|
 | `nelcota projects` | lists projects, state and version |
-| `nelcota up` | starts every project and Caddy (`-p` for just one) |
-| `nelcota status` | project state |
-| `nelcota -p shop logs -f [app]` | logs |
-| `nelcota -p shop down` / `down --all` | stops (`--volumes` DELETES the data; Docker only) |
+| `nelcota up` | starts every project and Caddy (`-p` for just one), then checks public HTTPS |
+| `nelcota status` | app and Postgres health, last backup age, version and free disk |
+| `nelcota doctor` | checks Docker, Caddy/ports 80 and 443, free disk, DNS, the backup cron, a backup younger than 26 h per project, S3 and service health; exits non-zero on any problem |
+| `nelcota -p shop logs -f [app\|postgres]` / `logs caddy` | project logs / the shared proxy's logs |
+| `nelcota -p shop down` / `down --all` | stops (`--volumes` DELETES the data after a confirmation, `--yes` skips it; Docker only) |
 | `nelcota -p shop migrate` | applies `projects/shop/migrations/V<n>__<name>.sql` |
-| `nelcota -p shop types -o database.ts` | TypeScript types of the schema |
+| `nelcota -p shop types -o database.ts` / `types --lang rust -o database.rs` | TypeScript (default) or Rust types of the schema |
 | `nelcota -p shop token service-role` | service JWT (**bypasses RLS**) |
-| `nelcota -p shop backup [--upload]` / `backup --all` | dump into `backups/` (and to S3) |
-| `nelcota -p shop restore <file>` | restores a dump |
+| `nelcota -p shop backup` / `backup --all --keep 7` | dump into `backups/`, uploaded to S3 when `host.env` has a bucket ([backup.md](backup.md)) |
+| `nelcota -p shop restore <file>` | restores a dump, after a safety backup of the current state |
 | `nelcota -p shop pitr enable` / `status` / `restore --time ...` | point-in-time recovery with WAL archived to S3 ([backup.md](backup.md#pitr-point-in-time-recovery)) |
-| `nelcota -p shop upgrade` / `upgrade --all` | upgrades with a backup and automatic rollback |
-| `nelcota -p shop remove` | final backup in `archive/`, removes containers, data and the Caddy site |
+| `nelcota -p shop upgrade` / `upgrade --all` | upgrades with a backup and automatic rollback (`--dry-run` shows current → target; downgrades need `--allow-downgrade`) |
+| `nelcota -p shop remove` | final backup in `archive/` (starting Postgres if needed; `--no-backup` skips it), removes containers, data and the Caddy site |
 | `nelcota panel-login shared` / `per-project` | panel login: single or per project |
 | `nelcota admin-password` | new panel password (`-p` with per-project login) |
 
@@ -140,12 +166,15 @@ Security details in [panel.md](panel.md).
 
 ## What the first `init` does
 
-1. **Checks** Docker and the compose plugin, free ports 80/443, RAM and the
-   domain's DNS.
+1. **Checks** Docker and the compose plugin (a user outside the `docker`
+   group is told to use sudo or `usermod -aG docker $USER`), free ports 80/443
+   (in use = error, with how to find the process; `--skip-checks` continues
+   anyway), RAM and the domain's DNS.
 2. **Generates** the host secrets: admin credentials (password shown **once**;
    `host.env` keeps only the argon2id hash) and the single sign-on secret.
 3. **Backup:** asks for the S3-compatible destination (or use `--s3-*`) and,
    as root, installs the daily cron job for every project (03:00, keeps 7).
+   The job uploads whenever `host.env` has a bucket, so S3 can be added later.
 4. **Machine:** with `--firewall`, configures `ufw` (SSH, 80 and 443).
 
 Each later `init` only creates the project: its own secrets (Postgres,
@@ -196,7 +225,24 @@ version, database and paired disk snapshot before reopening traffic. If backup
 creation fails, it restarts the unchanged previous version. A failed or
 interrupted recovery leaves the maintenance gate closed; after fixing the
 cause, `nelcota -p shop up` checks health and reopens it. Other projects keep
-serving traffic; `upgrade --all` upgrades one at a time.
+serving traffic; `upgrade --all` upgrades one at a time, keeps going when one
+project fails (it was rolled back) and lists the failures at the end.
+
+Without `--version`, the target is the CLI's own version. The CLI compares it
+with the project's `NELCOTA_VERSION` first:
+
+- same version: nothing to do (`--reinstall` redeploys it anyway, e.g. a rebuilt
+  binary on a systemd host);
+- older target: refused, because the older app does not know the newer
+  migrations. When the CLI itself is the older one, reinstall it
+  (`curl -fsSL https://nelcota.com/install | sh`); to go back on purpose, pass
+  `--allow-downgrade`;
+- `--dry-run` prints `current → target` for each project and changes nothing.
+
+```sh
+nelcota upgrade --all --dry-run
+nelcota -p shop upgrade --version 0.3.0
+```
 
 ## Local development
 
@@ -208,6 +254,10 @@ The development secrets (panel and Postgres passwords, JWT key) live in
 `.nelcota/dev.env`, readable only by you; the startup banner says where they
 are instead of printing them. `nelcota token service-role --days 30` issues a
 `service_role` token for that environment.
+
+`--db-port <port>` moves the development Postgres to another local port. The
+new port is saved in `.nelcota/dev.env`; it gets its own container and data,
+and the old container is left as it was.
 
 To test the full deploy locally (several projects, Caddy, HTTPS with an
 internal certificate): `nelcota init --local --project shop` and open

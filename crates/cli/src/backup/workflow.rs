@@ -3,6 +3,7 @@ use super::remote::{sync_files_down, sync_files_up, upload_s3};
 use crate::{
     host::Host,
     lifecycle::HEALTH_TIMEOUT,
+    maintenance::Maintenance,
     project::{Project, Service},
     util::{self, ok, step},
 };
@@ -45,6 +46,16 @@ pub fn backup(
     Ok(path)
 }
 
+/// When the newest local dump of the project was written.
+pub(crate) fn latest(project: &Project) -> Option<std::time::SystemTime> {
+    fs::read_dir(project.path("backups"))
+        .ok()?
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .filter(|p| p.extension().is_some_and(|x| x == "dump"))
+        .filter_map(|p| fs::metadata(p).and_then(|m| m.modified()).ok())
+        .max()
+}
+
 pub(crate) fn prune(dir: &Path, keep: usize) -> anyhow::Result<()> {
     let mut dumps: Vec<PathBuf> = fs::read_dir(dir)?
         .filter_map(|e| e.ok().map(|e| e.path()))
@@ -68,8 +79,9 @@ pub(crate) fn prune(dir: &Path, keep: usize) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Restores a dump: stops the app, recreates the objects in a single
-/// transaction and starts the app again.
+/// Restores a dump: closes the maintenance gate, stops the app, takes a
+/// safety backup of the current state, recreates the objects in a single
+/// transaction and starts the app again (the gate reopens once it is healthy).
 /// With `files`, verifies the matching immutable snapshot before any change.
 pub fn restore(
     host: &Host,
@@ -102,8 +114,21 @@ pub fn restore(
     } else {
         None
     };
+    // Public traffic gets a 503 until the restored app is healthy, and the
+    // current state is kept first so a wrong dump can be undone.
+    let gate = Maintenance::hold(host, project)?;
     step(&format!("Stopping the {} app", project.name));
     project.stop(&[Service::App])?;
+    let safety = match backup(host, project, false, None) {
+        Ok(safety) => safety,
+        Err(error) => {
+            project.start(&[Service::App])?;
+            project.wait_healthy(Service::App, HEALTH_TIMEOUT)?;
+            gate.finish()?;
+            return Err(error).context("safety backup failed; nothing was restored");
+        }
+    };
+    println!("Safety backup of the current state: {}", safety.display());
     step(&format!("Restoring {}", file.display()));
     // Prepare immutable bytes first. A copy failure cannot leave restored
     // metadata pointing to missing files; extra versions are harmless on rollback.
@@ -114,9 +139,27 @@ pub fn restore(
         restore_dump(project, file)
     };
     step("Starting the app");
-    project.start(&[Service::App])?;
-    result?;
-    project.wait_healthy(Service::App, HEALTH_TIMEOUT)?;
+    let healthy = project
+        .start(&[Service::App])
+        .and_then(|()| project.wait_healthy(Service::App, HEALTH_TIMEOUT));
+    if let Err(error) = healthy {
+        // Keep the gate closed: the project stays unreachable rather than
+        // serving a half-working state.
+        return Err(error).context(format!(
+            "the app is not healthy after the restore; {} stays in maintenance. \
+             To go back: nelcota -p {} restore {} --yes",
+            project.name,
+            project.name,
+            safety.display()
+        ));
+    }
+    gate.finish()?;
+    result.with_context(|| {
+        format!(
+            "restore failed; the previous data is still in place (safety backup: {})",
+            safety.display()
+        )
+    })?;
     ok("restore finished and app healthy");
     Ok(())
 }

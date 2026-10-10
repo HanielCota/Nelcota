@@ -94,6 +94,21 @@ impl BackupS3 {
     }
 }
 
+/// Has the host a backup bucket in `host.env`? Any of the S3 keys counts, so
+/// an incomplete configuration fails loudly on upload instead of being skipped
+/// (the local dump is written first either way).
+pub(crate) fn s3_configured(host: &Host) -> bool {
+    const KEYS: [&str; 4] = [
+        "NELCOTA_BACKUP_S3_ENDPOINT",
+        "NELCOTA_BACKUP_S3_BUCKET",
+        "NELCOTA_BACKUP_S3_ACCESS_KEY",
+        "NELCOTA_BACKUP_S3_SECRET_KEY",
+    ];
+    let secrets = host.secrets();
+    KEYS.iter()
+        .any(|key| secrets.get(key).ok().flatten().is_some())
+}
+
 /// Uploads to S3-compatible storage (credentials from `host.env`), under `<bucket>/<project>/`.
 pub(super) fn upload_s3(host: &Host, project: &str, path: &Path, name: &str) -> anyhow::Result<()> {
     let s3 = BackupS3::from_host(host)?;
@@ -148,4 +163,26 @@ pub(super) fn sync_files_down(host: &Host, project: &Project, dump: &Path) -> an
     crate::private_fs::seal_tree(&dir)?;
     ok("files restored");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_bucket_added_to_host_env_turns_uploads_on() {
+        let root = tempfile::tempdir().unwrap();
+        let host = Host::new(root.path());
+        assert!(!s3_configured(&host), "no host.env");
+        fs::write(
+            host.secrets().path(),
+            "# host secrets\nNELCOTA_ADMIN_EMAIL=a@b.c\n",
+        )
+        .unwrap();
+        assert!(!s3_configured(&host));
+        host.secrets()
+            .set("NELCOTA_BACKUP_S3_BUCKET", "backups")
+            .unwrap();
+        assert!(s3_configured(&host));
+    }
 }
