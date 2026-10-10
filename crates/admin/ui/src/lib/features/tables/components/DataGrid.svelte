@@ -7,7 +7,7 @@
   import GridColumnHeader from './GridColumnHeader.svelte'
   import CellDetailDialog from '$lib/components/shared/CellDetailDialog.svelte'
   import { copyText } from '$lib/clipboard'
-  import { alignRight, columnKind, columnWidth, monospace, nextCell, rowKey, rowPk, type CellPos } from '$lib/features/tables/grid'
+  import { alignRight, columnKind, columnWidth, editedValue, monospace, nextCell, rowKey, rowPk, type CellPos } from '$lib/features/tables/grid'
   import type { Column, RowData, TableData } from '$lib/types'
   import { t } from '$lib/i18n/index.svelte'
 
@@ -94,10 +94,10 @@
     if (disabled) return
     const target = editing
     const { pk, column, original } = editing
-    const value = asNull ? null : draft
+    const value = editedValue(original, draft, asNull)
     editing = null
     focusCell(active)
-    if (value === original) return
+    if (value === undefined) return
     try {
       await oncommit(pk, column, value)
     } catch {

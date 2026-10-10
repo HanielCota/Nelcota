@@ -115,3 +115,14 @@ export function nextCell(key: string, pos: CellPos, rows: number, cols: number, 
       return null
   }
 }
+
+/**
+ * The value an inline edit should store, or `undefined` when nothing changed.
+ * Opening a NULL cell shows an empty draft; leaving it empty keeps the NULL
+ * instead of writing '' (which also fails on numeric and date columns).
+ */
+export function editedValue(original: string | null, draft: string, asNull = false): string | null | undefined {
+  if (asNull) return original === null ? undefined : null
+  if (original === null && draft === '') return undefined
+  return draft === original ? undefined : draft
+}
