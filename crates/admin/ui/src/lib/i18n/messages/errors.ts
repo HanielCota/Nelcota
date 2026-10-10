@@ -5,6 +5,9 @@ import type { Messages } from '../index.svelte'
 
 const ptBR = {
   network: 'Sem resposta do servidor. Confira se ele está rodando e tente de novo.',
+  // Set by the panel itself when the response is not a panel error (api.ts).
+  server_unreachable: 'O servidor não está respondendo (HTTP {status}). Ele pode estar reiniciando: tente de novo em instantes.',
+  unexpected_response: 'Resposta inesperada do servidor (HTTP {status}).',
   sql_busy: "Todas as conexões do editor estão ocupadas. Aguarde uma consulta terminar.",
   internal: 'Erro interno do servidor. Os detalhes estão no log do servidor.',
   unavailable: 'Banco de dados indisponível. Confira se o Postgres está rodando e tente de novo.',
@@ -96,6 +99,8 @@ const ptBR = {
 
 const en: Messages<typeof ptBR> = {
   network: 'No answer from the server. Check that it is running and try again.',
+  server_unreachable: 'The server is not responding (HTTP {status}). It may be restarting: try again in a moment.',
+  unexpected_response: 'Unexpected response from the server (HTTP {status}).',
   sql_busy: 'All SQL editor connections are busy. Wait for a query to finish.',
   internal: 'Internal server error. The details are in the server log.',
   unavailable: 'Database unavailable. Check that Postgres is running and try again.',

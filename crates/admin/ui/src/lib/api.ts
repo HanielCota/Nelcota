@@ -58,19 +58,34 @@ export async function uploadFile<T>(path: string, file: File, onprogress?: (load
 async function parse<T>(res: Response, path: string, method: string): Promise<T> {
   const text = await res.text()
   let data: unknown = null
+  let json = true
   try {
     data = text ? JSON.parse(text) : null
   } catch {
+    json = false
     data = { error: text }
   }
   if (!res.ok) {
     if (res.status === 401 && path !== '/login') session.email = null
+    // Not our JSON error (e.g. a reverse proxy's HTML 502 page): never show
+    // the raw body, say what happened in the user's language instead.
+    if (!json) throw httpError(res.status)
     const body = data as { error?: string; code?: string; params?: Record<string, string | number> } | null
+    if (!body?.error && !body?.code) throw httpError(res.status)
     throw new ApiError(body?.error ?? `HTTP ${res.status}`, res.status, body?.code, body?.params)
   }
   const validate = responseContract(method, path)
   if (validate && !validate(data)) throw new ApiError(t('common.invalidResponse'), 502, 'invalid_response')
   return data as T
+}
+
+/**
+ * Failure without a panel error body. Gateway statuses mean the server
+ * behind a proxy is down or restarting; anything else is unexpected.
+ */
+export function httpError(status: number): ApiError {
+  const code = [502, 503, 504].includes(status) ? 'server_unreachable' : 'unexpected_response'
+  return new ApiError(`HTTP ${status}`, status, code, { status })
 }
 
 export const api = {
