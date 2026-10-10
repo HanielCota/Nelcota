@@ -3,10 +3,21 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  # Re-publishes an existing tag with this workflow (tags cannot move): the
+  # code is the tag's, the build steps are main's.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag, e.g. v0.3.0
+        required: true
+        type: string
 
 # Each job asks for what it needs.
 permissions:
   contents: read
+
+env:
+  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
 
 jobs:
   binaries:
@@ -19,12 +30,19 @@ jobs:
         target: [x86_64-unknown-linux-musl, aarch64-unknown-linux-musl]
     runs-on: ubuntu-latest
     steps:
+      - name: Release tag
+        run: |
+          case "$RELEASE_TAG" in v[0-9]*) ;; *) echo "::error::not a release tag: $RELEASE_TAG"; exit 1 ;; esac
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: refs/tags/${{ env.RELEASE_TAG }}
           persist-credentials: false
+      # The same toolchain as rust-toolchain.toml, installed with the target:
+      # otherwise cargo picks the pinned toolchain, which lacks the musl std.
       - uses: houseabsolute/actions-rust-cross@85826e468eac832e251ac58f6191ba784db237c8 # v1.0.8
         with:
           target: ${{ matrix.target }}
+          toolchain: 1.99.0
           args: "--release --locked -p nelcota-server"
       - name: Package binary + checksum
         run: |
@@ -36,6 +54,7 @@ jobs:
           subject-path: nelcota-${{ matrix.target }}
       - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
+          tag_name: ${{ env.RELEASE_TAG }}
           files: |
             nelcota-${{ matrix.target }}
             nelcota-${{ matrix.target }}.sha256
@@ -56,6 +75,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: refs/tags/${{ env.RELEASE_TAG }}
           persist-credentials: false
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -76,7 +96,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       # The image tag is the version without the "v" (same as NELCOTA_VERSION from init).
       - id: version
-        run: echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+        run: echo "value=${RELEASE_TAG#v}" >> "$GITHUB_OUTPUT"
       # `nelcota-server`, not the repository name: ghcr.io/hanielcota/nelcota
       # belongs to an earlier project still deployed from it (D76). GHCR only
       # accepts lowercase names.
