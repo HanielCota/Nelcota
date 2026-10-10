@@ -84,6 +84,11 @@ for zero rows (decode to `Option<T>`). Use `head().count_exact().execute::<()>()
 for count-only reads. Update/delete require a parent filter before any HTTP is
 sent. Exact counts scan all matching rows; only request them when needed.
 
+Each read returns at most `NELCOTA_MAX_ROWS` rows (1000 by default), even
+without `limit`. Page with `range(start, end)` or `limit` + `offset`, ordered
+by a unique column, until a page comes back empty; `count_exact()` gives the
+total when you need it.
+
 ## Auth
 
 ```rust,no_run
@@ -261,5 +266,10 @@ their own auth/mutation retries.
 The default client uses explicit rustls/ring and Mozilla roots without a global
 crypto-provider initialization. It can be reused across tasks.
 
+Start with the [quickstart](https://github.com/HanielCota/Nelcota/blob/main/docs/quickstart.md)
+(local server, migration, generated types). The examples in `examples/` use
+the shared [examples/notes.sql](https://github.com/HanielCota/Nelcota/blob/main/examples/notes.sql)
+schema. Empty results, 401/403 or a 1000-row cap? See
+[troubleshooting](https://github.com/HanielCota/Nelcota/blob/main/docs/troubleshooting.md).
 Portuguese guide: [quickstart.pt-BR.md](docs/quickstart.pt-BR.md).
 Contract: [contract.md](docs/contract.md). Release: [releasing.md](docs/releasing.md).
