@@ -115,7 +115,21 @@ impl Condition {
         group("or", conditions)
     }
     pub fn negate(mut self) -> Self {
-        self.encoded = self.encoded.map(|text| format!("not.{text}"));
+        self.encoded = self.encoded.and_then(|text| {
+            if text.starts_with("not.or(") || text.starts_with("not.and(") {
+                return Ok(text[4..].into());
+            }
+            if text.starts_with("or(") || text.starts_with("and(") {
+                return Ok(format!("not.{text}"));
+            }
+            let (column, filter) = text
+                .split_once('.')
+                .ok_or_else(|| Error::Usage("invalid condition".into()))?;
+            Ok(match filter.strip_prefix("not.") {
+                Some(filter) => format!("{column}.{filter}"),
+                None => format!("{column}.not.{filter}"),
+            })
+        });
         self
     }
 }

@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- Cancel auth/request waits independently while accepted refresh rotation
+  completes and persists the replacement token.
+- Type HEAD data as null and require row representation for single/maybeSingle;
+  reject malformed REST row representations with invalid_response.
+- Require complete bucket settings on update, with explicit null to clear
+  limits. Existing partial updateBucket calls must supply all three fields.
+- Add regressions for cancellation, result types, cardinality and bucket limits
+  against both mock transports and the production HTTP/Postgres contract.
+
 ## 0.1.0 — Initial release candidate
 
 - JavaScript ESM and TypeScript declarations with no runtime dependencies.

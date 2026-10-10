@@ -79,12 +79,14 @@ describe.skipIf(skip)('storage against the server', () => {
   it('manages buckets with service_role', async () => {
     const admin = serviceClient();
     const id = `sdk-${Date.now()}`;
-    const created = await admin.storage.createBucket(id, { public: false, allowed_mime_types: ['text/plain'] });
+    const created = await admin.storage.createBucket(id, { public: false, file_size_limit: 1024, allowed_mime_types: ['text/plain'] });
     expect(created.error).toBeNull();
     expect(created.data).toMatchObject({ id, public: false, allowed_mime_types: ['text/plain'] });
-    const updated = await admin.storage.updateBucket(id, { public: true, allowed_mime_types: ['text/plain'] });
+    await expect(admin.storage.updateBucket(id, { public: true } as never)).rejects.toThrow(NelcotaUsageError);
+    expect((await admin.storage.getBucket(id)).data).toMatchObject({ public: false, file_size_limit: 1024, allowed_mime_types: ['text/plain'] });
+    const updated = await admin.storage.updateBucket(id, { public: true, file_size_limit: 1024, allowed_mime_types: ['text/plain'] });
     expect(updated.error).toBeNull();
-    expect((await admin.storage.getBucket(id)).data?.public).toBe(true);
+    expect((await admin.storage.getBucket(id)).data).toMatchObject({ public: true, file_size_limit: 1024, allowed_mime_types: ['text/plain'] });
     expect((await admin.storage.listBuckets()).data?.some((b) => b.id === id)).toBe(true);
     expect((await admin.storage.deleteBucket(id)).error).toBeNull();
     expect((await visitor().storage.createBucket(`${id}-x`)).error?.status).toBeGreaterThanOrEqual(400);

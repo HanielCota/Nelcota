@@ -1,5 +1,6 @@
 /** One owner for session persistence, lifecycle transitions and refresh timers. */
 import { clientError, fail, ok, type Result } from '../core/errors.js';
+import { abortable } from '../core/cancellation.js';
 import { isBrowser } from '../core/jwt.js';
 import { Broadcast, withLock } from './coordination.js';
 import { isSession, memoryStorage, parseSession, secondsLeft, type Session, type SessionStorage, type User } from './session.js';
@@ -108,7 +109,10 @@ export class SessionManager {
     });
   }
   async get(options: AuthRequestOptions = {}): Promise<Result<Session | null>> {
-    const session = await this.current();
+    if (options.signal?.aborted) return fail(clientError('aborted', 'The request was aborted'));
+    const current = await abortable(this.current(), options.signal);
+    if (current.error) return fail(current.error);
+    const session = current.data;
     if (!session || secondsLeft(session) > this.#margin) return ok(session);
     const refreshed = await this.refresh(options);
     if (refreshed.error?.code === 'invalid_grant' || refreshed.error?.code === 'session_missing') return ok(null);
@@ -119,6 +123,7 @@ export class SessionManager {
     return result.data?.access_token ?? this.#session?.access_token ?? null;
   }
   refresh(options: AuthRequestOptions = {}): Promise<Result<Session>> {
+    if (options.signal?.aborted) return Promise.resolve(fail(clientError('aborted', 'The request was aborted')));
     this.#refreshing ??= (async () => {
       const known = await this.current();
       if (!known) return fail(clientError('session_missing', 'Not signed in'));
@@ -126,7 +131,9 @@ export class SessionManager {
         const current = await this.#read(true);
         if (!current) return fail(clientError('session_missing', 'Not signed in'));
         if (current.refresh_token !== known.refresh_token && secondsLeft(current) > this.#margin) return ok(current);
-        const result = await this.rotate(current.refresh_token, options);
+        // Once started, rotation owns its lifetime. A cancelled waiter must
+        // not discard the replacement for a token already spent by the server.
+        const result = await this.rotate(current.refresh_token, options.timeout === undefined ? {} : { timeout: options.timeout });
         if (result.error) {
           if (result.error.code === 'invalid_grant') await this.#write(null, 'signed_out');
           return result;
@@ -135,7 +142,7 @@ export class SessionManager {
         return result;
       });
     })().finally(() => { this.#refreshing = null; });
-    return this.#refreshing;
+    return abortable(this.#refreshing, options.signal).then(result => result.error ? fail(result.error) : result.data);
   }
   updateUser(snapshot: Session, user: User): Promise<void> {
     return this.#locked(async () => {

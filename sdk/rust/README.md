@@ -12,7 +12,16 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 
 Before the first crates.io release, use a path dependency on `sdk/rust`.
-Requires Rust 1.99+. Tested server protocol: Nelcota 0.2.0.
+Requires Rust 1.99+. Full support targets the current repository build.
+
+| SDK | Server baseline | Support |
+|---|---|---|
+| 0.1.x | Current repository build (workspace version `0.2.0`) | Full HTTP/Postgres contract suite, OAuth and generated Rust models |
+| 0.1.x | Released `v0.2.0` tag | Legacy baseline; lacks newer OAuth routes and generators, and is not covered by the full SDK contract suite |
+
+The server workspace still uses `0.2.0` while newer features are developed.
+Until the next server tag, use the repository build for full support; the
+version number alone does not identify its capabilities.
 
 ```rust,no_run
 use nelcota_client::{Client, rest::Order};

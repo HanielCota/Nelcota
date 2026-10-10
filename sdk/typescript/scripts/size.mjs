@@ -22,7 +22,8 @@ if (tsc.status !== 0) process.exit(tsc.status ?? 1);
 process.on('exit', () => rmSync(dist, { recursive: true, force: true }));
 
 const BUDGETS = {
-  'index.js': 12_500,
+  // Includes shared cancellation and explicit row/bucket contract validation.
+  'index.js': 13_000,
   // Standalone factories include HTTP and keep the other feature modules out.
   'rest/index.js': 8_000,
   'auth/index.js': 7_500,
