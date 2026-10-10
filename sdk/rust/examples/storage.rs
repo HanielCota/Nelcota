@@ -14,14 +14,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let name = format!("{}/demo.txt", user.id);
     let files = client.storage().from("sdk-files")?;
     let object = files
-        .upload_reader(
-            &name,
-            file,
-            UploadOptions {
-                content_type: "text/plain".into(),
-                ..Default::default()
-            },
-        )
+        // The content type is guessed from the name: demo.txt is text/plain.
+        .upload_reader(&name, file, UploadOptions::default())
         .await?;
     println!("Uploaded {} bytes", object.size);
     let downloaded = files.download(&name).await?;

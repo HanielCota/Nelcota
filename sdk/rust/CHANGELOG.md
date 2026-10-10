@@ -2,6 +2,12 @@
 
 ## 0.1.0 (unreleased)
 
+- **Breaking:** `UploadOptions::content_type` is an `Option<String>`. `None`
+  (the default) guesses the type from the object name's extension for common
+  types (`storage::guess_content_type`) instead of always sending
+  `application/octet-stream`, which made browsers download SVGs and PDFs
+  rather than display them.
+
 - **Breaking:** `StorageClient::update_bucket` takes a `BucketUpdate` instead
   of `BucketSettings`. `BucketSettings { public: true, ..Default::default() }`
   silently cleared the size and MIME limits, because the PUT replaces every

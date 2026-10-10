@@ -8,7 +8,7 @@ use axum::{
 };
 use nelcota_client::{
     Client,
-    storage::{BucketUpdate, OpenOptions},
+    storage::{BucketUpdate, OpenOptions, UploadOptions, guess_content_type},
 };
 use serde_json::{Value, json};
 use std::sync::{
@@ -129,6 +129,61 @@ fn recorder(seen: Seen) -> Router {
             ))
         }))
         .with_state(seen)
+}
+
+#[test]
+fn content_types_are_guessed_from_common_extensions() {
+    assert_eq!(
+        guess_content_type("a/b/report.PDF"),
+        Some("application/pdf")
+    );
+    assert_eq!(guess_content_type("data.json"), Some("application/json"));
+    assert_eq!(guess_content_type("x.tar.gz"), Some("application/gzip"));
+    assert_eq!(guess_content_type("photo.jpeg"), Some("image/jpeg"));
+    assert_eq!(guess_content_type("README"), None);
+    assert_eq!(guess_content_type("dir.png/README"), None);
+    assert_eq!(guess_content_type(".png"), None);
+    assert_eq!(guess_content_type("archive.unknown"), None);
+}
+
+#[tokio::test]
+async fn uploads_guess_the_type_unless_one_is_given() {
+    let seen = Seen::default();
+    let (url, task) = serve(recorder(seen.clone())).await;
+    let files = Client::builder(url)
+        .build()
+        .unwrap()
+        .storage()
+        .from("files")
+        .unwrap();
+    let cases = [
+        ("u/logo.svg", None, "image/svg+xml"),
+        ("u/data.CSV", None, "text/csv"),
+        ("u/blob", None, "application/octet-stream"),
+        (
+            "u/notes.txt",
+            Some("text/plain;charset=utf-8"),
+            "text/plain;charset=utf-8",
+        ),
+    ];
+    for (name, explicit, _) in &cases {
+        // The recorder answers with a bucket, not a stored object: only the request matters.
+        let _ = files
+            .upload(
+                name,
+                "x",
+                UploadOptions {
+                    content_type: explicit.map(str::to_owned),
+                    upsert: false,
+                },
+            )
+            .await;
+    }
+    let seen = seen.lock().await;
+    let sent: Vec<_> = seen.iter().map(|r| r["content_type"].clone()).collect();
+    let expected: Vec<_> = cases.iter().map(|(_, _, mime)| json!(mime)).collect();
+    assert_eq!(sent, expected);
+    task.abort();
 }
 
 #[tokio::test]

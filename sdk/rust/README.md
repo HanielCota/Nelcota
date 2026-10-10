@@ -144,8 +144,9 @@ Session, flow and link Debug implementations omit secret tokens.
 use nelcota_client::storage::{UploadOptions, OpenOptions, ListOptions};
 let files = client.storage().from("avatars")?;
 let name = format!("{user_id}/me.txt");
-files.upload(&name, "hello", UploadOptions {
-    content_type:"text/plain".into(), ..Default::default()
+files.upload(&name, "hello", UploadOptions::default()).await?; // text/plain, from .txt
+files.upload("logo", "<svg/>", UploadOptions {
+    content_type: Some("image/svg+xml".into()), upsert: true,
 }).await?;
 let bytes = files.download(&name).await?;
 let response = files.open(&name, OpenOptions { range:Some((0,Some(3))), ..Default::default() }).await?;
@@ -156,7 +157,10 @@ files.remove(&name).await?;
 # Ok(()) }
 ```
 
-`upload_reader` streams a Tokio reader. `open` returns a streaming
+Without an explicit `content_type`, uploads guess it from the name's extension
+(`json`, `csv`, `txt`, `html`, `css`, `js`, `svg`, `png`, `jpg`, `gif`, `webp`,
+`pdf`, `mp4` and other common types; see `storage::guess_content_type`) and
+fall back to `application/octet-stream`. `upload_reader` streams a Tokio reader. `open` returns a streaming
 `reqwest::Response`; handle 206, 304, ETag and stream failures yourself after it
 returns. `download` buffers the file and reports body failures in its Result.
 Uploads/downloads default to no deadline; scope a `RequestOptions` timeout when
