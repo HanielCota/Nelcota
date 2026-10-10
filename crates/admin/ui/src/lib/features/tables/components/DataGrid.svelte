@@ -89,20 +89,26 @@
     document.getElementById('inline-editor')?.focus()
   }
 
-  async function commitEdit(asNull = false) {
+  /**
+   * Saves the open edit. `refocus` is false when the editor lost focus to
+   * something else (a click elsewhere): focus stays where the user put it.
+   */
+  async function commitEdit(asNull = false, refocus = true) {
     if (!editing) return
     if (disabled) return
     const target = editing
     const { pk, column, original } = editing
     const value = editedValue(original, draft, asNull)
     editing = null
-    focusCell(active)
+    if (refocus) focusCell(active)
     if (value === undefined) return
     try {
       await oncommit(pk, column, value)
     } catch {
-      if (data.rows.some((row, i) => rowKey(row, data.table.primary_key, i) === target.key)) {
+      // Reopen the failed edit, unless another cell is being edited by now.
+      if (!editing && data.rows.some((row, i) => rowKey(row, data.table.primary_key, i) === target.key)) {
         editing = target
+        if (!refocus) return
         await tick()
         document.getElementById('inline-editor')?.focus()
       }
@@ -255,7 +261,9 @@
           >
             {#if editing?.key === rowKey(row, data.table.primary_key, i) && editing.column === column.name}
               <div class="flex items-center gap-1 bg-card p-0.5 ring-2 ring-brand ring-inset" onfocusout={(event) => {
-                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) editing = null
+                // Focus left the editor (click elsewhere, Tab): save like Enter
+                // does. Escape and Enter clear `editing` first, so this is a no-op.
+                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) commitEdit(false, false)
               }}>
                 {#if editing.original?.includes('\n')}
                   <!-- Multi-line text: an <input> would flatten the line breaks.
@@ -286,6 +294,7 @@
                     class="shrink-0 cursor-pointer rounded border border-border-strong bg-muted px-1.5 py-0.5 font-mono text-3xs text-muted-foreground hover:text-foreground"
                     type="button"
                     onkeydown={(event) => { if (event.key === 'Escape') cancelEdit() }}
+                    onmousedown={(event) => event.preventDefault()}
                     onclick={() => commitEdit(true)}>NULL</button
                   >
                 {/if}
