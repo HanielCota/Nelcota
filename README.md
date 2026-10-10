@@ -15,6 +15,10 @@ a 5-minute deploy on a VPS.**
   S3-compatible. You can leave and take everything with you
   ([leaving.md](docs/leaving.md)).
 
+**New here?** Follow the [local development quickstart](docs/quickstart.md):
+install, `nelcota dev`, a migration, generated types and the SDK, in a few
+minutes. Something not working? See [troubleshooting](docs/troubleshooting.md).
+
 ## Deploy (fresh VPS → HTTPS)
 
 ```sh
@@ -56,9 +60,13 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.notes TO authenticated;
 ```
 
 ```sh
-# sign up → JWT
-curl -X POST https://api.yourdomain.com/auth/v1/signup \
-  -H 'content-type: application/json' -d '{"email":"ana@x.com","password":"strong-password-123"}'
+# sign up → session; keep its access token and user id (requires jq)
+SESSION=$(curl -s -X POST https://api.yourdomain.com/auth/v1/signup \
+  -H 'content-type: application/json' -d '{"email":"ana@x.com","password":"strong-password-123"}')
+TOKEN=$(echo "$SESSION" | jq -r .access_token)
+USER_ID=$(echo "$SESSION" | jq -r .user.id)
+# With email confirmation on, sign-up returns no session: confirm the email, then sign in
+# with POST '/auth/v1/token?grant_type=password' and the same body to get one.
 
 # CRUD under RLS
 curl -X POST https://api.yourdomain.com/rest/v1/notes -H "authorization: Bearer $TOKEN" \
@@ -70,14 +78,16 @@ Files under the same policies: a row in `storage.objects` per file, bytes on
 disk or in any S3 bucket ([storage.md](docs/storage.md)).
 
 ```sh
-curl -X POST https://api.yourdomain.com/storage/v1/object/avatars/$USER_ID/me.png   -H "authorization: Bearer $TOKEN" -H 'content-type: image/png' --data-binary @me.png
+curl -X POST "https://api.yourdomain.com/storage/v1/object/avatars/$USER_ID/me.png" -H "authorization: Bearer $TOKEN" -H 'content-type: image/png' --data-binary @me.png
 ```
 
 Frontend types: `nelcota types -o database.ts`. OpenAPI at `/rest/v1/`.
 JavaScript and TypeScript client: [`@nelcota/client`](sdk/typescript/README.md),
 with sessions, OAuth and storage. Start with the
-[Portuguese quickstart](sdk/typescript/docs/quickstart.pt-BR.md) and runnable
-browser/Node examples; generated schema types are optional for JavaScript.
+[quickstart](docs/quickstart.md) (also in
+[Portuguese](sdk/typescript/docs/quickstart.pt-BR.md)) and the runnable
+browser/Node examples, which share [examples/notes.sql](examples/notes.sql);
+generated schema types are optional for JavaScript.
 Rust client: [`nelcota-client`](sdk/rust/README.md), with Tokio, sessions,
 OAuth and streaming storage. Generate models with
 `nelcota types --lang rust -o database.rs`.
@@ -124,6 +134,8 @@ token kills the session.
 
 ## Documentation
 
+- [Quickstart](docs/quickstart.md): local development, from install to the SDK
+- [Troubleshooting](docs/troubleshooting.md): empty results, 401/403, row cap, rate limits
 - [REST API](docs/api.md): filters, writes, RPC, OpenAPI, errors
 - [Storage](docs/storage.md): buckets, policies, uploads, signed URLs
 - [JWT and roles](docs/jwt-and-roles.md): the token contract and the JWT → RLS flow

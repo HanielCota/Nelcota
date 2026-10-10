@@ -20,11 +20,11 @@ pub mod rest;
 pub mod storage;
 
 pub use encoding::escape_like;
-pub use error::{Error, Result};
+pub use error::{DbErrorInfo, Error, Result};
 pub use http::RequestOptions;
 pub use tokio_util::sync::CancellationToken;
 
-use reqwest::header::{HeaderMap, HeaderValue};
+use reqwest::header::{AUTHORIZATION, HeaderMap, HeaderName, HeaderValue};
 use serde::Serialize;
 use std::{sync::Arc, time::Duration};
 use url::Url;
@@ -86,6 +86,7 @@ pub(crate) struct Inner {
     http: reqwest::Client,
     timeout: Duration,
     retries: usize,
+    headers: HeaderMap,
     auth: auth::Manager,
 }
 
@@ -115,6 +116,7 @@ impl Client {
             http: None,
             store: None,
             margin: Duration::from_secs(60),
+            headers: Vec::new(),
         }
     }
 
@@ -184,9 +186,17 @@ pub struct ClientBuilder {
     http: Option<reqwest::Client>,
     store: Option<Arc<dyn auth::SessionStorage>>,
     margin: Duration,
+    headers: Vec<(String, String)>,
 }
 
 impl ClientBuilder {
+    /// A header sent with every request (`x-request-source`, a tracing ID...).
+    /// Repeating a name keeps the last value. `build` refuses invalid names or
+    /// values and `Authorization`, which belongs to `access_token` and sessions.
+    pub fn header(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
+        self.headers.push((name.into(), value.into()));
+        self
+    }
     pub fn access_token(mut self, token: impl Into<String>) -> Self {
         self.token = TokenMode::Fixed(Some(token.into()));
         self
@@ -234,6 +244,19 @@ impl ClientBuilder {
             HeaderValue::from_str(&format!("Bearer {token}"))
                 .map_err(|_| Error::Usage("invalid access token header".into()))?;
         }
+        let mut headers = HeaderMap::new();
+        for (name, value) in &self.headers {
+            let name = HeaderName::from_bytes(name.as_bytes())
+                .map_err(|_| Error::Usage(format!("invalid header name {name:?}")))?;
+            if name == AUTHORIZATION {
+                return Err(Error::Usage(
+                    "set the Authorization header with access_token or a session".into(),
+                ));
+            }
+            let value = HeaderValue::from_str(value)
+                .map_err(|_| Error::Usage(format!("invalid value for header {name}")))?;
+            headers.insert(name, value);
+        }
         base.set_path(&format!("{}/", base.path().trim_end_matches('/')));
         let http = match self.http {
             Some(client) => client,
@@ -265,6 +288,7 @@ impl ClientBuilder {
                 http,
                 timeout: self.timeout,
                 retries: self.retries,
+                headers,
                 auth: auth::Manager::new(
                     self.store
                         .unwrap_or_else(|| Arc::new(auth::MemoryStorage::default())),

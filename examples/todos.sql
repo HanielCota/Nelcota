@@ -1,8 +1,9 @@
 -- Example: a table with RLS where each user only sees their own rows.
 --
 -- Not part of Nelcota's migrations (we do not want to create tables in anyone's
--- database). The integration tests apply this file; in dev, run:
---   psql "$NELCOTA_DATABASE_URL" -f examples/todos.sql
+-- database). The integration tests apply this file. In dev, copy it to your
+-- project's migrations/ folder (V1__todos.sql) and run `nelcota migrate`, or
+-- paste it into the SQL editor of the panel. Safe to run more than once.
 
 CREATE TABLE IF NOT EXISTS public.todos (
     id         bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,

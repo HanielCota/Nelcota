@@ -26,6 +26,8 @@ try {
     assert(paths.includes(required), `Missing published file: ${required}`);
   }
   assert(paths.every((path) => /^(dist\/|docs\/|examples\/|README\.md$|CHANGELOG\.md$|LICENSE$|package\.json$)/.test(path)), 'Unexpected published files');
+  // Maintainer-only documents stay in the repository.
+  assert(!paths.includes('docs/releasing.md'), 'docs/releasing.md must not be published');
   const consumer = join(taskDir, 'consumer');
   mkdirSync(consumer);
   writeFileSync(join(consumer, 'package.json'), JSON.stringify({ private: true, type: 'module' }));

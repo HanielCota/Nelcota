@@ -156,21 +156,21 @@ try {
   await Promise.all([tab, other].map((page) => page.evaluate(() => globalThis.sdkClient.dispose())));
 
   await other.goto(`${origin}/demo`);
-  await other.getByLabel('URL da API').fill(api);
+  await other.getByLabel('API URL').fill(api);
   await other.getByLabel('Email', { exact: true }).fill(`demo-${Date.now()}-${engine}@example.com`);
-  await other.getByLabel('Senha', { exact: true }).fill('browser-demo-password');
-  await other.getByRole('button', { name: 'Criar conta', exact: true }).click();
-  await other.waitForFunction(() => document.querySelector('#result').textContent.includes('Conta criada'));
-  await other.getByLabel('Nota', { exact: true }).fill('Hello from the browser demo');
-  await other.getByRole('button', { name: 'Salvar nota', exact: true }).click();
+  await other.getByLabel('Password', { exact: true }).fill('browser-demo-password');
+  await other.getByRole('button', { name: 'Create account', exact: true }).click();
+  await other.waitForFunction(() => document.querySelector('#result').textContent.includes('Account created'));
+  await other.getByLabel('Note', { exact: true }).fill('Hello from the browser demo');
+  await other.getByRole('button', { name: 'Save note', exact: true }).click();
   await other.waitForFunction(() => document.querySelector('#result').textContent.includes('Hello from the browser demo'));
-  await other.getByLabel('Arquivo', { exact: true }).setInputFiles({ name: 'demo.txt', mimeType: 'text/plain', buffer: Buffer.from('demo contents') });
-  await other.getByRole('button', { name: 'Enviar arquivo', exact: true }).click();
+  await other.getByLabel('File', { exact: true }).setInputFiles({ name: 'demo.txt', mimeType: 'text/plain', buffer: Buffer.from('demo contents') });
+  await other.getByRole('button', { name: 'Upload file', exact: true }).click();
   await other.waitForFunction(() => document.querySelector('#result').textContent.includes('demo.txt'));
-  await other.getByRole('button', { name: 'Consultar notas', exact: true }).click();
+  await other.getByRole('button', { name: 'List notes', exact: true }).click();
   await other.waitForFunction(() => document.querySelector('#result').textContent.includes('Hello from the browser demo'));
-  await other.getByRole('button', { name: 'Sair', exact: true }).click();
-  await other.waitForFunction(() => document.querySelector('#result').textContent === 'Você saiu.');
+  await other.getByRole('button', { name: 'Sign out', exact: true }).click();
+  await other.waitForFunction(() => document.querySelector('#result').textContent === 'You are signed out.');
   console.log('ok  runnable browser demo: signup, notes, upload and logout');
 } finally {
   await browser.close();

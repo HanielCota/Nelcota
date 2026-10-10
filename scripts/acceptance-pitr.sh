@@ -29,7 +29,7 @@ ROOT="$WORK"
 nelcota() { "$BIN" -C "$ROOT" "$@"; }
 sql() { docker compose --project-directory "$ROOT/projects/shop" exec -T postgres psql -U postgres -tAc "$1"; }
 cleanup() {
-  nelcota down --all --volumes >/dev/null 2>&1 || true
+  nelcota down --all --volumes --yes >/dev/null 2>&1 || true
   docker rm -f pitr-s3 >/dev/null 2>&1 || true
   docker volume rm pitr-s3-certs >/dev/null 2>&1 || true
   rm -rf "$WORK"

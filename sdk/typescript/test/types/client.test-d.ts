@@ -1,5 +1,5 @@
 import { describe, expectTypeOf, it } from 'vitest';
-import { createClient, type SelectError, type SelectOptions } from '../../src/index.js';
+import { createClient, unwrap, type SelectError, type SelectOptions } from '../../src/index.js';
 import type { Database, Json } from './database.js';
 
 const nelcota = createClient<Database>('https://api.example.com');
@@ -57,6 +57,26 @@ describe('select', () => {
     expectTypeOf<Result<ReturnType<typeof withOptions>>>().toEqualTypeOf<{ id: number }[] | null>();
     const get = nelcota.from('orders').select('id', { head: false });
     expectTypeOf<Result<typeof get>>().toEqualTypeOf<{ id: number }[]>();
+  });
+
+  it('throwOnError drops the error branch and survives later calls', () => {
+    const query = nelcota.from('orders').select('id').throwOnError().eq('id', 1).single();
+    expectTypeOf<Awaited<typeof query>['data']>().toEqualTypeOf<{ id: number }>();
+    expectTypeOf<Awaited<typeof query>['error']>().toEqualTypeOf<null>();
+    expectTypeOf<Awaited<ReturnType<typeof query.execute>>['data']>().toEqualTypeOf<{ id: number }>();
+    const plain = nelcota.from('orders').select('id');
+    expectTypeOf<Awaited<typeof plain>['data']>().toEqualTypeOf<{ id: number }[] | null>();
+    expectTypeOf(unwrap<{ id: number }[]>).returns.toEqualTypeOf<{ id: number }[]>();
+    void nelcota.from('orders').select('id').throwOnError().pages(10);
+  });
+
+  it('pages yield arrays of the selected row, only on row reads', () => {
+    const pages = nelcota.from('orders').select('id').order('id').offset(10).pages(100);
+    expectTypeOf(pages).toEqualTypeOf<AsyncGenerator<{ id: number }[], void, undefined>>();
+    // @ts-expect-error a HEAD read has no rows to page
+    nelcota.from('orders').select('id', { head: true }).pages(100);
+    // @ts-expect-error a single row has no pages
+    nelcota.from('orders').select('id').single().pages(100);
   });
 });
 

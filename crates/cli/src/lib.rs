@@ -12,6 +12,7 @@ mod caddy;
 mod checks;
 mod db;
 mod dev;
+mod doctor;
 mod envfile;
 mod host;
 mod init;
@@ -75,19 +76,26 @@ pub enum Command {
     Up,
     /// Stops a project (or all with --all). With --volumes, DELETES the data.
     Down {
+        /// Also deletes the data volumes (asks for confirmation; Docker only).
         #[arg(long)]
         volumes: bool,
         #[arg(long)]
         all: bool,
+        /// Does not ask for confirmation before deleting volumes.
+        #[arg(long)]
+        yes: bool,
     },
     /// State of the projects (all of them, or only the one from -p).
     Status,
-    /// Logs of a project.
+    /// Checks the host: Docker, ports, disk, DNS, backup job and age, S3, health.
+    Doctor,
+    /// Logs of a project, or of the host's Caddy.
     Logs {
         #[arg(short, long)]
         follow: bool,
-        /// postgres or app (default: both).
-        service: Option<String>,
+        /// app, postgres or caddy (default: the project's app and postgres).
+        #[arg(value_enum)]
+        service: Option<LogService>,
     },
     /// Removes a project: final backup in archive/, containers and data deleted.
     Remove {
@@ -97,6 +105,9 @@ pub enum Command {
         /// Keeps the project folder (migrations, backups).
         #[arg(long)]
         keep_files: bool,
+        /// Skips the final backup (otherwise a stopped Postgres is started for it).
+        #[arg(long)]
+        no_backup: bool,
     },
     /// Panel login: one for all (shared) or one per project.
     PanelLogin {
@@ -118,13 +129,24 @@ pub enum Command {
         /// All projects, one at a time.
         #[arg(long)]
         all: bool,
+        /// Allows a target older than the running version.
+        #[arg(long)]
+        allow_downgrade: bool,
+        /// Redeploys even when the project is already on the target version.
+        #[arg(long)]
+        reinstall: bool,
+        /// Only prints the current → target version of each project.
+        #[arg(long)]
+        dry_run: bool,
     },
-    /// Dumps the database to backups/ (and uploads it to S3 with --upload).
+    /// Dumps the database to backups/ and uploads it to S3 when host.env has a bucket.
     Backup {
+        /// Requires the S3 upload (fails if host.env has no bucket). Without it,
+        /// the dump is uploaded whenever the bucket is configured.
         #[arg(long)]
         upload: bool,
-        /// Keeps only the N most recent local dumps.
-        #[arg(long)]
+        /// Keeps only the N most recent local dumps (at least 1: the new one).
+        #[arg(long, value_parser = at_least_one)]
         keep: Option<usize>,
         /// All projects.
         #[arg(long)]
@@ -166,6 +188,30 @@ pub enum Command {
         #[arg(long, default_value = "127.0.0.1:8000")]
         addr: String,
     },
+}
+
+/// Is there a configuration for `serve`: the required database URL in the
+/// environment, or the TOML file `Config::load` reads?
+fn server_configured() -> bool {
+    let file = std::env::var("NELCOTA_CONFIG").unwrap_or_else(|_| "nelcota.toml".into());
+    std::env::var_os("NELCOTA_DATABASE_URL").is_some() || std::path::Path::new(&file).is_file()
+}
+
+/// `--keep 0` would delete the dump that was just written.
+fn at_least_one(value: &str) -> Result<usize, String> {
+    match value.parse::<usize>() {
+        Ok(0) => Err("must be at least 1 (0 would delete the new backup too)".into()),
+        Ok(n) => Ok(n),
+        Err(err) => Err(err.to_string()),
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
+pub enum LogService {
+    App,
+    Postgres,
+    /// The shared proxy (host-wide; -p is not needed).
+    Caddy,
 }
 
 #[derive(Clone, Copy, Debug, Default, ValueEnum)]
@@ -301,9 +347,10 @@ pub struct InitArgs {
 pub struct DevArgs {
     #[arg(long, default_value = "127.0.0.1:8000")]
     pub listen: std::net::SocketAddr,
-    /// Local port of the development Postgres.
-    #[arg(long, default_value_t = 54322)]
-    pub db_port: u16,
+    /// Local port of the development Postgres (default: the saved one, else 54322).
+    /// A new port is saved in .nelcota/dev.env.
+    #[arg(long)]
+    pub db_port: Option<u16>,
 }
 
 /// What `main` should do after the command.
@@ -317,6 +364,15 @@ pub fn run(cli: Cli) -> anyhow::Result<Outcome> {
     let host = host::Host::new(&cli.dir);
     let selection = cli.project.as_deref();
     let done = |r: anyhow::Result<()>| r.map(|()| Outcome::Done);
+
+    // A bare `nelcota` on a machine with no server configuration is someone
+    // looking for the commands, not trying to start the API.
+    if cli.command.is_none() && !server_configured() {
+        use clap::CommandFactory;
+        Cli::command().print_help()?;
+        println!();
+        return Ok(Outcome::Done);
+    }
 
     match cli.command.unwrap_or(Command::Serve) {
         Command::Serve => Ok(Outcome::Serve(Box::new(Config::load()?))),
@@ -335,19 +391,23 @@ pub fn run(cli: Cli) -> anyhow::Result<Outcome> {
             };
             done(lifecycle::up(&host, &manifest, &targets))
         }
-        Command::Down { volumes, all } => {
+        Command::Down { volumes, all, yes } => {
             let manifest = host.require()?;
-            if all {
-                for project in host.projects(&manifest) {
-                    lifecycle::down(&project, volumes)?;
-                }
-                done(caddy::down(&host, manifest.runtime, volumes))
+            let targets = if all {
+                host.projects(&manifest)
             } else {
-                done(lifecycle::down(
-                    &host.select(&manifest, selection)?,
-                    volumes,
-                ))
+                vec![host.select(&manifest, selection)?]
+            };
+            if volumes && manifest.runtime == Runtime::Docker {
+                lifecycle::confirm_volume_deletion(&targets, all, yes)?;
             }
+            for project in &targets {
+                lifecycle::down(project, volumes)?;
+            }
+            if all {
+                caddy::down(&host, manifest.runtime, volumes)?;
+            }
+            Ok(Outcome::Done)
         }
         Command::Status => {
             let manifest = host.require()?;
@@ -355,39 +415,68 @@ pub fn run(cli: Cli) -> anyhow::Result<Outcome> {
                 Some(_) => vec![host.select(&manifest, selection)?],
                 None => host.projects(&manifest),
             };
-            done(lifecycle::status(&manifest, &targets))
+            done(lifecycle::status(&host, &manifest, &targets))
         }
+        Command::Doctor => done(doctor::run(&host)),
         Command::Logs { follow, service } => {
             let manifest = host.require()?;
+            let service = match service {
+                Some(LogService::Caddy) => {
+                    return done(caddy::logs(&host, manifest.runtime, follow));
+                }
+                Some(LogService::App) => Some(project::Service::App),
+                Some(LogService::Postgres) => Some(project::Service::Postgres),
+                None => None,
+            };
             done(lifecycle::logs(
                 &host.select(&manifest, selection)?,
                 follow,
-                service.as_deref(),
+                service,
             ))
         }
-        Command::Remove { yes, keep_files } => {
+        Command::Remove {
+            yes,
+            keep_files,
+            no_backup,
+        } => {
             let Some(name) = selection else {
                 bail!("name the project to remove: nelcota -p <name> remove");
             };
-            done(projects::remove(&host, name, yes, keep_files))
+            done(projects::remove(&host, name, yes, keep_files, no_backup))
         }
         Command::PanelLogin { mode } => done(projects::set_panel_login(&host, mode)),
         Command::Dev(args) => dev::run(&cli.dir, args),
         Command::Migrate { path } => done(db::migrate(&host, selection, &path)),
-        Command::Upgrade { version, all } => {
+        Command::Upgrade {
+            version,
+            all,
+            allow_downgrade,
+            dry_run,
+            reinstall,
+        } => {
             let manifest = host.require()?;
-            if all {
-                for project in host.projects(&manifest) {
-                    upgrade::run(&host, &project, version.as_deref())?;
-                }
-                Ok(Outcome::Done)
+            let options = upgrade::Options {
+                allow_downgrade,
+                dry_run,
+                reinstall,
+            };
+            let targets = if all {
+                host.projects(&manifest)
             } else {
-                done(upgrade::run(
-                    &host,
-                    &host.select(&manifest, selection)?,
-                    version.as_deref(),
-                ))
+                vec![host.select(&manifest, selection)?]
+            };
+            let mut failed = Vec::new();
+            for project in &targets {
+                // One failed upgrade (already rolled back) does not stop the others.
+                if let Err(err) = upgrade::run(&host, project, version.as_deref(), options) {
+                    util::warn(&format!("{err:#}"));
+                    failed.push(project.name.clone());
+                }
             }
+            if !failed.is_empty() {
+                bail!("upgrade failed for: {}", failed.join(", "));
+            }
+            Ok(Outcome::Done)
         }
         Command::Backup { upload, keep, all } => {
             let manifest = host.require()?;
@@ -396,6 +485,8 @@ pub fn run(cli: Cli) -> anyhow::Result<Outcome> {
             } else {
                 vec![host.select(&manifest, selection)?]
             };
+            // S3 added to host.env after `init` is picked up without editing the cron.
+            let upload = upload || backup::s3_configured(&host);
             let mut failed = Vec::new();
             for project in &targets {
                 // A project with a problem does not stop the others from being backed up.
@@ -451,12 +542,15 @@ pub fn run(cli: Cli) -> anyhow::Result<Outcome> {
                 PanelLogin::PerProject => Some(host.select(&manifest, selection)?),
             };
             let new = panel_login::reset(&host, &manifest, project.as_ref())?;
+            // The hash is already on disk: show the password before a restart
+            // can fail, or it would be lost.
+            panel_login::print(&[new]);
+            println!();
             let affected = match project {
                 Some(project) => vec![project],
                 None => host.projects(&manifest),
             };
             lifecycle::recreate_apps(&affected)?;
-            panel_login::print(&[new]);
             Ok(Outcome::Done)
         }
         Command::Healthcheck { addr } => {
@@ -466,5 +560,86 @@ pub fn run(cli: Cli) -> anyhow::Result<Outcome> {
                 std::process::exit(1)
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod cli_tests {
+    use super::*;
+
+    #[test]
+    fn down_volumes_takes_an_explicit_yes() {
+        let cli = Cli::try_parse_from(["nelcota", "down", "--all", "--volumes", "--yes"]).unwrap();
+        assert!(matches!(
+            cli.command,
+            Some(Command::Down {
+                volumes: true,
+                all: true,
+                yes: true
+            })
+        ));
+        let cli = Cli::try_parse_from(["nelcota", "down", "--volumes"]).unwrap();
+        assert!(matches!(
+            cli.command,
+            Some(Command::Down { yes: false, .. })
+        ));
+    }
+
+    #[test]
+    fn logs_take_a_known_service() {
+        for (name, service) in [
+            ("app", LogService::App),
+            ("postgres", LogService::Postgres),
+            ("caddy", LogService::Caddy),
+        ] {
+            let cli = Cli::try_parse_from(["nelcota", "logs", "-f", name]).unwrap();
+            assert!(matches!(
+                cli.command,
+                Some(Command::Logs { follow: true, service: Some(s) }) if s == service
+            ));
+        }
+        assert!(Cli::try_parse_from(["nelcota", "logs", "redis"]).is_err());
+    }
+
+    #[test]
+    fn backup_keeps_at_least_the_new_dump() {
+        assert!(Cli::try_parse_from(["nelcota", "backup", "--keep", "0"]).is_err());
+        assert!(Cli::try_parse_from(["nelcota", "backup", "--keep", "-1"]).is_err());
+        let cli = Cli::try_parse_from(["nelcota", "backup", "--all", "--keep", "7"]).unwrap();
+        assert!(matches!(
+            cli.command,
+            Some(Command::Backup { keep: Some(7), .. })
+        ));
+    }
+
+    #[test]
+    fn upgrade_flags() {
+        let cli = Cli::try_parse_from(["nelcota", "upgrade", "--all", "--dry-run"]).unwrap();
+        assert!(matches!(
+            cli.command,
+            Some(Command::Upgrade {
+                all: true,
+                dry_run: true,
+                allow_downgrade: false,
+                version: None,
+                reinstall: false
+            })
+        ));
+        let cli = Cli::try_parse_from([
+            "nelcota",
+            "upgrade",
+            "--version",
+            "0.1.0",
+            "--allow-downgrade",
+        ])
+        .unwrap();
+        assert!(matches!(
+            cli.command,
+            Some(Command::Upgrade {
+                allow_downgrade: true,
+                version: Some(_),
+                ..
+            })
+        ));
     }
 }

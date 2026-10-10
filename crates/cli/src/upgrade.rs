@@ -13,7 +13,12 @@ use anyhow::{Context, bail};
 /// version and restores the backup (the new version may have applied
 /// migrations). On Docker the version is the image tag; on systemd, this
 /// binary replaces the one the unit runs.
-pub fn run(host: &Host, project: &Project, version: Option<&str>) -> anyhow::Result<()> {
+pub fn run(
+    host: &Host,
+    project: &Project,
+    version: Option<&str>,
+    options: Options,
+) -> anyhow::Result<()> {
     let env = project.env();
     let current = env
         .get("NELCOTA_VERSION")?
@@ -26,6 +31,47 @@ pub fn run(host: &Host, project: &Project, version: Option<&str>) -> anyhow::Res
         );
     }
     let target = version.map_or_else(|| this_binary.to_owned(), str::to_owned);
+    let direction = direction(&current, &target);
+    if options.dry_run {
+        println!(
+            "{}: {current} → {target} ({})",
+            project.name,
+            direction.describe()
+        );
+        return Ok(());
+    }
+    match direction {
+        Direction::Same if !options.reinstall => {
+            ok(&format!(
+                "{} is already on version {target} (--reinstall redeploys it)",
+                project.name
+            ));
+            return Ok(());
+        }
+        Direction::Downgrade if !options.allow_downgrade => {
+            let hint = if version.is_none() {
+                format!(
+                    "this nelcota CLI ({this_binary}) is older than the app ({current}); \
+                     reinstall the CLI (curl -fsSL https://nelcota.com/install | sh) or pass \
+                     --version"
+                )
+            } else {
+                "pass --allow-downgrade if this is intended (migrations are not reverted)".into()
+            };
+            bail!(
+                "{}: refusing to downgrade {current} → {target}: {hint}",
+                project.name
+            );
+        }
+        Direction::Downgrade => warn(&format!(
+            "downgrading {}: migrations applied by {current} are not reverted",
+            project.name
+        )),
+        Direction::Unknown => warn(&format!(
+            "cannot compare versions {current} and {target}; continuing"
+        )),
+        Direction::Upgrade | Direction::Same => {}
+    }
     println!("Upgrading {}: {current} → {target}", project.name);
 
     deploy(&mut HostDeployment {
@@ -38,6 +84,73 @@ pub fn run(host: &Host, project: &Project, version: Option<&str>) -> anyhow::Res
     })?;
     ok(&format!("{} healthy on version {target}", project.name));
     Ok(())
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Options {
+    /// Allow a target older than the running version.
+    pub allow_downgrade: bool,
+    /// Only print what would change.
+    pub dry_run: bool,
+    /// Redeploy even when the project is already on the target version.
+    pub reinstall: bool,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Direction {
+    Upgrade,
+    Same,
+    Downgrade,
+    /// A tag that is not `x.y.z[-pre]` (e.g. a custom image tag).
+    Unknown,
+}
+
+impl Direction {
+    fn describe(self) -> &'static str {
+        match self {
+            Direction::Upgrade => "upgrade",
+            Direction::Same => "no change",
+            Direction::Downgrade => "downgrade: refused without --allow-downgrade",
+            Direction::Unknown => "versions not comparable",
+        }
+    }
+}
+
+fn direction(current: &str, target: &str) -> Direction {
+    if current.trim() == target.trim() {
+        return Direction::Same;
+    }
+    match (parse_version(current), parse_version(target)) {
+        (Some(from), Some(to)) => match to.cmp(&from) {
+            std::cmp::Ordering::Greater => Direction::Upgrade,
+            std::cmp::Ordering::Equal => Direction::Same,
+            std::cmp::Ordering::Less => Direction::Downgrade,
+        },
+        _ => Direction::Unknown,
+    }
+}
+
+/// `x.y.z` or `x.y.z-pre` (an optional leading `v`). A pre-release sorts
+/// before its release: `(major, minor, patch, is_release, pre)`.
+fn parse_version(version: &str) -> Option<(u64, u64, u64, bool, String)> {
+    let version = version.trim();
+    let version = version.strip_prefix('v').unwrap_or(version);
+    let (core, pre) = match version.split_once('-') {
+        Some((core, pre)) => (core, Some(pre)),
+        None => (version, None),
+    };
+    let mut parts = core.split('.').map(|part| part.parse::<u64>().ok());
+    let (major, minor, patch) = (parts.next()??, parts.next()??, parts.next()??);
+    if parts.next().is_some() {
+        return None;
+    }
+    Some((
+        major,
+        minor,
+        patch,
+        pre.is_none(),
+        pre.unwrap_or_default().to_owned(),
+    ))
 }
 
 // The workflow owns when traffic may resume; runtime and snapshot operations
@@ -245,6 +358,21 @@ mod tests {
             self.paused = false;
             Ok(())
         }
+    }
+
+    #[test]
+    fn compares_versions() {
+        assert_eq!(direction("0.2.0", "0.2.0"), Direction::Same);
+        assert_eq!(direction("0.2.0", "v0.2.0"), Direction::Same);
+        assert_eq!(direction("0.2.0", "0.3.0"), Direction::Upgrade);
+        assert_eq!(direction("0.2.9", "0.10.0"), Direction::Upgrade);
+        assert_eq!(direction("1.0.0", "0.9.9"), Direction::Downgrade);
+        assert_eq!(direction("0.3.0-rc.1", "0.3.0"), Direction::Upgrade);
+        assert_eq!(direction("0.3.0", "0.3.0-rc.1"), Direction::Downgrade);
+        assert_eq!(direction("0.3.0-rc.1", "0.3.0-rc.2"), Direction::Upgrade);
+        assert_eq!(direction("0.2.0", "edge"), Direction::Unknown);
+        assert_eq!(direction("0.2", "0.3.0"), Direction::Unknown);
+        assert_eq!(direction("0.2.0.1", "0.3.0"), Direction::Unknown);
     }
 
     #[test]

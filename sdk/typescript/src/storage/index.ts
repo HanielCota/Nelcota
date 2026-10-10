@@ -8,7 +8,7 @@ import { bucketId, folderPrefix, objectPath } from '../core/encoding.js';
 import type { HttpClient, RequestSpec } from '../core/http.js';
 import { createHttpClient, type TransportOptions } from '../core/options.js';
 
-export { NelcotaError, NelcotaUsageError } from '../core/errors.js';
+export { NelcotaError, NelcotaUsageError, unwrap } from '../core/errors.js';
 export type { Result } from '../core/errors.js';
 export type { TransportOptions } from '../core/options.js';
 export type { FetchLike, TokenSource } from '../core/http.js';

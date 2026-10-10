@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { alignRight, columnKind, columnWidth, monospace, nextCell, pageInfo } from './grid'
+import { alignRight, columnKind, columnWidth, editedValue, monospace, nextCell, pageInfo } from './grid'
 
 const col = (
   name: string,
@@ -101,5 +101,27 @@ describe('keyboard navigation', () => {
   it('other keys and an empty grid do not move', () => {
     expect(nextCell('a', at(0, 0), 5, 3)).toBeNull()
     expect(nextCell('ArrowDown', at(0, 0), 0, 3)).toBeNull()
+  })
+})
+
+describe('inline edit value', () => {
+  it('an untouched NULL cell stays NULL', () => {
+    expect(editedValue(null, '')).toBeUndefined()
+  })
+
+  it('an unchanged value is not saved', () => {
+    expect(editedValue('abc', 'abc')).toBeUndefined()
+    expect(editedValue('', '')).toBeUndefined()
+  })
+
+  it('a changed value is saved as typed', () => {
+    expect(editedValue(null, '42')).toBe('42')
+    expect(editedValue('abc', '')).toBe('')
+    expect(editedValue('abc', 'abd')).toBe('abd')
+  })
+
+  it('setting NULL is saved only when the cell was not NULL', () => {
+    expect(editedValue('abc', 'abc', true)).toBeNull()
+    expect(editedValue(null, '', true)).toBeUndefined()
   })
 })

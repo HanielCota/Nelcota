@@ -7,6 +7,7 @@ export async function logout() {
   // Even if the request fails, the panel returns to the login screen.
   await api.post('/logout').catch(() => {})
   session.email = null
+  session.expired = false
   profile.avatar = null
   profile.loaded = false
 }

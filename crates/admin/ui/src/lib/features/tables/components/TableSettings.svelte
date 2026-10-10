@@ -15,10 +15,13 @@
 
   let {
     structure,
+    policies,
     onalter,
     ondrop,
   }: {
     structure: Structure
+    /** Policies on the table (unknown: no warning before turning RLS on). */
+    policies?: number
     /** Applies the actions; resolves after the structure reloads. */
     onalter: (actions: AlterAction[]) => Promise<void>
     ondrop: () => void
@@ -31,6 +34,8 @@
   let comment = $state('')
   let grants = $state<GrantDef[]>([])
   let disableRlsOpen = $state(false)
+  let enableRlsOpen = $state(false)
+  let renameOpen = $state(false)
   let busy = $state<'identity' | 'grants' | 'rls' | null>(null)
   let previous: Structure | null = null
 
@@ -68,7 +73,9 @@
       class="mt-3 grid gap-3 sm:grid-cols-[1fr_2fr_auto] sm:items-end"
       onsubmit={(e) => {
         e.preventDefault()
-        apply(identityChanges, 'identity').catch(() => {})
+        // A new name moves the REST endpoint: confirm before breaking clients.
+        if (identityChanges.some((a) => a.action === 'rename_table')) renameOpen = true
+        else apply(identityChanges, 'identity').catch(() => {})
       }}
     >
       <div class="grid gap-2">
@@ -95,7 +102,13 @@
         <h2 class="text-base font-semibold">{t('tables.settings.rls')}</h2>
         <p class="mt-0.5 text-sm text-destructive">{t('tables.settings.rlsOff')}</p>
       </div>
-      <Button disabled={busy !== null} onclick={() => apply([{ action: 'set_rls', enabled: true }], 'rls').catch(() => {})}>{#if busy === 'rls'}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{:else}<ShieldCheck data-icon="inline-start" aria-hidden="true" />{/if}{t('tables.settings.enableRls')}</Button>
+      <Button
+        disabled={busy !== null}
+        onclick={() => {
+          // No policy yet: RLS would hide every row from the API; ask first.
+          if (policies === 0) enableRlsOpen = true
+          else apply([{ action: 'set_rls', enabled: true }], 'rls').catch(() => {})
+        }}>{#if busy === 'rls'}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{:else}<ShieldCheck data-icon="inline-start" aria-hidden="true" />{/if}{t('tables.settings.enableRls')}</Button>
     {/if}
   </section>
 
@@ -129,4 +142,21 @@
   confirmLabel={t('tables.settings.disable')}
   destructive
   onconfirm={() => apply([{ action: 'set_rls', enabled: false }], 'rls')}
+/>
+
+<ConfirmDialog
+  bind:open={renameOpen}
+  title={t('tables.settings.renameTitle', { from: structure.name, to: name.trim() })}
+  description={t('tables.settings.renameDescription', { from: structure.name, to: name.trim() })}
+  confirmLabel={t('tables.settings.renameConfirm')}
+  destructive
+  onconfirm={() => apply(identityChanges, 'identity')}
+/>
+
+<ConfirmDialog
+  bind:open={enableRlsOpen}
+  title={t('policies.enableRlsEmpty.title', { table: structure.name })}
+  description={t('policies.enableRlsEmpty.description')}
+  confirmLabel={t('policies.enableRlsEmpty.confirm')}
+  onconfirm={() => apply([{ action: 'set_rls', enabled: true }], 'rls')}
 />

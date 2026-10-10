@@ -6,7 +6,10 @@ use axum::{
     response::Response,
     routing::any,
 };
-use nelcota_client::{Client, storage::OpenOptions};
+use nelcota_client::{
+    Client,
+    storage::{BucketUpdate, OpenOptions, UploadOptions, guess_content_type},
+};
 use serde_json::{Value, json};
 use std::sync::{
     Arc,
@@ -99,5 +102,140 @@ async fn interrupted_buffered_reads_retry_but_write_responses_do_not() {
         .unwrap_err();
     assert_eq!(error.code(), "network_error");
     assert_eq!(seen.load(Ordering::SeqCst), 3);
+    task.abort();
+}
+
+type Seen = Arc<tokio::sync::Mutex<Vec<Value>>>;
+
+/// Records method, path, content type and JSON body; answers with a bucket.
+fn recorder(seen: Seen) -> Router {
+    Router::new()
+        .fallback(any(|State(seen): State<Seen>, request: Request| async move {
+            let method = request.method().to_string();
+            let path = request.uri().path().to_owned();
+            let content_type = request
+                .headers()
+                .get(header::CONTENT_TYPE)
+                .map(|v| v.to_str().unwrap().to_owned());
+            let bytes = axum::body::to_bytes(request.into_body(), 1 << 16)
+                .await
+                .unwrap();
+            let body: Value = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
+            seen.lock().await.push(
+                json!({"method": method, "path": path, "content_type": content_type, "body": body}),
+            );
+            Response::new(Body::from(
+                r#"{"id":"avatars","public":false,"file_size_limit":1000,"allowed_mime_types":["image/png"],"created_at":"t","updated_at":"t"}"#,
+            ))
+        }))
+        .with_state(seen)
+}
+
+#[test]
+fn content_types_are_guessed_from_common_extensions() {
+    assert_eq!(
+        guess_content_type("a/b/report.PDF"),
+        Some("application/pdf")
+    );
+    assert_eq!(guess_content_type("data.json"), Some("application/json"));
+    assert_eq!(guess_content_type("x.tar.gz"), Some("application/gzip"));
+    assert_eq!(guess_content_type("photo.jpeg"), Some("image/jpeg"));
+    assert_eq!(guess_content_type("README"), None);
+    assert_eq!(guess_content_type("dir.png/README"), None);
+    assert_eq!(guess_content_type(".png"), None);
+    assert_eq!(guess_content_type("archive.unknown"), None);
+}
+
+#[tokio::test]
+async fn uploads_guess_the_type_unless_one_is_given() {
+    let seen = Seen::default();
+    let (url, task) = serve(recorder(seen.clone())).await;
+    let files = Client::builder(url)
+        .build()
+        .unwrap()
+        .storage()
+        .from("files")
+        .unwrap();
+    let cases = [
+        ("u/logo.svg", None, "image/svg+xml"),
+        ("u/data.CSV", None, "text/csv"),
+        ("u/blob", None, "application/octet-stream"),
+        (
+            "u/notes.txt",
+            Some("text/plain;charset=utf-8"),
+            "text/plain;charset=utf-8",
+        ),
+    ];
+    for (name, explicit, _) in &cases {
+        // The recorder answers with a bucket, not a stored object: only the request matters.
+        let _ = files
+            .upload(
+                name,
+                "x",
+                UploadOptions {
+                    content_type: explicit.map(str::to_owned),
+                    upsert: false,
+                },
+            )
+            .await;
+    }
+    let seen = seen.lock().await;
+    let sent: Vec<_> = seen.iter().map(|r| r["content_type"].clone()).collect();
+    let expected: Vec<_> = cases.iter().map(|(_, _, mime)| json!(mime)).collect();
+    assert_eq!(sent, expected);
+    task.abort();
+}
+
+#[tokio::test]
+async fn update_bucket_sends_every_setting_including_cleared_limits() {
+    let seen = Seen::default();
+    let (url, task) = serve(recorder(seen.clone())).await;
+    let storage = Client::builder(url).build().unwrap().storage();
+    let current = storage.get_bucket("avatars").await.unwrap();
+    storage
+        .update_bucket(
+            "avatars",
+            BucketUpdate {
+                public: true,
+                ..current.into()
+            },
+        )
+        .await
+        .unwrap();
+    storage
+        .update_bucket(
+            "avatars",
+            BucketUpdate {
+                public: false,
+                file_size_limit: None,
+                allowed_mime_types: None,
+            },
+        )
+        .await
+        .unwrap();
+    let invalid = BucketUpdate {
+        public: false,
+        file_size_limit: Some(0),
+        allowed_mime_types: None,
+    };
+    assert_eq!(
+        storage
+            .update_bucket("avatars", invalid)
+            .await
+            .unwrap_err()
+            .code(),
+        "invalid_input"
+    );
+    let seen = seen.lock().await;
+    assert_eq!(seen.len(), 3);
+    assert_eq!(seen[1]["method"], "PUT");
+    assert_eq!(
+        seen[1]["body"],
+        json!({"public":true,"file_size_limit":1000,"allowed_mime_types":["image/png"]})
+    );
+    assert_eq!(
+        seen[2]["body"],
+        json!({"public":false,"file_size_limit":null,"allowed_mime_types":null})
+    );
     task.abort();
 }

@@ -14,6 +14,11 @@ const ptBR = {
   noTables: 'Nenhuma tabela',
   noTablesHint: 'Crie uma tabela para definir políticas nela.',
   enableRls: 'Ativar proteção',
+  enableRlsEmpty: {
+    title: 'Ativar a proteção de {table}?',
+    description: 'A tabela ainda não tem nenhuma política. Com a proteção ativa, anon e authenticated deixam de ver qualquer linha pela API (as consultas voltam vazias) até você criar uma política. Só o service_role continua com acesso.',
+    confirm: 'Ativar mesmo assim',
+  },
   newPolicy: 'Nova política',
   noPolicies: 'Nenhuma regra.',
   noPoliciesRlsBefore: 'Nenhuma regra: ninguém acessa pela API, só o seu backend (',
@@ -190,6 +195,11 @@ const en: Messages<typeof ptBR> = {
   noTables: 'No tables',
   noTablesHint: 'Create a table to define policies on it.',
   enableRls: 'Turn on protection',
+  enableRlsEmpty: {
+    title: 'Turn on protection for {table}?',
+    description: 'This table has no policies yet. With protection on, anon and authenticated get no rows from the API (queries come back empty) until you create a policy. Only service_role keeps access.',
+    confirm: 'Turn on anyway',
+  },
   newPolicy: 'New policy',
   noPolicies: 'No rules.',
   noPoliciesRlsBefore: 'No rules: nobody gets in through the API, only your backend (',

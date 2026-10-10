@@ -2,11 +2,16 @@ import { RemoteResource } from '$lib/remote-resource.svelte'
 import type { Bucket, StorageListing } from '$lib/types'
 import { UploadQueue, type UploadTarget } from './upload-queue.svelte'
 
-export type BucketInfo = { bucket: Bucket; publicOrigin: string } | null
+/** Files per bulk deletion request (the server's limit, MAX_BULK_DELETE). */
+export const BULK_DELETE_BATCH = 200
+
+export type BucketInfo ={ bucket: Bucket; publicOrigin: string } | null
 export interface StorageBrowserAdapter {
   info(bucket: string, signal: AbortSignal): Promise<BucketInfo>
   list(target: UploadTarget, offset: number, signal: AbortSignal): Promise<StorageListing>
   remove(bucket: string, name: string): Promise<unknown>
+  /** Deletes up to {@link BULK_DELETE_BATCH} files; resolves to how many were deleted. */
+  removeMany(bucket: string, names: string[]): Promise<number>
   upload(file: File, target: UploadTarget, replace: boolean, progress: (loaded: number, total: number) => void): Promise<unknown>
   isConflict(error: unknown): boolean
 }
@@ -66,10 +71,50 @@ export class StorageBrowser {
     if (this.matches(target)) await this.refresh()
   }
 
+  /**
+   * Deletes several files in batches; resolves to how many were deleted. The
+   * folder reloads even after a failure, since earlier batches already went.
+   */
+  async removeMany(names: string[]) {
+    if (!this.target || names.length === 0) return 0
+    const target = { ...this.target }
+    let deleted = 0
+    try {
+      for (let start = 0; start < names.length; start += BULK_DELETE_BATCH) {
+        deleted += await this.adapter.removeMany(target.bucket, names.slice(start, start + BULK_DELETE_BATCH))
+      }
+    } finally {
+      if (this.matches(target)) await this.refresh()
+    }
+    return deleted
+  }
+
   private matches(target: UploadTarget) {
     return this.target?.bucket === target.bucket && this.target.prefix === target.prefix
   }
-  private refresh() { return Promise.all([this.load(), this.loadInfo()]) }
+  private refresh() { return Promise.all([this.reload(), this.loadInfo()]) }
+
+  /**
+   * Reloads the folder after a change, page by page until it shows at least
+   * as many entries as before, so "Load more" progress is not lost.
+   */
+  private reload() {
+    if (!this.target) return Promise.resolve(false)
+    const target = { ...this.target }
+    const current = this.filesResource.data
+    const shown = Math.max(current?.objects.length ?? 0, current?.folders.length ?? 0)
+    return this.filesResource.load(async signal => {
+      const objects: StorageListing['objects'] = []
+      const folders: string[] = []
+      let page: StorageListing
+      do {
+        page = await this.adapter.list(target, Math.max(objects.length, folders.length), signal)
+        objects.push(...page.objects)
+        folders.push(...page.folders)
+      } while (page.has_next && page.objects.length + page.folders.length > 0 && Math.max(objects.length, folders.length) < shown)
+      return { ...page, objects, folders }
+    })
+  }
   cancel() {
     this.target = undefined
     this.filesResource.cancel()

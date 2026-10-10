@@ -1,11 +1,12 @@
 # Começando com Rust
 
-O SDK usa Tokio e requer Rust 1.99+. Até a primeira publicação, adicione
+O SDK usa Tokio e requer Rust 1.88+. Até a primeira publicação, adicione
 `nelcota-client = { path = "/caminho/Nelcota/sdk/rust" }` no Cargo.toml do seu
 aplicativo, junto de serde, serde_json e tokio (veja o README).
 
 1. Inicie o Nelcota com `cargo run -- dev` ou use um projeto implantado.
-2. Aplique `sdk/rust/examples/schema.sql` como uma migração do projeto.
+2. Aplique [examples/notes.sql](https://github.com/HanielCota/Nelcota/blob/main/examples/notes.sql) (o mesmo do SDK JavaScript) pelo
+   editor SQL do painel ou como migração (`nelcota migrate`).
 3. Defina `NELCOTA_URL`, `NELCOTA_EMAIL` e `NELCOTA_PASSWORD` para um usuário
    existente. Como alternativa, passe `NELCOTA_ACCESS_TOKEN`.
 4. Execute `cargo run -p nelcota-client --example rest` na raiz do repositório.

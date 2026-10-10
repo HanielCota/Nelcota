@@ -40,7 +40,7 @@ ROOT="$WORK"
 command -v cygpath >/dev/null 2>&1 && ROOT="$(cygpath -w "$WORK")"
 native() { if command -v cygpath >/dev/null 2>&1; then cygpath -w "$1"; else printf '%s' "$1"; fi; }
 nelcota() { "$BIN" -C "$ROOT" "$@"; }
-cleanup() { nelcota down --all --volumes >/dev/null 2>&1 || true; rm -rf "$WORK"; }
+cleanup() { nelcota down --all --volumes --yes >/dev/null 2>&1 || true; rm -rf "$WORK"; }
 trap cleanup EXIT
 
 # *.localhost points at this machine; --resolve avoids depending on the resolver.

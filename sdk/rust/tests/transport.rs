@@ -339,6 +339,88 @@ async fn malformed_json_empty_results_and_cardinality() {
 }
 
 #[tokio::test]
+async fn error_bodies_keep_postgres_fields_and_bodyless_codes() {
+    let router = Router::new()
+        .route(
+            "/rest/v1/dup",
+            any(|| async {
+                Response::builder()
+                    .status(409)
+                    .body(Body::from(
+                        r#"{"code":"db_error","message":"duplicate (23505)","sqlstate":"23505","details":"Key (slug)=(a) already exists.","hint":"pick another","constraint":"notes_slug_key"}"#,
+                    ))
+                    .unwrap()
+            }),
+        )
+        .route(
+            "/rest/v1/hidden",
+            any(|| async { Response::builder().status(403).body(Body::empty()).unwrap() }),
+        );
+    let (url, task) = serve(router).await;
+    let client = Client::builder(url).build().unwrap();
+    let error = client
+        .from("dup")
+        .insert(&json!({"slug":"a"}))
+        .execute::<()>()
+        .await
+        .unwrap_err();
+    assert_eq!(error.code(), "db_error");
+    assert_eq!(error.sqlstate(), Some("23505"));
+    assert_eq!(error.details(), Some("Key (slug)=(a) already exists."));
+    assert_eq!(error.hint(), Some("pick another"));
+    assert_eq!(error.constraint(), Some("notes_slug_key"));
+    assert!(error.is_conflict() && error.is_unique_violation());
+    let hidden = client
+        .from("hidden")
+        .select("*")
+        .count_exact()
+        .head()
+        .execute::<Value>()
+        .await
+        .unwrap_err();
+    assert_eq!(hidden.code(), "forbidden");
+    assert!(hidden.is_forbidden() && hidden.db_info().is_none());
+    task.abort();
+}
+
+#[tokio::test]
+async fn default_headers_are_sent_and_validated() {
+    let router = Router::new().fallback(any(|request: Request| async move {
+        let get = |name: &str| {
+            request
+                .headers()
+                .get(name)
+                .map(|v| v.to_str().unwrap().to_owned())
+        };
+        Response::new(Body::from(
+            json!([get("x-app"), get("x-trace"), get("authorization")]).to_string(),
+        ))
+    }));
+    let (url, task) = serve(router).await;
+    let client = Client::builder(&url)
+        .header("x-app", "first")
+        .header("X-App", "notes")
+        .header("x-trace", "abc")
+        .access_token("token")
+        .build()
+        .unwrap();
+    let seen = client.from("t").execute::<Value>().await.unwrap().data;
+    assert_eq!(seen, json!(["notes", "abc", "Bearer token"]));
+    for (name, value) in [
+        ("authorization", "Bearer x"),
+        ("bad name", "v"),
+        ("x-ok", "a\nb"),
+    ] {
+        let error = Client::builder(&url)
+            .header(name, value)
+            .build()
+            .unwrap_err();
+        assert_eq!(error.code(), "invalid_input");
+    }
+    task.abort();
+}
+
+#[tokio::test]
 async fn unsafe_input_is_rejected_without_network() {
     let client = Client::builder("http://127.0.0.1:1").build().unwrap();
     for query in [

@@ -5,7 +5,13 @@ import type { Messages } from '../index.svelte'
 
 const ptBR = {
   network: 'Sem resposta do servidor. Confira se ele está rodando e tente de novo.',
+  // Set by the panel itself when the response is not a panel error (api.ts).
+  server_unreachable: 'O servidor não está respondendo (HTTP {status}). Ele pode estar reiniciando: tente de novo em instantes.',
+  unexpected_response: 'Resposta inesperada do servidor (HTTP {status}).',
   sql_busy: "Todas as conexões do editor estão ocupadas. Aguarde uma consulta terminar.",
+  internal: 'Erro interno do servidor. Os detalhes estão no log do servidor.',
+  unavailable: 'Banco de dados indisponível. Confira se o Postgres está rodando e tente de novo.',
+  invalid_range: 'Período inválido: use 1h ou 24h.',
 
   // Session and access
   route_not_found: 'Rota não encontrada.',
@@ -88,11 +94,19 @@ const ptBR = {
   storage_full: 'Sem espaço: a cota de storage ou o disco do servidor está cheio.',
   upload_timeout: 'O envio demorou demais.',
   upload_interrupted: 'O envio foi interrompido.',
+  upload_busy: 'Muitos envios ao mesmo tempo. Tente de novo em instantes.',
+  no_files_selected: 'Nenhum arquivo selecionado.',
+  too_many_files: 'No máximo {max} arquivos por vez.',
 }
 
 const en: Messages<typeof ptBR> = {
   network: 'No answer from the server. Check that it is running and try again.',
+  server_unreachable: 'The server is not responding (HTTP {status}). It may be restarting: try again in a moment.',
+  unexpected_response: 'Unexpected response from the server (HTTP {status}).',
   sql_busy: 'All SQL editor connections are busy. Wait for a query to finish.',
+  internal: 'Internal server error. The details are in the server log.',
+  unavailable: 'Database unavailable. Check that Postgres is running and try again.',
+  invalid_range: 'Invalid period: use 1h or 24h.',
   route_not_found: 'Route not found.',
   session_expired: 'Session expired: sign in again.',
   origin_not_allowed: 'Origin not allowed.',
@@ -167,6 +181,9 @@ const en: Messages<typeof ptBR> = {
   storage_full: "No room: the storage quota or the server's disk is full.",
   upload_timeout: 'The upload took too long.',
   upload_interrupted: 'The upload was interrupted.',
+  upload_busy: 'Too many uploads at once. Try again in a moment.',
+  no_files_selected: 'No files selected.',
+  too_many_files: 'At most {max} files at a time.',
 }
 
 export default { 'pt-BR': ptBR, en }

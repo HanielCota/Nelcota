@@ -4,7 +4,7 @@ import { AuthClient, type AuthOptions } from './client.js';
 import { createHttpClient, type TransportOptions } from '../core/options.js';
 
 export { AuthClient } from './client.js';
-export { NelcotaError, NelcotaUsageError } from '../core/errors.js';
+export { NelcotaError, NelcotaUsageError, unwrap } from '../core/errors.js';
 export type { Result } from '../core/errors.js';
 export type { TransportOptions } from '../core/options.js';
 export type { FetchLike, TokenSource } from '../core/http.js';
