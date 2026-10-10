@@ -349,11 +349,41 @@ async fn data_errors_become_400() {
         .await;
     assert_eq!(reply.status, StatusCode::CONFLICT);
 
-    // A body that is not JSON.
+    // An empty body is refused, not inserted as a row of defaults.
     let reply = app
         .request_with(Method::POST, "/rest/v1/products", Some(&s), None, &[])
         .await;
     assert_eq!(reply.status, StatusCode::BAD_REQUEST);
+    assert_eq!(reply.body["code"], "invalid_body", "{}", reply.body);
+    let before = app.get("/rest/v1/todos?select=id", Some(&s)).await.1;
+    let reply = app
+        .request_with(Method::POST, "/rest/v1/todos", Some(&s), None, &[])
+        .await;
+    assert_eq!(reply.body["code"], "invalid_body", "{}", reply.body);
+    assert_eq!(
+        app.get("/rest/v1/todos?select=id", Some(&s)).await.1,
+        before
+    );
+    // A body that is not JSON.
+    let reply = app
+        .raw(
+            Method::POST,
+            "/rest/v1/products",
+            &[("authorization", &format!("Bearer {s}"))],
+            "{".into(),
+        )
+        .await;
+    assert_eq!(reply.status, StatusCode::BAD_REQUEST);
+    assert_eq!(reply.body["code"], "invalid_body");
+    // RPC without a body still means "no arguments".
+    let reply = app
+        .request(Method::POST, "/rest/v1/rpc/add", None, None)
+        .await;
+    assert_eq!(reply.status, StatusCode::BAD_REQUEST, "a is required");
+    let reply = app
+        .request(Method::POST, "/rest/v1/rpc/nothing", None, None)
+        .await;
+    assert_eq!(reply.status, StatusCode::NO_CONTENT);
 
     // PATCH/DELETE without a filter are refused.
     let reply = app

@@ -41,10 +41,28 @@ fn not_found(kind: &str, name: &str) -> ApiError {
     )
 }
 
+/// RPC arguments: an empty body means no arguments (`{}`).
 fn parse_body(bytes: &[u8]) -> Result<Value, ApiError> {
     if bytes.is_empty() {
         return Ok(Value::Object(Map::new()));
     }
+    parse_json(bytes)
+}
+
+/// Rows of a POST/PATCH: an empty body is a mistake (a lost body, a client
+/// that forgot to serialize), not a row of defaults; send `{}` for that.
+fn parse_rows(bytes: &[u8]) -> Result<Value, ApiError> {
+    if bytes.iter().all(u8::is_ascii_whitespace) {
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "invalid_body",
+            "the request body is empty; send a JSON object or array",
+        ));
+    }
+    parse_json(bytes)
+}
+
+fn parse_json(bytes: &[u8]) -> Result<Value, ApiError> {
     serde_json::from_slice(bytes).map_err(|e| {
         ApiError::new(
             StatusCode::BAD_REQUEST,
@@ -213,7 +231,7 @@ pub(crate) async fn create(
     let sql = query::insert(
         &catalog.schema,
         table,
-        parse_body(bytes)?,
+        parse_rows(bytes)?,
         options.representation.then_some(&request.select),
         upsert.as_ref(),
     )
@@ -243,7 +261,7 @@ pub(crate) async fn update(
     let sql = query::update(
         &catalog.schema,
         table,
-        parse_body(bytes)?,
+        parse_rows(bytes)?,
         &request.filters,
         representation.then_some(&request.select),
     )

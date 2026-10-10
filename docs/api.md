@@ -145,6 +145,8 @@ transactional behavior and missing columns still receive their defaults.
 - `select=` also picks the columns of the representation.
 - On `POST`, missing columns get their `DEFAULT`, even in a batch whose
   objects have different keys.
+- An empty body on `POST`/`PATCH` is refused (400 `invalid_body`); to insert
+  a row of defaults, send `{}`. An `/rpc` call without a body has no arguments.
 - `PATCH`/`DELETE` without a filter are refused (400), to avoid changing or
   deleting the whole table by mistake. To do that on purpose, use an explicit
   filter (`?id=not.is.null`).
