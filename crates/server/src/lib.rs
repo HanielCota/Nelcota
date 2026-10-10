@@ -157,7 +157,7 @@ async fn observe(
         .headers()
         .get(header::AUTHORIZATION)
         .and_then(|v| v.to_str().ok())
-        .map(|v| v.strip_prefix("Bearer ").unwrap_or(v).to_owned());
+        .map(|v| nelcota_auth::bearer_token(v).unwrap_or(v).to_owned());
     let response = next.run(request).await;
     let status = response.status();
     observed.metrics.record(

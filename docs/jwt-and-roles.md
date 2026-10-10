@@ -21,7 +21,8 @@ member of the other roles and assumes one of them in each request.
 
 ## What happens in each request
 
-1. The API reads `Authorization: Bearer <jwt>`.
+1. The API reads `Authorization: Bearer <jwt>` (the scheme is case-insensitive:
+   `bearer <jwt>` works too).
    - Without the header: the request becomes `anon`.
    - Header present but invalid (signature, `exp`, scheme, unknown `kid` or
      role): **401**. It never silently becomes `anon`.
