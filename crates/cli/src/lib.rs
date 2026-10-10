@@ -483,12 +483,15 @@ pub fn run(cli: Cli) -> anyhow::Result<Outcome> {
                 PanelLogin::PerProject => Some(host.select(&manifest, selection)?),
             };
             let new = panel_login::reset(&host, &manifest, project.as_ref())?;
+            // The hash is already on disk: show the password before a restart
+            // can fail, or it would be lost.
+            panel_login::print(&[new]);
+            println!();
             let affected = match project {
                 Some(project) => vec![project],
                 None => host.projects(&manifest),
             };
             lifecycle::recreate_apps(&affected)?;
-            panel_login::print(&[new]);
             Ok(Outcome::Done)
         }
         Command::Healthcheck { addr } => {

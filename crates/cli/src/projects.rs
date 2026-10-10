@@ -99,13 +99,16 @@ pub fn set_panel_login(host: &Host, mode: PanelLogin) -> anyhow::Result<()> {
         mode.as_str()
     ));
     let generated = panel_login::switch(host, &mut manifest, mode)?;
-    registry::write(host, &manifest)?;
-    lifecycle::recreate_apps(&host.projects(&manifest))?;
+    // The new hashes are already written: show the passwords before a restart
+    // can fail, or they would be lost.
     if mode == PanelLogin::Shared {
         println!();
         println!("Single sign-on on: use the host email and password on any panel.");
         println!("(Forgot the password? `nelcota admin-password`.)");
     }
     panel_login::print(&generated);
+    println!();
+    registry::write(host, &manifest)?;
+    lifecycle::recreate_apps(&host.projects(&manifest))?;
     Ok(())
 }
