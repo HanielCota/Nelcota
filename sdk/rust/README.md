@@ -11,8 +11,7 @@ serde_json = "1"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 
-Before the first crates.io release, use a path dependency on `sdk/rust`.
-Requires Rust 1.88+ (checked in CI). Full support targets the current repository build.
+Requires Rust 1.88+ (checked in CI) and Nelcota server 0.3.0 or later.
 
 | SDK | Server baseline | Support |
 |---|---|---|
