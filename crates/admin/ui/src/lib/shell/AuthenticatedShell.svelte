@@ -5,6 +5,7 @@
   import TopNav from './components/TopNav.svelte'
   import CommandPalette from './components/CommandPalette.svelte'
   import NotFound from './NotFound.svelte'
+  import LoadError from '$lib/components/shared/LoadError.svelte'
   import { session } from '$lib/features/auth/session.svelte'
   import { match, route } from '$lib/router.svelte'
   import { crumbsFor } from './titles'
@@ -33,12 +34,13 @@
 </script>
 
 {#snippet loading()}
-  <p class="p-6 text-sm text-muted-foreground" role="status">{t('shell.app.loading')}</p>
+  <p class="mx-auto w-full max-w-page px-4 pt-2 text-sm text-muted-foreground sm:px-6 lg:px-8" role="status">{t('shell.app.loading')}</p>
 {/snippet}
 {#snippet failed(error: unknown)}
-  <div class="p-6 text-sm text-destructive" role="alert">
-    <p>{errorMessage(error)}</p>
-    <button class="mt-3 underline" onclick={() => window.location.reload()}>{t('common.retry')}</button>
+  <!-- A page whose code could not be fetched (often a new release): the same
+       card as any other load failure, and a reload to try again. -->
+  <div class="mx-auto w-full max-w-page px-4 pt-2 sm:px-6 lg:px-8">
+    <LoadError message={errorMessage(error)} onretry={() => window.location.reload()} />
   </div>
 {/snippet}
 
