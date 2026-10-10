@@ -75,10 +75,14 @@ pub enum Command {
     Up,
     /// Stops a project (or all with --all). With --volumes, DELETES the data.
     Down {
+        /// Also deletes the data volumes (asks for confirmation; Docker only).
         #[arg(long)]
         volumes: bool,
         #[arg(long)]
         all: bool,
+        /// Does not ask for confirmation before deleting volumes.
+        #[arg(long)]
+        yes: bool,
     },
     /// State of the projects (all of them, or only the one from -p).
     Status,
@@ -335,19 +339,23 @@ pub fn run(cli: Cli) -> anyhow::Result<Outcome> {
             };
             done(lifecycle::up(&host, &manifest, &targets))
         }
-        Command::Down { volumes, all } => {
+        Command::Down { volumes, all, yes } => {
             let manifest = host.require()?;
-            if all {
-                for project in host.projects(&manifest) {
-                    lifecycle::down(&project, volumes)?;
-                }
-                done(caddy::down(&host, manifest.runtime, volumes))
+            let targets = if all {
+                host.projects(&manifest)
             } else {
-                done(lifecycle::down(
-                    &host.select(&manifest, selection)?,
-                    volumes,
-                ))
+                vec![host.select(&manifest, selection)?]
+            };
+            if volumes && manifest.runtime == Runtime::Docker {
+                lifecycle::confirm_volume_deletion(&targets, all, yes)?;
             }
+            for project in &targets {
+                lifecycle::down(project, volumes)?;
+            }
+            if all {
+                caddy::down(&host, manifest.runtime, volumes)?;
+            }
+            Ok(Outcome::Done)
         }
         Command::Status => {
             let manifest = host.require()?;
@@ -466,5 +474,28 @@ pub fn run(cli: Cli) -> anyhow::Result<Outcome> {
                 std::process::exit(1)
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod cli_tests {
+    use super::*;
+
+    #[test]
+    fn down_volumes_takes_an_explicit_yes() {
+        let cli = Cli::try_parse_from(["nelcota", "down", "--all", "--volumes", "--yes"]).unwrap();
+        assert!(matches!(
+            cli.command,
+            Some(Command::Down {
+                volumes: true,
+                all: true,
+                yes: true
+            })
+        ));
+        let cli = Cli::try_parse_from(["nelcota", "down", "--volumes"]).unwrap();
+        assert!(matches!(
+            cli.command,
+            Some(Command::Down { yes: false, .. })
+        ));
     }
 }

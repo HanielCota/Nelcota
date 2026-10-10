@@ -3,8 +3,9 @@ use crate::{
     caddy,
     host::{Host, Manifest, Runtime},
     project::{Project, Service},
-    util::{ok, step, warn},
+    util::{self, ok, step, warn},
 };
+use anyhow::bail;
 use std::time::Duration;
 pub(crate) const HEALTH_TIMEOUT: Duration = Duration::from_secs(120);
 
@@ -35,13 +36,31 @@ pub fn up(host: &Host, manifest: &Manifest, projects: &[Project]) -> anyhow::Res
 }
 
 pub fn down(project: &Project, volumes: bool) -> anyhow::Result<()> {
-    if volumes && project.runtime == Runtime::Docker {
-        warn(&format!(
-            "--volumes: the data of {} will be DELETED",
-            project.name
-        ));
-    }
     project.down(volumes)
+}
+
+/// `down --volumes` deletes databases and files: ask first, and refuse
+/// without a terminal unless `--yes` was given.
+pub fn confirm_volume_deletion(projects: &[Project], all: bool, yes: bool) -> anyhow::Result<()> {
+    let names: Vec<&str> = projects.iter().map(|p| p.name.as_str()).collect();
+    let what = if all {
+        format!("{} and Caddy's certificates", names.join(", "))
+    } else {
+        names.join(", ")
+    };
+    warn(&format!("--volumes: the data of {what} will be DELETED"));
+    if yes {
+        return Ok(());
+    }
+    if !util::interactive() {
+        bail!("refusing to delete volumes without a terminal; pass --yes to confirm");
+    }
+    if !util::confirm(&format!(
+        "Delete the databases and files of {what}? This cannot be undone."
+    )) {
+        bail!("down cancelled (use --yes to skip the question)");
+    }
+    Ok(())
 }
 
 pub fn status(manifest: &Manifest, projects: &[Project]) -> anyhow::Result<()> {
