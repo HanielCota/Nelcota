@@ -52,6 +52,7 @@
     failure = null
     try {
       const me = await api.post<{ email: string }>('/login', { email, password })
+      session.expired = false
       session.email = me.email
     } catch (e) {
       failure = e
@@ -116,6 +117,9 @@
           {#if project}{t('login.projectPanel')} <span class="font-medium text-foreground" translate="no">{project}</span>{:else}{t('login.adminPanel')}{/if}
         </p>
       </div>
+      {#if session.expired}
+        <p class="rounded-2xl bg-well px-4 py-3 text-center text-sm text-muted-foreground" role="status">{t('login.sessionExpired')}</p>
+      {/if}
 
       <Field.Group class="gap-5">
         <Field.Field>

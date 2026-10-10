@@ -66,7 +66,10 @@ async function parse<T>(res: Response, path: string, method: string): Promise<T>
     data = { error: text }
   }
   if (!res.ok) {
-    if (res.status === 401 && path !== '/login') session.email = null
+    if (res.status === 401 && path !== '/login') {
+      if (session.email) session.expired = true
+      session.email = null
+    }
     // Not our JSON error (e.g. a reverse proxy's HTML 502 page): never show
     // the raw body, say what happened in the user's language instead.
     if (!json) throw httpError(res.status)

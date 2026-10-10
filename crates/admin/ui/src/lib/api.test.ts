@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { api, ApiError } from './api'
 import { errorMessage, i18n } from './i18n/index.svelte'
+import { session } from './features/auth/session.svelte'
 
 function respond(body: string, status: number) {
   vi.stubGlobal('fetch', vi.fn(async () => new Response(body, { status })))
@@ -34,6 +35,22 @@ describe('error responses', () => {
     i18n.locale = 'en'
     expect(errorMessage(error)).toContain('HTTP 502')
     expect(errorMessage(error)).not.toContain('<html>')
+  })
+
+  it('a 401 signs out and flags an expired session only when signed in', async () => {
+    const unauthorized = JSON.stringify({ error: 'session expired', code: 'session_expired' })
+    session.email = undefined
+    session.expired = false
+    respond(unauthorized, 401)
+    await failure()
+    expect(session.email).toBeNull()
+    expect(session.expired).toBe(false)
+
+    session.email = 'admin@example.com'
+    respond(unauthorized, 401)
+    await failure()
+    expect(session.email).toBeNull()
+    expect(session.expired).toBe(true)
   })
 
   it('other non-JSON or empty bodies read as an unexpected response', async () => {

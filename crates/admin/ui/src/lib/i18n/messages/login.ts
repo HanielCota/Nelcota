@@ -13,6 +13,7 @@ const ptBR = {
   signingIn: 'Entrando…',
   capsLock: 'Caps Lock ativado.',
   restricted: 'Acesso exclusivo para administradores.',
+  sessionExpired: 'Sua sessão expirou. Entre de novo para continuar.',
 }
 
 const en: Messages<typeof ptBR> = {
@@ -27,6 +28,7 @@ const en: Messages<typeof ptBR> = {
   signingIn: 'Signing in…',
   capsLock: 'Caps Lock is on.',
   restricted: 'Administrator access only.',
+  sessionExpired: 'Your session expired. Sign in again to continue.',
 }
 
 export default { 'pt-BR': ptBR, en }
