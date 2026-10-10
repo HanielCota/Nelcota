@@ -102,8 +102,22 @@ drop(background);
 # Ok(()) }
 ```
 
-Session storage defaults to memory. Implement `auth::SessionStorage` for a
-keychain, encrypted file or per-request cookie store. Clones share one session,
+Session storage defaults to memory. For a CLI or desktop app,
+`auth::FileStorage::new(path)` keeps the session in a JSON file, written
+atomically and readable by its owner only (0600 on Unix). Implement
+`auth::SessionStorage` for a keychain, encrypted file or per-request cookie
+store.
+
+```rust,no_run
+# fn example() -> nelcota_client::Result<()> {
+use std::sync::Arc;
+use nelcota_client::{Client, auth::FileStorage};
+let client = Client::builder("https://api.example.com")
+    .session_storage(Arc::new(FileStorage::new("/home/ana/.config/notes/session.json")))
+    .build()?;
+# Ok(()) }
+```
+ Clones share one session,
 lifecycle lock and refresh result. Independent clients/processes sharing a
 persistent store need external coordination: the store interface alone does
 not serialize refresh. A spent refresh token terminates its server session.

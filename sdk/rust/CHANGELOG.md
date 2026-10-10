@@ -2,6 +2,9 @@
 
 ## 0.1.0 (unreleased)
 
+- `auth::FileStorage` persists the session in a JSON file, replaced
+  atomically and created with mode 0600 on Unix.
+
 - `ClientBuilder::header(name, value)` sends a header with every request.
 
 - **Breaking:** `UploadOptions::content_type` is an `Option<String>`. `None`
