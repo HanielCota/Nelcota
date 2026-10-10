@@ -521,6 +521,7 @@ impl AuthClient {
                 code,
                 message: "OAuth sign-in failed".into(),
                 retry_after: None,
+                db: None,
             });
         }
         match code {

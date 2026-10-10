@@ -20,7 +20,7 @@ pub mod rest;
 pub mod storage;
 
 pub use encoding::escape_like;
-pub use error::{Error, Result};
+pub use error::{DbErrorInfo, Error, Result};
 pub use http::RequestOptions;
 pub use tokio_util::sync::CancellationToken;
 

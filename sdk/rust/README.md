@@ -194,7 +194,27 @@ requiring a DB connection when compiling consumer applications.
 Other variants distinguish invalid input, network, timeout, cancellation,
 invalid response, cardinality and session storage failures. No panic is used
 for caller configuration or HTTP failures. Signed request URLs are omitted
-from transport error text.
+from transport error text. A response without a JSON body (a `head()` count, a
+proxy page) gets `unauthorized`, `forbidden`, `not_found`, `rate_limited`,
+`unavailable` or `http_<status>` as its code.
+
+When the server reports them, `sqlstate()`, `details()`, `hint()` and
+`constraint()` expose what Postgres said about a `db_error`; older servers send
+none. Helpers classify common cases: `is_not_found()`, `is_conflict()`,
+`is_unique_violation()`, `is_rate_limited()`, `is_unauthorized()`,
+`is_forbidden()` and `is_retryable()`.
+
+```rust,no_run
+# async fn example(client: nelcota_client::Client) -> nelcota_client::Result<()> {
+use serde_json::json;
+match client.from("notes").insert(&json!({"slug":"a"})).execute::<()>().await {
+    Err(error) if error.is_unique_violation() => {
+        println!("taken ({:?})", error.constraint());
+    }
+    other => { other?; }
+}
+# Ok(()) }
+```
 
 Only GET/HEAD retry network/body-read failures and 429/503, default two retries.
 The backoff has jitter and respects Retry-After (seconds or HTTP date); a delay

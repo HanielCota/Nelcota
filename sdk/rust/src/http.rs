@@ -166,12 +166,13 @@ impl Client {
                         code: value["code"]
                             .as_str()
                             .map(str::to_owned)
-                            .unwrap_or_else(|| format!("http_{status}")),
+                            .unwrap_or_else(|| crate::error::code_for_status(status)),
                         message: value["message"]
                             .as_str()
                             .unwrap_or("HTTP request failed")
                             .to_owned(),
                         retry_after,
+                        db: crate::error::DbErrorInfo::from_body(&value),
                     });
                 }
                 let data = if buffered {
