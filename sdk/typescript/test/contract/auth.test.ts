@@ -66,6 +66,8 @@ describe.skipIf(skip)('auth against the server', () => {
     const second = await client.auth.refreshSession();
     expect(second.error).toBeNull();
     expect(second.data!.refresh_token).not.toBe(first.refresh_token);
+    // Rotate once more so the replay below is not a retry inside the grace window.
+    expect((await client.auth.refreshSession()).error).toBeNull();
 
     // Another client replaying the old token: the server ends the session.
     const replay = visitor();
