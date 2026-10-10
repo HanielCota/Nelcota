@@ -1,5 +1,11 @@
 name: Rust SDK release
 
+# Publishes nelcota-client to crates.io from a `rust-sdk-v<version>` tag with
+# crates.io trusted publishing (OIDC, no token stored in the repository).
+# Before the first run, add this repository, this workflow and the
+# `crates-io` environment as a trusted publisher of nelcota-client on
+# crates.io (crate settings → Trusted Publishing).
+
 on:
   push:
     tags: ['rust-sdk-v*']
@@ -27,6 +33,9 @@ jobs:
     needs: [checks, contract]
     runs-on: ubuntu-latest
     environment: crates-io
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -44,7 +53,23 @@ jobs:
               version = tomllib.load(source)['package']['version']
           assert os.environ['RELEASE_TAG'] == f'rust-sdk-v{version}', 'tag/version mismatch'
           PY
-      - run: cargo publish -p nelcota-client --dry-run
-      - run: cargo publish -p nelcota-client
+      # A version published by hand (the first one) is not published again.
+      - name: skip a version already on crates.io
+        id: published
+        run: |
+          version=${GITHUB_REF_NAME#rust-sdk-v}
+          if curl -fsS -A "nelcota-release (github.com/HanielCota/Nelcota)" "https://crates.io/api/v1/crates/nelcota-client/$version" >/dev/null 2>&1; then
+            echo "::notice::nelcota-client $version is already on crates.io"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.published.outputs.skip != 'true'
+        run: cargo publish -p nelcota-client --dry-run
+      # Trusted publishing: a short-lived token from this workflow's OIDC
+      # identity, no long-lived secret in the repository.
+      - if: steps.published.outputs.skip != 'true'
+        id: auth
+        uses: rust-lang/crates-io-auth-action@c6f97d42243bad5fab37ca0427f495c86d5b1a18 # v1.0.5
+      - if: steps.published.outputs.skip != 'true'
+        run: cargo publish -p nelcota-client
         env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
