@@ -12,7 +12,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let path = std::env::var("NELCOTA_UPLOAD_PATH")?;
     let file = tokio::fs::File::open(path).await?;
     let name = format!("{}/demo.txt", user.id);
-    let files = client.storage().from("sdk-files")?;
+    let files = client.storage().from("files")?;
     let object = files
         // The content type is guessed from the name: demo.txt is text/plain.
         .upload_reader(&name, file, UploadOptions::default())
