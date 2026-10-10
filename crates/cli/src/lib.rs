@@ -101,6 +101,9 @@ pub enum Command {
         /// Keeps the project folder (migrations, backups).
         #[arg(long)]
         keep_files: bool,
+        /// Skips the final backup (otherwise a stopped Postgres is started for it).
+        #[arg(long)]
+        no_backup: bool,
     },
     /// Panel login: one for all (shared) or one per project.
     PanelLogin {
@@ -381,11 +384,15 @@ pub fn run(cli: Cli) -> anyhow::Result<Outcome> {
                 service.as_deref(),
             ))
         }
-        Command::Remove { yes, keep_files } => {
+        Command::Remove {
+            yes,
+            keep_files,
+            no_backup,
+        } => {
             let Some(name) = selection else {
                 bail!("name the project to remove: nelcota -p <name> remove");
             };
-            done(projects::remove(&host, name, yes, keep_files))
+            done(projects::remove(&host, name, yes, keep_files, no_backup))
         }
         Command::PanelLogin { mode } => done(projects::set_panel_login(&host, mode)),
         Command::Dev(args) => dev::run(&cli.dir, args),
