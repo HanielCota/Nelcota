@@ -17,8 +17,30 @@ export type ColumnKind = 'number' | 'boolean' | 'temporal' | 'json' | 'uuid' | '
 const NUMBER = ['smallint', 'integer', 'bigint', 'numeric', 'real', 'double precision']
 const TEMPORAL = ['timestamp with time zone', 'timestamp without time zone', 'date', 'time without time zone', 'time with time zone', 'interval']
 
+// Short names Postgres also accepts (and `pg_type.typname` uses). The catalog
+// sends `format_type` names, but a type written by hand or a mock may not.
+const ALIASES: Record<string, string> = {
+  timestamptz: 'timestamp with time zone',
+  timestamp: 'timestamp without time zone',
+  timetz: 'time with time zone',
+  time: 'time without time zone',
+  int2: 'smallint',
+  int4: 'integer',
+  int: 'integer',
+  int8: 'bigint',
+  float4: 'real',
+  float8: 'double precision',
+  decimal: 'numeric',
+  bool: 'boolean',
+}
+
+/** The `format_type` name of a Postgres type, also from its short alias. */
+export function canonicalType(type: string): string {
+  return ALIASES[type] ?? type
+}
+
 export function columnKind(column: Pick<Column, 'type' | 'enum_values'>): ColumnKind {
-  const type = column.type
+  const type = canonicalType(column.type)
   if (column.enum_values.length) return 'enum'
   if (NUMBER.includes(type)) return 'number'
   if (type === 'boolean') return 'boolean'

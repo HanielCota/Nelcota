@@ -7,7 +7,7 @@
   import KeyRound from '@lucide/svelte/icons/key-round'
   import { formatCell } from '$lib/features/tables/format'
   import { formatJson as prettyJson } from '$lib/features/tables/json-format'
-  import { columnKind } from '$lib/features/tables/grid'
+  import { canonicalType, columnKind } from '$lib/features/tables/grid'
   import type { FieldState } from '$lib/features/tables/row-form'
   import type { Column } from '$lib/types'
   import { t } from '$lib/i18n/index.svelte'
@@ -94,7 +94,7 @@
   {#if problem}
     <p id={`${id}-error`} class="text-xs text-destructive">{t(`tables.row.problems.${problem}`)}</p>
   {:else if preview && preview.text !== field.value}
-    <p class="text-xs text-muted-foreground">= {preview.text}{column.type === 'timestamp with time zone' ? ` ${t('tables.row.inYourTimeZone')}` : ''}</p>
+    <p class="text-xs text-muted-foreground">= {preview.text}{canonicalType(column.type) === 'timestamp with time zone' ? ` ${t('tables.row.inYourTimeZone')}` : ''}</p>
   {/if}
   {#if kind === 'json' && !field.isNull && field.value.trim()}
     <Button variant="ghost" size="xs" class="justify-self-start text-muted-foreground" onclick={formatJson}>{t('tables.row.formatJson')}</Button>
