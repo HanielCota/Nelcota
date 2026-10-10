@@ -10,3 +10,7 @@ crates/admin/ui/node_modules/
 sdk/typescript/node_modules/
 sdk/typescript/dist/
 sdk/typescript/test/contract/generated/
+
+# Local scratch output (screenshots, browser logs, layout backups)
+/output/
+/.playwright-cli/
