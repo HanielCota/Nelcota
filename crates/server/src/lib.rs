@@ -86,7 +86,10 @@ pub fn app(
             header::RETRY_AFTER,
             HeaderName::from_static("preference-applied"),
             REQUEST_ID,
-        ]);
+        ])
+        // Browsers cache the preflight for 2 hours (Chromium caps it there)
+        // instead of sending an OPTIONS before every non-simple request.
+        .max_age(Duration::from_secs(2 * 60 * 60));
 
     let verifier = state.verifier.clone();
     let mut router = Router::new()

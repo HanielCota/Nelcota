@@ -1244,6 +1244,26 @@ async fn cors_exposes_what_a_browser_client_reads() {
 }
 
 #[tokio::test]
+async fn cors_preflight_is_cached_for_two_hours() {
+    let app = TestApp::spawn().await;
+    let reply = app
+        .request_with(
+            Method::OPTIONS,
+            "/rest/v1/products",
+            None,
+            None,
+            &[
+                ("origin", "https://app.example.com"),
+                ("access-control-request-method", "PATCH"),
+                ("access-control-request-headers", "authorization, prefer"),
+            ],
+        )
+        .await;
+    assert_eq!(reply.status, StatusCode::OK);
+    assert_eq!(reply.headers["access-control-max-age"], "7200");
+}
+
+#[tokio::test]
 async fn every_response_carries_a_request_id() {
     let app = TestApp::spawn().await;
     // A new id per request when the caller sends none...
