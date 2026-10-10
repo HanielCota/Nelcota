@@ -89,6 +89,26 @@ pub fn ask(question: &str, default: &str) -> String {
     }
 }
 
+/// Question whose answer is not echoed (a secret). Uses `stty` on Unix, so
+/// no terminal crate is needed; elsewhere it falls back to [`ask`].
+pub fn ask_secret(question: &str) -> String {
+    let stty = |arg: &str| {
+        cfg!(unix)
+            && std::process::Command::new("stty")
+                .arg(arg)
+                .stdin(std::process::Stdio::inherit())
+                .status()
+                .is_ok_and(|s| s.success())
+    };
+    if !stty("-echo") {
+        return ask(question, "");
+    }
+    let answer = ask(question, "");
+    stty("echo");
+    println!();
+    answer
+}
+
 pub fn confirm(question: &str) -> bool {
     matches!(
         ask(&format!("{question} (y/N)"), "")

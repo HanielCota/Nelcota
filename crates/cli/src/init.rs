@@ -8,7 +8,7 @@ use crate::{
     envfile::write_private,
     host::{Host, Manifest, ProjectEntry, Runtime},
     machine, naming, native, panel_login, registry, scaffold,
-    util::{self, ask, interactive, ok, step, warn},
+    util::{self, ask, ask_secret, interactive, ok, step, warn},
 };
 
 struct S3 {
@@ -263,7 +263,7 @@ fn backup_destination(args: &InitArgs) -> Option<S3> {
         endpoint,
         bucket: ask("Bucket", "nelcota-backups"),
         access_key: ask("Access key", ""),
-        secret_key: ask("Secret key", ""),
+        secret_key: ask_secret("Secret key (not shown)"),
         region: ask("Region", &args.s3_region),
     })
 }
