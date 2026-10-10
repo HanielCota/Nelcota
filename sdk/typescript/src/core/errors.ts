@@ -44,6 +44,8 @@ export type ServerErrorCode =
   | 'unsupported_grant_type'
   | 'provider_disabled'
   | 'redirect_not_allowed'
+  | 'invalid_code_challenge'
+  | 'invalid_state'
   | 'bad_verification_code'
   // Storage
   | 'invalid_bucket'
