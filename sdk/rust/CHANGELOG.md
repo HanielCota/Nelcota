@@ -2,6 +2,13 @@
 
 ## 0.1.0 (unreleased)
 
+- **Breaking:** `StorageClient::update_bucket` takes a `BucketUpdate` instead
+  of `BucketSettings`. `BucketSettings { public: true, ..Default::default() }`
+  silently cleared the size and MIME limits, because the PUT replaces every
+  setting. `BucketUpdate` has no `Default`; build it from the current bucket
+  (`BucketUpdate { public: true, ..bucket.into() }`) or spell out each field.
+  This matches the TypeScript client, which requires all three fields.
+
 - `Error::Http` gains a `db` field with the optional Postgres fields the server
   may send (`sqlstate`, `details`, `hint`, `constraint`), read through
   `Error::sqlstate()` and friends. Code that builds `Error::Http` by hand must

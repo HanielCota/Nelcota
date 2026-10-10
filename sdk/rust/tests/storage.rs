@@ -6,7 +6,10 @@ use axum::{
     response::Response,
     routing::any,
 };
-use nelcota_client::{Client, storage::OpenOptions};
+use nelcota_client::{
+    Client,
+    storage::{BucketUpdate, OpenOptions},
+};
 use serde_json::{Value, json};
 use std::sync::{
     Arc,
@@ -99,5 +102,85 @@ async fn interrupted_buffered_reads_retry_but_write_responses_do_not() {
         .unwrap_err();
     assert_eq!(error.code(), "network_error");
     assert_eq!(seen.load(Ordering::SeqCst), 3);
+    task.abort();
+}
+
+type Seen = Arc<tokio::sync::Mutex<Vec<Value>>>;
+
+/// Records method, path, content type and JSON body; answers with a bucket.
+fn recorder(seen: Seen) -> Router {
+    Router::new()
+        .fallback(any(|State(seen): State<Seen>, request: Request| async move {
+            let method = request.method().to_string();
+            let path = request.uri().path().to_owned();
+            let content_type = request
+                .headers()
+                .get(header::CONTENT_TYPE)
+                .map(|v| v.to_str().unwrap().to_owned());
+            let bytes = axum::body::to_bytes(request.into_body(), 1 << 16)
+                .await
+                .unwrap();
+            let body: Value = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
+            seen.lock().await.push(
+                json!({"method": method, "path": path, "content_type": content_type, "body": body}),
+            );
+            Response::new(Body::from(
+                r#"{"id":"avatars","public":false,"file_size_limit":1000,"allowed_mime_types":["image/png"],"created_at":"t","updated_at":"t"}"#,
+            ))
+        }))
+        .with_state(seen)
+}
+
+#[tokio::test]
+async fn update_bucket_sends_every_setting_including_cleared_limits() {
+    let seen = Seen::default();
+    let (url, task) = serve(recorder(seen.clone())).await;
+    let storage = Client::builder(url).build().unwrap().storage();
+    let current = storage.get_bucket("avatars").await.unwrap();
+    storage
+        .update_bucket(
+            "avatars",
+            BucketUpdate {
+                public: true,
+                ..current.into()
+            },
+        )
+        .await
+        .unwrap();
+    storage
+        .update_bucket(
+            "avatars",
+            BucketUpdate {
+                public: false,
+                file_size_limit: None,
+                allowed_mime_types: None,
+            },
+        )
+        .await
+        .unwrap();
+    let invalid = BucketUpdate {
+        public: false,
+        file_size_limit: Some(0),
+        allowed_mime_types: None,
+    };
+    assert_eq!(
+        storage
+            .update_bucket("avatars", invalid)
+            .await
+            .unwrap_err()
+            .code(),
+        "invalid_input"
+    );
+    let seen = seen.lock().await;
+    assert_eq!(seen.len(), 3);
+    assert_eq!(seen[1]["method"], "PUT");
+    assert_eq!(
+        seen[1]["body"],
+        json!({"public":true,"file_size_limit":1000,"allowed_mime_types":["image/png"]})
+    );
+    assert_eq!(
+        seen[2]["body"],
+        json!({"public":false,"file_size_limit":null,"allowed_mime_types":null})
+    );
     task.abort();
 }

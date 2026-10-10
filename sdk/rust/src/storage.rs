@@ -20,7 +20,7 @@ pub struct Bucket {
     pub updated_at: String,
 }
 
-/// PUT replaces the complete settings; omitted limits are cleared.
+/// Settings for a new bucket. `Default` is a private bucket without limits.
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct BucketSettings {
     pub public: bool,
@@ -29,11 +29,49 @@ pub struct BucketSettings {
 }
 impl BucketSettings {
     fn validate(&self) -> Result<()> {
-        if self.file_size_limit == Some(0) {
-            return Err(Error::Usage("file_size_limit must be positive".into()));
-        }
-        Ok(())
+        validate_limit(self.file_size_limit)
     }
+}
+
+/// The complete settings `update_bucket` writes. A PUT replaces every setting,
+/// so this type has no `Default`: a `None` limit always clears that limit on
+/// purpose. To change one setting, start from the current bucket:
+///
+/// ```no_run
+/// # async fn example(storage: nelcota_client::storage::StorageClient) -> nelcota_client::Result<()> {
+/// use nelcota_client::storage::BucketUpdate;
+/// let current = storage.get_bucket("avatars").await?;
+/// storage.update_bucket("avatars", BucketUpdate { public: true, ..current.into() }).await?;
+/// # Ok(()) }
+/// ```
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct BucketUpdate {
+    pub public: bool,
+    /// Bytes; `None` clears the limit.
+    pub file_size_limit: Option<u64>,
+    /// `image/png`, `image/*`...; `None` allows any type.
+    pub allowed_mime_types: Option<Vec<String>>,
+}
+impl From<Bucket> for BucketUpdate {
+    fn from(bucket: Bucket) -> Self {
+        Self {
+            public: bucket.public,
+            file_size_limit: bucket.file_size_limit,
+            allowed_mime_types: bucket.allowed_mime_types,
+        }
+    }
+}
+impl From<&Bucket> for BucketUpdate {
+    fn from(bucket: &Bucket) -> Self {
+        bucket.clone().into()
+    }
+}
+
+fn validate_limit(limit: Option<u64>) -> Result<()> {
+    if limit == Some(0) {
+        return Err(Error::Usage("file_size_limit must be positive".into()));
+    }
+    Ok(())
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -138,9 +176,10 @@ impl StorageClient {
             .await
             .map(|r| r.data)
     }
-    pub async fn update_bucket(&self, id: &str, settings: BucketSettings) -> Result<Bucket> {
+    /// Replaces every setting of the bucket; see [`BucketUpdate`].
+    pub async fn update_bucket(&self, id: &str, settings: BucketUpdate) -> Result<Bucket> {
         encoding::bucket(id)?;
-        settings.validate()?;
+        validate_limit(settings.file_size_limit)?;
         self.client
             .json::<Bucket>(
                 Spec::new(Method::PUT, format!("/storage/v1/bucket/{id}"))

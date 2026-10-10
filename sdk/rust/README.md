@@ -165,8 +165,20 @@ Object names are NFC-normalized and encoded per segment. Empty/dot segments,
 backslashes and control characters are rejected.
 
 Buckets support list/get/create/update/delete, usually with `service_role`.
-`update_bucket` replaces all settings. Authorization belongs to server RLS;
-a `service_role` token bypasses it and belongs only in a trusted application.
+`update_bucket` replaces all settings, so it takes a `BucketUpdate`, which has
+no `Default`: every field is explicit, and `None` clears a limit on purpose.
+Start from the current bucket to change one setting:
+
+```rust,no_run
+# async fn example(client: nelcota_client::Client) -> nelcota_client::Result<()> {
+use nelcota_client::storage::BucketUpdate;
+let current = client.storage().get_bucket("avatars").await?;
+client.storage().update_bucket("avatars", BucketUpdate { public: true, ..current.into() }).await?;
+# Ok(()) }
+```
+
+Authorization belongs to server RLS; a `service_role` token bypasses it and
+belongs only in a trusted application.
 
 ## Rust schema types
 
