@@ -69,7 +69,29 @@ export class StorageBrowser {
   private matches(target: UploadTarget) {
     return this.target?.bucket === target.bucket && this.target.prefix === target.prefix
   }
-  private refresh() { return Promise.all([this.load(), this.loadInfo()]) }
+  private refresh() { return Promise.all([this.reload(), this.loadInfo()]) }
+
+  /**
+   * Reloads the folder after a change, page by page until it shows at least
+   * as many entries as before, so "Load more" progress is not lost.
+   */
+  private reload() {
+    if (!this.target) return Promise.resolve(false)
+    const target = { ...this.target }
+    const current = this.filesResource.data
+    const shown = Math.max(current?.objects.length ?? 0, current?.folders.length ?? 0)
+    return this.filesResource.load(async signal => {
+      const objects: StorageListing['objects'] = []
+      const folders: string[] = []
+      let page: StorageListing
+      do {
+        page = await this.adapter.list(target, Math.max(objects.length, folders.length), signal)
+        objects.push(...page.objects)
+        folders.push(...page.folders)
+      } while (page.has_next && page.objects.length + page.folders.length > 0 && Math.max(objects.length, folders.length) < shown)
+      return { ...page, objects, folders }
+    })
+  }
   cancel() {
     this.target = undefined
     this.filesResource.cancel()

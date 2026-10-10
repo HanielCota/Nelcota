@@ -80,6 +80,22 @@ describe('storage browser operations', () => {
     expect(adapter.info).toHaveBeenCalledTimes(2)
   })
 
+  it('keeps the loaded pages after a deletion or an upload', async () => {
+    const { browser, adapter } = fixture()
+    adapter.list = vi.fn(async (_target, offset: number) => listing(`file-${offset}.txt`, offset < 2))
+    await browser.open({ bucket: 'docs', prefix: '' })
+    await browser.load(true)
+    await browser.load(true)
+    expect(browser.filesResource.data!.objects).toHaveLength(3)
+    vi.mocked(adapter.list).mockClear()
+    await browser.remove('file-1.txt')
+    expect(vi.mocked(adapter.list).mock.calls.map(call => call[1])).toEqual([0, 1, 2])
+    expect(browser.filesResource.data!.objects).toHaveLength(3)
+    vi.mocked(adapter.list).mockClear()
+    await browser.send([new File(['x'], 'new.txt')])
+    expect(vi.mocked(adapter.list).mock.calls.map(call => call[1])).toEqual([0, 1, 2])
+  })
+
   it('retains upload conflicts and their destination after navigation', async () => {
     const { browser, adapter } = fixture(), uploading = deferred<unknown>()
     const file = new File(['x'], 'existing.txt')
