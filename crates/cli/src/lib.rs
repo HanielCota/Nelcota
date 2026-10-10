@@ -122,6 +122,12 @@ pub enum Command {
         /// All projects, one at a time.
         #[arg(long)]
         all: bool,
+        /// Allows a target older than the running version.
+        #[arg(long)]
+        allow_downgrade: bool,
+        /// Only prints the current → target version of each project.
+        #[arg(long)]
+        dry_run: bool,
     },
     /// Dumps the database to backups/ (and uploads it to S3 with --upload).
     Backup {
@@ -382,20 +388,34 @@ pub fn run(cli: Cli) -> anyhow::Result<Outcome> {
         Command::PanelLogin { mode } => done(projects::set_panel_login(&host, mode)),
         Command::Dev(args) => dev::run(&cli.dir, args),
         Command::Migrate { path } => done(db::migrate(&host, selection, &path)),
-        Command::Upgrade { version, all } => {
+        Command::Upgrade {
+            version,
+            all,
+            allow_downgrade,
+            dry_run,
+        } => {
             let manifest = host.require()?;
-            if all {
-                for project in host.projects(&manifest) {
-                    upgrade::run(&host, &project, version.as_deref())?;
-                }
-                Ok(Outcome::Done)
+            let options = upgrade::Options {
+                allow_downgrade,
+                dry_run,
+            };
+            let targets = if all {
+                host.projects(&manifest)
             } else {
-                done(upgrade::run(
-                    &host,
-                    &host.select(&manifest, selection)?,
-                    version.as_deref(),
-                ))
+                vec![host.select(&manifest, selection)?]
+            };
+            let mut failed = Vec::new();
+            for project in &targets {
+                // One failed upgrade (already rolled back) does not stop the others.
+                if let Err(err) = upgrade::run(&host, project, version.as_deref(), options) {
+                    util::warn(&format!("{err:#}"));
+                    failed.push(project.name.clone());
+                }
             }
+            if !failed.is_empty() {
+                bail!("upgrade failed for: {}", failed.join(", "));
+            }
+            Ok(Outcome::Done)
         }
         Command::Backup { upload, keep, all } => {
             let manifest = host.require()?;
@@ -496,6 +516,36 @@ mod cli_tests {
         assert!(matches!(
             cli.command,
             Some(Command::Down { yes: false, .. })
+        ));
+    }
+
+    #[test]
+    fn upgrade_flags() {
+        let cli = Cli::try_parse_from(["nelcota", "upgrade", "--all", "--dry-run"]).unwrap();
+        assert!(matches!(
+            cli.command,
+            Some(Command::Upgrade {
+                all: true,
+                dry_run: true,
+                allow_downgrade: false,
+                version: None
+            })
+        ));
+        let cli = Cli::try_parse_from([
+            "nelcota",
+            "upgrade",
+            "--version",
+            "0.1.0",
+            "--allow-downgrade",
+        ])
+        .unwrap();
+        assert!(matches!(
+            cli.command,
+            Some(Command::Upgrade {
+                allow_downgrade: true,
+                version: Some(_),
+                ..
+            })
         ));
     }
 }
