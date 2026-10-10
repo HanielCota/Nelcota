@@ -27,6 +27,13 @@ function stored(value: unknown): SessionStorage {
 }
 
 describe('password sign-in', () => {
+  it('accepts cancellation options without sending an aborted sign-in', async () => {
+    const { nelcota, calls } = setup();
+    const controller = new AbortController();
+    controller.abort();
+    expect((await nelcota.auth.signInWithPassword({ email: 'a@x.com', password: 'pw' }, { signal: controller.signal })).error?.code).toBe('aborted');
+    expect(calls).toHaveLength(0);
+  });
   it('stores the session, emits signed_in and uses the token', async () => {
     const { nelcota, calls, storage, events } = setup(memoryStorage(), json(session()), json([]));
     const { data, error } = await nelcota.auth.signInWithPassword({ email: ' ana@example.com ', password: 'pw' });
@@ -59,6 +66,54 @@ describe('password sign-in', () => {
 });
 
 describe('refresh', () => {
+  it('coordinates clients sharing an adapter without Web Locks', async () => {
+    vi.stubGlobal('navigator', {});
+    const storage = stored(session(30));
+    let refreshes = 0;
+    const reply = async () => {
+      refreshes++;
+      await new Promise((resolve) => setTimeout(resolve, 15));
+      return json(session(900, 'refresh-2', 'access-2'));
+    };
+    const a = setup(storage, reply);
+    const b = setup(storage, reply);
+    const results = await Promise.all([a.nelcota.auth.getSession(), b.nelcota.auth.getSession()]);
+    expect(refreshes).toBe(1);
+    expect(results.map((result) => result.data?.refresh_token)).toEqual(['refresh-2', 'refresh-2']);
+  });
+
+  it('does not restore a session when logout overlaps a refresh', async () => {
+    let started!: () => void;
+    let finish!: () => void;
+    const begun = new Promise<void>((resolve) => { started = resolve; });
+    const wait = new Promise<void>((resolve) => { finish = resolve; });
+    const { nelcota, storage } = setup(stored(session(30)), async (request) => {
+      if (request.url.pathname !== '/auth/v1/token') return empty();
+      started(); await wait;
+      return json(session(900, 'refresh-2', 'access-2'));
+    });
+    const refresh = nelcota.auth.refreshSession();
+    await begun;
+    const logout = nelcota.auth.signOut();
+    finish();
+    expect((await refresh).error).toBeNull();
+    expect((await logout).error).toBeNull();
+    expect((await nelcota.auth.getSession()).data).toBeNull();
+    expect(await storage.getItem(KEY)).toBeNull();
+  });
+
+  it('does not rearm background timers after dispose during refresh', async () => {
+    vi.useFakeTimers();
+    try {
+      const mock = mockFetch(json(session(900, 'refresh-2', 'access-2')));
+      const nelcota = createClient('https://api.example.com', { fetch: mock.fetch, auth: { autoRefresh: true } });
+      await nelcota.auth.setSession(session(120));
+      const refresh = nelcota.auth.refreshSession();
+      nelcota.dispose(); await refresh;
+      await vi.advanceTimersByTimeAsync(1_000_000);
+      expect(mock.calls).toHaveLength(1);
+    } finally { vi.useRealTimers(); }
+  });
   it('refreshes a session about to expire before using it', async () => {
     const { nelcota, calls, events } = setup(stored(session(30)), json(session(900, 'refresh-2', 'access-2')), json([]));
     await nelcota.from('notes').select();
@@ -158,6 +213,72 @@ describe('refresh', () => {
 });
 
 describe('sign-out and user', () => {
+  it('does not restore a session when getUser completes after logout', async () => {
+    let started!: () => void, finish!: () => void;
+    const begun = new Promise<void>(resolve => { started = resolve; });
+    const wait = new Promise<void>(resolve => { finish = resolve; });
+    const changed = { ...session().user, user_metadata: { name: 'changed' } };
+    const { nelcota, storage, events } = setup(stored(session()), async request => {
+      if (request.url.pathname !== '/auth/v1/user') return empty();
+      started(); await wait; return json(changed);
+    });
+    const user = nelcota.auth.getUser();
+    await begun;
+    await nelcota.auth.signOut();
+    finish(); await user;
+    expect((await nelcota.auth.getSession()).data).toBeNull();
+    expect(await storage.getItem(KEY)).toBeNull();
+    expect(events).toEqual(['signed_out']);
+  });
+
+  it('keeps rotated tokens when an old user response has the same access token', async () => {
+    let started!: () => void, finish!: () => void;
+    const begun = new Promise<void>(resolve => { started = resolve; });
+    const wait = new Promise<void>(resolve => { finish = resolve; });
+    const { nelcota, storage } = setup(stored(session()), async request => {
+      if (request.url.pathname !== '/auth/v1/user') return json(session(900, 'refresh-2', 'access-1'));
+      started(); await wait;
+      return json({ ...session().user, user_metadata: { stale: true } });
+    });
+    const user = nelcota.auth.getUser();
+    await begun;
+    await nelcota.auth.refreshSession();
+    finish(); await user;
+    expect((await nelcota.auth.getSession()).data?.refresh_token).toBe('refresh-2');
+    expect(JSON.parse((await storage.getItem(KEY))!).user.user_metadata).toEqual({});
+  });
+
+  it('does not overwrite a different sign-in with an old user response', async () => {
+    let started!: () => void, finish!: () => void;
+    const begun = new Promise<void>(resolve => { started = resolve; });
+    const wait = new Promise<void>(resolve => { finish = resolve; });
+    const newer = { ...session(900, 'refresh-2', 'access-2'), user: { ...session().user, id: 'u2' } };
+    const { nelcota } = setup(stored(session()), async request => {
+      if (request.url.pathname !== '/auth/v1/user') return json(newer);
+      started(); await wait; return json({ ...session().user, user_metadata: { stale: true } });
+    });
+    const user = nelcota.auth.getUser();
+    await begun;
+    await nelcota.auth.signInWithPassword({ email: 'other@example.com', password: 'pw' });
+    finish(); await user;
+    expect((await nelcota.auth.getSession()).data).toEqual(newer);
+  });
+
+  it('serializes logout after a pending password sign-in', async () => {
+    let started!: () => void, finish!: () => void;
+    const begun = new Promise<void>(resolve => { started = resolve; });
+    const wait = new Promise<void>(resolve => { finish = resolve; });
+    const { nelcota } = setup(memoryStorage(), async request => {
+      if (request.url.pathname !== '/auth/v1/token') return empty();
+      started(); await wait; return json(session());
+    });
+    const signingIn = nelcota.auth.signInWithPassword({ email: 'a@example.com', password: 'pw' });
+    await begun;
+    const signingOut = nelcota.auth.signOut();
+    finish(); await Promise.all([signingIn, signingOut]);
+    expect((await nelcota.auth.getSession()).data).toBeNull();
+  });
+
   it('revokes on the server and forgets locally even when the server fails', async () => {
     const ok = setup(stored(session()), empty(204));
     expect((await ok.nelcota.auth.signOut()).error).toBeNull();

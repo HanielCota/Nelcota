@@ -1,12 +1,11 @@
 //! HTTP request metadata and endpoint rate limiting.
-use crate::AuthSettings;
 use axum::{
     extract::{ConnectInfo, FromRequestParts},
     http::{HeaderMap, header, request::Parts},
 };
 use std::net::{IpAddr, SocketAddr};
 /// Address of the TCP connection, when available (absent in `oneshot` tests).
-pub(crate) struct PeerAddr(pub(crate) Option<SocketAddr>);
+pub struct PeerAddr(pub Option<SocketAddr>);
 
 impl<S: Send + Sync> FromRequestParts<S> for PeerAddr {
     type Rejection = std::convert::Infallible;
@@ -23,12 +22,12 @@ impl<S: Send + Sync> FromRequestParts<S> for PeerAddr {
 
 /// Client IP. Behind a proxy (`trust_proxy`), uses the rightmost entry of
 /// `X-Forwarded-For` (the one OUR proxy added).
-pub(crate) fn client_ip(
-    settings: &AuthSettings,
+pub fn client_ip(
+    trust_proxy: bool,
     headers: &HeaderMap,
     peer: Option<SocketAddr>,
 ) -> Option<IpAddr> {
-    if settings.trust_proxy {
+    if trust_proxy {
         let forwarded = headers
             .get("x-forwarded-for")
             .and_then(|v| v.to_str().ok())
@@ -54,6 +53,7 @@ pub(crate) fn ip_key(ip: Option<IpAddr>) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::AuthSettings;
 
     #[test]
     fn x_forwarded_for_only_with_trust_proxy() {
@@ -69,13 +69,13 @@ mod tests {
         headers.insert("x-forwarded-for", "1.1.1.1, 2.2.2.2".parse().unwrap());
         let peer = Some("9.9.9.9:1234".parse().unwrap());
         assert_eq!(
-            client_ip(&settings, &headers, peer),
+            client_ip(settings.trust_proxy, &headers, peer),
             Some("9.9.9.9".parse().unwrap())
         );
         settings.trust_proxy = true;
         // Only the rightmost entry is trustworthy (the client forges the rest).
         assert_eq!(
-            client_ip(&settings, &headers, peer),
+            client_ip(settings.trust_proxy, &headers, peer),
             Some("2.2.2.2".parse().unwrap())
         );
     }

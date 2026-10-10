@@ -5,10 +5,18 @@ type Cell = string | null
 
 function csvField(value: Cell): string {
   if (value === null) return ''
+  // Protect spreadsheet imports, including headers and whitespace-prefixed
+  // formulas. A negative numeric literal is safe; keep all its original digits.
+  const negativeNumber = /^-(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(value)
+  const significant = value.replace(/^[\s\u0000-\u001f\u007f-\u009f]*/, '')
+  if (!negativeNumber && (/^[\t\r\n]/.test(value) || /^[=+\-@＝＋－＠]/.test(significant))) {
+    return `"\t${value.replaceAll('"', '""')}"`
+  }
   return /[",\r\n]|^\s|\s$/.test(value) ? `"${value.replaceAll('"', '""')}"` : value
 }
 
-/** CSV (RFC 4180) with a BOM, so Excel recognises UTF-8. NULL = empty field. */
+/** Spreadsheet-safe CSV with a BOM. Dangerous text gets a quoted tab prefix;
+ * JSON export keeps the original values. NULL = empty field. */
 export function toCsv(columns: readonly string[], rows: readonly (readonly Cell[])[]): string {
   const lines = [columns, ...rows].map((row) => row.map(csvField).join(','))
   return `﻿${lines.join('\r\n')}\r\n`

@@ -14,7 +14,7 @@ use serde_json::{Map, Value, json};
 use uuid::Uuid;
 
 use super::{ProviderIdentity, ProviderKind};
-use crate::{credentials::normalize_email, db::db_error};
+use crate::{accounts::confirm_inbox_owner, credentials::normalize_email, db::db_error};
 
 /// Why a sign-in cannot open an account; the code goes back to the app.
 #[derive(Debug, PartialEq, Eq)]
@@ -47,22 +47,40 @@ pub(super) async fn resolve(
         .as_deref()
         .and_then(|email| normalize_email(email).ok());
 
-    let linked: Option<Uuid> = tx
+    // Account before identity/code: an inbox claim removes the credentials
+    // established before verification. Recheck the identity after this lock,
+    // since it may have been removed while this sign-in waited.
+    let linked_account: Option<Uuid> = tx
         .query_opt(
+            "SELECT u.id FROM auth.users u
+               JOIN auth.identities i ON i.user_id = u.id
+              WHERE i.provider = $1 AND i.provider_id = $2
+              FOR UPDATE OF u",
+            &[&provider.as_str(), &identity.subject],
+        )
+        .await
+        .map_err(db_error)?
+        .map(|row| row.get(0));
+    let linked = if let Some(user_id) = linked_account {
+        tx.query_opt(
             "UPDATE auth.identities
                 SET email = $3, identity_data = $4, updated_at = now(), last_sign_in_at = now()
-              WHERE provider = $1 AND provider_id = $2
+              WHERE provider = $1 AND provider_id = $2 AND user_id = $5
               RETURNING user_id",
             &[
                 &provider.as_str(),
                 &identity.subject,
                 &email,
                 &identity.data,
+                &user_id,
             ],
         )
         .await
         .map_err(db_error)?
-        .map(|row| row.get(0));
+        .map(|row| row.get::<_, Uuid>(0))
+    } else {
+        None
+    };
     if let Some(user_id) = linked {
         return Ok(Ok(user_id));
     }
@@ -83,7 +101,7 @@ pub(super) async fn resolve(
         Some(_) if !identity.email_verified => return Ok(Err(Refusal::EmailConflict)),
         Some((user_id, true)) => user_id,
         Some((user_id, false)) => {
-            take_over(tx, user_id).await?;
+            confirm_inbox_owner(tx, user_id).await?;
             user_id
         }
         None if !signup_enabled => return Ok(Err(Refusal::SignupDisabled)),
@@ -105,33 +123,6 @@ pub(super) async fn resolve(
     .map_err(db_error)?;
     tracing::info!(user_id = %user_id, provider = provider.as_str(), "provider identity linked");
     Ok(Ok(user_id))
-}
-
-/// The verified owner claims an unconfirmed account: what someone else may
-/// have set up with the address (password, sessions, pending links) is void.
-async fn take_over(tx: &Transaction<'_>, user_id: Uuid) -> Result<(), ApiError> {
-    tx.execute(
-        "UPDATE auth.users
-            SET encrypted_password = NULL, email_confirmed_at = now(), updated_at = now()
-          WHERE id = $1",
-        &[&user_id],
-    )
-    .await
-    .map_err(db_error)?;
-    tx.execute(
-        "UPDATE auth.sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL",
-        &[&user_id],
-    )
-    .await
-    .map_err(db_error)?;
-    tx.execute(
-        "DELETE FROM auth.one_time_tokens WHERE user_id = $1",
-        &[&user_id],
-    )
-    .await
-    .map_err(db_error)?;
-    tracing::warn!(user_id = %user_id, "unconfirmed account taken over by its verified owner");
-    Ok(())
 }
 
 async fn create_user(

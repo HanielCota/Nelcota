@@ -120,6 +120,7 @@ pub struct Options {
     /// `migrations/` folder the panel sees.
     pub migrations_dir: Option<std::path::PathBuf>,
     pub rate_limit_per_minute: u32,
+    pub panel_rate_limit_per_minute: u32,
     pub access_ttl_secs: u64,
     pub max_rows: Option<i64>,
     /// Storage limits (on a disk store in a temporary directory).
@@ -138,6 +139,7 @@ impl Default for Options {
             signup_enabled: true,
             migrations_dir: None,
             rate_limit_per_minute: 10_000,
+            panel_rate_limit_per_minute: 1000,
             access_ttl_secs: 900,
             max_rows: None,
             storage: nelcota_storage::StorageSettings {
@@ -249,6 +251,7 @@ impl TestApp {
                 max_rows: options.max_rows,
             }),
         };
+        let passwords = Arc::new(Passwords::new(2));
         let panel = nelcota_admin::AdminState {
             sql: Arc::default(),
             db: db::admin_pool(&admin, 2),
@@ -259,7 +262,9 @@ impl TestApp {
                 password_hash: nelcota_auth::hash_password(ADMIN_PASSWORD).unwrap(),
             }),
             sessions: Arc::default(),
-            limiter: Arc::new(RateLimiter::new(1000)),
+            limiter: Arc::new(RateLimiter::new(options.panel_rate_limit_per_minute)),
+            passwords: passwords.clone(),
+            trust_proxy: false,
             secure_cookies: false,
             host: Arc::new(nelcota_admin::HostLink {
                 project: "shop".into(),
@@ -297,7 +302,7 @@ impl TestApp {
             oauth: options.oauth.clone(),
             pool: pool.clone(),
             keys: keys.clone(),
-            passwords: Arc::new(Passwords::new(2)),
+            passwords,
             limiter: Arc::new(RateLimiter::new(options.rate_limit_per_minute)),
             settings: Arc::new(AuthSettings {
                 issuer: "nelcota-test".into(),

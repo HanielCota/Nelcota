@@ -195,7 +195,7 @@
                     <Table.Head>{t('migrations.columns.name')}</Table.Head>
                     <Table.Head>{t('migrations.columns.status')}</Table.Head>
                     <Table.Head>{t('migrations.columns.appliedOn')}</Table.Head>
-                    <Table.Head class="w-28"></Table.Head>
+                    <Table.Head class="w-28"><span class="sr-only">{t('common.actions')}</span></Table.Head>
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>

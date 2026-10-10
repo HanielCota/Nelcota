@@ -203,8 +203,10 @@ with WAL-G is pending (daily dumps: an RPO of up to 24 h).
 **D40. Upgrade with rollback = previous image + restore of the pre-upgrade
 backup.** The new version may have applied internal migrations the previous
 one does not know (refinery refuses to start with an "unknown" migration).
-That is why the rollback also restores the database. The acceptance test
-covers this path.
+That is why the rollback also restores the database and the matching disk-file
+snapshot. The proxy stays in maintenance from before the old app stops until
+the upgraded or restored app is healthy, so successful public writes cannot
+be lost between capture and rollback. Failure-path tests cover this sequencing.
 
 **D41. `scratch` image with a musl binary; built-in healthcheck.** No shell or
 curl in the image: `nelcota healthcheck` performs `GET /health` over plain TCP.
@@ -575,6 +577,9 @@ Postgres share a disk. Every upload has a size cap (per bucket, and a global
 `NELCOTA_STORAGE_MAX_FILE_SIZE`, 50 MiB by default); an optional total quota
 covers all buckets; and on the disk backend an upload is refused when free
 space would fall under `NELCOTA_STORAGE_MIN_FREE_BYTES` (1 GiB by default).
+In-flight uploads reserve their capacity, and publication checks the resulting
+total under a database transaction lock across instances. Replacements credit
+their old logical size while reserving disk space for the new version.
 Per-user quotas are left to policies, which see the final row (with its
 size) on insert. Image transformations and resumable (TUS) uploads stay out:
 decoding untrusted images is a steady source of CVEs.

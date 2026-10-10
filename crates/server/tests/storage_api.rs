@@ -536,21 +536,48 @@ async fn signed_urls() {
     assert_eq!(status, StatusCode::FORBIDDEN);
     let (status, _) = app.get("/rest/v1/todos", Some(token)).await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
-    // Expired.
-    let expired = app
-        .keys
-        .sign(&json!({ "typ": "nelcota-storage-url", "bucket": "docs", "name": name, "exp": 1 }))
-        .unwrap();
+    // A file grant has a strict deadline, including the API JWT's 30 s leeway.
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    for exp in [1, now, now - 1, now - 10, now - 29, now - 31] {
+        let expired = app
+            .keys
+            .sign(&json!({
+                "typ": "nelcota-storage-url", "bucket": "docs", "name": name, "exp": exp
+            }))
+            .unwrap();
+        let (status, _, bytes) = app
+            .bytes(
+                Method::GET,
+                &format!("{sign}?token={expired}"),
+                None,
+                &[],
+                vec![],
+            )
+            .await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "exp={exp}, now={now}");
+        assert_ne!(bytes, b"%PDF-1.7 contract");
+    }
+
+    let reply = app.post(&sign, Some(&a), json!({ "expires_in": 1 })).await;
+    assert_eq!(reply.status, StatusCode::OK);
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
     let (status, _, _) = app
         .bytes(
             Method::GET,
-            &format!("{sign}?token={expired}"),
+            reply.body["signed_url"].as_str().unwrap(),
             None,
             &[],
             vec![],
         )
         .await;
-    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert_eq!(
+        status,
+        StatusCode::FORBIDDEN,
+        "a real one-second grant expired"
+    );
 }
 
 #[tokio::test]

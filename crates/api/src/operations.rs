@@ -53,13 +53,13 @@ async fn fetch_json(
     tx: &Transaction<'_>,
     sql: &Sql,
 ) -> Result<(String, i64), tokio_postgres::Error> {
-    let statement = tx.prepare_cached(&sql.text).await?;
+    let statement = tx.prepare(&sql.text).await?;
     let row = tx.query_one(&statement, &sql.param_refs()).await?;
     Ok((row.get(0), row.get(1)))
 }
 
 async fn execute(tx: &Transaction<'_>, sql: &Sql) -> Result<u64, tokio_postgres::Error> {
-    let statement = tx.prepare_cached(&sql.text).await?;
+    let statement = tx.prepare(&sql.text).await?;
     tx.execute(&statement, &sql.param_refs()).await
 }
 
@@ -120,7 +120,7 @@ pub(crate) async fn read(
         let (body, rows) = fetch_json(&tx, &sql).await?;
         let total = match &count_sql {
             Some(sql) => {
-                let statement = tx.prepare_cached(&sql.text).await?;
+                let statement = tx.prepare(&sql.text).await?;
                 Some(
                     tx.query_one(&statement, &sql.param_refs())
                         .await?
@@ -252,6 +252,7 @@ pub(crate) async fn rpc(
     catalog: &Catalog,
     name: &str,
     bytes: &[u8],
+    max_rows: Option<i64>,
 ) -> Result<Option<String>, ApiError> {
     let candidates = catalog
         .functions
@@ -265,13 +266,13 @@ pub(crate) async fn rpc(
         ));
     };
     let function = query::resolve_function(candidates, &args).map_err(bad_query)?;
-    let sql = query::rpc(&catalog.schema, function, args);
+    let sql = query::rpc(&catalog.schema, function, args, max_rows);
     if function.returns_void {
         in_request_tx!(pool, claims, |tx| { execute(&tx, &sql).await });
         return Ok(None);
     }
     let body = in_request_tx!(pool, claims, |tx| {
-        let statement = tx.prepare_cached(&sql.text).await?;
+        let statement = tx.prepare(&sql.text).await?;
         let row = tx.query_one(&statement, &sql.param_refs()).await?;
         Ok::<_, tokio_postgres::Error>(row.get::<_, Option<String>>(0))
     });

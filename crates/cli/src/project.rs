@@ -29,6 +29,8 @@ impl Service {
     }
 }
 
+mod services;
+
 pub struct Project {
     pub name: String,
     pub dir: PathBuf,
@@ -75,87 +77,31 @@ impl Project {
         }
     }
 
-    fn unit(&self, service: Service) -> String {
-        match service {
-            Service::Postgres => native::POSTGRES_UNIT.to_owned(),
-            Service::App => native::app_unit(&self.name),
-        }
-    }
-
-    fn units(&self, services: &[Service]) -> Vec<String> {
-        services.iter().map(|s| self.unit(*s)).collect()
-    }
-
     // ------------------------------------------------------------ lifecycle
 
     /// Starts everything (and, on systemd, enables it at boot).
     pub fn up(&self) -> anyhow::Result<()> {
-        match self.runtime {
-            Runtime::Docker => self.compose_ok(&["up", "-d"]),
-            Runtime::Systemd => {
-                let mut args = vec!["enable".to_owned(), "--now".to_owned()];
-                args.extend(self.units(&[Service::Postgres, Service::App]));
-                native::systemctl(&args)
-            }
-        }
+        services::for_project(self).up()
     }
 
     /// Stops everything. With `volumes`, also deletes the data (Docker only:
     /// on systemd, `remove` drops the cluster).
     pub fn down(&self, volumes: bool) -> anyhow::Result<()> {
-        match (self.runtime, volumes) {
-            (Runtime::Docker, true) => self.compose_ok(&["down", "--volumes"]),
-            (Runtime::Docker, false) => self.compose_ok(&["down"]),
-            (Runtime::Systemd, true) => {
-                bail!("--volumes is for Docker hosts; to delete the data use `nelcota remove`")
-            }
-            (Runtime::Systemd, false) => self.stop(&[Service::App, Service::Postgres]),
-        }
+        services::for_project(self).down(volumes)
     }
 
     pub fn start(&self, services: &[Service]) -> anyhow::Result<()> {
-        match self.runtime {
-            Runtime::Docker => {
-                let mut args = vec!["up", "-d"];
-                args.extend(services.iter().map(|s| s.compose()));
-                self.compose_ok(&args)
-            }
-            Runtime::Systemd => {
-                let units = self.units(services);
-                // A unit that failed before (a refused recovery) must be cleared to start.
-                let _ =
-                    native::systemctl_quiet(&[&["reset-failed".to_owned()], &units[..]].concat());
-                native::systemctl(&[&["start".to_owned()], &units[..]].concat())
-            }
-        }
+        services::for_project(self).start(services)
     }
 
     pub fn stop(&self, services: &[Service]) -> anyhow::Result<()> {
-        match self.runtime {
-            Runtime::Docker => {
-                let mut args = vec!["stop"];
-                args.extend(services.iter().map(|s| s.compose()));
-                self.compose_ok(&args)
-            }
-            Runtime::Systemd => {
-                native::systemctl(&[&["stop".to_owned()], &self.units(services)[..]].concat())
-            }
-        }
+        services::for_project(self).stop(services)
     }
 
     /// Restarts a service so it rereads its configuration (on Docker, a new
     /// container: also picks up `.env` and image changes).
     pub fn recreate(&self, service: Service) -> anyhow::Result<()> {
-        match self.runtime {
-            Runtime::Docker => {
-                self.compose_ok(&["up", "-d", "--force-recreate", service.compose()])
-            }
-            Runtime::Systemd => {
-                let unit = self.unit(service);
-                let _ = native::systemctl_quiet(&["reset-failed".to_owned(), unit.clone()]);
-                native::systemctl(&["restart".to_owned(), unit])
-            }
-        }
+        services::for_project(self).recreate(service)
     }
 
     /// Has the app been created (container or unit)?
@@ -167,73 +113,19 @@ impl Project {
     }
 
     pub fn logs(&self, follow: bool, service: Option<&str>) -> anyhow::Result<()> {
-        match self.runtime {
-            Runtime::Docker => {
-                let mut args = vec!["logs", "--tail", "200"];
-                if follow {
-                    args.push("-f");
-                }
-                if let Some(service) = service {
-                    args.push(service);
-                }
-                self.compose_ok(&args)
-            }
-            Runtime::Systemd => {
-                let units = match service {
-                    None => self.units(&[Service::Postgres, Service::App]),
-                    Some("postgres") => self.units(&[Service::Postgres]),
-                    Some("app") => self.units(&[Service::App]),
-                    Some(other) => bail!("unknown service '{other}' (postgres or app)"),
-                };
-                let mut command = Command::new("journalctl");
-                command.args(["--no-pager", "-n", "200"]);
-                if follow {
-                    command.arg("-f");
-                }
-                for unit in &units {
-                    command.args(["-u", unit]);
-                }
-                run(&mut command, "journalctl")
-            }
-        }
+        services::for_project(self).logs(follow, service)
+    }
+
+    /// Downloads/checks a target version before entering maintenance.
+    pub fn prepare_version(&self, version: &str) -> anyhow::Result<()> {
+        services::for_project(self).prepare_version(version)
     }
 
     // --------------------------------------------------------------- health
 
     /// Health of the service (`healthy`, `starting`, `unhealthy`...), if running.
     pub fn health(&self, service: Service) -> Option<String> {
-        match self.runtime {
-            Runtime::Docker => {
-                let id = self.compose_output(&["ps", "-q", service.compose()]).ok()?;
-                let id = id.trim();
-                if id.is_empty() {
-                    return None;
-                }
-                let output = Command::new("docker")
-                    .args(["inspect", "--format", "{{.State.Health.Status}}", id])
-                    .output()
-                    .ok()?;
-                Some(String::from_utf8_lossy(&output.stdout).trim().to_owned())
-            }
-            Runtime::Systemd => {
-                let state = native::unit_state(&self.unit(service))?;
-                match state.as_str() {
-                    "active" => {}
-                    "failed" => return Some("unhealthy".into()),
-                    "activating" | "reloading" => return Some("starting".into()),
-                    _ => return None,
-                }
-                let up = match service {
-                    Service::App => crate::util::healthcheck(native::APP_LISTEN),
-                    Service::Postgres => self
-                        .as_postgres(&["pg_isready", "-q"])
-                        .stderr(Stdio::null())
-                        .status()
-                        .is_ok_and(|s| s.success()),
-                };
-                Some(if up { "healthy" } else { "starting" }.into())
-            }
-        }
+        services::for_project(self).health(service)
     }
 
     /// Waits for the service to become `healthy`.
@@ -262,27 +154,7 @@ impl Project {
     /// Did Postgres die since it was last (re)started? A recovery whose
     /// target the archive does not reach makes it exit.
     pub fn postgres_crashed(&self) -> bool {
-        match self.runtime {
-            Runtime::Docker => {
-                let Ok(id) = self.compose_output_quiet(&["ps", "-a", "-q", "postgres"]) else {
-                    return false;
-                };
-                Command::new("docker")
-                    .args(["inspect", "--format", "{{.RestartCount}}", id.trim()])
-                    .output()
-                    .ok()
-                    .and_then(|o| {
-                        String::from_utf8_lossy(&o.stdout)
-                            .trim()
-                            .parse::<u64>()
-                            .ok()
-                    })
-                    .is_some_and(|n| n > 0)
-            }
-            Runtime::Systemd => {
-                native::unit_state(native::POSTGRES_UNIT).as_deref() == Some("failed")
-            }
-        }
+        services::for_project(self).postgres_crashed()
     }
 
     // ------------------------------------------------- commands on the data

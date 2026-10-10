@@ -1,0 +1,1 @@
+import{D as e,O as t,y as n}from"./api-D7w_tm9R.js";var r=new Set([`$$slots`,`$$events`,`$$legacy`]);function i(i,a){let o=e(a,r),s={name:`arrow-up-right`,size:24,node:[[`path`,{d:`M7 7h10v10`}],[`path`,{d:`M7 17 17 7`}]]};n(i,t(()=>o,{get icon(){return s}}))}export{i as t};

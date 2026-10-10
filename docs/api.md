@@ -116,9 +116,25 @@ Same syntax as PostgREST. Inside the parentheses each filter is written
 
 - Body: a JSON array built by Postgres (`json_agg`).
 - `Content-Range: 0-19/*`, or `0-19/137` with `Prefer: count=exact`.
-- `NELCOTA_MAX_ROWS` (optional) caps the number of rows per read.
+- `NELCOTA_MAX_ROWS` defaults to **1000** and must be positive. It caps the root
+  read, each embedded collection, and set-returning RPCs, including explicit
+  limits larger than the cap. Embedded collections in write representations
+  have a fixed cap of 1000. Paginate collections to reach subsequent rows.
+- JSON has an **8 MiB serialization budget**, checked in PostgreSQL before each
+  row enters an aggregate, also on write representations and scalar RPCs.
+  Intermediate embedded values count towards the same budget, so deeply nested
+  results can reach it with less than 8 MiB of final output. Oversized results
+  return `413 response_too_large`; a write requesting such a representation
+  rolls back. A single database value must still be serialized before its size
+  can be checked. Administrative streaming exports remain available for large data.
+- `select` accepts at most 128 items across the relation tree. Repeated columns
+  are rejected; `*` already includes explicitly selected columns.
 
 ## Writes
+
+An insert accepts at most **1000 rows** and **128 distinct column sets** per
+request. Split larger batches into requests. Each accepted request keeps its
+transactional behavior and missing columns still receive their defaults.
 
 | Verb | Body | Filters | Without `return=representation` | With `return=representation` |
 |---|---|---|---|---|
@@ -181,6 +197,11 @@ JWT's role (unless it is `SECURITY DEFINER`): `auth.uid()` works inside it.
 
 An OpenAPI 3.0 document generated from the catalog and **filtered by the
 request's role**: `anon` only sees what `anon` may use.
+
+Schema models: `nelcota types -o database.ts` (TypeScript, default), or
+`nelcota types --lang rust -o database.rs` for the
+[Rust SDK](../sdk/rust/README.md). The Rust models distinguish omitted write
+fields from explicit nulls and keep Postgres numeric precision.
 
 ## Catalog reload
 

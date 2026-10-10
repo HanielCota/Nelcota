@@ -14,10 +14,19 @@ function locks(): LockManagerLike | undefined {
   return nav?.locks;
 }
 
-/** Runs `task` holding a lock shared by every tab of this origin (when available). */
+const pending = new Map<string, Promise<void>>();
+
+/** Web Locks across tabs, or a queue shared by clients in this module instance. */
 export function withLock<T>(name: string, task: () => Promise<T>): Promise<T> {
   const manager = locks();
-  return manager ? manager.request(name, task) : task();
+  if (manager) return manager.request(name, task);
+  const run = (pending.get(name) ?? Promise.resolve()).then(task);
+  const tail = run.then(() => undefined, () => undefined);
+  pending.set(name, tail);
+  void tail.then(() => {
+    if (pending.get(name) === tail) pending.delete(name);
+  });
+  return run;
 }
 
 export type SessionSignal = 'changed';

@@ -11,6 +11,8 @@ pub mod http;
 mod mime;
 mod operations;
 mod path;
+mod private_dir;
+mod quota;
 mod serve;
 mod signing;
 mod store;
@@ -46,6 +48,7 @@ pub struct StorageState {
     pub store: Arc<Store>,
     pub settings: Arc<StorageSettings>,
     uploads: Arc<Semaphore>,
+    quota: Arc<quota::Quota>,
 }
 
 impl StorageState {
@@ -56,6 +59,7 @@ impl StorageState {
             store,
             settings: Arc::new(settings),
             uploads: Arc::new(Semaphore::new(CONCURRENT_UPLOADS)),
+            quota: Arc::default(),
         }
     }
 }

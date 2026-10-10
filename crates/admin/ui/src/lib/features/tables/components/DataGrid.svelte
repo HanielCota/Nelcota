@@ -201,7 +201,7 @@
         </th>
       {/if}
       {#each columns as { column, kind } (column.name)}
-        <th class="border-r border-b bg-card p-0 align-top font-normal shadow-[inset_0_-1px_0_var(--border)]">
+        <th aria-sort={sortOf(column.name) === 'asc' ? 'ascending' : sortOf(column.name) === 'desc' ? 'descending' : undefined} class="border-r border-b bg-card p-0 align-top font-normal shadow-[inset_0_-1px_0_var(--border)]">
           <GridColumnHeader
             {column}
             {kind}
@@ -219,7 +219,7 @@
   <tbody>
     {#each data.rows as row, i (rowKey(row, data.table.primary_key, i))}
       {@const isSelected = selected.has(i)}
-      <tr class={['group transition-colors', isSelected ? 'bg-brand/[0.07]' : 'hover:bg-muted/60']}>
+      <tr aria-selected={editable ? isSelected : undefined} class={['group transition-colors', isSelected ? 'bg-brand/[0.07]' : 'hover:bg-muted/60']}>
         {#if editable}
           <td role="gridcell" class={[stickyCell, 'px-3.5 py-2', isSelected ? 'bg-[color-mix(in_oklch,var(--brand)_7%,var(--background))]' : 'group-hover:bg-[color-mix(in_oklch,var(--muted)_60%,var(--background))]']}>
             <div class="flex items-center gap-2">

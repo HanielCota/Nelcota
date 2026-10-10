@@ -25,6 +25,58 @@ const APP: &str = "https://app.example.com/auth";
 const AUTHORIZE: &str = "https://github.example/login/oauth/authorize";
 const VERIFIER: &str = "app-verifier-0123456789-abcdefghijklmnopqrstuvwxyz";
 
+#[tokio::test]
+async fn rust_sdk_finishes_a_real_pkce_flow() {
+    let harness = Harness::spawn().await;
+    harness.account(9900, Some("rust-oauth@example.com"), true);
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let url = format!("http://{}", listener.local_addr().unwrap());
+    let router = harness.app.router.clone();
+    let task = tokio::spawn(async move {
+        axum::serve(
+            listener,
+            router.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .await
+        .unwrap();
+    });
+    let client = nelcota_client::Client::builder(url).build().unwrap();
+    let flow = client
+        .auth()
+        .begin_oauth(nelcota_client::auth::OAuthProvider::Github, APP)
+        .unwrap();
+    let reply = harness
+        .app
+        .raw(
+            axum::http::Method::GET,
+            &format!("{}?{}", flow.url.path(), flow.url.query().unwrap()),
+            &[],
+            String::new(),
+        )
+        .await;
+    assert_eq!(reply.status, StatusCode::SEE_OTHER);
+    let state = query_of(&location(&reply))["state"].clone();
+    let reply = harness
+        .callback(&format!("code=good-code&state={state}"))
+        .await;
+    assert_eq!(reply.status, StatusCode::SEE_OTHER);
+    let mut callback = url::Url::parse(&location(&reply)).unwrap();
+    let session = client
+        .auth()
+        .handle_redirect(&mut callback, flow)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(session.user.email, "rust-oauth@example.com");
+    assert!(
+        !callback
+            .query_pairs()
+            .any(|(k, _)| k == "code" || k == "error")
+    );
+    assert_eq!(client.auth().get_user().await.unwrap().id, session.user.id);
+    task.abort();
+}
+
 /// What the fake provider answers and what it was sent.
 #[derive(Default)]
 struct Fake {
@@ -33,6 +85,7 @@ struct Fake {
     token_requests: Vec<HashMap<String, String>>,
     /// How long the code exchange takes (to overlap concurrent callbacks).
     token_delay: std::time::Duration,
+    token_gate: Option<Arc<tokio::sync::Notify>>,
 }
 
 type Shared = Arc<Mutex<Fake>>;
@@ -42,9 +95,15 @@ async fn token(
     Form(form): Form<HashMap<String, String>>,
 ) -> (StatusCode, Json<Value>) {
     let good = form.get("code").map(String::as_str) == Some("good-code");
-    let delay = fake.lock().unwrap().token_delay;
+    let (delay, gate) = {
+        let mut fake = fake.lock().unwrap();
+        fake.token_requests.push(form);
+        (fake.token_delay, fake.token_gate.clone())
+    };
+    if let Some(gate) = gate {
+        gate.notified().await;
+    }
     tokio::time::sleep(delay).await;
-    fake.lock().unwrap().token_requests.push(form);
     if good {
         (
             StatusCode::OK,
@@ -403,6 +462,338 @@ async fn verified_emails_link_confirmed_accounts() {
             .status,
         StatusCode::OK
     );
+    h.app
+        .post(
+            "/auth/v1/magiclink",
+            None,
+            json!({"email":"linked@example.com"}),
+        )
+        .await;
+    let token = link_token(
+        &h.app.outbox.wait_for(1).await[0],
+        MAGIC_LINK_URL,
+        "magiclink",
+    );
+    let reply = h
+        .app
+        .post(
+            "/auth/v1/verify",
+            None,
+            json!({"type":"magiclink","token":token}),
+        )
+        .await;
+    assert_eq!(reply.status, StatusCode::OK);
+    assert_eq!(
+        h.session().await["user"]["id"],
+        id,
+        "confirmed provider links remain usable"
+    );
+}
+
+#[tokio::test]
+async fn magic_link_claim_invalidates_unverified_provider_identity_and_pending_code() {
+    let h = Harness::spawn().await;
+    h.account(700, Some("provider-victim@example.com"), false);
+    let old = h.session().await;
+    assert!(old["user"]["email_confirmed_at"].is_null());
+    let pending = h.sign_in().await;
+    h.app
+        .post(
+            "/auth/v1/magiclink",
+            None,
+            json!({"email":"provider-victim@example.com"}),
+        )
+        .await;
+    let token = link_token(
+        &h.app.outbox.wait_for(1).await[0],
+        MAGIC_LINK_URL,
+        "magiclink",
+    );
+    let owner = h
+        .app
+        .post(
+            "/auth/v1/verify",
+            None,
+            json!({"type":"magiclink","token":token}),
+        )
+        .await;
+    assert_eq!(owner.status, StatusCode::OK);
+    assert_eq!(owner.body["user"]["id"], old["user"]["id"]);
+    assert_eq!(
+        h.redeem(&pending["code"], VERIFIER).await.body["code"],
+        "invalid_grant",
+        "a provider code authorized before inbox proof must not open a new session"
+    );
+    assert_eq!(
+        h.sign_in().await.get("error").map(String::as_str),
+        Some("email_conflict"),
+        "the old unverified provider identity must no longer open the claimed account"
+    );
+    assert_eq!(
+        h.app
+            .post(
+                "/auth/v1/token?grant_type=refresh_token",
+                None,
+                json!({"refresh_token": old["refresh_token"]})
+            )
+            .await
+            .body["code"],
+        "invalid_grant"
+    );
+}
+
+#[tokio::test]
+async fn verified_provider_claim_invalidates_old_identity_and_code() {
+    let h = Harness::spawn().await;
+    h.account(710, Some("provider-claim@example.com"), false);
+    let old = h.session().await;
+    let pending = h.sign_in().await;
+    h.account(711, Some("provider-claim@example.com"), true);
+    let owner = h.session().await;
+    assert_eq!(owner["user"]["id"], old["user"]["id"]);
+    assert_eq!(
+        h.redeem(&pending["code"], VERIFIER).await.body["code"],
+        "invalid_grant"
+    );
+    assert_eq!(
+        h.session().await["user"]["id"],
+        old["user"]["id"],
+        "the verified identity is retained"
+    );
+    h.account(710, Some("provider-claim@example.com"), false);
+    assert_eq!(
+        h.sign_in().await.get("error").map(String::as_str),
+        Some("email_conflict")
+    );
+}
+
+#[tokio::test]
+async fn inbox_claim_serializes_with_pending_pkce_redemption() {
+    claim_serializes_with_pending_pkce("magiclink").await;
+}
+
+#[tokio::test]
+async fn recovery_claim_serializes_with_pending_pkce_redemption() {
+    claim_serializes_with_pending_pkce("recovery").await;
+}
+
+async fn claim_serializes_with_pending_pkce(kind: &str) {
+    let h = Arc::new(Harness::spawn().await);
+    h.account(720, Some("pkce-race@example.com"), false);
+    let old = h.session().await;
+    let pending = h.sign_in().await;
+    let code = pending["code"].clone();
+    let id: uuid::Uuid = old["user"]["id"].as_str().unwrap().parse().unwrap();
+    let (path, page) = if kind == "recovery" {
+        ("/auth/v1/recover", RECOVERY_URL)
+    } else {
+        ("/auth/v1/magiclink", MAGIC_LINK_URL)
+    };
+    h.app
+        .post(path, None, json!({"email":"pkce-race@example.com"}))
+        .await;
+    let token = link_token(&h.app.outbox.wait_for(1).await[0], page, kind);
+    let (mut locker, connection) = h.app.admin.connect(tokio_postgres::NoTls).await.unwrap();
+    tokio::spawn(connection);
+    let lock = locker.transaction().await.unwrap();
+    lock.query_one("SELECT id FROM auth.users WHERE id=$1 FOR UPDATE", &[&id])
+        .await
+        .unwrap();
+    let owner_app = h.clone();
+    let kind = kind.to_owned();
+    let owner = tokio::spawn(async move {
+        owner_app
+            .app
+            .post(
+                "/auth/v1/verify",
+                None,
+                json!({"type":kind,"token":token,"password":"owner-password-123"}),
+            )
+            .await
+    });
+    async fn wait(h: &Harness, table: &str) {
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(5);
+        loop {
+            let found: bool = h
+                .app
+                .admin_client
+                .query_one(
+                    "SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE wait_event_type='Lock'
+                    AND query LIKE 'SELECT u.id FROM auth.users u%' AND query LIKE $1)",
+                    &[&format!("%{table}%")],
+                )
+                .await
+                .unwrap()
+                .get(0);
+            if found {
+                return;
+            }
+            assert!(
+                tokio::time::Instant::now() < deadline,
+                "request never reached the account lock"
+            );
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+    }
+    wait(&h, "auth.one_time_tokens").await;
+    let attacker_app = h.clone();
+    let attacker = tokio::spawn(async move { attacker_app.redeem(&code, VERIFIER).await });
+    wait(&h, "auth.flow_states").await;
+    lock.commit().await.unwrap();
+    assert_eq!(owner.await.unwrap().status, StatusCode::OK);
+    let denied = attacker.await.unwrap();
+    assert_eq!(denied.status, StatusCode::BAD_REQUEST, "{}", denied.text);
+    assert_eq!(denied.body["code"], "invalid_grant");
+    let active: i64 = h
+        .app
+        .admin_client
+        .query_one(
+            "SELECT count(*) FROM auth.sessions WHERE user_id=$1 AND revoked_at IS NULL",
+            &[&id],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    assert_eq!(active, 1, "only the inbox owner's session survives");
+}
+
+#[tokio::test]
+async fn recovery_claim_removes_unverified_identity_codes_and_links_but_keeps_new_password() {
+    let h = Harness::spawn().await;
+    h.account(730, Some("recovery-claim@example.com"), false);
+    let previous = h.session().await;
+    assert!(previous["user"]["email_confirmed_at"].is_null());
+    let pending = h.sign_in().await;
+    h.app
+        .post(
+            "/auth/v1/magiclink",
+            None,
+            json!({"email":"recovery-claim@example.com"}),
+        )
+        .await;
+    let old_link = link_token(
+        &h.app.outbox.wait_for(1).await[0],
+        MAGIC_LINK_URL,
+        "magiclink",
+    );
+    h.app
+        .post(
+            "/auth/v1/recover",
+            None,
+            json!({"email":"recovery-claim@example.com"}),
+        )
+        .await;
+    let token = link_token(&h.app.outbox.wait_for(2).await[1], RECOVERY_URL, "recovery");
+    let owner = h
+        .app
+        .post(
+            "/auth/v1/verify",
+            None,
+            json!({"type":"recovery","token":token,"password":"owner-password-123"}),
+        )
+        .await;
+    assert_eq!(owner.status, StatusCode::OK, "{}", owner.text);
+    assert_eq!(owner.body["user"]["id"], previous["user"]["id"]);
+    assert!(owner.body["user"]["email_confirmed_at"].is_string());
+    assert_eq!(
+        h.redeem(&pending["code"], VERIFIER).await.body["code"],
+        "invalid_grant"
+    );
+    assert_eq!(
+        h.sign_in().await.get("error").map(String::as_str),
+        Some("email_conflict")
+    );
+    assert_eq!(
+        h.app
+            .post(
+                "/auth/v1/token?grant_type=refresh_token",
+                None,
+                json!({"refresh_token":previous["refresh_token"]})
+            )
+            .await
+            .body["code"],
+        "invalid_grant"
+    );
+    assert_eq!(
+        h.app
+            .post(
+                "/auth/v1/verify",
+                None,
+                json!({"type":"magiclink","token":old_link})
+            )
+            .await
+            .body["code"],
+        "invalid_grant"
+    );
+    assert_eq!(
+        password_login(&h.app, "recovery-claim@example.com", "owner-password-123")
+            .await
+            .status,
+        StatusCode::OK
+    );
+    assert_eq!(
+        h.app
+            .post(
+                "/auth/v1/token?grant_type=refresh_token",
+                None,
+                json!({"refresh_token":owner.body["refresh_token"]})
+            )
+            .await
+            .status,
+        StatusCode::OK
+    );
+}
+
+#[tokio::test]
+async fn recovery_of_a_confirmed_account_preserves_its_verified_provider_identity() {
+    let h = Harness::spawn().await;
+    h.account(740, Some("confirmed-recovery@example.com"), true);
+    let previous = h.session().await;
+    let pending = h.sign_in().await;
+    h.app
+        .post(
+            "/auth/v1/recover",
+            None,
+            json!({"email":"confirmed-recovery@example.com"}),
+        )
+        .await;
+    let token = link_token(&h.app.outbox.wait_for(1).await[0], RECOVERY_URL, "recovery");
+    let owner = h
+        .app
+        .post(
+            "/auth/v1/verify",
+            None,
+            json!({"type":"recovery","token":token,"password":"owner-password-123"}),
+        )
+        .await;
+    assert_eq!(owner.status, StatusCode::OK, "{}", owner.text);
+    assert_eq!(owner.body["user"]["id"], previous["user"]["id"]);
+    assert_eq!(
+        h.app
+            .post(
+                "/auth/v1/token?grant_type=refresh_token",
+                None,
+                json!({"refresh_token":previous["refresh_token"]})
+            )
+            .await
+            .body["code"],
+        "invalid_grant"
+    );
+    assert_eq!(
+        h.redeem(&pending["code"], VERIFIER).await.status,
+        StatusCode::OK
+    );
+    assert_eq!(h.session().await["user"]["id"], owner.body["user"]["id"]);
+    assert_eq!(
+        password_login(
+            &h.app,
+            "confirmed-recovery@example.com",
+            "owner-password-123"
+        )
+        .await
+        .status,
+        StatusCode::OK
+    );
 }
 
 #[tokio::test]
@@ -502,4 +893,93 @@ async fn a_duplicate_callback_does_not_void_the_code_already_issued() {
         .collect();
     assert_eq!(codes.len(), 1, "exactly one callback hands out a code");
     assert_eq!(h.redeem(&codes[0], VERIFIER).await.status, StatusCode::OK);
+    assert_eq!(
+        h.fake.lock().unwrap().token_requests.len(),
+        2,
+        "one exchange for each distinct sign-in"
+    );
+}
+
+#[tokio::test]
+async fn concurrent_callbacks_exchange_one_code_even_when_the_provider_fails() {
+    let h = Harness::spawn().await;
+    let state = query_of(&location(&h.authorize(APP).await))["state"].clone();
+    h.fake.lock().unwrap().token_delay = std::time::Duration::from_millis(500);
+    let query = format!("code=invalid-code&state={state}");
+    let replies = futures_util::future::join_all((0..32).map(|_| h.callback(&query))).await;
+    assert_eq!(h.fake.lock().unwrap().token_requests.len(), 1);
+    assert_eq!(
+        replies
+            .iter()
+            .filter(|r| r.status == StatusCode::SEE_OTHER)
+            .count(),
+        1
+    );
+    assert_eq!(
+        replies
+            .iter()
+            .filter(|r| r.status == StatusCode::BAD_REQUEST)
+            .count(),
+        31
+    );
+    assert_eq!(h.callback(&query).await.status, StatusCode::BAD_REQUEST);
+
+    // A failed exchange cannot be retried; a fresh authorize can succeed.
+    h.account(9921, Some("restart@example.com"), true);
+    let redirect = h.sign_in().await;
+    assert_eq!(
+        h.redeem(&redirect["code"], VERIFIER).await.status,
+        StatusCode::OK
+    );
+    assert_eq!(h.fake.lock().unwrap().token_requests.len(), 2);
+}
+
+#[tokio::test]
+async fn callbacks_have_their_own_ip_budget() {
+    let h = Harness::spawn_with(Options {
+        rate_limit_per_minute: 1,
+        ..Options::default()
+    })
+    .await;
+    let reply = h.authorize(APP).await;
+    assert_eq!(reply.status, StatusCode::SEE_OTHER);
+    let state = query_of(&location(&reply))["state"].clone();
+    let query = format!("code=invalid-code&state={state}");
+    assert_eq!(h.callback(&query).await.status, StatusCode::SEE_OTHER);
+    let blocked = h.callback(&query).await;
+    assert_eq!(blocked.status, StatusCode::TOO_MANY_REQUESTS);
+    assert!(blocked.headers.contains_key("retry-after"));
+    assert_eq!(h.fake.lock().unwrap().token_requests.len(), 1);
+}
+
+#[tokio::test]
+async fn a_cancelled_callback_cannot_restart_the_provider_exchange() {
+    let h = Harness::spawn().await;
+    let state = query_of(&location(&h.authorize(APP).await))["state"].clone();
+    let gate = Arc::new(tokio::sync::Notify::new());
+    h.fake.lock().unwrap().token_gate = Some(gate.clone());
+    let query = format!("code=good-code&state={state}");
+    {
+        let callback = h.callback(&query);
+        tokio::pin!(callback);
+        tokio::select! {
+            _ = &mut callback => panic!("provider exchange should still be pending"),
+            started = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+                while h.fake.lock().unwrap().token_requests.is_empty() {
+                    tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+                }
+            }) => { started.expect("the provider exchange must start"); }
+        }
+        assert_eq!(h.fake.lock().unwrap().token_requests.len(), 1);
+    } // Drop the request while the HTTP provider is still pending.
+    assert_eq!(h.callback(&query).await.status, StatusCode::BAD_REQUEST);
+    assert_eq!(h.fake.lock().unwrap().token_requests.len(), 1);
+    gate.notify_waiters();
+    h.fake.lock().unwrap().token_gate = None;
+    h.account(9922, Some("cancel-restart@example.com"), true);
+    let redirect = h.sign_in().await;
+    assert_eq!(
+        h.redeem(&redirect["code"], VERIFIER).await.status,
+        StatusCode::OK
+    );
 }

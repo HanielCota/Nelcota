@@ -1,0 +1,361 @@
+use axum::{
+    Router,
+    body::Body,
+    extract::{Request, State},
+    http::header,
+    response::Response,
+    routing::any,
+};
+use nelcota_client::{
+    Client, Error, RequestOptions,
+    rest::{Condition, IsValue, Order, UpsertOptions},
+};
+use serde_json::{Value, json};
+use std::{
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
+    time::Duration,
+};
+
+async fn serve(router: Router) -> (String, tokio::task::JoinHandle<()>) {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let url = format!("http://{}", listener.local_addr().unwrap());
+    let task = tokio::spawn(async move {
+        axum::serve(listener, router).await.unwrap();
+    });
+    (url, task)
+}
+
+#[tokio::test]
+async fn read_write_headers_cardinality_and_rpc() {
+    let seen = Arc::new(tokio::sync::Mutex::new(Vec::new()));
+    let router = Router::new()
+        .fallback(any(
+            |State(seen): State<Arc<tokio::sync::Mutex<Vec<Value>>>>, request: Request| async move {
+                let (parts, body) = request.into_parts();
+                let body = axum::body::to_bytes(body, 1024 * 1024).await.unwrap();
+                seen.lock().await.push(
+                    json!({"method":parts.method.as_str(), "uri":parts.uri.to_string(),
+            "auth":parts.headers.get(header::AUTHORIZATION).map(|v| v.to_str().unwrap()),
+            "prefer":parts.headers.get("prefer").map(|v| v.to_str().unwrap()),
+            "body":serde_json::from_slice::<Value>(&body).ok()}),
+                );
+                let body = if parts.method == "HEAD" || parts.method == "DELETE" {
+                    ""
+                } else if parts.uri.path().ends_with("/rpc/add") {
+                    "12"
+                } else {
+                    r#"[{"id":1,"body":"hello"}]"#
+                };
+                Response::builder()
+                    .status(if parts.method == "DELETE" { 204 } else { 200 })
+                    .header("content-range", "0-0/17")
+                    .body(Body::from(body))
+                    .unwrap()
+            },
+        ))
+        .with_state(seen.clone());
+    let (url, task) = serve(router).await;
+    let client = Client::builder(url)
+        .access_token("caller-token")
+        .build()
+        .unwrap();
+    let base = client
+        .from("notes")
+        .select("id, body")
+        .eq("owner", "a,b()\"\\&x=1");
+    let query = base
+        .clone()
+        .or([
+            Condition::eq("body", "a,b()\"\\"),
+            Condition::all([
+                Condition::gt("id", 0),
+                !Condition::is("deleted", IsValue::True),
+            ]),
+        ])
+        .order("id", Order::descending())
+        .order("body", Order::ascending().nulls_first(false))
+        .range(0, 19)
+        .count_exact();
+    let response = query.execute::<Vec<Value>>().await.unwrap();
+    assert_eq!(response.count, Some(17));
+    assert_eq!(
+        base.clone().single().execute::<Value>().await.unwrap().data["id"],
+        1
+    );
+    assert_eq!(
+        base.count_exact()
+            .head()
+            .execute::<()>()
+            .await
+            .unwrap()
+            .count,
+        Some(17)
+    );
+    client
+        .from("notes")
+        .insert(&json!({"body":"hello"}))
+        .select("id")
+        .execute::<Vec<Value>>()
+        .await
+        .unwrap();
+    client
+        .from("notes")
+        .upsert(
+            &json!({"id":1}),
+            UpsertOptions {
+                on_conflict: vec!["id".into()],
+                ignore_duplicates: true,
+            },
+        )
+        .select("id")
+        .execute::<Vec<Value>>()
+        .await
+        .unwrap();
+    client
+        .from("notes")
+        .delete()
+        .in_values("id", [1, 2])
+        .execute::<()>()
+        .await
+        .unwrap();
+    assert_eq!(
+        client
+            .rpc("add", &json!({"a":2}))
+            .execute::<i32>()
+            .await
+            .unwrap()
+            .data,
+        12
+    );
+    let requests = seen.lock().await;
+    let uri = url::Url::parse(&format!(
+        "http://test{}",
+        requests[0]["uri"].as_str().unwrap()
+    ))
+    .unwrap();
+    let params: Vec<_> = uri.query_pairs().into_owned().collect();
+    assert!(params.contains(&("owner".into(), "eq.a,b()\"\\&x=1".into())));
+    assert!(
+        params
+            .iter()
+            .any(|(k, v)| k == "or" && v.contains("body.eq.\"a,b()\\\"\\\\\""))
+    );
+    assert!(params.contains(&("order".into(), "id.desc,body.asc.nullslast".into())));
+    assert_eq!(requests[0]["auth"], "Bearer caller-token");
+    assert_eq!(requests[0]["prefer"], "count=exact");
+    assert_eq!(requests[3]["prefer"], "return=representation");
+    assert_eq!(
+        requests[4]["prefer"],
+        "resolution=ignore-duplicates,return=representation"
+    );
+    assert_eq!(requests[5]["method"], "DELETE");
+    task.abort();
+}
+
+#[tokio::test]
+async fn retries_are_bounded_and_mutations_are_never_replayed() {
+    let attempts = Arc::new(AtomicUsize::new(0));
+    let router = Router::new()
+        .fallback(any(
+            |State(count): State<Arc<AtomicUsize>>, request: Request| async move {
+                let n = count.fetch_add(1, Ordering::SeqCst);
+                if request.method() == "GET" && n == 2 {
+                    Response::builder().body(Body::from("[]")).unwrap()
+                } else {
+                    Response::builder()
+                        .status(503)
+                        .header("retry-after", "0")
+                        .body(Body::from(
+                            r#"{"code":"unavailable","message":"try later"}"#,
+                        ))
+                        .unwrap()
+                }
+            },
+        ))
+        .with_state(attempts.clone());
+    let (url, task) = serve(router).await;
+    let client = Client::builder(url).build().unwrap();
+    client.from("notes").execute::<Vec<Value>>().await.unwrap();
+    assert_eq!(attempts.load(Ordering::SeqCst), 3);
+    let error = client
+        .from("notes")
+        .insert(&json!({"body":"once"}))
+        .execute::<()>()
+        .await
+        .unwrap_err();
+    assert_eq!(attempts.load(Ordering::SeqCst), 4);
+    assert_eq!(error.code(), "unavailable");
+    assert_eq!(error.status(), Some(503));
+    assert_eq!(error.retry_after(), Some(Duration::ZERO));
+    task.abort();
+}
+
+#[tokio::test]
+async fn long_retry_after_returns_immediately_and_body_deadline_applies() {
+    let router = Router::new()
+        .route(
+            "/rest/v1/rate",
+            any(|| async {
+                Response::builder()
+                    .status(429)
+                    .header("retry-after", "31")
+                    .body(Body::from("{}"))
+                    .unwrap()
+            }),
+        )
+        .route(
+            "/rest/v1/slow",
+            any(|| async {
+                let stream = futures_util::stream::once(async {
+                    tokio::time::sleep(Duration::from_millis(200)).await;
+                    Ok::<_, std::io::Error>(bytes::Bytes::from_static(b"[]"))
+                });
+                Response::builder().body(Body::from_stream(stream)).unwrap()
+            }),
+        );
+    let (url, task) = serve(router).await;
+    let client = Client::builder(url)
+        .timeout(Duration::from_millis(40))
+        .build()
+        .unwrap();
+    assert_eq!(
+        client
+            .from("rate")
+            .execute::<Value>()
+            .await
+            .unwrap_err()
+            .retry_after(),
+        Some(Duration::from_secs(31))
+    );
+    assert!(matches!(
+        client.from("slow").execute::<Value>().await,
+        Err(Error::Timeout)
+    ));
+    let token = nelcota_client::CancellationToken::new();
+    token.cancel();
+    let cancelled = client.with_options(RequestOptions {
+        timeout: None,
+        cancellation: Some(token),
+    });
+    assert!(matches!(
+        cancelled.from("slow").execute::<Value>().await,
+        Err(Error::Cancelled)
+    ));
+    task.abort();
+}
+
+#[tokio::test]
+async fn malformed_json_empty_results_and_cardinality() {
+    let router = Router::new()
+        .route("/rest/v1/bad", any(|| async { "not json" }))
+        .route("/rest/v1/zero", any(|| async { "[]" }))
+        .route("/rest/v1/two", any(|| async { "[{\"id\":1},{\"id\":2}]" }));
+    let (url, task) = serve(router).await;
+    let client = Client::builder(url).build().unwrap();
+    assert!(matches!(
+        client.from("bad").execute::<Value>().await,
+        Err(Error::InvalidResponse { status: 200, .. })
+    ));
+    assert!(
+        client
+            .from("zero")
+            .maybe_single()
+            .execute::<Option<Value>>()
+            .await
+            .unwrap()
+            .data
+            .is_none()
+    );
+    assert_eq!(
+        client
+            .from("zero")
+            .single()
+            .execute::<Value>()
+            .await
+            .unwrap_err()
+            .code(),
+        "not_single"
+    );
+    assert_eq!(
+        client
+            .from("two")
+            .maybe_single()
+            .execute::<Option<Value>>()
+            .await
+            .unwrap_err()
+            .code(),
+        "not_single"
+    );
+    task.abort();
+}
+
+#[tokio::test]
+async fn unsafe_input_is_rejected_without_network() {
+    let client = Client::builder("http://127.0.0.1:1").build().unwrap();
+    for query in [
+        client.from("../notes"),
+        client.from("notes").eq("x&order", 1).range(9, 2),
+        client.from("notes").update(&json!({"body":"no filter"})),
+        client.from("notes").delete().eq("items.id", 1),
+        client.from("notes").insert(&json!([])),
+        client.from("notes").eq("x", f64::NAN),
+        client.from("notes").or(Vec::new()),
+        client.from("notes").select("id\"evil"),
+    ] {
+        assert!(matches!(
+            query.execute::<Value>().await,
+            Err(Error::Usage(_))
+        ));
+    }
+    assert!(
+        Client::builder("https://secret:password@example.com")
+            .build()
+            .is_err()
+    );
+    assert!(Client::builder("https://example.com?q=x").build().is_err());
+    assert!(
+        Client::builder("https://example.com")
+            .access_token("bad\r\nvalue")
+            .build()
+            .is_err()
+    );
+    assert!(client.storage().from("sign").is_err());
+    let files = client.storage().from("files").unwrap();
+    for name in ["../x", "a//b", "a\\b", "a/./b", "a/\u{0000}"] {
+        assert!(files.public_url(name).is_err());
+    }
+    let normalized = files.public_url("cafe\u{0301}/a?#%.txt").unwrap();
+    assert!(normalized.as_str().contains("caf%C3%A9/a%3F%23%25.txt"));
+}
+
+#[test]
+fn group_limits_and_query_clone() {
+    let client = Client::builder("https://api.example.com/prefix/")
+        .build()
+        .unwrap();
+    let base = client.from("notes").eq("id", 1);
+    assert!(
+        !base
+            .clone()
+            .limit(5)
+            .query_string()
+            .unwrap()
+            .contains("limit=10")
+    );
+    assert!(!base.query_string().unwrap().contains("limit="));
+    let mut nested = Condition::eq("x", "a,b)");
+    for _ in 0..8 {
+        nested = Condition::all([nested]);
+    }
+    assert!(client.from("notes").or([nested]).query_string().is_err());
+    assert!(
+        client
+            .from("notes")
+            .or((0..101).map(|n| Condition::eq("x", n)))
+            .query_string()
+            .is_err()
+    );
+}

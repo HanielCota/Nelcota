@@ -143,6 +143,81 @@ async fn panel_changes_become_a_migration_recognised_by_migrate() {
 }
 
 #[tokio::test]
+async fn multiline_identifiers_round_trip_through_migrations_without_executing_comments() {
+    let app = TestApp::spawn().await;
+    let cookie = login(&app).await;
+    app.admin_client
+        .batch_execute("CREATE TABLE public.audit_marker(n integer)")
+        .await
+        .unwrap();
+    let names = [
+        "orders\narchive",
+        "orders\rarchive",
+        "orders\r\narchive",
+        "orders \"archive\"",
+        "x\nINSERT INTO public.audit_marker VALUES(1); --",
+        "x\rINSERT INTO public.audit_marker VALUES(2); --",
+        "x\r\nINSERT INTO public.audit_marker VALUES(3); --",
+    ];
+    for name in names {
+        let created = send(
+            &app,
+            Method::POST,
+            "/admin/api/tables",
+            &cookie,
+            json!({"table":simple_table(name)}),
+        )
+        .await;
+        assert_eq!(created.status, StatusCode::OK, "{}", created.text);
+    }
+    let exported = send(
+        &app,
+        Method::POST,
+        "/admin/api/migrations",
+        &cookie,
+        json!({"name":"multiline_names"}),
+    )
+    .await;
+    assert_eq!(exported.status, StatusCode::OK, "{}", exported.text);
+    let sql = exported.body["sql"].as_str().unwrap();
+    for name in names {
+        app.admin_client
+            .batch_execute(&format!(
+                "DROP TABLE public.{}",
+                nelcota_api::query::ident(name)
+            ))
+            .await
+            .unwrap();
+    }
+    app.admin_client
+        .batch_execute("DELETE FROM nelcota.user_migrations")
+        .await
+        .unwrap();
+    assert_eq!(
+        refinery_migrate(&app, &[("V1__multiline_names", sql)]).await,
+        Ok(1)
+    );
+    let names: Vec<&str> = names.into();
+    let restored: i64 = app.admin_client.query_one(
+        "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname=ANY($1::text[])", &[&names]).await.unwrap().get(0);
+    assert_eq!(restored, names.len() as i64);
+    let injected: i64 = app
+        .admin_client
+        .query_one("SELECT count(*) FROM public.audit_marker", &[])
+        .await
+        .unwrap()
+        .get(0);
+    assert_eq!(
+        injected, 0,
+        "text from names must never run as migration SQL"
+    );
+    assert_eq!(
+        refinery_migrate(&app, &[("V1__multiline_names", sql)]).await,
+        Ok(0)
+    );
+}
+
+#[tokio::test]
 async fn concurrent_migration_exports_record_pending_changes_once() {
     let app = TestApp::spawn().await;
     let cookie = login(&app).await;

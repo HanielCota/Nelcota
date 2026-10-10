@@ -6,6 +6,17 @@
 import { NelcotaUsageError, clientError, fail, ok, type Result } from '../core/errors.js';
 import { bucketId, folderPrefix, objectPath } from '../core/encoding.js';
 import type { HttpClient, RequestSpec } from '../core/http.js';
+import { createHttpClient, type TransportOptions } from '../core/options.js';
+
+export { NelcotaError, NelcotaUsageError } from '../core/errors.js';
+export type { Result } from '../core/errors.js';
+export type { TransportOptions } from '../core/options.js';
+export type { FetchLike, TokenSource } from '../core/http.js';
+
+/** Storage without loading REST or auth. Supply a token source for private files. */
+export function createStorageClient(url: string | URL, options: TransportOptions = {}): StorageClient {
+  return new StorageClient(createHttpClient(url, options));
+}
 
 export interface Bucket {
   id: string;
@@ -138,9 +149,7 @@ export class BucketFiles {
 
   /** The whole file as a Blob. For large files, ranges or ETags use `open`. */
   async download(name: string, options: Omit<OpenOptions, 'range' | 'ifNoneMatch'> = {}): Promise<Result<Blob>> {
-    const opened = await this.open(name, options);
-    if (opened.error) return opened;
-    return ok(await opened.data.blob());
+    return this.#http.blob(this.#openSpec(name, options));
   }
 
   /**
@@ -149,18 +158,22 @@ export class BucketFiles {
    * it and drops the Authorization header on the way.
    */
   async open(name: string, options: OpenOptions = {}): Promise<Result<Response>> {
+    const { response, error } = await this.#http.send(this.#openSpec(name, options));
+    return error ? fail(error) : ok(response);
+  }
+
+  #openSpec(name: string, options: OpenOptions): RequestSpec {
     const headers: Record<string, string> = {};
     if (options.range) headers['range'] = rangeHeader(options.range);
     if (options.ifNoneMatch !== undefined) headers['if-none-match'] = options.ifNoneMatch;
-    const { response, error } = await this.#http.send({
+    return {
       method: 'GET',
       path: this.#path('', name),
       query: options.download ? new URLSearchParams({ download: '' }) : undefined,
       headers,
       signal: options.signal,
       timeout: options.timeout ?? 0,
-    });
-    return error ? fail(error) : ok(response);
+    };
   }
 
   async remove(name: string, options: RequestOptions = {}): Promise<Result<null>> {

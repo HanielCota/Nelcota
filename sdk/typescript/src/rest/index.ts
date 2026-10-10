@@ -6,6 +6,7 @@
 import { NelcotaUsageError, type NelcotaError } from '../core/errors.js';
 import { identifier } from '../core/encoding.js';
 import type { HttpClient } from '../core/http.js';
+import { createHttpClient, type TransportOptions } from '../core/options.js';
 import { TableRef } from './query.js';
 import type {
   ArgsOptional,
@@ -18,7 +19,22 @@ import type {
   RelationName,
   RowOf,
   UpdateOf,
+  DefaultSchemaName,
+  SchemaOf,
 } from './types.js';
+
+export { NelcotaError, NelcotaUsageError } from '../core/errors.js';
+export { escapeLike } from '../core/encoding.js';
+export type { TransportOptions } from '../core/options.js';
+export type { FetchLike, TokenSource } from '../core/http.js';
+
+/** REST without loading session handling or storage. Supply a token source when needed. */
+export function createRestClient<Database = any, SchemaName extends string = DefaultSchemaName<Database>>(
+  url: string | URL,
+  options: TransportOptions & { schema?: SchemaName } = {},
+): RestClient<SchemaOf<Database, SchemaName>> {
+  return new RestClient(createHttpClient(url, options));
+}
 
 export { Query, TableRef, countFromRange, selectList } from './query.js';
 export type {

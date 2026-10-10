@@ -89,6 +89,11 @@ without policies) and red (table exposed without RLS).
 | Profile photo | account menu, at the top right: "Add photo…". The image is center-cropped and scaled to 256px in the browser; the server accepts PNG, JPEG or WebP up to 256 KB. It lives in the project's database (`nelcota.admin_avatar`, out of reach of the API roles), so it works in any browser, but it is per project |
 | Dates in the grid | `timestamptz` shows in the viewer's time zone and language; `timestamp` and `date` as stored. The exact value is in the tooltip, in edit mode and in exports |
 
+CSV exports protect spreadsheet imports: formula-like cells and headers receive
+a quoted tab prefix, including formulas hidden behind whitespace or control
+characters. Negative numeric literals keep their digits and numeric form.
+Use JSON export when you need the original text without this neutralization.
+
 | Page | What it has |
 |---|---|
 | **Overview** | what needs action (unprotected or locked tables), next steps ticked by the project's state (first table, data protected, a user, a first sign-in through the app), a one-line summary and the table list with who can read and write. Pages that show access rules read in plain language; "Technical details" shows RLS, roles, grants and SQL |

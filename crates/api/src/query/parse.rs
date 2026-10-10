@@ -24,11 +24,20 @@ pub(super) fn parse_select(
         columns: Vec::new(),
         embeds: Vec::new(),
     };
-    for item in split_top_level(value)?.into_iter().map(str::trim) {
+    let items = split_top_level(value)?;
+    if items.len() > MAX_SELECT_ITEMS {
+        return Err(invalid(format!(
+            "select accepts at most {MAX_SELECT_ITEMS} items per relation"
+        )));
+    }
+    for item in items.into_iter().map(str::trim) {
         if item.is_empty() {
             return Err(invalid("empty or malformed select"));
         }
         if item == "*" {
+            if select.star {
+                return Err(invalid("duplicate '*' in select"));
+            }
             select.star = true;
         } else if item.contains('(') {
             let Some(catalog) = catalog else {
@@ -42,8 +51,15 @@ pub(super) fn parse_select(
                 "column aliases are not supported: '{item}'"
             )));
         } else {
+            if select.columns.iter().any(|c| c == item) {
+                return Err(invalid(format!("duplicate column '{item}' in select")));
+            }
             select.columns.push(column(table, item)?.name.clone());
         }
+    }
+    // '*' already includes the explicit columns; emit each field only once.
+    if select.star {
+        select.columns.clear();
     }
     // An embedded key must not collide with a column of the same row.
     let mut keys: Vec<&str> = select.columns.iter().map(String::as_str).collect();
@@ -58,6 +74,20 @@ pub(super) fn parse_select(
             )));
         }
         keys.push(&embed.alias);
+    }
+    fn item_count(select: &Select) -> usize {
+        usize::from(select.star)
+            + select.columns.len()
+            + select
+                .embeds
+                .iter()
+                .map(|embed| 1 + item_count(&embed.select))
+                .sum::<usize>()
+    }
+    if depth == 0 && item_count(&select) > MAX_SELECT_ITEMS {
+        return Err(invalid(format!(
+            "select accepts at most {MAX_SELECT_ITEMS} items including nested relations"
+        )));
     }
     Ok(select)
 }

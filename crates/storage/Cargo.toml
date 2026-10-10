@@ -35,5 +35,8 @@ reqwest.workspace = true
 rustls.workspace = true
 unicode-normalization = "0.1.25"
 
+[dev-dependencies]
+tempfile = "3"
+
 [lints]
 workspace = true

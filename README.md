@@ -74,8 +74,13 @@ curl -X POST https://api.yourdomain.com/storage/v1/object/avatars/$USER_ID/me.pn
 ```
 
 Frontend types: `nelcota types -o database.ts`. OpenAPI at `/rest/v1/`.
-TypeScript client: [`@nelcota/client`](sdk/typescript/README.md), typed from
-those types, with sessions, OAuth and storage.
+JavaScript and TypeScript client: [`@nelcota/client`](sdk/typescript/README.md),
+with sessions, OAuth and storage. Start with the
+[Portuguese quickstart](sdk/typescript/docs/quickstart.pt-BR.md) and runnable
+browser/Node examples; generated schema types are optional for JavaScript.
+Rust client: [`nelcota-client`](sdk/rust/README.md), with Tokio, sessions,
+OAuth and streaming storage. Generate models with
+`nelcota types --lang rust -o database.rs`.
 Panel at `/admin/`: table editor with inline editing, SQL editor with
 autocomplete, users, RLS policies and migrations generated from panel changes.
 The panel is available in Portuguese and English (picked from the browser,

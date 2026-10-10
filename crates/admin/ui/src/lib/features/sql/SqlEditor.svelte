@@ -275,7 +275,11 @@
     <Resizable.Handle withHandle aria-label={t('sql.editor.resize')} />
     <Resizable.Pane bind:this={resultsPane} defaultSize={58} minSize={20} collapsible collapsedSize={0}>
 
-    <div class="relative h-full min-h-0 overflow-auto bg-card" aria-busy={running}>
+    <p class="sr-only" role="status" aria-atomic="true">{running ? t('sql.editor.running') : response && 'results' in response ? t('sql.results.completed', { ms: elapsed }) : ''}</p>
+    <!-- Keyboard users need a Tab stop to scroll results, including the empty
+         state; this named region intentionally has a nonnegative tabindex. -->
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+    <div class="relative h-full min-h-0 overflow-auto bg-card focus-visible:outline-offset-[-2px]" role="region" tabindex="0" aria-label={t('sql.results.label')} aria-busy={running}>
       {#if running}
         <div class="pointer-events-none sticky top-0 z-20 h-0.5 overflow-hidden bg-brand/15" aria-hidden="true">
           <div class="animate-progress h-full w-2/5 bg-brand"></div>

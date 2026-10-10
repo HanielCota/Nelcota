@@ -121,8 +121,10 @@ pub fn app(
     }
     router
         .layer(cors)
-        // The default span records method and URI, never headers (Authorization).
-        .layer(TraceLayer::new_for_http())
+        // Query strings can contain signed download tokens. Record paths only.
+        .layer(TraceLayer::new_for_http().make_span_with(|request: &Request| {
+            tracing::debug_span!("request", method = %request.method(), path = %request.uri().path())
+        }))
 }
 
 /// Where API traffic is recorded for the panel.

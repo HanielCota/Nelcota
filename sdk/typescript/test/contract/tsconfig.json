@@ -3,6 +3,7 @@
   "compilerOptions": {
     "isolatedDeclarations": false,
     "declaration": false,
+    "allowJs": true,
     "types": ["node"]
   },
   "include": ["../../src", "."]

@@ -28,7 +28,7 @@
 	--primary-border: oklch(0.74 0.19 153);
 	--primary-hover: oklch(0.7 0.19 153);
 	/* Text and icons in the brand colour: the stronger step keeps AA on white. */
-	--brand: oklch(0.51 0.14 152);
+	--brand: oklch(0.48 0.13 152);
 	--brand-soft: oklch(0.74 0.19 153 / 14%);
 	--secondary: oklch(0.94 0.003 260);
 	--secondary-foreground: oklch(0.205 0 0);
@@ -43,7 +43,7 @@
 	--field: oklch(1 0 0);
 	/* Inset surface inside a card: code, tiles, rows. */
 	--well: oklch(0.965 0.002 260);
-	--ring: oklch(0.74 0.19 153);
+	--ring: var(--brand);
 	/* Chart series: the brand green and a neutral grey. */
 	--chart-1: oklch(0.62 0.16 152);
 	--chart-2: oklch(0.556 0 0);

@@ -1,9 +1,9 @@
 //! Streamed file writes, quota enforcement and atomic metadata publication.
 use crate::{
     StorageState, db,
-    error::{bucket_not_found, storage_full, store_failed, too_large, write_error},
+    error::{bucket_not_found, store_failed, too_large, write_error},
     mime::{self, SNIFF_BYTES},
-    path,
+    path, quota,
     store::{PARTS_IN_FLIGHT, Store},
 };
 use axum::http::StatusCode;
@@ -77,6 +77,7 @@ async fn write(
     options: UploadOptions,
     body: UploadStream,
 ) -> Result<UploadOutcome, ApiError> {
+    let deadline = tokio::time::Instant::now() + state.settings.upload_timeout;
     let mode = if options.replace {
         Mode::Upsert
     } else {
@@ -84,76 +85,84 @@ async fn write(
     };
     let bucket = path::bucket(bucket)?;
     let name = path::object(name)?;
-    let settings = db::bucket(&state.pool, bucket)
-        .await?
-        .ok_or_else(bucket_not_found)?;
-    let limit = settings
-        .file_size_limit
-        .map_or(state.settings.max_file_size, |l| {
-            l.min(state.settings.max_file_size)
-        });
-    let declared = options.content_length;
-    if declared.is_some_and(|len| len > limit) {
-        return Err(too_large(limit));
-    }
-    // Without a Content-Length the room is enforced as the bytes arrive.
-    let room = room(&state).await?;
-    if let Some(room) = room
-        && declared.unwrap_or(1) > room.bytes
-    {
-        return Err(room.full());
-    }
+    // One deadline covers pool waits, the policy check, admission and bytes.
+    // Active uploads are bounded; overload never builds an unbounded queue.
+    let (settings, limit, reservation, _slot) = tokio::time::timeout_at(deadline, async {
+        let slot = state.uploads.clone().try_acquire_owned().map_err(|_| {
+            ApiError::new(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "upload_busy",
+                "all upload slots are busy; retry later",
+            )
+        })?;
+        let settings = db::bucket(&state.pool, bucket)
+            .await?
+            .ok_or_else(bucket_not_found)?;
+        let limit = settings
+            .file_size_limit
+            .map_or(state.settings.max_file_size, |l| {
+                l.min(state.settings.max_file_size)
+            });
+        let declared = options.content_length;
+        if declared.is_some_and(|len| len > limit) {
+            return Err(too_large(limit));
+        }
+        // The policy check before any byte is taken (D78): the same write with
+        // placeholder values, rolled back.
+        let old_size = {
+            let mut client = state.pool.get().await.map_err(ApiError::from_pool)?;
+            let tx = begin_request(&mut client, &claims)
+                .await
+                .map_err(|e| ApiError::from_db(e, claims.role()))?;
+            let old_size = if mode == Mode::Upsert {
+                tx.query_opt(
+                    "SELECT size FROM storage.objects WHERE bucket_id = $1 AND name = $2",
+                    &[&bucket, &name],
+                )
+                .await
+                .map_err(|e| write_error(e, &claims))?
+                .map_or(0, |row| row.get::<_, i64>(0).max(0) as u64)
+            } else {
+                0
+            };
+            let sql = if mode == Mode::Create { INSERT } else { UPSERT };
+            let placeholder: [&(dyn tokio_postgres::types::ToSql + Sync); 7] = [
+                &Uuid::now_v7(),
+                &bucket,
+                &name,
+                &Uuid::now_v7(),
+                &0i64,
+                &"application/octet-stream",
+                &"",
+            ];
+            tx.execute(sql, &placeholder)
+                .await
+                .map_err(|e| write_error(e, &claims))?;
+            old_size
+        };
 
-    // The policy check before any byte is taken (D78): the same write with
-    // placeholder values, rolled back.
-    {
-        let mut client = state.pool.get().await.map_err(ApiError::from_pool)?;
-        let tx = begin_request(&mut client, &claims)
-            .await
-            .map_err(|e| ApiError::from_db(e, claims.role()))?;
-        let sql = if mode == Mode::Create { INSERT } else { UPSERT };
-        let placeholder: [&(dyn tokio_postgres::types::ToSql + Sync); 7] = [
-            &Uuid::now_v7(),
-            &bucket,
-            &name,
-            &Uuid::now_v7(),
-            &0i64,
-            &"application/octet-stream",
-            &"",
-        ];
-        tx.execute(sql, &placeholder)
-            .await
-            .map_err(|e| write_error(e, &claims))?;
-    }
-
-    let _slot = state
-        .uploads
-        .acquire()
-        .await
-        .map_err(|_| ApiError::unavailable())?;
+        let reservation = quota::reserve(&state, old_size, declared, limit).await?;
+        Ok::<_, ApiError>((settings, limit, reservation, slot))
+    })
+    .await
+    .map_err(|_| upload_timeout())??;
     let version = Uuid::now_v7();
     let key = Store::key(bucket, version);
     let declared_type = options.content_type.as_deref();
-    let received = tokio::time::timeout(
-        state.settings.upload_timeout,
+    let received = tokio::time::timeout_at(
+        deadline,
         receive(
             &state.store,
             &key,
             body,
             limit,
-            room,
+            &reservation,
             declared_type,
             settings.allowed_mime_types.as_deref(),
         ),
     )
     .await
-    .unwrap_or_else(|_| {
-        Err(ApiError::new(
-            StatusCode::REQUEST_TIMEOUT,
-            "upload_timeout",
-            "the upload took too long",
-        ))
-    });
+    .unwrap_or_else(|_| Err(upload_timeout()));
     let received = match received {
         Ok(received) => received,
         Err(err) => {
@@ -187,6 +196,14 @@ async fn write(
     }
 }
 
+fn upload_timeout() -> ApiError {
+    ApiError::new(
+        StatusCode::REQUEST_TIMEOUT,
+        "upload_timeout",
+        "the upload took too long",
+    )
+}
+
 /// Writes the row once the bytes are stored. Returns the row id and, when a
 /// file was replaced, the version its bytes are under.
 async fn record(
@@ -199,81 +216,41 @@ async fn record(
     mode: Mode,
 ) -> Result<(Uuid, Option<Uuid>), ApiError> {
     let db_err = |e| write_error(e, claims);
-    let mut client = state.pool.get().await.map_err(ApiError::from_pool)?;
-    let tx = begin_request(&mut client, claims).await.map_err(db_err)?;
-    let id = Uuid::now_v7();
-    let size = i64::try_from(received.size).unwrap_or(i64::MAX);
-    let values: [&(dyn tokio_postgres::types::ToSql + Sync); 7] = [
-        &id,
-        &bucket,
-        &name,
-        &version,
-        &size,
-        &received.mime_type,
-        &received.etag,
-    ];
-    let (id, replaced) = match mode {
-        Mode::Create => {
-            tx.execute(INSERT, &values).await.map_err(db_err)?;
-            (id, None)
-        }
-        Mode::Upsert => {
-            // Under the caller's policies: replacing needs SELECT anyway.
-            let old: Option<Uuid> = tx
-                .query_opt(
-                    "SELECT version FROM storage.objects
+    quota::publish(state, claims, async |tx| {
+        let id = Uuid::now_v7();
+        let size = i64::try_from(received.size).unwrap_or(i64::MAX);
+        let values: [&(dyn tokio_postgres::types::ToSql + Sync); 7] = [
+            &id,
+            &bucket,
+            &name,
+            &version,
+            &size,
+            &received.mime_type,
+            &received.etag,
+        ];
+        let (id, replaced) = match mode {
+            Mode::Create => {
+                tx.execute(INSERT, &values).await.map_err(db_err)?;
+                (id, None)
+            }
+            Mode::Upsert => {
+                // Under the caller's policies: replacing needs SELECT anyway.
+                let old: Option<Uuid> = tx
+                    .query_opt(
+                        "SELECT version FROM storage.objects
                       WHERE bucket_id = $1 AND name = $2 FOR UPDATE",
-                    &[&bucket, &name],
-                )
-                .await
-                .map_err(db_err)?
-                .map(|r| r.get(0));
-            let row = tx.query_one(UPSERT, &values).await.map_err(db_err)?;
-            (row.get(0), old)
-        }
-    };
-    tx.commit().await.map_err(db_err)?;
-    Ok((id, replaced))
-}
-
-/// Bytes an upload may still add before the total quota or the disk guard
-/// (D80) refuses it; the tighter of the two.
-#[derive(Clone, Copy)]
-struct Room {
-    bytes: u64,
-    disk: bool,
-}
-
-impl Room {
-    fn full(self) -> ApiError {
-        if self.disk {
-            tracing::warn!("upload refused: the storage disk is almost full");
-            storage_full("the server's disk is almost full")
-        } else {
-            storage_full("the project's storage quota is full")
-        }
-    }
-}
-
-async fn room(state: &StorageState) -> Result<Option<Room>, ApiError> {
-    let mut room: Option<Room> = None;
-    if let Some(max) = state.settings.max_total_size {
-        let used = db::used_bytes(&state.pool).await?;
-        room = Some(Room {
-            bytes: max.saturating_sub(used),
-            disk: false,
-        });
-    }
-    if let Some(free) = state.store.free_bytes() {
-        let disk = free.saturating_sub(state.settings.min_free_bytes);
-        if room.is_none_or(|r| disk < r.bytes) {
-            room = Some(Room {
-                bytes: disk,
-                disk: true,
-            });
-        }
-    }
-    Ok(room)
+                        &[&bucket, &name],
+                    )
+                    .await
+                    .map_err(db_err)?
+                    .map(|r| r.get(0));
+                let row = tx.query_one(UPSERT, &values).await.map_err(db_err)?;
+                (row.get(0), old)
+            }
+        };
+        Ok((id, replaced))
+    })
+    .await
 }
 
 struct Received {
@@ -289,7 +266,7 @@ async fn receive(
     key: &Key,
     body: UploadStream,
     limit: u64,
-    room: Option<Room>,
+    reservation: &quota::Reservation,
     declared_type: Option<&str>,
     allowed: Option<&[String]>,
 ) -> Result<Received, ApiError> {
@@ -306,10 +283,10 @@ async fn receive(
     let mut take = |chunk: &Bytes| {
         size += chunk.len() as u64;
         hasher.update(chunk);
-        match room {
-            _ if size > limit => Err(too_large(limit)),
-            Some(room) if size > room.bytes => Err(room.full()),
-            _ => Ok(()),
+        if size > limit {
+            Err(too_large(limit))
+        } else {
+            reservation.check(size)
         }
     };
 

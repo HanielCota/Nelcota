@@ -2,7 +2,7 @@
 use crate::{Credentials, DeniedLog, HostLink, Metrics, Sessions, SqlExecutor, TokenIssuer};
 use deadpool_postgres::Pool;
 use nelcota_api::CatalogHandle;
-use nelcota_auth::RateLimiter;
+use nelcota_auth::{Passwords, RateLimiter};
 use std::sync::Arc;
 #[derive(Clone)]
 pub struct AdminState {
@@ -16,6 +16,9 @@ pub struct AdminState {
     pub credentials: Arc<Credentials>,
     pub sessions: Arc<Sessions>,
     pub limiter: Arc<RateLimiter>,
+    /// Shared process-wide Argon2 budget, also used by public authentication.
+    pub passwords: Arc<Passwords>,
+    pub trust_proxy: bool,
     /// Cookie with `Secure` (behind Caddy/HTTPS).
     pub secure_cookies: bool,
     /// Current project, the host's project list and single sign-on.

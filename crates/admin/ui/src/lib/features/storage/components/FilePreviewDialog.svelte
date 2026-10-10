@@ -10,6 +10,7 @@
   import CodeBlock from '$lib/components/shared/CodeBlock.svelte'
   import { ApiError, isAbort } from '$lib/api'
   import { baseName, formatBytes, previewKind } from '$lib/features/storage/files'
+  import { readPreview } from '$lib/features/storage/preview'
   import type { StoredFile } from '$lib/types'
   import { errorMessage, intlLocale, t } from '$lib/i18n/index.svelte'
 
@@ -40,9 +41,9 @@
     try {
       const response = await fetch(url, { credentials: 'same-origin', signal: request.signal })
       if (!response.ok) throw new ApiError(t('common.requestFailed'), response.status)
-      const blob = await response.blob()
+      const blob = await readPreview(response, (format === 'text' ? 1 : 20) * 1024 * 1024, request.signal)
       if (request.signal.aborted) return
-      if (blob.size > (format === 'text' ? 1 : 20) * 1024 * 1024) { unavailable = true; return }
+      if (!blob) { unavailable = true; return }
       if (format === 'text') {
         const content = await blob.text()
         if (!request.signal.aborted) text = content

@@ -4,7 +4,7 @@ use crate::{
     contracts::{User, UsersResponse},
 };
 use deadpool_postgres::Pool;
-use nelcota_auth::{hash_password, normalize_email, validate_password};
+use nelcota_auth::{Passwords, normalize_email, validate_password};
 use serde_json::json;
 use tokio_postgres::error::SqlState;
 
@@ -135,21 +135,23 @@ fn check_password(password: &str) -> Result<(), ApiError> {
 }
 
 /// Expensive hashing runs outside the async runtime's threads.
-async fn hash(password: String) -> Result<String, ApiError> {
-    tokio::task::spawn_blocking(move || hash_password(&password))
-        .await?
+async fn hash(passwords: &Passwords, password: String) -> Result<String, ApiError> {
+    passwords
+        .hash(password)
+        .await
         .ok_or_else(|| ApiError::from("failed to hash the password"))
 }
 
 pub(super) async fn create(
     pool: &Pool,
+    passwords: &Passwords,
     email: &str,
     password: String,
 ) -> Result<CreatedUser, ApiError> {
     let email = normalize_email(email)
         .map_err(|_| ApiError::bad_request("invalid_email", "invalid email"))?;
     check_password(&password)?;
-    let hash = hash(password).await?;
+    let hash = hash(passwords, password).await?;
     let client = pool.get().await?;
     let row = client
         .query_one(
@@ -178,10 +180,15 @@ pub(super) async fn create(
 }
 
 /// A password change and session revocation commit together.
-pub(super) async fn set_password(pool: &Pool, id: &str, password: String) -> Result<u64, ApiError> {
+pub(super) async fn set_password(
+    pool: &Pool,
+    passwords: &Passwords,
+    id: &str,
+    password: String,
+) -> Result<u64, ApiError> {
     check_id(id)?;
     check_password(&password)?;
-    let hash = hash(password).await?;
+    let hash = hash(passwords, password).await?;
     let mut client = pool.get().await?;
     let tx = client.transaction().await?;
     let updated = tx.execute(

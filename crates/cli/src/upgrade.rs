@@ -3,6 +3,7 @@ use crate::{
     backup,
     host::{Host, Runtime},
     lifecycle::HEALTH_TIMEOUT,
+    maintenance::Maintenance,
     native,
     project::{Project, Service},
     util::{ok, step, warn},
@@ -27,52 +28,264 @@ pub fn run(host: &Host, project: &Project, version: Option<&str>) -> anyhow::Res
     let target = version.map_or_else(|| this_binary.to_owned(), str::to_owned);
     println!("Upgrading {}: {current} → {target}", project.name);
 
-    let dump = backup::run(host, project, false, None)
-        .context("pre-upgrade backup failed; nothing was changed")?;
+    deploy(&mut HostDeployment {
+        host,
+        project,
+        current: &current,
+        target: &target,
+        maintenance: None,
+        deployed: false,
+    })?;
+    ok(&format!("{} healthy on version {target}", project.name));
+    Ok(())
+}
 
-    env.set("NELCOTA_VERSION", &target)?;
-    match project.runtime {
-        Runtime::Docker => {
-            step("Pulling the new image");
-            if !project
-                .compose(&["pull", "app"])
-                .map(|s| s.success())
-                .unwrap_or(false)
-            {
-                warn("could not pull the image (continuing with the local image, if any)");
+// The workflow owns when traffic may resume; runtime and snapshot operations
+// stay behind this private interface so failure recovery can be exercised.
+trait Deployment {
+    type Snapshot;
+    fn prepare(&mut self) -> anyhow::Result<()>;
+    fn pause(&mut self) -> anyhow::Result<()>;
+    fn capture(&mut self) -> anyhow::Result<Self::Snapshot>;
+    fn activate(&mut self) -> anyhow::Result<()>;
+    fn restore(&mut self, snapshot: &Self::Snapshot) -> anyhow::Result<()>;
+    fn restart_previous(&mut self) -> anyhow::Result<()>;
+    fn resume(&mut self) -> anyhow::Result<()>;
+}
+
+fn deploy(deployment: &mut impl Deployment) -> anyhow::Result<()> {
+    deployment.prepare()?;
+    deployment.pause()?;
+    let snapshot = match deployment.capture() {
+        Ok(snapshot) => snapshot,
+        Err(error) => {
+            deployment.restart_previous()?;
+            deployment.resume()?;
+            return Err(error).context("pre-upgrade backup failed; previous version restarted");
+        }
+    };
+    if let Err(error) = deployment.activate() {
+        deployment
+            .restore(&snapshot)
+            .context("rollback failed; project remains in maintenance")?;
+        deployment.resume()?;
+        return Err(error).context("upgrade failed and was reverted");
+    }
+    deployment.resume()
+}
+
+struct HostDeployment<'a> {
+    host: &'a Host,
+    project: &'a Project,
+    current: &'a str,
+    target: &'a str,
+    maintenance: Option<Maintenance<'a>>,
+    deployed: bool,
+}
+
+impl Deployment for HostDeployment<'_> {
+    type Snapshot = std::path::PathBuf;
+
+    fn prepare(&mut self) -> anyhow::Result<()> {
+        self.project.prepare_version(self.target)
+    }
+
+    fn pause(&mut self) -> anyhow::Result<()> {
+        self.maintenance = Some(Maintenance::enter(self.host, self.project)?);
+        // Drain old requests before capturing either the database or files.
+        self.project.stop(&[Service::App])
+    }
+
+    fn capture(&mut self) -> anyhow::Result<Self::Snapshot> {
+        let dump = backup::run(self.host, self.project, false, None)?;
+        println!("Pre-upgrade backup: {}", dump.display());
+        Ok(dump)
+    }
+
+    fn activate(&mut self) -> anyhow::Result<()> {
+        step("Restarting the app on the new version");
+        self.project.env().set("NELCOTA_VERSION", self.target)?;
+        if self.project.runtime == Runtime::Systemd {
+            native::deploy_binary()?;
+            self.deployed = true;
+        }
+        self.project.recreate(Service::App)?;
+        self.project.wait_healthy(Service::App, HEALTH_TIMEOUT)
+    }
+
+    fn restore(&mut self, dump: &Self::Snapshot) -> anyhow::Result<()> {
+        warn(&format!("version {} did not become healthy", self.target));
+        step(&format!("Rolling back to {}", self.current));
+        self.project.stop(&[Service::App])?;
+        self.project.env().set("NELCOTA_VERSION", self.current)?;
+        if self.deployed {
+            native::rollback_binary()?;
+        }
+        if self.project.stores_files_on_disk()? {
+            let manifest = backup::validate(dump)?;
+            backup::restore_files(self.project, dump, &manifest)?;
+        }
+        backup::restore_dump(self.project, dump)?;
+        self.project.recreate(Service::App)?;
+        self.project.wait_healthy(Service::App, HEALTH_TIMEOUT)?;
+        ok(&format!(
+            "rollback finished: version {}, pre-upgrade backup restored",
+            self.current
+        ));
+        Ok(())
+    }
+
+    fn restart_previous(&mut self) -> anyhow::Result<()> {
+        self.project.start(&[Service::App])?;
+        self.project.wait_healthy(Service::App, HEALTH_TIMEOUT)
+    }
+
+    fn resume(&mut self) -> anyhow::Result<()> {
+        self.maintenance
+            .take()
+            .context("upgrade maintenance gate missing")?
+            .finish()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(Clone, Copy)]
+    enum Fail {
+        Never,
+        Prepare,
+        Backup,
+        Activate,
+        Restore,
+    }
+
+    struct App {
+        fail: Fail,
+        paused: bool,
+        running: bool,
+        healthy: bool,
+        database: String,
+        file: Option<String>,
+    }
+
+    impl App {
+        fn new(fail: Fail) -> Self {
+            Self {
+                fail,
+                paused: false,
+                running: true,
+                healthy: true,
+                database: "accepted-write".into(),
+                file: Some("original-file".into()),
             }
         }
-        Runtime::Systemd => native::deploy_binary()?,
-    }
-    step("Restarting the app on the new version");
-    let healthy = project
-        .recreate(Service::App)
-        .and_then(|()| project.wait_healthy(Service::App, HEALTH_TIMEOUT));
 
-    match healthy {
-        Ok(()) => {
-            ok(&format!("{} healthy on version {target}", project.name));
-            println!("Pre-upgrade backup: {}", dump.display());
+        fn accepts_writes(&self) -> bool {
+            self.running && !self.paused
+        }
+    }
+
+    impl Deployment for App {
+        type Snapshot = (String, Option<String>);
+
+        fn prepare(&mut self) -> anyhow::Result<()> {
+            if matches!(self.fail, Fail::Prepare) {
+                bail!("target image unavailable");
+            }
             Ok(())
         }
-        Err(err) => {
-            warn(&format!("version {target} did not become healthy: {err}"));
-            step(&format!("Rolling back to {current}"));
-            env.set("NELCOTA_VERSION", &current)?;
-            if project.runtime == Runtime::Systemd {
-                native::rollback_binary()?;
-            }
-            project.stop(&[Service::App])?;
-            backup::restore_dump(project, &dump)?;
-            project.recreate(Service::App)?;
-            project.wait_healthy(Service::App, HEALTH_TIMEOUT)?;
-            ok(&format!(
-                "rollback finished: version {current}, database restored"
-            ));
-            bail!(
-                "upgrade of {} to {target} failed and was reverted",
-                project.name
-            )
+
+        fn pause(&mut self) -> anyhow::Result<()> {
+            self.paused = true;
+            self.running = false;
+            Ok(())
         }
+
+        fn capture(&mut self) -> anyhow::Result<Self::Snapshot> {
+            assert!(!self.accepts_writes());
+            if matches!(self.fail, Fail::Backup) {
+                bail!("snapshot failed");
+            }
+            Ok((self.database.clone(), self.file.clone()))
+        }
+
+        fn activate(&mut self) -> anyhow::Result<()> {
+            self.running = true;
+            assert!(!self.accepts_writes());
+            self.database = "new-migration".into();
+            self.file = None;
+            self.healthy = matches!(self.fail, Fail::Never);
+            if !self.healthy {
+                bail!("new version unhealthy");
+            }
+            Ok(())
+        }
+
+        fn restore(&mut self, snapshot: &Self::Snapshot) -> anyhow::Result<()> {
+            self.running = false;
+            if matches!(self.fail, Fail::Restore) {
+                bail!("restore failed");
+            }
+            (self.database, self.file) = snapshot.clone();
+            self.running = true;
+            self.healthy = true;
+            Ok(())
+        }
+
+        fn restart_previous(&mut self) -> anyhow::Result<()> {
+            self.running = true;
+            self.healthy = true;
+            Ok(())
+        }
+
+        fn resume(&mut self) -> anyhow::Result<()> {
+            assert!(self.healthy);
+            self.paused = false;
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn failed_upgrade_restores_accepted_data_and_historical_file_bytes() {
+        let mut app = App::new(Fail::Activate);
+        assert!(deploy(&mut app).is_err());
+        assert!(app.accepts_writes());
+        assert_eq!(app.database, "accepted-write");
+        assert_eq!(app.file.as_deref(), Some("original-file"));
+    }
+
+    #[test]
+    fn backup_failure_restarts_the_unchanged_previous_app() {
+        let mut app = App::new(Fail::Backup);
+        assert!(deploy(&mut app).is_err());
+        assert!(app.accepts_writes());
+        assert_eq!(app.database, "accepted-write");
+        assert_eq!(app.file.as_deref(), Some("original-file"));
+    }
+
+    #[test]
+    fn failed_restore_keeps_public_traffic_blocked() {
+        let mut app = App::new(Fail::Restore);
+        assert!(deploy(&mut app).is_err());
+        assert!(!app.accepts_writes());
+        assert!(app.paused);
+    }
+
+    #[test]
+    fn unavailable_target_does_not_interrupt_the_live_app() {
+        let mut app = App::new(Fail::Prepare);
+        assert!(deploy(&mut app).is_err());
+        assert!(app.accepts_writes());
+        assert_eq!(app.database, "accepted-write");
+    }
+
+    #[test]
+    fn healthy_upgrade_opens_the_gate_with_the_new_data() {
+        let mut app = App::new(Fail::Never);
+        deploy(&mut app).unwrap();
+        assert!(app.accepts_writes());
+        assert_eq!(app.database, "new-migration");
     }
 }

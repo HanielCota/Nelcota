@@ -1,7 +1,24 @@
 /** `@nelcota/client/auth`: accounts, sessions and sign-in. */
 
+import { AuthClient, type AuthOptions } from './client.js';
+import { createHttpClient, type TransportOptions } from '../core/options.js';
+
 export { AuthClient } from './client.js';
+export { NelcotaError, NelcotaUsageError } from '../core/errors.js';
+export type { Result } from '../core/errors.js';
+export type { TransportOptions } from '../core/options.js';
+export type { FetchLike, TokenSource } from '../core/http.js';
+
+export interface AuthClientOptions extends TransportOptions {
+  auth?: AuthOptions;
+}
+
+/** Auth without loading REST query builders or storage. */
+export function createAuthClient(url: string | URL, options: AuthClientOptions = {}): AuthClient {
+  return new AuthClient(createHttpClient(url, options), options.auth);
+}
 export type {
+  AuthRequestOptions,
   AuthEvent,
   AuthListener,
   AuthOptions,

@@ -49,6 +49,7 @@
     type="button"
     class="flex h-14 w-full min-w-0 cursor-pointer items-center gap-3 rounded-full bg-nav p-1.5 sm:pr-4 text-left whitespace-nowrap transition-colors hover:bg-accent aria-expanded:bg-accent"
     title={`${t('shell.projects.switch')} · ${status}`}
+    aria-label={`${t('shell.projects.switch')}: ${data?.current ?? 'Nelcota'} · ${status}`}
   >
     <span class="relative grid size-11 shrink-0 place-items-center">
       <img src={mascot} alt="" class="size-10 select-none" draggable="false" />

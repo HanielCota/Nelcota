@@ -23,6 +23,17 @@ function fixture() {
 }
 
 describe('storage browser operations', () => {
+  it('advances through folder-only pages and retains earlier folders', async () => {
+    const { browser, adapter } = fixture()
+    adapter.list = vi.fn()
+      .mockResolvedValueOnce({ folders: ['a', 'b'], objects: [], has_next: true })
+      .mockResolvedValueOnce({ folders: ['c'], objects: [], has_next: false })
+    await browser.open({ bucket: 'docs', prefix: '' })
+    await browser.load(true)
+    expect(vi.mocked(adapter.list).mock.calls[1][1]).toBe(2)
+    expect(browser.filesResource.data!.folders).toEqual(['a', 'b', 'c'])
+    expect(browser.filesResource.data!.has_next).toBe(false)
+  })
   it('paginates the captured folder and blocks duplicate page requests', async () => {
     const { browser, adapter } = fixture(), page = deferred<StorageListing>()
     await browser.open({ bucket: 'docs', prefix: 'old/' })

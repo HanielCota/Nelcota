@@ -66,7 +66,15 @@ impl BackupS3 {
             .env("AWS_ACCESS_KEY_ID", &self.access_key)
             .env("AWS_SECRET_ACCESS_KEY", &self.secret_key)
             .env("AWS_DEFAULT_REGION", &self.region)
-            .args(["amazon/aws-cli", "s3"])
+            .args([
+                "--entrypoint",
+                "/bin/sh",
+                "amazon/aws-cli",
+                "-c",
+                "umask 077; exec aws \"$@\"",
+                "--",
+                "s3",
+            ])
             .args(args)
             .args(["--endpoint-url", &self.endpoint])
             .status()
@@ -127,7 +135,7 @@ pub(super) fn sync_files_up(host: &Host, project: &Project, dump: &Path) -> anyh
 /// Fetch the matching snapshot into the backup directory, never the live store.
 pub(super) fn sync_files_down(host: &Host, project: &Project, dump: &Path) -> anyhow::Result<()> {
     let dir = crate::backup::bundle_path(dump)?;
-    fs::create_dir_all(&dir)?;
+    crate::private_fs::dir(&dir)?;
     let s3 = BackupS3::from_host(host)?;
     let url = s3.files_url(&project.name, dump)?;
     step(&format!("Fetching file snapshot from {url}"));
@@ -137,6 +145,7 @@ pub(super) fn sync_files_down(host: &Host, project: &Project, dump: &Path) -> an
         None,
         &["sync", &url, "/data", "--only-show-errors"],
     )?;
+    crate::private_fs::seal_tree(&dir)?;
     ok("files restored");
     Ok(())
 }

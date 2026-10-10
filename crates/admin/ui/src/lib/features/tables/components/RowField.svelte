@@ -6,6 +6,7 @@
   import { Button } from '$lib/components/ui/button'
   import KeyRound from '@lucide/svelte/icons/key-round'
   import { formatCell } from '$lib/features/tables/format'
+  import { formatJson as prettyJson } from '$lib/features/tables/json-format'
   import { columnKind } from '$lib/features/tables/grid'
   import type { FieldState } from '$lib/features/tables/row-form'
   import type { Column } from '$lib/types'
@@ -38,7 +39,7 @@
 
   function formatJson() {
     try {
-      field.value = JSON.stringify(JSON.parse(field.value), null, 2)
+      field.value = prettyJson(field.value)
     } catch {
       // Invalid: the error message is already visible.
     }

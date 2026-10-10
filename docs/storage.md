@@ -34,13 +34,50 @@ turns it on by adding the two `disk` lines to its `.env` and
 `- ./storage:/storage` to the app's `volumes` in `docker-compose.yml`
 (`mkdir storage && chown 65532:65532 storage` first).
 
+On Unix, the CLI creates the disk storage root with mode **0700**, owned by
+the app's UID 65532 on Docker hosts. The server also enforces 0700 at startup
+on existing roots, before opening the store. This prevents other host users
+from reading or enumerating private files, including staged uploads and old
+files, regardless of their individual modes. The server must own the root
+and be allowed to change its permissions. Windows deployments require the
+equivalent directory ACL; Unix modes do not configure Windows ACLs.
+
 | Variable | Default | |
 |---|---|---|
 | `NELCOTA_STORAGE_MAX_FILE_SIZE` | 50 MiB | largest file; a bucket can only lower it |
 | `NELCOTA_STORAGE_MAX_TOTAL_SIZE` | none | cap on all buckets together, in bytes |
 | `NELCOTA_STORAGE_MIN_FREE_BYTES` | 1 GiB | disk backend: refuse uploads that would leave less free space |
-| `NELCOTA_STORAGE_UPLOAD_TIMEOUT_SECS` | 3600 | longest an upload may take |
+| `NELCOTA_STORAGE_UPLOAD_TIMEOUT_SECS` | 3600 | shared deadline for admission, database/policy waits and receiving bytes |
 | `NELCOTA_STORAGE_PUBLIC_URL` | the API's | origin of public file URLs, e.g. `https://files.shop.com` |
+
+Uploads reserve capacity while their bodies are being received. A request
+without `Content-Length` reserves up to its allowed file size or the remaining
+capacity; another upload may receive 507 until that reservation is released.
+The committed total is checked in a serialized database transaction, including
+when several server instances share the same database. Replacements receive
+credit for their old bytes against the total quota, but still need disk space
+for the new version while it is being written.
+
+At most **32 uploads** may be active in a process. Excess attempts return
+`503 upload_busy` immediately. Admission and byte reception share the configured
+deadline, including pool and quota waits (`408 upload_timeout`); metadata
+publication then settles with database timeouts so cancellation cannot delete
+bytes after an ambiguous commit.
+
+`storage.usage` holds the committed byte total. Statement-level triggers update
+it transactionally for inserts, updates, deletes, upserts and truncation,
+including administrative SQL; bulk statements aggregate their changes once.
+Only the internal storage role can read it. No caller role can modify it.
+The migration initializes it while metadata writes are locked. If an operator
+disabled triggers during maintenance, reconcile before resuming writes:
+
+```sql
+BEGIN;
+LOCK TABLE storage.objects IN SHARE MODE;
+UPDATE storage.usage SET bytes = (SELECT coalesce(sum(size), 0)::bigint FROM storage.objects)
+WHERE singleton;
+COMMIT;
+```
 
 ## Buckets and policies
 
@@ -112,6 +149,10 @@ curl -X DELETE "$API/storage/v1/object/avatars/$USER_ID/me.png" -H "authorizatio
 | `POST /storage/v1/object/list/{bucket}` | `{"prefix": "a/", "limit": 100, "offset": 0}` → `{"folders": [...], "objects": [...]}` |
 | `DELETE /storage/v1/object/{bucket}/{path}` | delete (204) |
 | `GET/POST /storage/v1/bucket`, `GET/PUT/DELETE /storage/v1/bucket/{id}` | buckets (writes: `service_role`) |
+
+Listing applies `limit` and `offset` independently to the sorted `folders` and
+`objects` arrays. Advance the offset by the requested limit while either array
+fills a page; a page containing only folders can still have a next page.
 
 A file the caller may not see answers 404, as if it did not exist. Downloads
 take `?download` to force a "save as". Errors: 400 `invalid_path`, 404

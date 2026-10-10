@@ -94,6 +94,13 @@ impl ApiError {
             return Self::unavailable();
         };
         let code = db.code().code();
+        if code == "54000" && db.message() == "NELCOTA_RESPONSE_TOO_LARGE" {
+            return Self::new(
+                StatusCode::PAYLOAD_TOO_LARGE,
+                "response_too_large",
+                "the JSON response exceeds the 8 MiB budget; narrow the selection or page the results",
+            );
+        }
         let status = match *db.code() {
             SqlState::INSUFFICIENT_PRIVILEGE if role == Role::Anon => StatusCode::UNAUTHORIZED,
             SqlState::INSUFFICIENT_PRIVILEGE => StatusCode::FORBIDDEN,

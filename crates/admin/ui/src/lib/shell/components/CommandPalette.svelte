@@ -68,8 +68,8 @@
   description={t('palette.description')}
   class="sm:max-w-xl"
 >
-  <Command.Input placeholder={t('palette.placeholder')} />
-  <Command.List class="max-h-[min(60vh,420px)]">
+  <Command.Input aria-label={t('shell.topbar.searchLabel')} placeholder={t('palette.placeholder')} />
+  <Command.List aria-label={t('palette.title')} class="max-h-[min(60vh,420px)]">
     <Command.Empty class="py-8 text-muted-foreground">{t('palette.empty')}</Command.Empty>
 
     <Command.Group heading={t('palette.groups.pages')}>

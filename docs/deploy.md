@@ -185,11 +185,18 @@ that SQL into a migration by hand.
 
 ## Upgrade
 
-`nelcota -p shop upgrade` takes a backup, changes `NELCOTA_VERSION` in the
-project's `.env`, pulls the image and waits for the healthcheck. If the new
-version does not become healthy, it goes back to the previous version **and**
-restores the backup (the new version may have migrated the schema). Other
-projects are not touched; `upgrade --all` upgrades one at a time.
+`nelcota -p shop upgrade` makes the target image available before changing the
+running project. It then puts that project's Caddy site in maintenance (HTTP
+503 with `Retry-After`), stops the app to drain existing requests, and captures
+the database and disk files together. Only then does it change
+`NELCOTA_VERSION` in `.env`, start the new version and wait for its healthcheck.
+
+If the new version does not become healthy, the CLI restores the previous
+version, database and paired disk snapshot before reopening traffic. If backup
+creation fails, it restarts the unchanged previous version. A failed or
+interrupted recovery leaves the maintenance gate closed; after fixing the
+cause, `nelcota -p shop up` checks health and reopens it. Other projects keep
+serving traffic; `upgrade --all` upgrades one at a time.
 
 ## Local development
 

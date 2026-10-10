@@ -107,9 +107,16 @@ pub(crate) struct LoginRequest {
 
 pub(crate) async fn login(
     State(state): State<AdminState>,
+    nelcota_auth::PeerAddr(peer): nelcota_auth::PeerAddr,
+    headers: HeaderMap,
     Json(form): Json<LoginRequest>,
 ) -> Response {
-    if state.limiter.check("admin-login").is_err() {
+    let ip = nelcota_auth::client_ip(state.trust_proxy, &headers, peer);
+    let key = format!(
+        "admin-login:{}",
+        ip.map(|ip| ip.to_string()).unwrap_or_default()
+    );
+    if state.limiter.check(&key).is_err() {
         return ApiError::new(
             StatusCode::TOO_MANY_REQUESTS,
             "too_many_attempts",
@@ -120,11 +127,7 @@ pub(crate) async fn login(
     // The password is always checked (even with a wrong email), so response
     // time does not reveal which of the two failed.
     let hash = state.credentials.password_hash.clone();
-    let password = form.password;
-    let password_ok =
-        tokio::task::spawn_blocking(move || nelcota_auth::verify_password(&password, &hash))
-            .await
-            .unwrap_or(false);
+    let password_ok = state.passwords.verify(form.password, Some(hash)).await;
     let email_ok = form
         .email
         .trim()

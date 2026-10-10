@@ -203,13 +203,19 @@ pub async fn list(
         )
         .await
         .map_err(from_storage)?;
-    // One extra row tells whether there is a next page.
+    // Both lists use the same offset independently. One extra entry in either
+    // list tells whether there is a next page.
     let mut page: Value = serde_json::to_value(body)?;
     let objects = page["objects"]
         .as_array_mut()
         .map(std::mem::take)
         .unwrap_or_default();
-    let has_next = objects.len() as i64 > PAGE;
+    let folders = page["folders"]
+        .as_array_mut()
+        .map(std::mem::take)
+        .unwrap_or_default();
+    let has_next = objects.len() as i64 > PAGE || folders.len() as i64 > PAGE;
+    page["folders"] = Value::Array(folders.into_iter().take(PAGE as usize).collect());
     page["objects"] = Value::Array(objects.into_iter().take(PAGE as usize).collect());
     page["has_next"] = json!(has_next);
     Ok(crate::contracts::response::<crate::contracts::StorageListing>(page)?.into_response())

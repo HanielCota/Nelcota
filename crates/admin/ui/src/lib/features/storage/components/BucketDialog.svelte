@@ -94,16 +94,17 @@
               spellcheck={false}
               class="h-10 font-mono"
               aria-invalid={id !== '' && !validBucketName(id)}
+              aria-describedby="bucket-id-hint"
               required
             />
-            <p class="text-xs text-muted-foreground">{t('storage.dialog.nameHint')}</p>
+            <p id="bucket-id-hint" class="text-xs text-muted-foreground">{t('storage.dialog.nameHint')}</p>
           </div>
         {/if}
         <div class="grid gap-1.5">
           <label class="flex cursor-pointer items-center gap-2 text-sm font-medium">
-            <Checkbox bind:checked={isPublic} />{t('storage.dialog.public')}
+            <Checkbox bind:checked={isPublic} aria-describedby="bucket-public-hint" />{t('storage.dialog.public')}
           </label>
-          <p class="text-xs text-muted-foreground">{t('storage.dialog.publicHint')}</p>
+          <p id="bucket-public-hint" class="text-xs text-muted-foreground">{t('storage.dialog.publicHint')}</p>
         </div>
         <div class="grid gap-2">
           <Label for="bucket-limit">{t('storage.dialog.limit')}</Label>
@@ -114,15 +115,16 @@
             autocomplete="off"
             class="h-10 w-40 font-mono"
             aria-invalid={!limitOk}
+            aria-describedby="bucket-limit-hint"
           />
-          <p class="text-xs text-muted-foreground">
+          <p id="bucket-limit-hint" class="text-xs text-muted-foreground">
             {t('storage.dialog.limitHint', { size: formatBytes(serverLimit, intlLocale()) })}
           </p>
         </div>
         <div class="grid gap-2">
           <Label for="bucket-types">{t('storage.dialog.types')}</Label>
-          <Input id="bucket-types" bind:value={types} placeholder="image/*" autocomplete="off" spellcheck={false} class="h-10 font-mono" />
-          <p class="text-xs text-muted-foreground">{t('storage.dialog.typesHint')}</p>
+          <Input id="bucket-types" bind:value={types} placeholder="image/*" autocomplete="off" spellcheck={false} class="h-10 font-mono" aria-describedby="bucket-types-hint" />
+          <p id="bucket-types-hint" class="text-xs text-muted-foreground">{t('storage.dialog.typesHint')}</p>
         </div>
         <Dialog.Footer>
           <Button variant="outline" disabled={saving} onclick={guard.request}>{t('common.cancel')}</Button>

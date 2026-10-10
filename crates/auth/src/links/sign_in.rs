@@ -7,6 +7,7 @@ use serde_json::Value;
 use super::{LinkKind, tokens};
 use crate::{
     AuthState,
+    accounts::confirm_inbox_owner,
     db::{begin_auth, db_error},
     error::invalid_grant,
     sessions::start_session,
@@ -32,14 +33,20 @@ pub(crate) async fn sign_in(
     let user_id = tokens::consume(&tx, kind, &hash)
         .await?
         .ok_or_else(expired_link)?;
-    // Opening the link proves the person receives the account's emails.
-    tx.execute(
-        "UPDATE auth.users SET email_confirmed_at = coalesce(email_confirmed_at, now())
-         WHERE id = $1",
-        &[&user_id],
-    )
-    .await
-    .map_err(db_error)?;
+    if kind == LinkKind::MagicLink {
+        // A magic link is independent of the pending signup: the inbox owner
+        // must not inherit a password chosen by whoever registered the address.
+        confirm_inbox_owner(&tx, user_id).await?;
+    } else {
+        // A signup confirmation approves the password from that signup.
+        tx.execute(
+            "UPDATE auth.users SET email_confirmed_at = coalesce(email_confirmed_at, now())
+             WHERE id = $1",
+            &[&user_id],
+        )
+        .await
+        .map_err(db_error)?;
+    }
     let session = start_session(state, &tx, user_id, ip, user_agent).await?;
     tx.commit().await.map_err(db_error)?;
     tracing::info!(user_id = %user_id, kind = kind.as_str(), "signed in through an email link");

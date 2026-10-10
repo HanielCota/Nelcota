@@ -32,6 +32,8 @@ const ptBR = {
     exportBaseName: 'resultado',
   },
   results: {
+    label: 'Resultados da consulta SQL',
+    completed: 'Consulta concluída em {ms} ms.',
     emptyTitle: 'Nenhum resultado ainda',
     emptyDescription: 'Escreva uma consulta e execute.',
     position: 'Posição {position} no texto.',
@@ -167,6 +169,8 @@ const en: Messages<typeof ptBR> = {
     exportBaseName: 'result',
   },
   results: {
+    label: 'SQL query results',
+    completed: 'Query completed in {ms} ms.',
     emptyTitle: 'No results yet',
     emptyDescription: 'Write a query and run it.',
     position: 'Position {position} in the text.',

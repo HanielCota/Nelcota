@@ -115,8 +115,10 @@
         <Label for="email">{t('login.email')}</Label>
         <Input
           id="email"
+          name="email"
           type="email"
           autocomplete="username"
+          spellcheck={false}
           class="h-10"
           bind:value={email}
           onfocus={followCaret}
@@ -135,6 +137,7 @@
         <div class="relative">
         <Input
           id="password"
+          name="password"
           type={showPassword ? 'text' : 'password'}
           autocomplete="current-password"
           class="h-10 pr-11"

@@ -19,6 +19,14 @@ pub(crate) async fn issue(
     user_id: Uuid,
     kind: LinkKind,
 ) -> Result<Option<String>, ApiError> {
+    // Serializes the empty-token case too. There is no token row to lock on
+    // the first request; every issuer instead locks the owning account.
+    tx.query_one(
+        "SELECT id FROM auth.users WHERE id = $1 FOR UPDATE",
+        &[&user_id],
+    )
+    .await
+    .map_err(db_error)?;
     let recent: bool = tx
         .query_one(
             "SELECT EXISTS (
@@ -80,6 +88,22 @@ pub(crate) async fn consume(
     kind: LinkKind,
     hash: &[u8],
 ) -> Result<Option<Uuid>, ApiError> {
+    // Match issuance/password-login lock order: account before link/session.
+    // The UPDATE below rechecks validity after waiting for this account lock.
+    let account = tx
+        .query_opt(
+            "SELECT u.id FROM auth.users u
+         JOIN auth.one_time_tokens t ON t.user_id = u.id
+         WHERE t.token_hash = $1 AND t.kind = $2
+           AND t.used_at IS NULL AND t.expires_at > now()
+         FOR UPDATE OF u",
+            &[&hash, &kind.as_str()],
+        )
+        .await
+        .map_err(db_error)?;
+    if account.is_none() {
+        return Ok(None);
+    }
     Ok(tx
         .query_opt(
             "UPDATE auth.one_time_tokens SET used_at = now()

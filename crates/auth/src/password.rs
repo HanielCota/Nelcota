@@ -8,10 +8,11 @@ use argon2::{
     Argon2,
     password_hash::{PasswordHasher, PasswordVerifier, phc::PasswordHash},
 };
+use std::sync::Arc;
 use tokio::sync::Semaphore;
 
 pub struct Passwords {
-    permits: Semaphore,
+    permits: Arc<Semaphore>,
     /// Hash of a random password: a login for an unknown email verifies against
     /// it, so the response time does not reveal whether the email exists.
     dummy: String,
@@ -22,35 +23,45 @@ impl Passwords {
         let mut random = [0u8; 32];
         getrandom::fill(&mut random).expect("system randomness source unavailable");
         Passwords {
-            permits: Semaphore::new(max_concurrent.max(1)),
+            permits: Arc::new(Semaphore::new(max_concurrent.max(1))),
             dummy: hash_blocking(&random).expect("argon2 with default parameters cannot fail"),
         }
     }
 
     pub async fn hash(&self, password: String) -> Option<String> {
-        let _permit = self.permits.acquire().await.ok()?;
-        tokio::task::spawn_blocking(move || hash_blocking(password.as_bytes()))
-            .await
-            .ok()?
+        self.compute(move || hash_blocking(password.as_bytes()))
+            .await?
+    }
+
+    /// The worker owns its permit, including after its caller is cancelled.
+    async fn compute<T: Send + 'static>(
+        &self,
+        work: impl FnOnce() -> T + Send + 'static,
+    ) -> Option<T> {
+        let permit = self.permits.clone().acquire_owned().await.ok()?;
+        tokio::task::spawn_blocking(move || {
+            let _permit = permit;
+            work()
+        })
+        .await
+        .ok()
     }
 
     /// `phc = None` (unknown user or no password) always fails, but takes the
     /// same time as a real verification.
     pub async fn verify(&self, password: String, phc: Option<String>) -> bool {
-        let Ok(_permit) = self.permits.acquire().await else {
-            return false;
-        };
         let exists = phc.is_some();
         let phc = phc.unwrap_or_else(|| self.dummy.clone());
-        let ok = tokio::task::spawn_blocking(move || {
-            PasswordHash::new(&phc).is_ok_and(|parsed| {
-                Argon2::default()
-                    .verify_password(password.as_bytes(), &parsed)
-                    .is_ok()
+        let ok = self
+            .compute(move || {
+                PasswordHash::new(&phc).is_ok_and(|parsed| {
+                    Argon2::default()
+                        .verify_password(password.as_bytes(), &parsed)
+                        .is_ok()
+                })
             })
-        })
-        .await
-        .unwrap_or(false);
+            .await
+            .unwrap_or(false);
         ok && exists
     }
 }
@@ -60,7 +71,7 @@ pub fn hash_password(password: &str) -> Option<String> {
     hash_blocking(password.as_bytes())
 }
 
-/// Synchronous verification (for the CLI and the panel).
+/// Synchronous verification for the CLI. Server requests use [`Passwords`].
 pub fn verify_password(password: &str, phc: &str) -> bool {
     PasswordHash::new(phc).is_ok_and(|parsed| {
         Argon2::default()
@@ -79,6 +90,35 @@ fn hash_blocking(password: &[u8]) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn cancelled_caller_keeps_the_worker_permit_until_completion() {
+        let passwords = Arc::new(Passwords::new(1));
+        let (started, running) = tokio::sync::oneshot::channel();
+        let (release, wait) = std::sync::mpsc::channel();
+        let worker = passwords.clone();
+        let caller = tokio::spawn(async move {
+            worker
+                .compute(move || {
+                    started.send(()).unwrap();
+                    wait.recv().unwrap();
+                })
+                .await
+        });
+        running.await.unwrap();
+        caller.abort();
+        let _ = caller.await;
+        assert!(passwords.permits.try_acquire().is_err());
+        release.send(()).unwrap();
+        let permit = tokio::time::timeout(
+            std::time::Duration::from_secs(2),
+            passwords.permits.acquire(),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        drop(permit);
+    }
 
     #[tokio::test]
     async fn phc_argon2id_hash_and_verification() {

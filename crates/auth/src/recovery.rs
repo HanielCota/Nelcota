@@ -12,6 +12,7 @@ use std::net::IpAddr;
 
 use crate::{
     AuthState,
+    accounts::confirm_inbox_owner,
     credentials::validate_password,
     db::{begin_auth, db_error},
     error::{invalid, invalid_grant, validation},
@@ -60,7 +61,9 @@ pub(crate) async fn complete(
     let user_id = links::consume(&tx, LinkKind::Recovery, &hash)
         .await?
         .ok_or_else(expired_link)?;
-    // Opening the link proves the person receives the account's emails.
+    // First inbox proof retires credentials set before verification. Consume
+    // holds the account lock; claim before assigning the owner's new password.
+    confirm_inbox_owner(&tx, user_id).await?;
     tx.execute(
         "UPDATE auth.users
             SET encrypted_password = $2, updated_at = now(),
