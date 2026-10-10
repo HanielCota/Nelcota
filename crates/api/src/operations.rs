@@ -100,6 +100,23 @@ fn require_filters(request: &query::Request) -> Result<(), ApiError> {
     Ok(())
 }
 
+/// PATCH/DELETE act on every row the filters match: `order`, `limit` and
+/// `offset` would be silently ignored, which reads as "change only the first
+/// N rows" and changes them all. Refuse them instead.
+fn reject_paging(request: &query::Request) -> Result<(), ApiError> {
+    let ignored = [
+        ("order", !request.order.is_empty()),
+        ("limit", request.limit.is_some()),
+        ("offset", request.offset.is_some()),
+    ];
+    if let Some((name, _)) = ignored.iter().find(|(_, set)| *set) {
+        return Err(bad_query(QueryError::Invalid(format!(
+            "{name} does not apply to PATCH or DELETE, which change every matching row; narrow the filters instead"
+        ))));
+    }
+    Ok(())
+}
+
 pub(crate) async fn read(
     pool: &Pool,
     claims: &Claims,
@@ -212,6 +229,7 @@ pub(crate) async fn update(
     let request = query::parse_request_with_relations(pairs, table, catalog).map_err(bad_query)?;
     require_filters(&request)?;
     reject_on_conflict(&request)?;
+    reject_paging(&request)?;
     let sql = query::update(
         &catalog.schema,
         table,
@@ -237,6 +255,7 @@ pub(crate) async fn remove(
     let request = query::parse_request_with_relations(pairs, table, catalog).map_err(bad_query)?;
     require_filters(&request)?;
     reject_on_conflict(&request)?;
+    reject_paging(&request)?;
     let sql = query::delete(
         &catalog.schema,
         table,

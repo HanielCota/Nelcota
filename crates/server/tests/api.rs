@@ -1212,6 +1212,25 @@ async fn embedded_rows_follow_the_related_tables_rls() {
 }
 
 #[tokio::test]
+async fn patch_and_delete_refuse_order_limit_and_offset() {
+    let app = TestApp::spawn().await;
+    let s = service_token();
+    for query in ["order=id", "limit=1", "offset=1"] {
+        let path = format!("/rest/v1/products?stock=gt.0&{query}");
+        let reply = app
+            .request(Method::PATCH, &path, Some(&s), Some(json!({ "stock": 1 })))
+            .await;
+        assert_eq!(reply.status, StatusCode::BAD_REQUEST, "{query}");
+        assert_eq!(reply.body["code"], "invalid_query", "{query}");
+        let reply = app.request(Method::DELETE, &path, Some(&s), None).await;
+        assert_eq!(reply.status, StatusCode::BAD_REQUEST, "{query}");
+    }
+    // Nothing was changed.
+    let (_, body) = app.get("/rest/v1/products?stock=eq.1", None).await;
+    assert_eq!(body, json!([]));
+}
+
+#[tokio::test]
 async fn cors_exposes_what_a_browser_client_reads() {
     let app = TestApp::spawn().await;
     let reply = app

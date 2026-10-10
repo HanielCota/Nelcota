@@ -148,6 +148,9 @@ transactional behavior and missing columns still receive their defaults.
 - `PATCH`/`DELETE` without a filter are refused (400), to avoid changing or
   deleting the whole table by mistake. To do that on purpose, use an explicit
   filter (`?id=not.is.null`).
+- `order`, `limit` and `offset` are refused on `PATCH`/`DELETE` (400
+  `invalid_query`): they change every row the filters match, so narrow the
+  filters instead.
 - `return=representation` runs `RETURNING`, which requires `SELECT`
   permission (GRANT + policy) on the written rows.
 
