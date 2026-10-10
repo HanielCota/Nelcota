@@ -17,6 +17,7 @@
     policies,
     onrenamed,
     ondropped,
+    onaltered,
   }: {
     name: string
     /** Policies on the table, when the table list knows it. */
@@ -24,6 +25,8 @@
     /** The table was renamed: the editor switches the URL. */
     onrenamed: (name: string) => void
     ondropped: () => void
+    /** Something else changed (RLS, grants): the table list's status may be stale. */
+    onaltered?: () => void
   } = $props()
 
   let structure = $state<Structure | null>(null)
@@ -66,7 +69,10 @@
       toast.success(t('tables.toast.tableAltered'))
       const renamed = actions.findLast((a) => a.action === 'rename_table')
       if (renamed) onrenamed(renamed.name)
-      else await load()
+      else {
+        await load()
+        onaltered?.()
+      }
     } catch (e) {
       toast.error(errorMessage(e))
       throw e

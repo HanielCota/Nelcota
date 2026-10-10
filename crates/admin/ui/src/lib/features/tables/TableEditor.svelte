@@ -259,7 +259,7 @@
 
       {#if view === 'structure'}
         <div class="min-h-0 flex-1 overflow-auto">
-          <StructureView {name} policies={tables.find((entry) => entry.name === name)?.rls.policies} onrenamed={onRenamed} ondropped={onDropped} />
+          <StructureView {name} policies={tables.find((entry) => entry.name === name)?.rls.policies} onrenamed={onRenamed} ondropped={onDropped} onaltered={loadTables} />
         </div>
       {:else}
         {#if filterOpen && data}
