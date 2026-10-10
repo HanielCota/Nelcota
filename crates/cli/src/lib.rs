@@ -141,8 +141,8 @@ pub enum Command {
         /// the dump is uploaded whenever the bucket is configured.
         #[arg(long)]
         upload: bool,
-        /// Keeps only the N most recent local dumps.
-        #[arg(long)]
+        /// Keeps only the N most recent local dumps (at least 1: the new one).
+        #[arg(long, value_parser = at_least_one)]
         keep: Option<usize>,
         /// All projects.
         #[arg(long)]
@@ -184,6 +184,15 @@ pub enum Command {
         #[arg(long, default_value = "127.0.0.1:8000")]
         addr: String,
     },
+}
+
+/// `--keep 0` would delete the dump that was just written.
+fn at_least_one(value: &str) -> Result<usize, String> {
+    match value.parse::<usize>() {
+        Ok(0) => Err("must be at least 1 (0 would delete the new backup too)".into()),
+        Ok(n) => Ok(n),
+        Err(err) => Err(err.to_string()),
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, ValueEnum)]
@@ -534,6 +543,17 @@ mod cli_tests {
         assert!(matches!(
             cli.command,
             Some(Command::Down { yes: false, .. })
+        ));
+    }
+
+    #[test]
+    fn backup_keeps_at_least_the_new_dump() {
+        assert!(Cli::try_parse_from(["nelcota", "backup", "--keep", "0"]).is_err());
+        assert!(Cli::try_parse_from(["nelcota", "backup", "--keep", "-1"]).is_err());
+        let cli = Cli::try_parse_from(["nelcota", "backup", "--all", "--keep", "7"]).unwrap();
+        assert!(matches!(
+            cli.command,
+            Some(Command::Backup { keep: Some(7), .. })
         ));
     }
 
