@@ -64,6 +64,7 @@ const ptBR = {
   app: {
     loading: 'Carregando painel…',
     skipToContent: 'Pular para o conteúdo',
+    offlineTitle: 'Não foi possível falar com o servidor',
   },
 }
 
@@ -129,6 +130,7 @@ const en: Messages<typeof ptBR> = {
   app: {
     loading: 'Loading panel…',
     skipToContent: 'Skip to content',
+    offlineTitle: 'Could not reach the server',
   },
 }
 

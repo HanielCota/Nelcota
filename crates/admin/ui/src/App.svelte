@@ -4,7 +4,10 @@
   import Login from '$lib/features/auth/Login.svelte'
   import LoadingScreen from '$lib/shell/LoadingScreen.svelte'
   import { takeHandoffToken } from '$lib/features/projects/projects'
-  import { api } from '$lib/api'
+  import { api, ApiError } from '$lib/api'
+  import { Button } from '$lib/components/ui/button'
+  import Logo from '$lib/shell/components/Logo.svelte'
+  import LoaderCircle from '@lucide/svelte/icons/loader-circle'
   import { session } from '$lib/features/auth/session.svelte'
   import { route } from '$lib/router.svelte'
   import { crumbsFor, documentTitle } from '$lib/shell/titles'
@@ -21,13 +24,31 @@
         // Expired or already used token: fall back to the normal login.
       }
     }
+    await checkSession()
+  })
+
+  // Why the session check failed when it was not a plain "signed out" (401):
+  // server down, proxy error… The login form would be misleading then.
+  let offline = $state<unknown>(null)
+  let checking = $state(false)
+
+  async function checkSession() {
+    checking = true
     try {
       const me = await api.get<{ email: string }>('/session')
+      offline = null
       session.email = me.email
-    } catch {
-      session.email = null
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) {
+        offline = null
+        session.email = null
+      } else {
+        offline = e
+      }
+    } finally {
+      checking = false
     }
-  })
+  }
 
   // Tab title: the current page (or the login) followed by the product name.
   const title = $derived(
@@ -38,7 +59,20 @@
 <svelte:head><title>{title}</title></svelte:head>
 
 <ModeWatcher defaultMode="dark" />
-{#if session.email === undefined}
+{#if session.email === undefined && offline}
+  <main class="flex min-h-dvh items-center justify-center bg-background px-6 py-12">
+    <div class="flex w-full max-w-sm flex-col items-center gap-6 text-center" role="alert">
+      <Logo size="lg" />
+      <div class="grid gap-2">
+        <h1 class="text-base font-semibold">{t('shell.app.offlineTitle')}</h1>
+        <p class="text-sm text-muted-foreground">{errorMessage(offline)}</p>
+      </div>
+      <Button variant="outline" disabled={checking} onclick={checkSession}>
+        {#if checking}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{/if}{t('common.retry')}
+      </Button>
+    </div>
+  </main>
+{:else if session.email === undefined}
   <LoadingScreen />
 {:else if session.email === null}
   <Login />
