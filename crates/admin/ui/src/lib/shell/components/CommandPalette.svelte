@@ -30,9 +30,11 @@
 
   // Load on mount (whoever types right after opening finds the tables) and
   // refresh on every open, since they may have changed; meanwhile the previous
-  // list stays visible.
+  // list stays visible. Closing the palette fetches nothing.
+  let mounted = false
   $effect(() => {
-    void palette.open
+    if (!palette.open && mounted) return
+    mounted = true
     const controller = new AbortController()
     loadTables(controller.signal)
     return () => controller.abort()
