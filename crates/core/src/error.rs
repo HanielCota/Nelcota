@@ -234,9 +234,16 @@ impl IntoResponse for ApiError {
             message: self.message,
         });
         if self.status == StatusCode::UNAUTHORIZED {
+            // RFC 6750 §3.1: `invalid_token` only when a token was presented
+            // and rejected; `anon` lacking a privilege just needs to sign in.
+            let challenge = if self.code == "invalid_token" {
+                r#"Bearer error="invalid_token""#
+            } else {
+                "Bearer"
+            };
             response.headers_mut().insert(
                 header::WWW_AUTHENTICATE,
-                HeaderValue::from_static(r#"Bearer error="invalid_token""#),
+                HeaderValue::from_static(challenge),
             );
         }
         if let Some(secs) = self.retry_after_secs {
@@ -288,6 +295,18 @@ mod tests {
                 "constraint": "t_pkey",
             })
         );
+    }
+
+    #[tokio::test]
+    async fn only_rejected_tokens_name_invalid_token_in_the_challenge() {
+        let (response, _) = body(ApiError::invalid_token()).await;
+        assert_eq!(
+            response.headers()[header::WWW_AUTHENTICATE],
+            r#"Bearer error="invalid_token""#
+        );
+        let anon = ApiError::new(StatusCode::UNAUTHORIZED, "db_error", "permission denied");
+        let (response, _) = body(anon).await;
+        assert_eq!(response.headers()[header::WWW_AUTHENTICATE], "Bearer");
     }
 
     #[test]

@@ -107,3 +107,7 @@ CREATE POLICY owner ON public.todos
 | `anon` without permission on the table | 401 |
 | `authenticated` without permission / policy violated on write | 403 |
 | Table does not exist | 404 |
+
+Every 401 carries `WWW-Authenticate`: `Bearer error="invalid_token"` when a
+token was presented and rejected, plain `Bearer` when the request had no
+token (an `anon` request that needs to sign in).
