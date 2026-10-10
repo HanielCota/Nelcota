@@ -4,7 +4,7 @@
 #   curl -fsSL https://nelcota.com/install | sh
 #
 # Optional variables:
-#   NELCOTA_VERSION=0.2.0     version (default: the latest)
+#   NELCOTA_VERSION=0.3.0     version (default: the latest)
 #   NELCOTA_REPO=owner/repo   GitHub repository (default: HanielCota/Nelcota)
 #   PREFIX=/usr/local/bin     where to install
 #   NELCOTA_SKIP_DOCKER=1     do not install Docker (for `nelcota init --runtime systemd`)

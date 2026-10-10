@@ -2019,7 +2019,7 @@ dependencies = [
 
 [[package]]
 name = "nelcota-admin"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "axum",
  "base64 0.23.1",
@@ -2049,7 +2049,7 @@ dependencies = [
 
 [[package]]
 name = "nelcota-api"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "axum",
  "bytes",
@@ -2069,7 +2069,7 @@ dependencies = [
 
 [[package]]
 name = "nelcota-auth"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "argon2",
  "axum",
@@ -2097,7 +2097,7 @@ dependencies = [
 
 [[package]]
 name = "nelcota-cli"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "base64 0.23.1",
@@ -2141,7 +2141,7 @@ dependencies = [
 
 [[package]]
 name = "nelcota-core"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "axum",
  "deadpool-postgres",
@@ -2160,7 +2160,7 @@ dependencies = [
 
 [[package]]
 name = "nelcota-server"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "axum",
@@ -2197,7 +2197,7 @@ dependencies = [
 
 [[package]]
 name = "nelcota-storage"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "axum",
  "bytes",
