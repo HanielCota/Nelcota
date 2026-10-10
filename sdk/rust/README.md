@@ -97,6 +97,11 @@ let signup = client.auth().sign_up("ana@example.com", "strong-password-123", Non
 // signup.session is None while email confirmation is pending.
 let session = client.auth().get_session().await?;
 let user = client.auth().get_user().await?;
+// Merged into user_metadata; a null value removes the key.
+client.auth().update_user(nelcota_client::auth::UserUpdate {
+    data: Some(serde_json::json!({ "plan": "pro" })),
+    ..Default::default()
+}).await?;
 let mut events = client.auth().subscribe();
 let background = client.auth().start_auto_refresh(); // opt-in; retain this handle
 client.auth().request_password_reset("ana@example.com").await?;
