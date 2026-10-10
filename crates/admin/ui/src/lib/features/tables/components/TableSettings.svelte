@@ -15,10 +15,13 @@
 
   let {
     structure,
+    policies,
     onalter,
     ondrop,
   }: {
     structure: Structure
+    /** Policies on the table (unknown: no warning before turning RLS on). */
+    policies?: number
     /** Applies the actions; resolves after the structure reloads. */
     onalter: (actions: AlterAction[]) => Promise<void>
     ondrop: () => void
@@ -31,6 +34,7 @@
   let comment = $state('')
   let grants = $state<GrantDef[]>([])
   let disableRlsOpen = $state(false)
+  let enableRlsOpen = $state(false)
   let busy = $state<'identity' | 'grants' | 'rls' | null>(null)
   let previous: Structure | null = null
 
@@ -95,7 +99,13 @@
         <h2 class="text-base font-semibold">{t('tables.settings.rls')}</h2>
         <p class="mt-0.5 text-sm text-destructive">{t('tables.settings.rlsOff')}</p>
       </div>
-      <Button disabled={busy !== null} onclick={() => apply([{ action: 'set_rls', enabled: true }], 'rls').catch(() => {})}>{#if busy === 'rls'}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{:else}<ShieldCheck data-icon="inline-start" aria-hidden="true" />{/if}{t('tables.settings.enableRls')}</Button>
+      <Button
+        disabled={busy !== null}
+        onclick={() => {
+          // No policy yet: RLS would hide every row from the API; ask first.
+          if (policies === 0) enableRlsOpen = true
+          else apply([{ action: 'set_rls', enabled: true }], 'rls').catch(() => {})
+        }}>{#if busy === 'rls'}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{:else}<ShieldCheck data-icon="inline-start" aria-hidden="true" />{/if}{t('tables.settings.enableRls')}</Button>
     {/if}
   </section>
 
@@ -129,4 +139,12 @@
   confirmLabel={t('tables.settings.disable')}
   destructive
   onconfirm={() => apply([{ action: 'set_rls', enabled: false }], 'rls')}
+/>
+
+<ConfirmDialog
+  bind:open={enableRlsOpen}
+  title={t('policies.enableRlsEmpty.title', { table: structure.name })}
+  description={t('policies.enableRlsEmpty.description')}
+  confirmLabel={t('policies.enableRlsEmpty.confirm')}
+  onconfirm={() => apply([{ action: 'set_rls', enabled: true }], 'rls')}
 />

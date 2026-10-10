@@ -14,10 +14,13 @@
 
   let {
     name,
+    policies,
     onrenamed,
     ondropped,
   }: {
     name: string
+    /** Policies on the table, when the table list knows it. */
+    policies?: number
     /** The table was renamed: the editor switches the URL. */
     onrenamed: (name: string) => void
     ondropped: () => void
@@ -90,7 +93,7 @@
         deleteOpen = true
       }}
     />
-    <TableSettings {structure} onalter={alter} ondrop={() => (dropOpen = true)} />
+    <TableSettings {structure} {policies} onalter={alter} ondrop={() => (dropOpen = true)} />
   </div>
 
   <ColumnSheet bind:open={columnOpen} table={name} original={editing} onsaved={load} />
