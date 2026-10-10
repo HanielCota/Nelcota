@@ -50,19 +50,38 @@
 
   // The section nearest the top of the screen, for the pill row.
   let current = $state('api-address')
+  let tabRow = $state<HTMLElement>()
   onMount(() => {
+    const root = document.getElementById('conteudo')
+    // The last card is too short to ever reach the top: at the bottom of the page it is the current one.
+    const bottom = () => !!root && root.scrollTop > 0 && root.scrollTop + root.clientHeight >= root.scrollHeight - 4
     const observer = new IntersectionObserver(
       (entries) => {
+        if (bottom()) return
         const top = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0]
         if (top) current = top.target.id
       },
-      { root: document.getElementById('conteudo'), rootMargin: '-80px 0px -55% 0px' },
+      { root, rootMargin: '-80px 0px -55% 0px' },
     )
     for (const { id } of sections) {
       const element = document.getElementById(id)
       if (element) observer.observe(element)
     }
-    return () => observer.disconnect()
+    const atBottom = () => {
+      if (bottom()) current = sections[sections.length - 1].id
+    }
+    root?.addEventListener('scroll', atBottom, { passive: true })
+    return () => {
+      observer.disconnect()
+      root?.removeEventListener('scroll', atBottom)
+    }
+  })
+
+  // On a narrow screen the pill row scrolls sideways: keep the current pill in view.
+  $effect(() => {
+    const active = tabRow?.querySelector<HTMLElement>(`[href="#${current}"]`)
+    if (!tabRow || !active || tabRow.scrollWidth <= tabRow.clientWidth) return
+    tabRow.scrollTo({ left: active.offsetLeft - (tabRow.clientWidth - active.offsetWidth) / 2, behavior: 'smooth' })
   })
 
   function choose(patch: { table?: string; lang?: Lang; topic?: 'tables' | 'auth' }) {
@@ -97,11 +116,11 @@
   ] as const
 
   const sections = $derived([
-    { id: 'api-address', label: t('connect.address') },
-    { id: 'api-roles', label: t('connect.caller') },
-    { id: 'api-sdk', label: t('connect.sdk.title') },
-    { id: 'api-examples', label: t('connect.examples') },
-    { id: 'api-token', label: t('connect.token.title') },
+    { id: 'api-address', label: t('connect.address'), short: t('connect.short.address') },
+    { id: 'api-roles', label: t('connect.caller'), short: t('connect.short.caller') },
+    { id: 'api-sdk', label: t('connect.sdk.title'), short: t('connect.short.sdk') },
+    { id: 'api-examples', label: t('connect.examples'), short: t('connect.short.examples') },
+    { id: 'api-token', label: t('connect.token.title'), short: t('connect.short.token') },
   ])
 
   const roles = ['anon', 'authenticated', 'service_role'] as const
@@ -127,7 +146,7 @@
   <div class="grid gap-6 *:min-w-0">
     <!-- Keep the active section visible while scrolling through the cards. -->
     <div class="sticky top-0 z-10 -my-3 bg-background/90 py-3 backdrop-blur">
-    <nav class="flex w-fit max-w-full gap-1 overflow-x-auto rounded-full bg-card p-1" aria-label={t('connect.navigation')}>
+    <nav bind:this={tabRow} class="flex w-fit max-w-full gap-1 overflow-x-auto rounded-full bg-card p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label={t('connect.navigation')}>
       {#each sections as section (section.id)}
         <a
           class={[
@@ -135,7 +154,8 @@
             current === section.id ? 'bg-nav-active font-medium text-nav-active-foreground' : 'text-muted-foreground hover:text-foreground',
           ]}
           aria-current={current === section.id ? 'location' : undefined}
-          href={`#${section.id}`}>{section.label}</a
+          onclick={() => (current = section.id)}
+          href={`#${section.id}`}><span class="sm:hidden">{section.short}</span><span class="hidden sm:inline">{section.label}</span></a
         >
       {/each}
     </nav>

@@ -4,6 +4,7 @@ import type { Messages } from '../index.svelte'
 const ptBR = {
   title: 'API',
   navigation: 'Seções da documentação da API',
+  short: { address: 'Endereço', caller: 'Quem chama', sdk: 'SDK', examples: 'Exemplos', token: 'Token' },
   description: 'Como o seu app conversa com este projeto.',
   start: 'Conectar meu app',
   openapi: 'Documentação OpenAPI',
@@ -100,10 +101,11 @@ const ptBR = {
   },
   token: {
     title: 'Token',
-    introBefore: 'Para o seu backend.',
-    introWarning: 'Ignora todo o RLS',
-    introAfter:
-      ': nunca coloque no frontend, num app mobile ou num repositório. Cada token vale até expirar e ainda depende de GRANT em cada tabela (as criadas pelo painel já dão acesso total ao service_role).',
+    intro: 'Para o seu backend chamar a API como service_role, sem passar pelas regras de acesso.',
+    warningTitle: 'Ignora todo o RLS',
+    warning: 'Guarde como uma senha: nunca no frontend, num app mobile ou num repositório.',
+    details:
+      'O token não fica guardado no servidor: vale até expirar, e gerar outro não invalida os anteriores. Ainda depende de GRANT em cada tabela (as criadas pelo painel já dão acesso total ao service_role).',
     copy: 'Copiar token',
     copyNow: 'Copie agora: ele não será mostrado de novo. Vale até {date}.',
     validity: 'Validade',
@@ -119,6 +121,7 @@ const ptBR = {
 const en: Messages<typeof ptBR> = {
   title: 'API',
   navigation: 'API documentation sections',
+  short: { address: 'Address', caller: 'Who calls', sdk: 'SDK', examples: 'Examples', token: 'Token' },
   description: 'How your app talks to this project.',
   start: 'Connect my app',
   openapi: 'OpenAPI documentation',
@@ -215,10 +218,11 @@ const en: Messages<typeof ptBR> = {
   },
   token: {
     title: 'Token',
-    introBefore: 'For your backend.',
-    introWarning: 'It bypasses all RLS',
-    introAfter:
-      ': never put it in a frontend, a mobile app or a repository. Each token lasts until it expires and still depends on a GRANT on each table (tables created by the panel already give service_role full access).',
+    intro: 'For your backend to call the API as service_role, without going through the access rules.',
+    warningTitle: 'It bypasses all RLS',
+    warning: 'Keep it like a password: never in a frontend, a mobile app or a repository.',
+    details:
+      'The token is not stored on the server: it lasts until it expires, and generating another does not revoke earlier ones. It still depends on a GRANT on each table (tables created by the panel already give service_role full access).',
     copy: 'Copy token',
     copyNow: 'Copy it now: it will not be shown again. Valid until {date}.',
     validity: 'Validity',
