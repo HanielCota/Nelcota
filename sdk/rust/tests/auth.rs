@@ -166,6 +166,9 @@ fn oauth_and_email_links_keep_secrets_out_of_debug_and_clean_callback_urls() {
         .unwrap();
     assert_eq!(flow.verifier.len(), 43);
     let params: std::collections::BTreeMap<_, _> = flow.url.query_pairs().into_owned().collect();
+    assert_eq!(params.len(), 4);
+    assert_eq!(params["code_challenge_method"], "S256");
+    assert!(!flow.url.as_str().contains(&flow.verifier));
     assert_eq!(
         params["code_challenge"],
         URL_SAFE_NO_PAD.encode(Sha256::digest(flow.verifier.as_bytes()))

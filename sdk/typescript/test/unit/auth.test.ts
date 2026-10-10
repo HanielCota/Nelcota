@@ -26,6 +26,51 @@ function stored(value: unknown): SessionStorage {
   return storage;
 }
 
+describe('session storage keys', () => {
+  it.each([
+    ['', ''],
+    ['/', ''],
+    ['////', ''],
+    ['/api', '/api'],
+    ['/api///', '/api'],
+    ['/api//v1///', '/api//v1'],
+    ['/api%2F///', '/api%2F'],
+  ])('normalizes trailing slashes in %s while retaining the base path', async (path, normalized) => {
+    const storage = memoryStorage();
+    const nelcota = createClient(`https://api.example.com${path}`, { auth: { storage, autoRefresh: false } });
+    const value = session();
+    try {
+      await nelcota.auth.setSession(value);
+      expect(JSON.parse((await storage.getItem(`nelcota.api.example.com${normalized}.session`))!)).toEqual(value);
+    } finally { nelcota.dispose(); }
+  });
+
+  it('handles a long slash sequence followed by a non-slash without backtracking', async () => {
+    const path = `/api/${'/'.repeat(100_000)}x///`;
+    const storage = memoryStorage();
+    const started = performance.now();
+    const nelcota = createClient(`https://api.example.com${path}`, { auth: { storage, autoRefresh: false } });
+    const elapsed = performance.now() - started;
+    try {
+      expect(elapsed).toBeLessThan(1000);
+      await nelcota.auth.setSession(session());
+      expect(await storage.getItem(`nelcota.api.example.com${path.slice(0, -3)}.session`)).not.toBeNull();
+    } finally { nelcota.dispose(); }
+  });
+
+  it('honors a custom storage key', async () => {
+    const storage = memoryStorage();
+    const nelcota = createClient('https://api.example.com/api///', {
+      auth: { storage, storageKey: 'custom-session', autoRefresh: false },
+    });
+    try {
+      await nelcota.auth.setSession(session());
+      expect(await storage.getItem('custom-session')).not.toBeNull();
+      expect(await storage.getItem('nelcota.api.example.com/api.session')).toBeNull();
+    } finally { nelcota.dispose(); }
+  });
+});
+
 describe('password sign-in', () => {
   it('accepts cancellation options without sending an aborted sign-in', async () => {
     const { nelcota, calls } = setup();

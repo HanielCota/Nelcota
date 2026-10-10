@@ -42,7 +42,10 @@ export class SessionManager {
 
   constructor(url: URL, options: AuthOptions, private rotate: (token: string, options: AuthRequestOptions) => Promise<Result<Session>>) {
     this.storage = options.storage ?? browserStorage() ?? memoryStorage();
-    const path = url.pathname.replace(/\/+$/, '');
+    const pathname = url.pathname;
+    let end = pathname.length;
+    while (end > 0 && pathname[end - 1] === '/') end--;
+    const path = pathname.slice(0, end);
     this.key = options.storageKey ?? `nelcota.${url.host}${path}.session`;
     this.#margin = options.refreshMargin ?? 60;
     this.#autoRefresh = options.autoRefresh ?? isBrowser();
