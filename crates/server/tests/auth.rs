@@ -135,14 +135,26 @@ async fn signup_validates_input_and_duplicate_email() {
     assert_eq!(dup.status, StatusCode::CONFLICT);
     assert_eq!(dup.body["code"], "user_already_exists");
 
+    let bad_email = signup(&app, "not-an-email", "strong-pass-123").await;
+    assert_eq!(bad_email.status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(bad_email.body["code"], "invalid_email");
+    assert_eq!(bad_email.body["message"], "invalid email");
+    let weak = signup(&app, "dani@example.com", "short").await;
+    assert_eq!(weak.status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(weak.body["code"], "weak_password");
     assert_eq!(
-        signup(&app, "not-an-email", "strong-pass-123").await.status,
-        StatusCode::UNPROCESSABLE_ENTITY
+        weak.body["message"],
+        "the password needs at least 8 characters"
     );
-    assert_eq!(
-        signup(&app, "dani@example.com", "short").await.status,
-        StatusCode::UNPROCESSABLE_ENTITY
-    );
+    let missing = app
+        .post(
+            "/auth/v1/signup",
+            None,
+            json!({ "email": "eva@example.com" }),
+        )
+        .await;
+    assert_eq!(missing.status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(missing.body["code"], "invalid_body");
 }
 
 #[tokio::test]
@@ -581,6 +593,7 @@ async fn expired_or_invalid_link_or_weak_password() {
     // A password breaking the rules does not consume the link.
     let reply = verify(&app, &token, "short").await;
     assert_eq!(reply.status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(reply.body["code"], "weak_password");
 
     for bad in ["", "made-up-token", &"x".repeat(200)] {
         let reply = verify(&app, bad, "new-pass-456").await;

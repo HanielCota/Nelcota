@@ -3,7 +3,7 @@ use crate::{
     AuthState, confirmation,
     credentials::{normalize_email, validate_password},
     db::{USER_JSON, begin_auth, db_error},
-    error::{invalid, invalid_grant, validation},
+    error::{invalid_email, invalid_grant, validation, weak_password},
     links::{self, LinkKind},
     rate_limit::limit,
     sessions::{session_of, start_session},
@@ -87,8 +87,8 @@ pub(crate) async fn signup(
         ));
     }
 
-    let email = normalize_email(&body.email).map_err(invalid)?;
-    validate_password(&body.password).map_err(invalid)?;
+    let email = normalize_email(&body.email).map_err(invalid_email)?;
+    validate_password(&body.password).map_err(weak_password)?;
     let metadata = match body.data {
         None => json!({}),
         Some(data @ Value::Object(_)) => data,

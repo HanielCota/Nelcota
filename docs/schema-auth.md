@@ -168,7 +168,10 @@ Session:
 }
 ```
 
-Errors: `422 validation_failed` (email or password outside the rules), `409
+Errors: `422 invalid_email` or `422 weak_password` (email or password outside
+the rules), `422 validation_failed` (a value the endpoint requires is missing,
+such as `refresh_token`), `400`/`422 invalid_body` (the body is not JSON or a
+field has the wrong type), `409
 user_already_exists`, `400 invalid_grant` (invalid credentials or refresh, with
 the same message for an unknown email and a wrong password), `429
 rate_limited` with `Retry-After`, `403 signup_disabled`, `400

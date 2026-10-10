@@ -15,7 +15,7 @@ use crate::{
     accounts::confirm_inbox_owner,
     credentials::validate_password,
     db::{begin_auth, db_error},
-    error::{invalid, invalid_grant, validation},
+    error::{invalid_grant, validation, weak_password},
     links::{self, LinkKind},
     sessions::start_session,
 };
@@ -34,7 +34,7 @@ pub(crate) async fn complete(
 ) -> Result<Value, ApiError> {
     let hash = links::hash(token).ok_or_else(expired_link)?;
     let password = password.ok_or_else(|| validation("password is required"))?;
-    validate_password(&password).map_err(invalid)?;
+    validate_password(&password).map_err(weak_password)?;
 
     // Check the link before argon2 (expensive): an invalid link costs no CPU.
     let mut client = state.pool.get().await.map_err(ApiError::from_pool)?;

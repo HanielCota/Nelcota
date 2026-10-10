@@ -10,7 +10,7 @@ use crate::{
     AuthState, Mailer,
     credentials::normalize_email,
     db::{begin_auth, db_error},
-    error::invalid,
+    error::invalid_email,
 };
 
 fn disabled(kind: LinkKind) -> ApiError {
@@ -48,7 +48,7 @@ pub(crate) fn ensure_enabled(
 /// accounts exist.
 pub(crate) async fn send(state: &AuthState, kind: LinkKind, email: &str) -> Result<(), ApiError> {
     ensure_enabled(state, kind)?;
-    let email = normalize_email(email).map_err(invalid)?;
+    let email = normalize_email(email).map_err(invalid_email)?;
 
     let mut client = state.pool.get().await.map_err(ApiError::from_pool)?;
     let tx = begin_auth(&mut client).await?;
