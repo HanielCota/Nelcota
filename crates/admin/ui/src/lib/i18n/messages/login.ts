@@ -12,6 +12,8 @@ const ptBR = {
   signIn: 'Entrar',
   signingIn: 'Entrando…',
   capsLock: 'Caps Lock ativado.',
+  emailRequired: 'Digite seu email.',
+  passwordRequired: 'Digite sua senha.',
   restricted: 'Acesso exclusivo para administradores.',
   sessionExpired: 'Sua sessão expirou. Entre de novo para continuar.',
 }
@@ -27,6 +29,8 @@ const en: Messages<typeof ptBR> = {
   signIn: 'Sign in',
   signingIn: 'Signing in…',
   capsLock: 'Caps Lock is on.',
+  emailRequired: 'Enter your email.',
+  passwordRequired: 'Enter your password.',
   restricted: 'Administrator access only.',
   sessionExpired: 'Your session expired. Sign in again to continue.',
 }

@@ -1,0 +1,1 @@
+import{A as e,S as t,j as n}from"./router.svelte-BJmhpyzZ.js";var r=new Set([`$$slots`,`$$events`,`$$legacy`]);function i(i,a){let o=e(a,r),s={name:`square-terminal`,size:24,node:[[`path`,{d:`m7 11 2-2-2-2`}],[`path`,{d:`M11 13h4`}],[`rect`,{width:`18`,height:`18`,x:`3`,y:`3`,rx:`2`,ry:`2`}]],aliases:[`terminal-square`]};t(i,n(()=>o,{get icon(){return s}}))}export{i as t};

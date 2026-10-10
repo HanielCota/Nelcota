@@ -47,7 +47,10 @@
     }
   }
 
-  const host = (url: string | null) => (url ? url.replace(/^https?:\/\//, '') : null)
+  const host = (url: string) => url.replace(/^https?:\/\//, '').replace(/\/$/, '')
+  // The address to copy: the project's own, or this page's origin for the
+  // panel being looked at (the server only lists other projects' URLs).
+  const address = (project: ProjectStatus) => project.url ?? (project.current ? location.origin : null)
 </script>
 
 <div class="mx-auto grid w-full max-w-page gap-6 px-4 pt-2 pb-12 *:min-w-0 sm:px-6 lg:px-8 [&>:first-child]:mb-0">
@@ -67,17 +70,20 @@
     </div>
   {:else if projects}
     {#if projects.length === 0}<EmptyState icon={Boxes} title={t('projects.empty')} description={t('projects.emptyDescription')} />{/if}
-    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+    <div class="grid items-start gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {#each projects as project (project.name)}
+        {@const url = address(project)}
         <article class={['flex flex-col gap-4 rounded-3xl bg-card p-5', project.current && 'ring-1 ring-brand/40']}>
           <div class="flex items-center gap-3">
             <span class="grid size-11 shrink-0 place-items-center rounded-full bg-well"><img src={mascot} alt="" class="size-8 select-none" draggable="false" /></span>
             <div class="grid min-w-0 flex-1">
               <p class="truncate font-semibold">{project.name}</p>
-              <p class="flex min-w-0 items-center gap-1 font-mono text-xs text-muted-foreground">
-                <span class="truncate">{host(project.url) ?? (project.current ? location.host : '')}</span>
-                {#if project.url}<Button variant="ghost" size="icon-xs" aria-label={t('projects.copyUrl', { name: project.name })} onclick={() => copyText(project.url!)}><Copy aria-hidden="true" /></Button>{/if}
-              </p>
+              {#if url}
+                <p class="flex min-w-0 items-center gap-1 font-mono text-xs text-muted-foreground">
+                  <span class="truncate" title={url}>{host(url)}</span>
+                  <Button variant="ghost" size="icon-xs" aria-label={t('projects.copyUrl', { name: project.name })} title={t('projects.copyUrl', { name: project.name })} onclick={() => copyText(url)}><Copy aria-hidden="true" /></Button>
+                </p>
+              {/if}
             </div>
             {#if project.current}<span class="shrink-0 rounded-full bg-brand/15 px-2.5 py-1 text-xs font-medium text-brand">{t('projects.current')}</span>{/if}
           </div>
@@ -97,9 +103,9 @@
           </div>
 
           {#if project.current}
-            <Button variant="outline" class="mt-auto w-full" href={href('/')}>{t('projects.back')}</Button>
+            <Button variant="outline" class="w-full" href={href('/')}>{t('projects.back')}</Button>
           {:else if project.url}
-            <Button variant="outline" class="mt-auto w-full" onclick={() => open(project)}>
+            <Button variant="outline" class="w-full" onclick={() => open(project)}>
               {t('projects.open')}<ArrowUpRight data-icon="inline-end" aria-hidden="true" />
             </Button>
           {/if}
