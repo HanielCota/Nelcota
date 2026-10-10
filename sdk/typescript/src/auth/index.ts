@@ -28,6 +28,7 @@ export type {
   OAuthInput,
   OAuthProvider,
   SignUpInput,
+  UserUpdate,
 } from './client.js';
 export { memoryStorage } from './session.js';
 export type { Session, SessionStorage, User } from './session.js';
