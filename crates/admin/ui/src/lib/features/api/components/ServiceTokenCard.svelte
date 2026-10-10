@@ -2,6 +2,7 @@
   import * as Select from '$lib/components/ui/select'
   import { Button } from '$lib/components/ui/button'
   import KeyRound from '@lucide/svelte/icons/key-round'
+  import TriangleAlert from '@lucide/svelte/icons/triangle-alert'
   import LoaderCircle from '@lucide/svelte/icons/loader-circle'
   import { toast } from 'svelte-sonner'
   import CodeBlock from '$lib/components/shared/CodeBlock.svelte'
@@ -36,10 +37,14 @@
 <section class="grid gap-4 rounded-3xl bg-card p-6">
   <div>
     <h2 class="text-lg font-semibold">{t('connect.token.title')} <code class="font-mono">service_role</code></h2>
-    <p class="mt-1 text-sm text-muted-foreground">
-      {t('connect.token.introBefore')} <span class="text-warning">{t('connect.token.introWarning')}</span>{t('connect.token.introAfter')}
-    </p>
+    <p class="mt-1 text-sm text-muted-foreground">{t('connect.token.intro')}</p>
   </div>
+  <!-- A standing warning, not a live alert: plain markup instead of role="alert". -->
+  <div class="flex items-start gap-3 rounded-2xl bg-warning/10 px-4 py-3 text-sm">
+    <TriangleAlert class="mt-0.5 size-4 shrink-0 text-warning" aria-hidden="true" />
+    <p><span class="font-medium text-warning">{t('connect.token.warningTitle')}.</span> <span class="text-muted-foreground">{t('connect.token.warning')}</span></p>
+  </div>
+  <p class="text-sm text-muted-foreground">{t('connect.token.details')}</p>
 
   {#if issued}
     <div class="grid gap-2">

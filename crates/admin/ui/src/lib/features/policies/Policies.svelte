@@ -56,7 +56,15 @@
     debounce = setTimeout(() => setFilters(rlsFilter, search, true), 250)
   }
   let enabling = $state<string | null>(null)
-  const visible = $derived(data?.tables.filter((table) => table.name.toLowerCase().includes(search.trim().toLowerCase()) && (rlsFilter === 'all' || rlsFilter === 'enabled' && table.rls.enabled || rlsFilter === 'disabled' && !table.rls.enabled && table.rls.state !== 'view' || rlsFilter === 'attention' && ['danger', 'warn'].includes(table.rls.state))) ?? [])
+  type Table = PoliciesData['tables'][number]
+  const inFilter = (table: Table, filter: Filter) =>
+    filter === 'all' ||
+    (filter === 'enabled' && table.rls.enabled) ||
+    (filter === 'disabled' && !table.rls.enabled && table.rls.state !== 'view') ||
+    (filter === 'attention' && ['danger', 'warn'].includes(table.rls.state))
+  const visible = $derived(data?.tables.filter((table) => table.name.toLowerCase().includes(search.trim().toLowerCase()) && inFilter(table, rlsFilter)) ?? [])
+  // How many tables each pill would show, so an empty filter is visible before a click.
+  const filterCounts = $derived(Object.fromEntries(FILTERS.map((filter) => [filter, data?.tables.filter((table) => inFilter(table, filter)).length ?? 0])) as Record<Filter, number>)
 
   const stats = $derived.by(() => {
     const tables = data?.tables.filter((table) => table.rls.state !== 'view') ?? []
@@ -68,7 +76,7 @@
     }
   })
   const segment = (on: boolean) => [
-    'h-9 cursor-pointer rounded-full px-4 text-sm whitespace-nowrap transition-colors',
+    'flex h-9 cursor-pointer items-center gap-1.5 rounded-full px-4 text-sm whitespace-nowrap transition-colors',
     on ? 'bg-nav-active text-nav-active-foreground font-medium' : 'text-muted-foreground hover:text-foreground',
   ]
 
@@ -156,7 +164,7 @@
   {#if error}<LoadError message={error} onretry={load} busy={loading} />{/if}
   {#if !data && loading}
     <div class="grid gap-4">
-      {#each [0, 1, 2] as i (i)}<Skeleton class="h-36 rounded-lg" />{/each}
+      {#each [0, 1, 2] as i (i)}<Skeleton class="h-36 rounded-3xl" />{/each}
     </div>
   {:else if data}
     {#if data.exposed_without_rls.length}
@@ -168,35 +176,45 @@
 
     <!-- The page at a glance, in the overview's figure style. -->
     <!-- Same columns as below: the last figure sits over the side column. -->
-    <div class="grid gap-4 sm:grid-cols-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_24rem] xl:gap-6">
-      <div class="grid gap-1 rounded-3xl bg-card p-5">
-        <p class="text-sm text-muted-foreground">{t('policies.stats.protected')}</p>
-        <p class="text-3xl font-semibold tracking-tight tabular-nums">{stats.protected}<span class="ml-1.5 text-base font-medium text-muted-foreground">{t('policies.stats.of', { count: stats.tables })}</span></p>
+    <!-- Three across even on a phone: the figures are short, stacking them pushed the tables a screen down. -->
+    <div class="grid grid-cols-3 gap-3 sm:gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_24rem] xl:gap-6">
+      <div class="grid content-start gap-1 rounded-3xl bg-card p-4 sm:p-5">
+        <p class="text-xs text-muted-foreground sm:text-sm">{t('policies.stats.protected')}</p>
+        <p class="text-2xl font-semibold tracking-tight tabular-nums sm:text-3xl">{stats.protected}<span class="ml-1.5 text-sm font-medium text-muted-foreground sm:text-base">{t('policies.stats.of', { count: stats.tables })}</span></p>
       </div>
-      <div class="grid gap-1 rounded-3xl bg-card p-5">
-        <p class="text-sm text-muted-foreground">{t('policies.stats.policies')}</p>
-        <p class="text-3xl font-semibold tracking-tight tabular-nums">{stats.policies}</p>
+      <div class="grid content-start gap-1 rounded-3xl bg-card p-4 sm:p-5">
+        <p class="text-xs text-muted-foreground sm:text-sm">{t('policies.stats.policies')}</p>
+        <p class="text-2xl font-semibold tracking-tight tabular-nums sm:text-3xl">{stats.policies}</p>
       </div>
-      <div class="grid gap-1 rounded-3xl bg-card p-5">
-        <p class="text-sm text-muted-foreground">{t('policies.stats.attention')}</p>
-        <p class={['text-3xl font-semibold tracking-tight tabular-nums', stats.attention > 0 && 'text-warning']}>{stats.attention}</p>
+      <div class="grid content-start gap-1 rounded-3xl bg-card p-4 sm:p-5">
+        <p class="text-xs text-muted-foreground sm:text-sm">{t('policies.stats.attention')}</p>
+        <p class={['text-2xl font-semibold tracking-tight tabular-nums sm:text-3xl', stats.attention > 0 && 'text-warning']}>{stats.attention}</p>
       </div>
     </div>
 
     <div class="grid gap-6 *:min-w-0 xl:grid-cols-[minmax(0,1fr)_24rem] xl:items-start">
     <div class="grid min-w-0 gap-4">
     {#if data.tables.length === 0}
-      <EmptyState icon={ShieldCheck} title={t('policies.noTables')} description={t('policies.noTablesHint')}>{#snippet actions()}<Button href={href('/tables?create=true')}><Plus data-icon="inline-start" aria-hidden="true" />{t('tables.editor.newTable')}</Button>{/snippet}</EmptyState>
+      <EmptyState class="rounded-3xl bg-card" icon={ShieldCheck} title={t('policies.noTables')} description={t('policies.noTablesHint')}>{#snippet actions()}<Button href={href('/tables?create=true')}><Plus data-icon="inline-start" aria-hidden="true" />{t('tables.editor.newTable')}</Button>{/snippet}</EmptyState>
     {:else}
       <div class="flex flex-wrap items-center justify-between gap-3">
-        <div class="flex max-w-full items-center gap-1 overflow-x-auto rounded-full bg-card p-1" role="group" aria-label={t('policies.filterLabel')}>
+        <!-- Wraps on a phone instead of hiding the last filters behind a scroll. -->
+        <div class="flex max-w-full flex-wrap items-center gap-1 rounded-3xl bg-card p-1 sm:rounded-full" role="group" aria-label={t('policies.filterLabel')}>
           {#each FILTERS as option (option)}
-            <button type="button" class={segment(rlsFilter === option)} aria-pressed={rlsFilter === option} onclick={() => setFilters(option)}>{t(`policies.filters.${option}`)}</button>
+            {@const on = rlsFilter === option}
+            <button type="button" class={segment(on)} aria-pressed={on} onclick={() => setFilters(option)}>{t(`policies.filters.${option}`)}<span class={['text-xs tabular-nums', on ? 'opacity-70' : 'text-muted-foreground/80']}>{filterCounts[option]}</span></button>
           {/each}
         </div>
         <div class="w-full sm:w-72"><SearchField bind:value={search} oninput={onSearch} label={t('policies.search')} /></div>
       </div>
-      {#if !visible.length}<EmptyState icon={Search} title={t('common.noMatches')}>{#snippet actions()}<Button variant="outline" onclick={() => setFilters('all', '')}>{t('common.clearFilters')}</Button>{/snippet}</EmptyState>{/if}
+      {#if !visible.length}
+        {#if !search.trim() && rlsFilter !== 'all'}
+          <!-- A filter with nothing in it is usually good news: say so instead of "no matches". -->
+          <EmptyState class="rounded-3xl bg-card" icon={ShieldCheck} title={t(`policies.filterEmpty.${rlsFilter}.title`)} description={t(`policies.filterEmpty.${rlsFilter}.text`)}>{#snippet actions()}<Button variant="outline" onclick={() => setFilters('all', '')}>{t('policies.showAll')}</Button>{/snippet}</EmptyState>
+        {:else}
+          <EmptyState class="rounded-3xl bg-card" icon={Search} title={t('common.noMatches')}>{#snippet actions()}<Button variant="outline" onclick={() => setFilters('all', '')}>{t('common.clearFilters')}</Button>{/snippet}</EmptyState>
+        {/if}
+      {/if}
     {/if}
       {#each visible as table (table.name)}
         <section class="@container grid gap-4 rounded-3xl bg-card p-5">

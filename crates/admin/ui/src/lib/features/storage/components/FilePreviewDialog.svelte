@@ -78,7 +78,7 @@
   <Dialog.Content class="sm:max-w-3xl">
     <Dialog.Header>
       <Dialog.Title class="break-all pr-6">{baseName(file.name)}</Dialog.Title>
-      <Dialog.Description class="break-all">{file.name} · {file.mime_type} · {formatBytes(file.size, intlLocale())}</Dialog.Description>
+      <Dialog.Description class="break-all">{[...(file.name.includes('/') ? [file.name] : []), file.mime_type, formatBytes(file.size, intlLocale())].join(' · ')}</Dialog.Description>
     </Dialog.Header>
     {#if error}<LoadError message={error} onretry={load} busy={loading} />
     {:else if loading}<Skeleton class="h-48" />

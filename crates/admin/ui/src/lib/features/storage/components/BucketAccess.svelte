@@ -66,8 +66,9 @@
 <section class="mb-6 grid gap-3 rounded-3xl bg-card p-4" aria-labelledby="bucket-access">
   <div class="flex flex-wrap items-start justify-between gap-3">
     <div class="grid gap-0.5">
-      <h2 id="bucket-access" class="text-sm font-medium">{t('storage.access.title')}</h2>
+      <h2 id="bucket-access" class="text-base font-semibold">{t('storage.access.title')}</h2>
       <p class="text-xs text-muted-foreground">{t('storage.access.hint')}</p>
+      {#if technical.on}<p class="text-xs text-muted-foreground">{t('storage.access.technicalHint')}</p>{/if}
     </div>
     <DropdownMenu.Root>
       <DropdownMenu.Trigger>
@@ -98,7 +99,7 @@
     {#if locked(access.policies, access.public)}
       <Callout>{t('storage.access.locked')}</Callout>
     {:else if access.public}
-      <p class="text-sm text-muted-foreground">{t('storage.access.publicNote')}</p>
+      <p class="rounded-2xl bg-well px-3 py-2.5 text-sm text-muted-foreground">{t('storage.access.publicNote')}</p>
     {/if}
     {#if access.policies.length}
       <ul class="divide-y overflow-hidden rounded-2xl bg-well">
@@ -113,7 +114,7 @@
                 </p>
               {/if}
             </div>
-            <Button variant="ghost" size="icon-sm" aria-label={t('storage.access.remove')} title={t('storage.access.remove')} onclick={() => { removing = policy; removeOpen = true }}>
+            <Button variant="ghost" size="icon-sm" aria-label={t('storage.access.removeNamed', { rule: sentence(policy) })} title={t('storage.access.remove')} onclick={() => { removing = policy; removeOpen = true }}>
               <Trash2 />
             </Button>
           </li>

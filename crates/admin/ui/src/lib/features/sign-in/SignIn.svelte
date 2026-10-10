@@ -45,7 +45,7 @@
   <PageHeader title={t('signIn.title')} description={t('signIn.description')}>
     {#snippet actions()}<Button variant="outline" href={href('/connect?topic=auth')}><BookOpen data-icon="inline-start" aria-hidden="true" />{t('signIn.examples')}</Button>{/snippet}
   </PageHeader>
-  <div class="-mt-6"><PillTabs label={t('shell.pages.users')} current={'/sign-in'} tabs={[{ path: '/users', label: t('shell.pages.users') }, { path: '/sign-in', label: t('shell.pages.userSignIn') }]} /></div>
+  <div class="-mt-8"><PillTabs label={t('shell.pages.users')} current={'/sign-in'} tabs={[{ path: '/users', label: t('shell.pages.users') }, { path: '/sign-in', label: t('shell.pages.userSignIn') }]} /></div>
 
   {#if resource.error}
     <LoadError message={errorMessage(resource.error)} onretry={load} busy={resource.loading} />

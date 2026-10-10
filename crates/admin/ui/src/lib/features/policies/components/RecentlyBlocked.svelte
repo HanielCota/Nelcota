@@ -16,9 +16,11 @@
   const data = $derived(resource.data)
   let expanded = $state(false)
   const shown = $derived(data ? (expanded ? data.requests : data.requests.slice(0, PREVIEW)) : [])
+  // When the list was last fetched: refreshing an unchanged list should still visibly do something.
+  let updatedAt = $state<Date | null>(null)
 
   async function load() {
-    await resource.load((signal) => api.get<DeniedRequests>('/denied', { signal }))
+    if (await resource.load((signal) => api.get<DeniedRequests>('/denied', { signal }))) updatedAt = new Date()
   }
   onMount(() => {
     void load()
@@ -45,7 +47,7 @@
     <div class="grid gap-0.5">
       <h2 id="recently-blocked" class="text-base font-semibold">{t('policies.blocked.title')}</h2>
       <p class="text-xs text-muted-foreground">{t('policies.blocked.hint', { capacity: data?.capacity ?? 100 })}</p>
-      <p class="text-xs text-muted-foreground">{t('policies.blocked.hintMore')}</p>
+      {#if updatedAt}<p class="text-xs text-muted-foreground tabular-nums" aria-live="polite">{t('policies.blocked.updated', { time: updatedAt.toLocaleTimeString(intlLocale(), { hour: '2-digit', minute: '2-digit', second: '2-digit' }) })}</p>{/if}
     </div>
     <Button variant="ghost" size="icon-sm" disabled={resource.loading} onclick={load} aria-label={t('policies.blocked.refresh')} title={t('policies.blocked.refresh')}>
       <RefreshCw class={resource.loading ? 'animate-spin' : ''} />
@@ -83,4 +85,5 @@
       </Button>
     {/if}
   {/if}
+  <p class="text-xs text-muted-foreground">{t('policies.blocked.hintMore')}</p>
 </section>
