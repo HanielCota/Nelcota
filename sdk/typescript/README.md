@@ -429,14 +429,8 @@ error immediately with `retryAfter`, allowing the app to decide when to retry.
 
 | @nelcota/client | Server baseline | Support |
 |---|---|---|
-| 0.1.x | Current repository build (workspace version `0.2.0`) | Full contract suite, OAuth routes, exposed CORS headers and generated `Relationships` |
-| 0.1.x | Released `v0.2.0` tag | Legacy baseline: lacks OAuth routes, generated `Relationships` and the newer exposed headers; not covered by the full contract suite |
-
-The workspace still uses the old version number while developing new server
-features. Do not treat every `0.2.0` binary as the current build. Until the next
-server release is tagged, use the current repository build for full support.
-Older generated types give loosely typed embeds, and browser clients cannot
-read Retry-After without the corresponding CORS exposure.
+| 0.1.x | Server `v0.3.0` or later | Full contract suite, OAuth routes, `updateUser`, exposed CORS headers and generated `Relationships` |
+| 0.1.x | Server `v0.2.0` | Not supported: lacks the OAuth routes, `PUT /auth/v1/user`, the JSON error contract, generated `Relationships` and the newer exposed headers |
 
 Release verification covers Node 22/24/26, Bun, Deno and the Chromium, Firefox
 and WebKit engines. Other runtimes need their own validation.
