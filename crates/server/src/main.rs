@@ -57,6 +57,7 @@ async fn serve(config: Config) -> anyhow::Result<()> {
         catalog,
         api: Arc::new(ApiSettings {
             max_rows: config.max_rows,
+            max_body_bytes: config.max_body_bytes,
         }),
     };
     // Auth email (single-use links). Without SMTP those endpoints answer
@@ -97,6 +98,8 @@ async fn serve(config: Config) -> anyhow::Result<()> {
         }
         None => None,
     };
+    // Expired refresh tokens and dead sessions, once an hour.
+    nelcota_auth::spawn_pruner(pool.clone());
     let passwords = Arc::new(Passwords::new(hash_concurrency()));
     let auth = AuthState {
         mailer,
@@ -105,6 +108,11 @@ async fn serve(config: Config) -> anyhow::Result<()> {
         keys: keys.clone(),
         passwords: passwords.clone(),
         limiter: Arc::new(RateLimiter::new(config.auth_rate_limit_per_minute)),
+        session_limiter: Arc::new(RateLimiter::new(
+            config
+                .auth_rate_limit_per_minute
+                .saturating_mul(nelcota_auth::SESSION_RATE_LIMIT_FACTOR),
+        )),
         settings: Arc::new(AuthSettings {
             issuer: config.jwt_issuer.clone(),
             access_ttl_secs: config.jwt_expiry_secs,

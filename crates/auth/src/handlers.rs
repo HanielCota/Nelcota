@@ -4,20 +4,23 @@ use crate::{
     error::unsupported_type,
     links::{self, LinkKind},
     oauth,
-    rate_limit::limit,
+    rate_limit::{limit, limit_sessions},
     request::{PeerAddr, client_ip, ip_key, user_agent},
     sessions,
     verify::{self, VerifyBody},
 };
 use axum::{
-    Json, Router,
-    extract::{Query, State},
+    Router,
+    extract::State,
     http::{HeaderMap, StatusCode, header},
     response::IntoResponse,
     response::Redirect,
     routing::{get, post},
 };
-use nelcota_core::ApiError;
+use nelcota_core::{
+    ApiError,
+    extract::{Json, Query},
+};
 use serde::Deserialize;
 use serde_json::Value;
 pub fn router(state: AuthState) -> Router {
@@ -25,7 +28,7 @@ pub fn router(state: AuthState) -> Router {
         .route("/auth/v1/signup", post(signup))
         .route("/auth/v1/token", post(token))
         .route("/auth/v1/logout", post(logout))
-        .route("/auth/v1/user", get(user))
+        .route("/auth/v1/user", get(user).put(update_user))
         .route("/auth/v1/recover", post(recover))
         .route("/auth/v1/magiclink", post(magic_link))
         .route("/auth/v1/resend", post(resend))
@@ -59,6 +62,13 @@ async fn logout(
 async fn user(State(state): State<AuthState>, Auth(claims): Auth) -> Result<Json<Value>, ApiError> {
     Ok(Json(accounts::user(&state, &claims).await?))
 }
+async fn update_user(
+    State(state): State<AuthState>,
+    Auth(claims): Auth,
+    Json(body): Json<accounts::UserUpdate>,
+) -> Result<Json<Value>, ApiError> {
+    Ok(Json(accounts::update_user(&state, &claims, body).await?))
+}
 #[derive(Deserialize)]
 struct GrantQuery {
     grant_type: String,
@@ -82,7 +92,13 @@ async fn token(
     Json(body): Json<TokenBody>,
 ) -> Result<Json<Value>, ApiError> {
     let ip = client_ip(state.settings.trust_proxy, &headers, peer);
-    limit(&state, &format!("token:{}", ip_key(ip)))?;
+    // Password guessing gets the tight per-IP budget. Refreshes and code
+    // redemptions only work with a secret already in hand, and every open tab
+    // refreshes on its own, so they draw from a separate, larger budget.
+    match query.grant_type.as_str() {
+        "password" => limit(&state, &format!("token:{}", ip_key(ip)))?,
+        _ => limit_sessions(&state, &format!("refresh:{}", ip_key(ip)))?,
+    }
 
     let session = match query.grant_type.as_str() {
         "password" => {

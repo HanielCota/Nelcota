@@ -157,7 +157,12 @@ fills a page; a page containing only folders can still have a next page.
 A file the caller may not see answers 404, as if it did not exist. Downloads
 take `?download` to force a "save as". Errors: 400 `invalid_path`, 404
 `bucket_not_found`/`object_not_found`, 409 `object_exists`, 413
-`file_too_large`, 415 `mime_type_not_allowed`, 507 `storage_full`.
+`file_too_large`, 415 `mime_type_not_allowed`, 507 `storage_full`. The JSON
+endpoints (bucket writes, list, sign) answer 400/422 `invalid_body` for a
+malformed body and 415 `unsupported_media_type` without `Content-Type:
+application/json`; a range that cannot be served is 416
+`range_not_satisfiable` (with `Content-Range: bytes */<size>`). Every error
+has the API's JSON shape (see [api.md](api.md#errors)).
 
 ## How files are served
 

@@ -43,6 +43,10 @@ pub struct AuthState {
     pub keys: Arc<Keys>,
     pub passwords: Arc<Passwords>,
     pub limiter: Arc<RateLimiter>,
+    /// Per-IP budget of token refreshes and PKCE redemptions, apart from
+    /// password sign-in so a page full of tabs refreshing cannot lock its
+    /// users out of logging in (and the other way round).
+    pub session_limiter: Arc<RateLimiter>,
     pub settings: Arc<AuthSettings>,
     /// Email sending; without it, every email link flow is off.
     pub mailer: Option<Arc<dyn Mailer>>,

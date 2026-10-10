@@ -25,6 +25,10 @@ use governor::{
     state::{InMemoryState, NotKeyed},
 };
 
+/// Refreshes and PKCE redemptions get this many times the per-IP budget of
+/// password sign-in (`NELCOTA_AUTH_RATE_LIMIT_PER_MINUTE`).
+pub const SESSION_RATE_LIMIT_FACTOR: u32 = 10;
+
 /// Capacity is enforced without evicting a key's active rate limit.
 const MAX_KEYS: usize = 50_000;
 const CLEANUP_INTERVAL: Duration = Duration::from_secs(1);
@@ -144,6 +148,14 @@ impl<C: Clock + Clone> RateLimiter<C> {
 pub(crate) fn limit(state: &AuthState, key: &str) -> Result<(), ApiError> {
     state
         .limiter
+        .check(key)
+        .map_err(|wait| ApiError::rate_limited(wait.as_secs()))
+}
+
+/// The budget of refreshes and PKCE redemptions (`session_limiter`).
+pub(crate) fn limit_sessions(state: &AuthState, key: &str) -> Result<(), ApiError> {
+    state
+        .session_limiter
         .check(key)
         .map_err(|wait| ApiError::rate_limited(wait.as_secs()))
 }

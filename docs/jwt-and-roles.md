@@ -21,7 +21,8 @@ member of the other roles and assumes one of them in each request.
 
 ## What happens in each request
 
-1. The API reads `Authorization: Bearer <jwt>`.
+1. The API reads `Authorization: Bearer <jwt>` (the scheme is case-insensitive:
+   `bearer <jwt>` works too).
    - Without the header: the request becomes `anon`.
    - Header present but invalid (signature, `exp`, scheme, unknown `kid` or
      role): **401**. It never silently becomes `anon`.
@@ -103,7 +104,14 @@ CREATE POLICY owner ON public.todos
 
 | Situation | Status |
 |---|---|
-| Invalid or expired JWT, or unknown role | 401 `invalid_token` |
-| `anon` without permission on the table | 401 |
-| `authenticated` without permission / policy violated on write | 403 |
-| Table does not exist | 404 |
+| Invalid or expired JWT, unknown role or a scheme other than Bearer | 401 `invalid_token` |
+| `anon` without permission on the table | 401 `db_error` (`sqlstate` `42501`) |
+| `authenticated` without permission / policy violated on write | 403 `db_error` (`sqlstate` `42501`) |
+| Table does not exist | 404 `not_found` |
+
+The body is the API's error JSON (`code`, `message` and, for database errors,
+`sqlstate`/`details`/`hint`/`constraint`); see [api.md](api.md#errors).
+
+Every 401 carries `WWW-Authenticate`: `Bearer error="invalid_token"` when a
+token was presented and rejected, plain `Bearer` when the request had no
+token (an `anon` request that needs to sign in).

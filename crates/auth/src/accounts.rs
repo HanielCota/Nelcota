@@ -3,7 +3,7 @@ use crate::{
     AuthState, confirmation,
     credentials::{normalize_email, validate_password},
     db::{USER_JSON, begin_auth, db_error},
-    error::{invalid, invalid_grant, validation},
+    error::{invalid_email, invalid_grant, validation, weak_password},
     links::{self, LinkKind},
     rate_limit::limit,
     sessions::{session_of, start_session},
@@ -87,8 +87,8 @@ pub(crate) async fn signup(
         ));
     }
 
-    let email = normalize_email(&body.email).map_err(invalid)?;
-    validate_password(&body.password).map_err(invalid)?;
+    let email = normalize_email(&body.email).map_err(invalid_email)?;
+    validate_password(&body.password).map_err(weak_password)?;
     let metadata = match body.data {
         None => json!({}),
         Some(data @ Value::Object(_)) => data,
@@ -221,4 +221,138 @@ pub(crate) async fn user(
         )
     })?;
     Ok(row.get(0))
+}
+
+#[derive(Deserialize)]
+pub(crate) struct UserUpdate {
+    password: Option<String>,
+    current_password: Option<String>,
+    data: Option<Value>,
+}
+
+/// `PUT /auth/v1/user` (Bearer) `{password?, current_password?, data?}`:
+/// the signed-in user changes their password and/or metadata.
+///
+/// - `password` needs `current_password` when the account already has one;
+///   an account without a password (magic link, provider) can set one. The
+///   user's other sessions end; the calling one continues.
+/// - `data` is merged into `user_metadata` one level deep; a key set to
+///   `null` is removed.
+pub(crate) async fn update_user(
+    state: &AuthState,
+    claims: &nelcota_core::Claims,
+    body: UserUpdate,
+) -> Result<Value, ApiError> {
+    let (user_id, session_id) = session_of(claims)?;
+    let data = match body.data {
+        None => None,
+        Some(data @ Value::Object(_)) => Some(data),
+        Some(_) => return Err(validation("data must be a JSON object")),
+    };
+    if body.password.is_none() && data.is_none() {
+        return Err(validation("provide password or data"));
+    }
+    let new_hash = match body.password {
+        Some(password) => {
+            Some(change_password(state, user_id, password, body.current_password).await?)
+        }
+        None => None,
+    };
+
+    let mut client = state.pool.get().await.map_err(ApiError::from_pool)?;
+    let tx = begin_auth(&mut client).await?;
+    // A JWT outlives its session (logout, password reset): only a live
+    // session may change the account.
+    let current = tx
+        .query_opt(
+            "SELECT u.encrypted_password
+             FROM auth.users u
+             JOIN auth.sessions s ON s.user_id = u.id
+             WHERE u.id = $1 AND s.id = $2 AND s.revoked_at IS NULL
+             FOR UPDATE OF u",
+            &[&user_id, &session_id],
+        )
+        .await
+        .map_err(db_error)?
+        .ok_or_else(ApiError::invalid_token)?;
+    if let Some((expected, _)) = &new_hash
+        && current.get::<_, Option<String>>(0) != *expected
+    {
+        // Changed by someone else while argon2 ran: verify again.
+        return Err(invalid_grant("the password changed meanwhile; try again"));
+    }
+    let new_hash = new_hash.map(|(_, hash)| hash);
+    let row = tx
+        .query_one(
+            &format!(
+                "UPDATE auth.users u SET
+                    encrypted_password = coalesce($2, u.encrypted_password),
+                    raw_user_meta_data = CASE WHEN $3::jsonb IS NULL THEN u.raw_user_meta_data
+                        ELSE (u.raw_user_meta_data || $3::jsonb)
+                             - ARRAY(SELECT key FROM jsonb_each($3::jsonb) WHERE value = 'null'::jsonb)
+                    END,
+                    updated_at = now()
+                 WHERE u.id = $1
+                 RETURNING {USER_JSON}"
+            ),
+            &[&user_id, &new_hash, &data],
+        )
+        .await
+        .map_err(db_error)?;
+    if new_hash.is_some() {
+        // Whoever signed in with the old password loses access; this
+        // session continues.
+        tx.execute(
+            "UPDATE auth.sessions SET revoked_at = now()
+             WHERE user_id = $1 AND id <> $2 AND revoked_at IS NULL",
+            &[&user_id, &session_id],
+        )
+        .await
+        .map_err(db_error)?;
+    }
+    tx.commit().await.map_err(db_error)?;
+    if new_hash.is_some() {
+        tracing::info!(user_id = %user_id, "password changed by the user");
+    }
+    Ok(row.get(0))
+}
+
+/// Checks the new password's rules and the current one, then hashes the new
+/// one. Returns the PHC the account had (to detect a concurrent change) and
+/// the new PHC. argon2 runs without holding a connection.
+async fn change_password(
+    state: &AuthState,
+    user_id: Uuid,
+    password: String,
+    current_password: Option<String>,
+) -> Result<(Option<String>, String), ApiError> {
+    validate_password(&password).map_err(weak_password)?;
+    // A stolen access token must not become a password-guessing oracle.
+    limit(state, &format!("password:{user_id}"))?;
+    let phc: Option<String> = {
+        let mut client = state.pool.get().await.map_err(ApiError::from_pool)?;
+        let tx = begin_auth(&mut client).await?;
+        let row = tx
+            .query_opt(
+                "SELECT encrypted_password FROM auth.users WHERE id = $1",
+                &[&user_id],
+            )
+            .await
+            .map_err(db_error)?;
+        tx.commit().await.map_err(db_error)?;
+        row.ok_or_else(ApiError::invalid_token)?.get(0)
+    };
+    if phc.is_some() {
+        let current = current_password
+            .ok_or_else(|| validation("current_password is required to change the password"))?;
+        if !state.passwords.verify(current, phc.clone()).await {
+            return Err(invalid_grant("current password is incorrect"));
+        }
+    }
+    let hash = state
+        .passwords
+        .hash(password)
+        .await
+        .ok_or_else(ApiError::internal)?;
+    Ok((phc, hash))
 }

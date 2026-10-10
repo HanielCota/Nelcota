@@ -392,6 +392,6 @@ async fn malformed_email_is_rejected_before_any_account_is_written() {
             "{}",
             reply.body
         );
-        assert_eq!(reply.body["code"], "validation_failed");
+        assert_eq!(reply.body["code"], "invalid_email");
     }
 }

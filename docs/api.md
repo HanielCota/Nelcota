@@ -133,7 +133,10 @@ Same syntax as PostgREST. Inside the parentheses each filter is written
 ## Writes
 
 An insert accepts at most **1000 rows** and **128 distinct column sets** per
-request. Split larger batches into requests. Each accepted request keeps its
+request. Split larger batches into requests. A request body (writes and RPC
+arguments) can have at most `NELCOTA_MAX_BODY_BYTES` bytes, **2 MiB** by
+default; a larger one gets `413 payload_too_large`. The body is buffered and
+parsed whole, so raise the limit only as far as the server's memory allows. Each accepted request keeps its
 transactional behavior and missing columns still receive their defaults.
 
 | Verb | Body | Filters | Without `return=representation` | With `return=representation` |
@@ -145,9 +148,17 @@ transactional behavior and missing columns still receive their defaults.
 - `select=` also picks the columns of the representation.
 - On `POST`, missing columns get their `DEFAULT`, even in a batch whose
   objects have different keys.
+- An empty body on `POST`/`PATCH` is refused (400 `invalid_body`); to insert
+  a row of defaults, send `{}`. An `/rpc` call without a body has no arguments.
 - `PATCH`/`DELETE` without a filter are refused (400), to avoid changing or
   deleting the whole table by mistake. To do that on purpose, use an explicit
   filter (`?id=not.is.null`).
+- `order`, `limit` and `offset` are refused on `PATCH`/`DELETE` (400
+  `invalid_query`): they change every row the filters match, so narrow the
+  filters instead.
+- With `Prefer: count=exact`, `PATCH`/`DELETE` answer `Content-Range: */<n>`
+  with the number of rows changed (and `Preference-Applied: count=exact`),
+  with or without `return=representation`.
 - `return=representation` runs `RETURNING`, which requires `SELECT`
   permission (GRANT + policy) on the written rows.
 
@@ -186,8 +197,11 @@ the keys wins.
 | scalar or composite | JSON value |
 | `void` | 204 |
 
-`RAISE EXCEPTION` becomes 400 with the message. The function runs with the
-JWT's role (unless it is `SECURITY DEFINER`): `auth.uid()` works inside it.
+`RAISE EXCEPTION` becomes 400 with the message, also with a custom SQLSTATE of
+class `P0` (`USING ERRCODE = 'P0002'`) and for a failed `ASSERT`; its `DETAIL`
+and `HINT` come back as `details` and `hint` (see [Errors](#errors)). The
+function runs with the JWT's role (unless it is `SECURITY DEFINER`):
+`auth.uid()` works inside it.
 
 > **Warning:** By default, Postgres grants `EXECUTE` on new functions to
 > `PUBLIC` (including `anon`). For sensitive functions:
@@ -215,18 +229,54 @@ NOTIFY nelcota, 'reload schema';
 
 ## Errors
 
-`{"code": "...", "message": "..."}`
+Every error from the server (REST, auth, storage, unknown routes, wrong
+methods, body limits and timeouts) is JSON with the same shape:
 
-| Status | When |
-|---|---|
-| 400 `invalid_query` | invalid column/operator/order in the URL |
-| 400 `invalid_body` | the body is not valid JSON |
-| 400 `db_error` | value invalid for the type, check, not null, generated column, `RAISE EXCEPTION` |
-| 401 | invalid JWT, or `anon` without permission |
-| 403 | role without permission, or a policy violated on write |
-| 404 `not_found` | table/function outside the exposed schema |
-| 409 | unique key or FK violated |
-| 504 | `statement_timeout` (`NELCOTA_STATEMENT_TIMEOUT_SECS`, default 10 s) |
+```json
+{"code": "db_error", "message": "duplicate key value violates unique constraint \"products_pkey\" (23505)",
+ "sqlstate": "23505", "details": "Key (id)=(1) already exists.", "constraint": "products_pkey"}
+```
+
+- `code` and `message` are always present. `code` is stable and meant for
+  programs; `message` is English text for people.
+- Errors that come from Postgres add `sqlstate` (the 5-character SQLSTATE)
+  and, when Postgres provides them, `details`, `hint` and `constraint`
+  (`DETAIL`, `HINT` and the violated constraint's name). Absent fields are
+  omitted, never `null`. For `db_error`, `message` stays `"<text> (<sqlstate>)"`.
+- Every response carries `x-request-id` (see [Request IDs](#request-ids)):
+  quote it when reporting an error.
+
+| Status | `code` | When |
+|---|---|---|
+| 400 | `invalid_query` | invalid column/operator/order in the URL; `order`/`limit`/`offset` on `PATCH`/`DELETE` |
+| 400 | `invalid_body` | the body is not valid JSON, or is empty on `POST`/`PATCH` |
+| 400 | `db_error` | value invalid for the type, check, not null, generated column, `RAISE EXCEPTION` (any SQLSTATE of class `P0`) |
+| 401 | `invalid_token` | invalid or expired JWT (`WWW-Authenticate: Bearer error="invalid_token"`) |
+| 401 | `db_error` | `anon` without permission: sign in (`WWW-Authenticate: Bearer`) |
+| 403 | `db_error` | role without permission, or a policy violated on write |
+| 404 | `not_found` | table/function outside the exposed schema, or an unknown route |
+| 405 | `method_not_allowed` | the route exists but not with this method (`Allow` lists the methods) |
+| 409 | `db_error` | unique key, foreign key or exclusion constraint violated |
+| 413 | `payload_too_large` | request body over `NELCOTA_MAX_BODY_BYTES` (default 2 MiB) |
+| 413 | `response_too_large` | the JSON response would exceed the 8 MiB budget |
+| 415 | `unsupported_media_type` | an auth or storage JSON endpoint without `Content-Type: application/json` |
+| 422 | `invalid_body` | an auth or storage JSON body with a missing field or a field of the wrong type |
+| 429 | `rate_limited` | too many attempts (`Retry-After`) |
+| 500 | `internal` | unexpected error; details only in the server log |
+| 503 | `unavailable` | database unreachable, or a transient failure: serialization failure (`40001`), deadlock (`40P01`), lock not available (`55P03`), too many connections (`53300`), server shutting down or starting (`57P01`, `57P02`, `57P03`). Comes with `Retry-After: 1` (and `sqlstate` when Postgres answered): retry the request |
+| 504 | `db_error` | `statement_timeout` (`NELCOTA_STATEMENT_TIMEOUT_SECS`, default 10 s; `sqlstate` `57014`) |
+| 504 | `timeout` | the whole request took longer than `NELCOTA_REQUEST_TIMEOUT_SECS` (default 15 s, must exceed the statement timeout) |
+
+Auth and storage add their own codes; see [schema-auth.md](schema-auth.md) and
+[storage.md](storage.md).
+
+## Request IDs
+
+Each response carries an `x-request-id` header: the one the request came with
+(for example from a proxy in front), or a new UUID. The server logs one line
+per response at `INFO` with the method, path (never the query string), status,
+latency and that id, so an error a user reports can be found in the log.
+Browsers can read the header (it is in `Access-Control-Expose-Headers`).
 
 ## Out of the MVP
 

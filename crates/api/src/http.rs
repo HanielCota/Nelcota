@@ -144,6 +144,23 @@ fn write_response(body: Option<String>, with_body: StatusCode, minimal: StatusCo
     )
 }
 
+/// PATCH/DELETE response. With `Prefer: count=exact`, `Content-Range:
+/// */<rows changed>`, as PostgREST does.
+fn change_response(result: operations::ChangeResult, prefer: &Prefer) -> Response {
+    let mut response = write_response(result.body, StatusCode::OK, StatusCode::NO_CONTENT);
+    if prefer.count_exact {
+        let headers = response.headers_mut();
+        if let Ok(value) = HeaderValue::from_str(&format!("*/{}", result.rows)) {
+            headers.insert(header::CONTENT_RANGE, value);
+        }
+        headers.append(
+            "preference-applied",
+            HeaderValue::from_static("count=exact"),
+        );
+    }
+    response
+}
+
 pub(crate) async fn update(
     State(pool): State<Pool>,
     State(catalog): State<Arc<CatalogHandle>>,
@@ -154,7 +171,7 @@ pub(crate) async fn update(
     bytes: Bytes,
 ) -> Result<Response, ApiError> {
     let prefer = Prefer::from_headers(&headers);
-    let body = operations::update(
+    let result = operations::update(
         &pool,
         &claims,
         &catalog.get(),
@@ -164,7 +181,7 @@ pub(crate) async fn update(
         prefer.representation,
     )
     .await?;
-    Ok(write_response(body, StatusCode::OK, StatusCode::NO_CONTENT))
+    Ok(change_response(result, &prefer))
 }
 
 pub(crate) async fn remove(
@@ -176,7 +193,7 @@ pub(crate) async fn remove(
     Auth(claims): Auth,
 ) -> Result<Response, ApiError> {
     let prefer = Prefer::from_headers(&headers);
-    let body = operations::remove(
+    let result = operations::remove(
         &pool,
         &claims,
         &catalog.get(),
@@ -185,7 +202,7 @@ pub(crate) async fn remove(
         prefer.representation,
     )
     .await?;
-    Ok(write_response(body, StatusCode::OK, StatusCode::NO_CONTENT))
+    Ok(change_response(result, &prefer))
 }
 
 pub(crate) async fn rpc(

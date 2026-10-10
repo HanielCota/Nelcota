@@ -30,11 +30,23 @@ use deadpool_postgres::Pool;
 use nelcota_auth::SharedVerifier;
 use std::sync::Arc;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct ApiSettings {
     /// Row cap per root, embedded collection and set-returning RPC.
     /// `None` uses the safe default of 1000.
     pub max_rows: Option<i64>,
+    /// Largest request body, in bytes (`NELCOTA_MAX_BODY_BYTES`); the server
+    /// applies it to these routes, a larger body gets 413.
+    pub max_body_bytes: usize,
+}
+
+impl Default for ApiSettings {
+    fn default() -> Self {
+        ApiSettings {
+            max_rows: None,
+            max_body_bytes: nelcota_core::config::DEFAULT_MAX_BODY_BYTES,
+        }
+    }
 }
 
 pub fn router<S>() -> Router<S>

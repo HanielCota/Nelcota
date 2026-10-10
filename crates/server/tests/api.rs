@@ -349,11 +349,41 @@ async fn data_errors_become_400() {
         .await;
     assert_eq!(reply.status, StatusCode::CONFLICT);
 
-    // A body that is not JSON.
+    // An empty body is refused, not inserted as a row of defaults.
     let reply = app
         .request_with(Method::POST, "/rest/v1/products", Some(&s), None, &[])
         .await;
     assert_eq!(reply.status, StatusCode::BAD_REQUEST);
+    assert_eq!(reply.body["code"], "invalid_body", "{}", reply.body);
+    let before = app.get("/rest/v1/todos?select=id", Some(&s)).await.1;
+    let reply = app
+        .request_with(Method::POST, "/rest/v1/todos", Some(&s), None, &[])
+        .await;
+    assert_eq!(reply.body["code"], "invalid_body", "{}", reply.body);
+    assert_eq!(
+        app.get("/rest/v1/todos?select=id", Some(&s)).await.1,
+        before
+    );
+    // A body that is not JSON.
+    let reply = app
+        .raw(
+            Method::POST,
+            "/rest/v1/products",
+            &[("authorization", &format!("Bearer {s}"))],
+            "{".into(),
+        )
+        .await;
+    assert_eq!(reply.status, StatusCode::BAD_REQUEST);
+    assert_eq!(reply.body["code"], "invalid_body");
+    // RPC without a body still means "no arguments".
+    let reply = app
+        .request(Method::POST, "/rest/v1/rpc/add", None, None)
+        .await;
+    assert_eq!(reply.status, StatusCode::BAD_REQUEST, "a is required");
+    let reply = app
+        .request(Method::POST, "/rest/v1/rpc/nothing", None, None)
+        .await;
+    assert_eq!(reply.status, StatusCode::NO_CONTENT);
 
     // PATCH/DELETE without a filter are refused.
     let reply = app
@@ -1212,6 +1242,78 @@ async fn embedded_rows_follow_the_related_tables_rls() {
 }
 
 #[tokio::test]
+async fn patch_and_delete_refuse_order_limit_and_offset() {
+    let app = TestApp::spawn().await;
+    let s = service_token();
+    for query in ["order=id", "limit=1", "offset=1"] {
+        let path = format!("/rest/v1/products?stock=gt.0&{query}");
+        let reply = app
+            .request(Method::PATCH, &path, Some(&s), Some(json!({ "stock": 1 })))
+            .await;
+        assert_eq!(reply.status, StatusCode::BAD_REQUEST, "{query}");
+        assert_eq!(reply.body["code"], "invalid_query", "{query}");
+        let reply = app.request(Method::DELETE, &path, Some(&s), None).await;
+        assert_eq!(reply.status, StatusCode::BAD_REQUEST, "{query}");
+    }
+    // Nothing was changed.
+    let (_, body) = app.get("/rest/v1/products?stock=eq.1", None).await;
+    assert_eq!(body, json!([]));
+}
+
+#[tokio::test]
+async fn patch_and_delete_report_the_rows_changed_with_count_exact() {
+    let app = TestApp::spawn().await;
+    let s = service_token();
+    let count = ("prefer", "count=exact");
+    let reply = app
+        .request_with(
+            Method::PATCH,
+            "/rest/v1/products?stock=gt.0",
+            Some(&s),
+            Some(json!({ "stock": 7 })),
+            &[count],
+        )
+        .await;
+    assert_eq!(reply.status, StatusCode::NO_CONTENT);
+    assert_eq!(reply.headers[header::CONTENT_RANGE], "*/3");
+    assert_eq!(reply.headers["preference-applied"], "count=exact");
+
+    let reply = app
+        .request_with(
+            Method::DELETE,
+            "/rest/v1/products?stock=eq.7",
+            Some(&s),
+            None,
+            &[("prefer", "count=exact, return=representation")],
+        )
+        .await;
+    assert_eq!(reply.status, StatusCode::OK);
+    assert_eq!(reply.body.as_array().unwrap().len(), 3);
+    assert_eq!(reply.headers[header::CONTENT_RANGE], "*/3");
+
+    // Matching nothing is a count too; without the preference, no header.
+    let reply = app
+        .request_with(
+            Method::DELETE,
+            "/rest/v1/products?id=eq.999",
+            Some(&s),
+            None,
+            &[count],
+        )
+        .await;
+    assert_eq!(reply.headers[header::CONTENT_RANGE], "*/0");
+    let reply = app
+        .request(
+            Method::DELETE,
+            "/rest/v1/products?id=eq.999",
+            Some(&s),
+            None,
+        )
+        .await;
+    assert!(!reply.headers.contains_key(header::CONTENT_RANGE));
+}
+
+#[tokio::test]
 async fn cors_exposes_what_a_browser_client_reads() {
     let app = TestApp::spawn().await;
     let reply = app
@@ -1237,7 +1339,52 @@ async fn cors_exposes_what_a_browser_client_reads() {
         "last-modified",
         "retry-after",
         "preference-applied",
+        "x-request-id",
     ] {
         assert!(exposed.contains(name), "{name} not exposed: {exposed}");
     }
+}
+
+#[tokio::test]
+async fn cors_preflight_is_cached_for_two_hours() {
+    let app = TestApp::spawn().await;
+    let reply = app
+        .request_with(
+            Method::OPTIONS,
+            "/rest/v1/products",
+            None,
+            None,
+            &[
+                ("origin", "https://app.example.com"),
+                ("access-control-request-method", "PATCH"),
+                ("access-control-request-headers", "authorization, prefer"),
+            ],
+        )
+        .await;
+    assert_eq!(reply.status, StatusCode::OK);
+    assert_eq!(reply.headers["access-control-max-age"], "7200");
+}
+
+#[tokio::test]
+async fn every_response_carries_a_request_id() {
+    let app = TestApp::spawn().await;
+    // A new id per request when the caller sends none...
+    let first = app
+        .request(Method::GET, "/rest/v1/products?select=id", None, None)
+        .await;
+    let second = app.request(Method::GET, "/nope", None, None).await;
+    let id = |reply: &Reply| reply.headers["x-request-id"].to_str().unwrap().to_owned();
+    assert_eq!(id(&first).len(), 36, "a UUID");
+    assert_ne!(id(&first), id(&second));
+    // ...and the caller's own (a proxy in front) is kept.
+    let reply = app
+        .request_with(
+            Method::GET,
+            "/rest/v1/products?select=id",
+            None,
+            None,
+            &[("x-request-id", "from-the-proxy")],
+        )
+        .await;
+    assert_eq!(id(&reply), "from-the-proxy");
 }

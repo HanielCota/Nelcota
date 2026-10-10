@@ -135,14 +135,26 @@ async fn signup_validates_input_and_duplicate_email() {
     assert_eq!(dup.status, StatusCode::CONFLICT);
     assert_eq!(dup.body["code"], "user_already_exists");
 
+    let bad_email = signup(&app, "not-an-email", "strong-pass-123").await;
+    assert_eq!(bad_email.status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(bad_email.body["code"], "invalid_email");
+    assert_eq!(bad_email.body["message"], "invalid email");
+    let weak = signup(&app, "dani@example.com", "short").await;
+    assert_eq!(weak.status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(weak.body["code"], "weak_password");
     assert_eq!(
-        signup(&app, "not-an-email", "strong-pass-123").await.status,
-        StatusCode::UNPROCESSABLE_ENTITY
+        weak.body["message"],
+        "the password needs at least 8 characters"
     );
-    assert_eq!(
-        signup(&app, "dani@example.com", "short").await.status,
-        StatusCode::UNPROCESSABLE_ENTITY
-    );
+    let missing = app
+        .post(
+            "/auth/v1/signup",
+            None,
+            json!({ "email": "eva@example.com" }),
+        )
+        .await;
+    assert_eq!(missing.status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(missing.body["code"], "invalid_body");
 }
 
 #[tokio::test]
@@ -201,6 +213,299 @@ async fn refresh_rotates_and_reuse_voids_the_family() {
     assert_eq!(
         refresh(&app, "no-such-token").await.status,
         StatusCode::BAD_REQUEST
+    );
+}
+
+#[tokio::test]
+async fn refresh_retry_within_the_grace_window_keeps_the_session() {
+    let app = TestApp::spawn().await;
+    let session = signup(&app, "retry@example.com", "strong-pass-123")
+        .await
+        .body;
+    let r1 = str_field(&session, "refresh_token").to_owned();
+
+    // R1 -> R2, but the client never saw the answer and retries with R1.
+    let lost = refresh(&app, &r1).await;
+    assert_eq!(lost.status, StatusCode::OK);
+    let r2 = str_field(&lost.body, "refresh_token").to_owned();
+    let retried = refresh(&app, &r1).await;
+    assert_eq!(retried.status, StatusCode::OK, "{}", retried.body);
+    let r3 = str_field(&retried.body, "refresh_token").to_owned();
+    assert_ne!(r3, r2);
+    assert_eq!(
+        retried.body["user"]["email"], "retry@example.com",
+        "{}",
+        retried.body
+    );
+    let claims = |body: &Value| {
+        let payload = str_field(body, "access_token").split('.').nth(1).unwrap();
+        let bytes =
+            base64::Engine::decode(&base64::engine::general_purpose::URL_SAFE_NO_PAD, payload)
+                .unwrap();
+        serde_json::from_slice::<Value>(&bytes).unwrap()
+    };
+    assert_eq!(
+        claims(&retried.body)["session_id"],
+        claims(&lost.body)["session_id"],
+        "the retry stays in the same session"
+    );
+
+    // Only the newest token works: R3 rotates on; the lost R2 is gone.
+    let next = refresh(&app, &r3).await;
+    assert_eq!(next.status, StatusCode::OK, "{}", next.body);
+    let r4 = str_field(&next.body, "refresh_token").to_owned();
+    // Once R3 has rotated, presenting R1 again is reuse, not a retry.
+    let reuse = refresh(&app, &r1).await;
+    assert_eq!(reuse.status, StatusCode::BAD_REQUEST);
+    assert_eq!(refresh(&app, &r4).await.status, StatusCode::BAD_REQUEST);
+    assert_eq!(refresh(&app, &r2).await.status, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn refresh_reuse_after_the_grace_window_revokes_the_session() {
+    let app = TestApp::spawn().await;
+    let session = signup(&app, "late@example.com", "strong-pass-123")
+        .await
+        .body;
+    let r1 = str_field(&session, "refresh_token").to_owned();
+    let rotated = refresh(&app, &r1).await;
+    assert_eq!(rotated.status, StatusCode::OK);
+    let r2 = str_field(&rotated.body, "refresh_token").to_owned();
+
+    // The rotation happened a minute ago.
+    app.admin_client
+        .batch_execute(
+            "UPDATE auth.refresh_tokens SET created_at = created_at - interval '1 minute';
+             UPDATE auth.sessions SET refreshed_at = refreshed_at - interval '1 minute';",
+        )
+        .await
+        .unwrap();
+    let reuse = refresh(&app, &r1).await;
+    assert_eq!(reuse.status, StatusCode::BAD_REQUEST);
+    assert_eq!(reuse.body["code"], "invalid_grant");
+    assert_eq!(refresh(&app, &r2).await.status, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn pruning_removes_expired_tokens_and_dead_sessions() {
+    let app = TestApp::spawn().await;
+    let live = signup(&app, "live@example.com", "strong-pass-123")
+        .await
+        .body;
+    let expired = login(&app, "live@example.com", "strong-pass-123")
+        .await
+        .body;
+    let logged_out = login(&app, "live@example.com", "strong-pass-123")
+        .await
+        .body;
+    let recent_logout = login(&app, "live@example.com", "strong-pass-123")
+        .await
+        .body;
+    let session = |body: &Value| {
+        let payload = str_field(body, "access_token").split('.').nth(1).unwrap();
+        let bytes =
+            base64::Engine::decode(&base64::engine::general_purpose::URL_SAFE_NO_PAD, payload)
+                .unwrap();
+        let claims: Value = serde_json::from_slice(&bytes).unwrap();
+        Uuid::parse_str(claims["session_id"].as_str().unwrap()).unwrap()
+    };
+    let (live_id, expired_id, old_id, recent_id) = (
+        session(&live),
+        session(&expired),
+        session(&logged_out),
+        session(&recent_logout),
+    );
+    // Rotate once so the live session also holds a revoked (unexpired) token.
+    let rotated = refresh(&app, str_field(&live, "refresh_token")).await;
+    assert_eq!(rotated.status, StatusCode::OK);
+    app.admin_client
+        .execute(
+            "UPDATE auth.refresh_tokens SET expires_at = now() - interval '1 second'
+             WHERE session_id = $1",
+            &[&expired_id],
+        )
+        .await
+        .unwrap();
+    app.admin_client
+        .execute(
+            "UPDATE auth.sessions SET revoked_at = now() - interval '8 days' WHERE id = $1",
+            &[&old_id],
+        )
+        .await
+        .unwrap();
+    app.admin_client
+        .execute(
+            "UPDATE auth.sessions SET revoked_at = now() WHERE id = $1",
+            &[&recent_id],
+        )
+        .await
+        .unwrap();
+
+    let pruned = nelcota_auth::prune(&app.pool).await.unwrap();
+    // The expired session's token, then that session and the old logout
+    // (with its token, by cascade).
+    assert_eq!(pruned.refresh_tokens, 1);
+    assert_eq!(pruned.sessions, 2);
+    let left: Vec<Uuid> = app
+        .admin_client
+        .query("SELECT id FROM auth.sessions ORDER BY created_at", &[])
+        .await
+        .unwrap()
+        .iter()
+        .map(|r| r.get(0))
+        .collect();
+    assert_eq!(left, [live_id, recent_id]);
+    let live_tokens: i64 = app
+        .admin_client
+        .query_one(
+            "SELECT count(*) FROM auth.refresh_tokens WHERE session_id = $1",
+            &[&live_id],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    assert_eq!(
+        live_tokens, 2,
+        "the rotated token stays for reuse detection"
+    );
+    let again = refresh(&app, str_field(&rotated.body, "refresh_token")).await;
+    assert_eq!(again.status, StatusCode::OK);
+    assert_eq!(
+        nelcota_auth::prune(&app.pool).await.unwrap(),
+        nelcota_auth::Pruned::default()
+    );
+}
+
+async fn update_user(app: &TestApp, access_token: &str, body: Value) -> Reply {
+    app.request(
+        axum::http::Method::PUT,
+        "/auth/v1/user",
+        Some(access_token),
+        Some(body),
+    )
+    .await
+}
+
+#[tokio::test]
+async fn signed_in_user_updates_metadata_and_password() {
+    let app = TestApp::spawn().await;
+    let first = signup(&app, "upd@example.com", "strong-pass-123")
+        .await
+        .body;
+    let access = str_field(&first, "access_token").to_owned();
+    let other = login(&app, "upd@example.com", "strong-pass-123").await.body;
+
+    // Metadata: merged one level deep; null removes a key.
+    let reply = update_user(
+        &app,
+        &access,
+        json!({ "data": { "name": "Ana", "tmp": 1 } }),
+    )
+    .await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+    assert_eq!(
+        reply.body["user_metadata"],
+        json!({ "name": "Ana", "tmp": 1 })
+    );
+    let reply = update_user(
+        &app,
+        &access,
+        json!({ "data": { "tmp": null, "plan": "pro" } }),
+    )
+    .await;
+    assert_eq!(
+        reply.body["user_metadata"],
+        json!({ "name": "Ana", "plan": "pro" })
+    );
+    assert_eq!(reply.body["email"], "upd@example.com");
+
+    // Invalid requests.
+    for (body, status, code) in [
+        (
+            json!({}),
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "validation_failed",
+        ),
+        (
+            json!({ "data": [1] }),
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "validation_failed",
+        ),
+        (
+            json!({ "password": "new-pass-456" }),
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "validation_failed",
+        ),
+        (
+            json!({ "password": "new-pass-456", "current_password": "wrong-pass-000" }),
+            StatusCode::BAD_REQUEST,
+            "invalid_grant",
+        ),
+        (
+            json!({ "password": "short", "current_password": "strong-pass-123" }),
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "weak_password",
+        ),
+    ] {
+        let reply = update_user(&app, &access, body.clone()).await;
+        assert_eq!(reply.status, status, "{body}: {}", reply.body);
+        assert_eq!(reply.body["code"], code, "{body}");
+    }
+    let anon = app
+        .request(
+            axum::http::Method::PUT,
+            "/auth/v1/user",
+            None,
+            Some(json!({ "data": {} })),
+        )
+        .await;
+    assert_eq!(anon.status, StatusCode::UNAUTHORIZED);
+
+    // Password: the other session ends, this one continues.
+    let reply = update_user(
+        &app,
+        &access,
+        json!({ "password": "new-pass-456", "current_password": "strong-pass-123" }),
+    )
+    .await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+    assert_eq!(
+        login(&app, "upd@example.com", "strong-pass-123")
+            .await
+            .status,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        refresh(&app, str_field(&other, "refresh_token"))
+            .await
+            .status,
+        StatusCode::BAD_REQUEST
+    );
+    let rotated = refresh(&app, str_field(&first, "refresh_token")).await;
+    assert_eq!(rotated.status, StatusCode::OK, "{}", rotated.body);
+    let fresh = login(&app, "upd@example.com", "new-pass-456").await;
+    assert_eq!(fresh.status, StatusCode::OK);
+
+    // An access token of an ended session can no longer change the account.
+    let ended = str_field(&other, "access_token");
+    let reply = update_user(&app, ended, json!({ "data": { "x": 1 } })).await;
+    assert_eq!(reply.status, StatusCode::UNAUTHORIZED, "{}", reply.body);
+
+    // An account without a password (magic link, provider) can set one.
+    app.admin_client
+        .execute(
+            "UPDATE auth.users SET encrypted_password = NULL WHERE email = 'upd@example.com'",
+            &[],
+        )
+        .await
+        .unwrap();
+    let reply = update_user(&app, &access, json!({ "password": "third-pass-789" })).await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+    assert_eq!(
+        login(&app, "upd@example.com", "third-pass-789")
+            .await
+            .status,
+        StatusCode::OK
     );
 }
 
@@ -277,6 +582,33 @@ async fn rate_limit_on_login() {
     let blocked = login(&app, "ivo@example.com", "wrong-pass-000").await;
     assert_eq!(blocked.status, StatusCode::TOO_MANY_REQUESTS);
     assert!(blocked.headers.contains_key(header::RETRY_AFTER));
+}
+
+#[tokio::test]
+async fn refresh_has_its_own_rate_limit_budget() {
+    let app = TestApp::spawn_with(Options {
+        rate_limit_per_minute: 3,
+        ..Options::default()
+    })
+    .await;
+    let session = signup(&app, "tabs@example.com", "strong-pass-123")
+        .await
+        .body;
+    // More refreshes than the password budget allows...
+    let mut token = str_field(&session, "refresh_token").to_owned();
+    for _ in 0..5 {
+        let reply = refresh(&app, &token).await;
+        assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+        token = str_field(&reply.body, "refresh_token").to_owned();
+    }
+    // ...leave password sign-in untouched, and the reverse.
+    for _ in 0..3 {
+        let reply = login(&app, "tabs@example.com", "strong-pass-123").await;
+        assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+    }
+    let blocked = login(&app, "tabs@example.com", "strong-pass-123").await;
+    assert_eq!(blocked.status, StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(refresh(&app, &token).await.status, StatusCode::OK);
 }
 
 /// The `auth.*` tables are not accessible to the API roles.
@@ -484,6 +816,7 @@ async fn expired_or_invalid_link_or_weak_password() {
     // A password breaking the rules does not consume the link.
     let reply = verify(&app, &token, "short").await;
     assert_eq!(reply.status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(reply.body["code"], "weak_password");
 
     for bad in ["", "made-up-token", &"x".repeat(200)] {
         let reply = verify(&app, bad, "new-pass-456").await;

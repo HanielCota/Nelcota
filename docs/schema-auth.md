@@ -74,9 +74,21 @@ One row per login.
 3. If R1 is used **again** (someone has a copy), the whole session is revoked:
    R2, R3... stop working. The user's other sessions continue.
 
-Two simultaneous refreshes with the same token (two tabs) also trigger the
-detection. The client should serialize refreshes. A grace window may come
-later, if needed.
+**Retry grace window.** A client that lost the answer to step 2 (network drop,
+two tabs refreshing at once) still holds only R1. For **10 seconds** after the
+rotation, presenting R1 again is treated as a retry: the server revokes R2 (and
+any other live token of the session issued after R1) and answers with a fresh
+pair for the **same session**. Retries never extend the window, which counts
+from the original rotation (its `refreshed_at`). Once R2's successor has been
+rotated in turn, or after the window, R1 is reuse again and step 3 applies.
+The client should still serialize refreshes; the window only absorbs retries.
+
+### Cleanup
+
+Once an hour the server deletes refresh tokens past `expires_at` (a rotated
+token stays until then, so reuse is still detected), sessions left without
+any token, and sessions revoked more than 7 days ago (with their tokens).
+Nothing that could still sign anyone in is removed.
 
 ## `auth.one_time_tokens`
 
@@ -144,6 +156,7 @@ a full minute, enough to recover the complete GCRA burst.
 | `GET /auth/v1/callback` | (the provider's redirect) | 303 to `redirect_to?code=...` or `?error=...` |
 | `POST /auth/v1/logout` | Bearer | 204 (revokes the session) |
 | `GET /auth/v1/user` | Bearer | user data |
+| `PUT /auth/v1/user` | Bearer + `{password?, current_password?, data?}` | 200 + user data (see [Updating the signed-in user](#updating-the-signed-in-user)) |
 | `GET /auth/v1/.well-known/jwks.json` | - | public JWKS |
 | `POST /auth/v1/recover` | `{email}` | 200 `{}` (whether or not the account exists) |
 | `POST /auth/v1/magiclink` | `{email}` | 200 `{}` (whether or not the account exists) |
@@ -163,7 +176,10 @@ Session:
 }
 ```
 
-Errors: `422 validation_failed` (email or password outside the rules), `409
+Errors: `422 invalid_email` or `422 weak_password` (email or password outside
+the rules), `422 validation_failed` (a value the endpoint requires is missing,
+such as `refresh_token`), `400`/`422 invalid_body` (the body is not JSON or a
+field has the wrong type), `409
 user_already_exists`, `400 invalid_grant` (invalid credentials or refresh, with
 the same message for an unknown email and a wrong password), `429
 rate_limited` with `Retry-After`, `403 signup_disabled`, `400
@@ -175,7 +191,30 @@ expired, already used or other-kind link), `400 unsupported_type`.
 
 Password: 8 to 256 characters. Rate limit:
 `NELCOTA_AUTH_RATE_LIMIT_PER_MINUTE` per IP (default 30) and the same limit
-per email on login.
+per email on password login. Refreshes and PKCE redemptions
+(`grant_type=refresh_token` / `pkce`) draw from a separate per-IP budget of
+10 times that (300 by default), so open tabs refreshing do not use up the
+password sign-in budget of everyone behind the same IP.
+
+## Updating the signed-in user
+
+`PUT /auth/v1/user` with the user's access token changes their own account.
+Send at least one of:
+
+- `data`: merged into `user_metadata` (`raw_user_meta_data`) one level deep:
+  the keys sent replace the stored ones, the others stay, and a key sent as
+  `null` is removed. `{"data": {"plan": "pro", "tmp": null}}`.
+- `password` (same rules as signup): requires `current_password` when the
+  account already has a password (`422 validation_failed` without it, `400
+  invalid_grant` when wrong). An account without one (magic link or provider
+  sign-in) can set it directly. The user's **other** sessions are revoked;
+  the calling session and its refresh token keep working. Attempts count
+  against the per-minute limit, per user.
+
+The access token's session must still be active (not logged out or revoked):
+otherwise `401 invalid_token`. The response is the updated user, as in `GET
+/auth/v1/user`. Changing the email is not supported yet (it needs a
+confirmation of the new address); an administrator can change it in SQL.
 
 ## Password recovery
 

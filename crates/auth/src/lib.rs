@@ -16,6 +16,7 @@ mod links;
 mod mail;
 mod oauth;
 mod password;
+mod prune;
 mod rate_limit;
 mod recovery;
 mod request;
@@ -38,7 +39,8 @@ pub use keys::{KeyError, Keys, generate_ed25519_private_key};
 pub use mail::{Email, MailError, Mailer, SmtpMailer};
 pub use oauth::{OAuth, Provider, ProviderEndpoints, ProviderKind};
 pub use password::{Passwords, hash_password, verify_password};
-pub use rate_limit::RateLimiter;
+pub use prune::{Pruned, prune, spawn_pruner};
+pub use rate_limit::{RateLimiter, SESSION_RATE_LIMIT_FACTOR};
 pub use state::{AuthSettings, AuthState, EmailLinks};
 
 #[derive(Debug, thiserror::Error)]
@@ -58,6 +60,15 @@ pub trait JwtVerifier: Send + Sync + 'static {
 
 /// Verifier shared in the axum state.
 pub type SharedVerifier = Arc<dyn JwtVerifier>;
+
+/// The token of an `Authorization: Bearer <token>` value. The scheme is
+/// case-insensitive (RFC 7235 §2.1): `bearer`, as in our own `token_type`,
+/// works too. `None` for another scheme or an empty token.
+pub fn bearer_token(authorization: &str) -> Option<&str> {
+    let (scheme, token) = authorization.split_once(' ')?;
+    let token = token.trim();
+    (scheme.eq_ignore_ascii_case("bearer") && !token.is_empty()).then_some(token)
+}
 
 /// Extractor of the request claims.
 ///
@@ -81,9 +92,7 @@ where
         let token = value
             .to_str()
             .ok()
-            .and_then(|v| v.strip_prefix("Bearer "))
-            .map(str::trim)
-            .filter(|t| !t.is_empty())
+            .and_then(bearer_token)
             .ok_or_else(ApiError::invalid_token)?;
 
         let verifier = SharedVerifier::from_ref(state);
@@ -94,6 +103,21 @@ where
                 tracing::debug!(error = %err, "JWT rejected");
                 Err(ApiError::invalid_token())
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::bearer_token;
+
+    #[test]
+    fn bearer_scheme_is_case_insensitive() {
+        for value in ["Bearer abc", "bearer abc", "BEARER abc", "bEaReR  abc "] {
+            assert_eq!(bearer_token(value), Some("abc"), "{value}");
+        }
+        for value in ["Basic abc", "Bearer", "Bearer ", "Bearerabc", "abc"] {
+            assert_eq!(bearer_token(value), None, "{value}");
         }
     }
 }

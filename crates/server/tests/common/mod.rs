@@ -123,6 +123,8 @@ pub struct Options {
     pub panel_rate_limit_per_minute: u32,
     pub access_ttl_secs: u64,
     pub max_rows: Option<i64>,
+    /// REST body limit (`NELCOTA_MAX_BODY_BYTES`).
+    pub max_body_bytes: usize,
     /// Storage limits (on a disk store in a temporary directory).
     pub storage: nelcota_storage::StorageSettings,
     /// Another store instead of the temporary directory (S3 tests).
@@ -142,6 +144,7 @@ impl Default for Options {
             panel_rate_limit_per_minute: 1000,
             access_ttl_secs: 900,
             max_rows: None,
+            max_body_bytes: nelcota_core::config::DEFAULT_MAX_BODY_BYTES,
             storage: nelcota_storage::StorageSettings {
                 max_file_size: 1024 * 1024,
                 max_total_size: None,
@@ -249,6 +252,7 @@ impl TestApp {
             catalog: catalog.clone(),
             api: Arc::new(ApiSettings {
                 max_rows: options.max_rows,
+                max_body_bytes: options.max_body_bytes,
             }),
         };
         let passwords = Arc::new(Passwords::new(2));
@@ -304,6 +308,11 @@ impl TestApp {
             keys: keys.clone(),
             passwords,
             limiter: Arc::new(RateLimiter::new(options.rate_limit_per_minute)),
+            session_limiter: Arc::new(RateLimiter::new(
+                options
+                    .rate_limit_per_minute
+                    .saturating_mul(nelcota_auth::SESSION_RATE_LIMIT_FACTOR),
+            )),
             settings: Arc::new(AuthSettings {
                 issuer: "nelcota-test".into(),
                 access_ttl_secs: options.access_ttl_secs,

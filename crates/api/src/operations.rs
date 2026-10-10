@@ -18,6 +18,11 @@ pub(crate) struct WriteResult {
     pub body: Option<String>,
     pub resolution: Option<Resolution>,
 }
+/// A PATCH/DELETE: the representation (if asked for) and the rows changed.
+pub(crate) struct ChangeResult {
+    pub body: Option<String>,
+    pub rows: u64,
+}
 #[derive(Default)]
 pub(crate) struct WriteOptions {
     pub representation: bool,
@@ -36,10 +41,28 @@ fn not_found(kind: &str, name: &str) -> ApiError {
     )
 }
 
+/// RPC arguments: an empty body means no arguments (`{}`).
 fn parse_body(bytes: &[u8]) -> Result<Value, ApiError> {
     if bytes.is_empty() {
         return Ok(Value::Object(Map::new()));
     }
+    parse_json(bytes)
+}
+
+/// Rows of a POST/PATCH: an empty body is a mistake (a lost body, a client
+/// that forgot to serialize), not a row of defaults; send `{}` for that.
+fn parse_rows(bytes: &[u8]) -> Result<Value, ApiError> {
+    if bytes.iter().all(u8::is_ascii_whitespace) {
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "invalid_body",
+            "the request body is empty; send a JSON object or array",
+        ));
+    }
+    parse_json(bytes)
+}
+
+fn parse_json(bytes: &[u8]) -> Result<Value, ApiError> {
     serde_json::from_slice(bytes).map_err(|e| {
         ApiError::new(
             StatusCode::BAD_REQUEST,
@@ -100,6 +123,23 @@ fn require_filters(request: &query::Request) -> Result<(), ApiError> {
     Ok(())
 }
 
+/// PATCH/DELETE act on every row the filters match: `order`, `limit` and
+/// `offset` would be silently ignored, which reads as "change only the first
+/// N rows" and changes them all. Refuse them instead.
+fn reject_paging(request: &query::Request) -> Result<(), ApiError> {
+    let ignored = [
+        ("order", !request.order.is_empty()),
+        ("limit", request.limit.is_some()),
+        ("offset", request.offset.is_some()),
+    ];
+    if let Some((name, _)) = ignored.iter().find(|(_, set)| *set) {
+        return Err(bad_query(QueryError::Invalid(format!(
+            "{name} does not apply to PATCH or DELETE, which change every matching row; narrow the filters instead"
+        ))));
+    }
+    Ok(())
+}
+
 pub(crate) async fn read(
     pool: &Pool,
     claims: &Claims,
@@ -139,18 +179,23 @@ pub(crate) async fn read(
     })
 }
 
+/// Runs a write; returns the representation (if asked for) and how many
+/// rows it wrote.
 async fn write(
     pool: &Pool,
     claims: &Claims,
     sql: Sql,
     representation: bool,
-) -> Result<Option<String>, ApiError> {
+) -> Result<ChangeResult, ApiError> {
     if representation {
-        let (body, _) = in_request_tx!(pool, claims, |tx| { fetch_json(&tx, &sql).await });
-        Ok(Some(body))
+        let (body, rows) = in_request_tx!(pool, claims, |tx| { fetch_json(&tx, &sql).await });
+        Ok(ChangeResult {
+            body: Some(body),
+            rows: u64::try_from(rows).unwrap_or_default(),
+        })
     } else {
-        in_request_tx!(pool, claims, |tx| { execute(&tx, &sql).await });
-        Ok(None)
+        let rows = in_request_tx!(pool, claims, |tx| { execute(&tx, &sql).await });
+        Ok(ChangeResult { body: None, rows })
     }
 }
 
@@ -186,13 +231,13 @@ pub(crate) async fn create(
     let sql = query::insert(
         &catalog.schema,
         table,
-        parse_body(bytes)?,
+        parse_rows(bytes)?,
         options.representation.then_some(&request.select),
         upsert.as_ref(),
     )
     .map_err(bad_query)?;
     Ok(WriteResult {
-        body: write(pool, claims, sql, options.representation).await?,
+        body: write(pool, claims, sql, options.representation).await?.body,
         resolution: options.resolution,
     })
 }
@@ -205,17 +250,18 @@ pub(crate) async fn update(
     pairs: &[(String, String)],
     bytes: &[u8],
     representation: bool,
-) -> Result<Option<String>, ApiError> {
+) -> Result<ChangeResult, ApiError> {
     let table = catalog
         .table(name)
         .ok_or_else(|| not_found("table", name))?;
     let request = query::parse_request_with_relations(pairs, table, catalog).map_err(bad_query)?;
     require_filters(&request)?;
     reject_on_conflict(&request)?;
+    reject_paging(&request)?;
     let sql = query::update(
         &catalog.schema,
         table,
-        parse_body(bytes)?,
+        parse_rows(bytes)?,
         &request.filters,
         representation.then_some(&request.select),
     )
@@ -230,13 +276,14 @@ pub(crate) async fn remove(
     name: &str,
     pairs: &[(String, String)],
     representation: bool,
-) -> Result<Option<String>, ApiError> {
+) -> Result<ChangeResult, ApiError> {
     let table = catalog
         .table(name)
         .ok_or_else(|| not_found("table", name))?;
     let request = query::parse_request_with_relations(pairs, table, catalog).map_err(bad_query)?;
     require_filters(&request)?;
     reject_on_conflict(&request)?;
+    reject_paging(&request)?;
     let sql = query::delete(
         &catalog.schema,
         table,

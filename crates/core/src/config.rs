@@ -52,6 +52,11 @@ pub enum StorageBackend {
     S3,
 }
 
+/// Default REST body limit: axum's own default, which the API always had.
+/// A body is buffered and parsed whole, and a 1000-row insert of typical
+/// rows fits well under it; raise it for larger batches if memory allows.
+pub const DEFAULT_MAX_BODY_BYTES: usize = 2 * 1024 * 1024;
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Config {
     /// Postgres URL with a role that owns the schema (used only for migrations
@@ -119,6 +124,8 @@ pub struct Config {
     pub db_schema: String,
     /// Row cap per API collection (`None` uses 1000).
     pub max_rows: Option<i64>,
+    /// Largest REST request body (`/rest/v1`), in bytes.
+    pub max_body_bytes: usize,
     pub listen: SocketAddr,
     pub db_pool_size: usize,
     pub request_timeout_secs: u64,
@@ -192,6 +199,7 @@ impl Default for Config {
             migrations_dir: None,
             db_schema: "public".into(),
             max_rows: Some(1000),
+            max_body_bytes: DEFAULT_MAX_BODY_BYTES,
             listen: SocketAddr::from(([0, 0, 0, 0], 8000)),
             db_pool_size: 10,
             request_timeout_secs: 15,
@@ -259,6 +267,29 @@ impl Config {
         if self.max_rows.is_some_and(|rows| rows <= 0) {
             return Err(ConfigError::Invalid("NELCOTA_MAX_ROWS must be > 0"));
         }
+        if self.max_body_bytes == 0 {
+            return Err(ConfigError::Invalid("NELCOTA_MAX_BODY_BYTES must be > 0"));
+        }
+        if self.request_timeout_secs == 0 {
+            return Err(ConfigError::Invalid(
+                "NELCOTA_REQUEST_TIMEOUT_SECS must be > 0",
+            ));
+        }
+        // The statement must time out first, so a slow query answers its own
+        // 504 and its transaction ends, instead of the request being dropped
+        // while Postgres keeps working (0 turns the statement timeout off).
+        if self.statement_timeout_secs > 0
+            && self.request_timeout_secs <= self.statement_timeout_secs
+        {
+            return Err(ConfigError::Invalid(
+                "NELCOTA_REQUEST_TIMEOUT_SECS must be greater than NELCOTA_STATEMENT_TIMEOUT_SECS",
+            ));
+        }
+        if self.auth_rate_limit_per_minute == 0 {
+            return Err(ConfigError::Invalid(
+                "NELCOTA_AUTH_RATE_LIMIT_PER_MINUTE must be > 0 (requests per minute per IP)",
+            ));
+        }
         self.mail()?;
         self.validate_storage()?;
         self.database_config()?;
@@ -280,7 +311,8 @@ impl Config {
                     || non_empty(&self.storage_s3_secret_access_key).is_none() =>
             {
                 return Err(ConfigError::Invalid(
-                    "NELCOTA_STORAGE_BACKEND=s3 needs NELCOTA_STORAGE_S3_BUCKET,                      NELCOTA_STORAGE_S3_ACCESS_KEY_ID and NELCOTA_STORAGE_S3_SECRET_ACCESS_KEY",
+                    "NELCOTA_STORAGE_BACKEND=s3 needs NELCOTA_STORAGE_S3_BUCKET, \
+                     NELCOTA_STORAGE_S3_ACCESS_KEY_ID and NELCOTA_STORAGE_S3_SECRET_ACCESS_KEY",
                 ));
             }
             _ => {}
@@ -469,6 +501,65 @@ fn non_empty(value: &Option<Secret>) -> Option<&str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The smallest configuration that passes `validate`.
+    fn valid() -> Config {
+        Config {
+            database_url: Secret::new("postgres://u:p@localhost/db"),
+            authenticator_password: Secret::new("a-password-of-16+"),
+            jwt_secret: Some(Secret::new("a-secret-with-at-least-32-characters")),
+            ..Config::default()
+        }
+    }
+
+    #[test]
+    fn body_limit_must_be_positive() {
+        assert!(valid().validate().is_ok());
+        assert_eq!(valid().max_body_bytes, 2 * 1024 * 1024);
+        let zero = Config {
+            max_body_bytes: 0,
+            ..valid()
+        };
+        assert!(zero.validate().is_err());
+    }
+
+    #[test]
+    fn timeouts_and_rate_limit_are_checked() {
+        for invalid in [
+            Config {
+                request_timeout_secs: 0,
+                ..valid()
+            },
+            Config {
+                request_timeout_secs: 10,
+                statement_timeout_secs: 10,
+                ..valid()
+            },
+            Config {
+                auth_rate_limit_per_minute: 0,
+                ..valid()
+            },
+        ] {
+            assert!(invalid.validate().is_err(), "{invalid:?}");
+        }
+        let no_statement_timeout = Config {
+            request_timeout_secs: 5,
+            statement_timeout_secs: 0,
+            ..valid()
+        };
+        assert!(no_statement_timeout.validate().is_ok());
+    }
+
+    #[test]
+    fn s3_error_names_each_variable_once() {
+        let s3 = Config {
+            storage_backend: StorageBackend::S3,
+            ..Config::default()
+        };
+        let message = s3.validate_storage().unwrap_err().to_string();
+        assert!(!message.contains("  "), "{message}");
+        assert!(message.contains("_BUCKET, NELCOTA_STORAGE_S3_ACCESS_KEY_ID"));
+    }
 
     #[test]
     fn secret_never_shows_in_debug() {
