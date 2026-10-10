@@ -101,6 +101,7 @@ const ptBR = {
     title: 'Página não encontrada',
     description: 'O endereço não existe neste painel.',
     back: 'Voltar à visão geral',
+    search: 'Buscar no painel',
   },
 }
 
@@ -204,6 +205,7 @@ const en: Messages<typeof ptBR> = {
     title: 'Page not found',
     description: 'This address does not exist in this panel.',
     back: 'Back to the overview',
+    search: 'Search the panel',
   },
 }
 
