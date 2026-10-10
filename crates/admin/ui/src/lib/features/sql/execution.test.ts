@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { SqlResponse } from '$lib/types'
-import { SqlExecution, type SqlAdapter } from './execution.svelte'
+import { changesSchema, SqlExecution, type SqlAdapter } from './execution.svelte'
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -74,6 +74,14 @@ describe('SQL execution lifetime', () => {
     expect(execution.error).toBeNull()
     expect(await loading).toBe(true)
     expect(execution.schema.data?.tables).toEqual({ docs: ['id'] })
+  })
+
+  it('detects SQL that changes the schema', () => {
+    expect(changesSchema('create table notes (id int)')).toBe(true)
+    expect(changesSchema('ALTER TABLE notes ADD x int')).toBe(true)
+    expect(changesSchema('select 1;\ndrop view v')).toBe(true)
+    expect(changesSchema('select created_at from notes')).toBe(false)
+    expect(changesSchema('update notes set dropped = true')).toBe(false)
   })
 
   it('cancels schema loading without preventing SQL execution', async () => {

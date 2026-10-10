@@ -29,7 +29,7 @@
   import SaveQueryDialog from '$lib/features/sql/components/SaveQueryDialog.svelte'
   import SqlSidebar from '$lib/features/sql/components/SqlSidebar.svelte'
   import CellDetailDialog from '$lib/components/shared/CellDetailDialog.svelte'
-  import { SqlExecution } from '$lib/features/sql/execution.svelte'
+  import { changesSchema, SqlExecution } from '$lib/features/sql/execution.svelte'
   import { sqlAdapter } from '$lib/features/sql/api'
   import { downloadText, toCsv, toJson } from '$lib/download'
   import { errorMessage, t } from '$lib/i18n/index.svelte'
@@ -101,7 +101,11 @@
     const offset = runsSelection ? cursor.from : 0
     errorAt = null
     resultsPane?.expand()
-    if (await execution.run(code, runAsRequest())) sqlStore.remember(code)
+    if (await execution.run(code, runAsRequest())) {
+      sqlStore.remember(code)
+      // New or changed tables and columns show up in autocomplete right away.
+      if (changesSchema(code)) void execution.loadSchema()
+    }
     const result = execution.response
     // Postgres counts from 1 within the text it received.
     const position = !execution.error && result && 'error' in result ? result.error.position : null
