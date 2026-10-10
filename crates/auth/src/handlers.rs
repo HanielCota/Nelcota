@@ -28,7 +28,7 @@ pub fn router(state: AuthState) -> Router {
         .route("/auth/v1/signup", post(signup))
         .route("/auth/v1/token", post(token))
         .route("/auth/v1/logout", post(logout))
-        .route("/auth/v1/user", get(user))
+        .route("/auth/v1/user", get(user).put(update_user))
         .route("/auth/v1/recover", post(recover))
         .route("/auth/v1/magiclink", post(magic_link))
         .route("/auth/v1/resend", post(resend))
@@ -61,6 +61,13 @@ async fn logout(
 }
 async fn user(State(state): State<AuthState>, Auth(claims): Auth) -> Result<Json<Value>, ApiError> {
     Ok(Json(accounts::user(&state, &claims).await?))
+}
+async fn update_user(
+    State(state): State<AuthState>,
+    Auth(claims): Auth,
+    Json(body): Json<accounts::UserUpdate>,
+) -> Result<Json<Value>, ApiError> {
+    Ok(Json(accounts::update_user(&state, &claims, body).await?))
 }
 #[derive(Deserialize)]
 struct GrantQuery {

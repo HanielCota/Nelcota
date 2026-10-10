@@ -149,6 +149,7 @@ a full minute, enough to recover the complete GCRA burst.
 | `GET /auth/v1/callback` | (the provider's redirect) | 303 to `redirect_to?code=...` or `?error=...` |
 | `POST /auth/v1/logout` | Bearer | 204 (revokes the session) |
 | `GET /auth/v1/user` | Bearer | user data |
+| `PUT /auth/v1/user` | Bearer + `{password?, current_password?, data?}` | 200 + user data (see [Updating the signed-in user](#updating-the-signed-in-user)) |
 | `GET /auth/v1/.well-known/jwks.json` | - | public JWKS |
 | `POST /auth/v1/recover` | `{email}` | 200 `{}` (whether or not the account exists) |
 | `POST /auth/v1/magiclink` | `{email}` | 200 `{}` (whether or not the account exists) |
@@ -187,6 +188,26 @@ per email on password login. Refreshes and PKCE redemptions
 (`grant_type=refresh_token` / `pkce`) draw from a separate per-IP budget of
 10 times that (300 by default), so open tabs refreshing do not use up the
 password sign-in budget of everyone behind the same IP.
+
+## Updating the signed-in user
+
+`PUT /auth/v1/user` with the user's access token changes their own account.
+Send at least one of:
+
+- `data`: merged into `user_metadata` (`raw_user_meta_data`) one level deep:
+  the keys sent replace the stored ones, the others stay, and a key sent as
+  `null` is removed. `{"data": {"plan": "pro", "tmp": null}}`.
+- `password` (same rules as signup): requires `current_password` when the
+  account already has a password (`422 validation_failed` without it, `400
+  invalid_grant` when wrong). An account without one (magic link or provider
+  sign-in) can set it directly. The user's **other** sessions are revoked;
+  the calling session and its refresh token keep working. Attempts count
+  against the per-minute limit, per user.
+
+The access token's session must still be active (not logged out or revoked):
+otherwise `401 invalid_token`. The response is the updated user, as in `GET
+/auth/v1/user`. Changing the email is not supported yet (it needs a
+confirmation of the new address); an administrator can change it in SQL.
 
 ## Password recovery
 

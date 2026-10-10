@@ -286,6 +286,139 @@ async fn refresh_reuse_after_the_grace_window_revokes_the_session() {
     assert_eq!(refresh(&app, &r2).await.status, StatusCode::BAD_REQUEST);
 }
 
+async fn update_user(app: &TestApp, access_token: &str, body: Value) -> Reply {
+    app.request(
+        axum::http::Method::PUT,
+        "/auth/v1/user",
+        Some(access_token),
+        Some(body),
+    )
+    .await
+}
+
+#[tokio::test]
+async fn signed_in_user_updates_metadata_and_password() {
+    let app = TestApp::spawn().await;
+    let first = signup(&app, "upd@example.com", "strong-pass-123")
+        .await
+        .body;
+    let access = str_field(&first, "access_token").to_owned();
+    let other = login(&app, "upd@example.com", "strong-pass-123").await.body;
+
+    // Metadata: merged one level deep; null removes a key.
+    let reply = update_user(
+        &app,
+        &access,
+        json!({ "data": { "name": "Ana", "tmp": 1 } }),
+    )
+    .await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+    assert_eq!(
+        reply.body["user_metadata"],
+        json!({ "name": "Ana", "tmp": 1 })
+    );
+    let reply = update_user(
+        &app,
+        &access,
+        json!({ "data": { "tmp": null, "plan": "pro" } }),
+    )
+    .await;
+    assert_eq!(
+        reply.body["user_metadata"],
+        json!({ "name": "Ana", "plan": "pro" })
+    );
+    assert_eq!(reply.body["email"], "upd@example.com");
+
+    // Invalid requests.
+    for (body, status, code) in [
+        (
+            json!({}),
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "validation_failed",
+        ),
+        (
+            json!({ "data": [1] }),
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "validation_failed",
+        ),
+        (
+            json!({ "password": "new-pass-456" }),
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "validation_failed",
+        ),
+        (
+            json!({ "password": "new-pass-456", "current_password": "wrong-pass-000" }),
+            StatusCode::BAD_REQUEST,
+            "invalid_grant",
+        ),
+        (
+            json!({ "password": "short", "current_password": "strong-pass-123" }),
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "weak_password",
+        ),
+    ] {
+        let reply = update_user(&app, &access, body.clone()).await;
+        assert_eq!(reply.status, status, "{body}: {}", reply.body);
+        assert_eq!(reply.body["code"], code, "{body}");
+    }
+    let anon = app
+        .request(
+            axum::http::Method::PUT,
+            "/auth/v1/user",
+            None,
+            Some(json!({ "data": {} })),
+        )
+        .await;
+    assert_eq!(anon.status, StatusCode::UNAUTHORIZED);
+
+    // Password: the other session ends, this one continues.
+    let reply = update_user(
+        &app,
+        &access,
+        json!({ "password": "new-pass-456", "current_password": "strong-pass-123" }),
+    )
+    .await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+    assert_eq!(
+        login(&app, "upd@example.com", "strong-pass-123")
+            .await
+            .status,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        refresh(&app, str_field(&other, "refresh_token"))
+            .await
+            .status,
+        StatusCode::BAD_REQUEST
+    );
+    let rotated = refresh(&app, str_field(&first, "refresh_token")).await;
+    assert_eq!(rotated.status, StatusCode::OK, "{}", rotated.body);
+    let fresh = login(&app, "upd@example.com", "new-pass-456").await;
+    assert_eq!(fresh.status, StatusCode::OK);
+
+    // An access token of an ended session can no longer change the account.
+    let ended = str_field(&other, "access_token");
+    let reply = update_user(&app, ended, json!({ "data": { "x": 1 } })).await;
+    assert_eq!(reply.status, StatusCode::UNAUTHORIZED, "{}", reply.body);
+
+    // An account without a password (magic link, provider) can set one.
+    app.admin_client
+        .execute(
+            "UPDATE auth.users SET encrypted_password = NULL WHERE email = 'upd@example.com'",
+            &[],
+        )
+        .await
+        .unwrap();
+    let reply = update_user(&app, &access, json!({ "password": "third-pass-789" })).await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+    assert_eq!(
+        login(&app, "upd@example.com", "third-pass-789")
+            .await
+            .status,
+        StatusCode::OK
+    );
+}
+
 #[tokio::test]
 async fn logout_ends_the_session() {
     let app = TestApp::spawn().await;
