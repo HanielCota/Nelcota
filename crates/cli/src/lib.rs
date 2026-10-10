@@ -328,9 +328,10 @@ pub struct InitArgs {
 pub struct DevArgs {
     #[arg(long, default_value = "127.0.0.1:8000")]
     pub listen: std::net::SocketAddr,
-    /// Local port of the development Postgres.
-    #[arg(long, default_value_t = 54322)]
-    pub db_port: u16,
+    /// Local port of the development Postgres (default: the saved one, else 54322).
+    /// A new port is saved in .nelcota/dev.env.
+    #[arg(long)]
+    pub db_port: Option<u16>,
 }
 
 /// What `main` should do after the command.
