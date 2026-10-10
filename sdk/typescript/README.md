@@ -377,5 +377,5 @@ engines. Browser checks include the runnable demo, simultaneous refresh across
 two real tabs and sign-out broadcasts. Each run owns unique container names
 and dynamically assigned ports, so it can coexist with development services.
 
-See [releasing.md](docs/releasing.md) for the account setup, candidate checks
+See [releasing.md](https://github.com/HanielCota/Nelcota/blob/main/sdk/typescript/docs/releasing.md) (in the repository) for the account setup, candidate checks
 and tagged release procedure. [CHANGELOG.md](CHANGELOG.md) tracks SDK changes.
