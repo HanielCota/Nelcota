@@ -21,9 +21,10 @@ pub fn docker() -> anyhow::Result<()> {
                 String::from_utf8_lossy(&out.stdout).trim()
             ));
         }
-        Ok(_) => {
-            bail!("Docker is installed but the daemon does not answer (systemctl start docker)")
-        }
+        Ok(out) => bail!(
+            "Docker is installed but {}",
+            docker_failure(&String::from_utf8_lossy(&out.stderr))
+        ),
         Err(_) => {
             bail!("Docker not found. Install it with: curl -fsSL https://get.docker.com | sh")
         }
@@ -43,7 +44,20 @@ pub fn docker() -> anyhow::Result<()> {
     }
 }
 
-pub fn ports() {
+/// Why `docker version` failed, from its error output.
+fn docker_failure(stderr: &str) -> String {
+    if stderr.to_lowercase().contains("permission denied") {
+        "this user may not use it: run with sudo, or add the user to the docker group \
+         (sudo usermod -aG docker $USER, then log in again)"
+            .to_owned()
+    } else {
+        "the daemon does not answer (systemctl start docker)".to_owned()
+    }
+}
+
+/// Caddy needs 80 and 443: another web server there makes HTTPS fail later.
+pub fn ports() -> anyhow::Result<()> {
+    let mut busy = Vec::new();
     for port in [80u16, 443] {
         match TcpListener::bind(("0.0.0.0", port)) {
             Ok(_) => ok(&format!("port {port} free")),
@@ -52,11 +66,25 @@ pub fn ports() {
                     "no permission to test port {port} (run as root to check)"
                 ));
             }
-            Err(_) => warn(&format!(
-                "port {port} in use: stop the service holding it (nginx? apache?)"
-            )),
+            Err(_) => busy.push(port),
         }
     }
+    if busy.is_empty() {
+        return Ok(());
+    }
+    bail!("{}", ports_in_use(&busy))
+}
+
+fn ports_in_use(ports: &[u16]) -> String {
+    let list: Vec<String> = ports.iter().map(u16::to_string).collect();
+    format!(
+        "port(s) {} in use: stop the service holding them (nginx? apache?). \
+         Find it with `sudo ss -ltnp 'sport = :{}'` (or `sudo lsof -i :{}`), \
+         or pass --skip-checks to continue anyway",
+        list.join(" and "),
+        ports[0],
+        ports[0]
+    )
 }
 
 /// Total machine RAM in MB (Linux).
@@ -99,5 +127,26 @@ pub fn dns(domain: &str) {
         None => ok(&format!(
             "DNS: {domain} → {resolved:?} (public IP not verified)"
         )),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn docker_permission_errors_suggest_the_docker_group() {
+        let denied = "permission denied while trying to connect to the Docker daemon socket at \
+                      unix:///var/run/docker.sock";
+        assert!(docker_failure(denied).contains("usermod -aG docker $USER"));
+        assert!(docker_failure("Cannot connect to the Docker daemon").contains("systemctl"));
+    }
+
+    #[test]
+    fn busy_ports_say_how_to_find_the_process() {
+        let message = ports_in_use(&[80, 443]);
+        assert!(message.contains("80 and 443"));
+        assert!(message.contains("ss -ltnp 'sport = :80'"));
+        assert!(message.contains("--skip-checks"));
     }
 }

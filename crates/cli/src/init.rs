@@ -169,7 +169,7 @@ fn create_host(
         if args.runtime == Runtime::Docker {
             checks::docker()?;
         }
-        checks::ports();
+        checks::ports()?;
         match checks::total_ram_mb() {
             Some(mb) => ok(&format!("RAM: {mb} MB")),
             None => warn("could not measure RAM; assuming 2 GB"),
