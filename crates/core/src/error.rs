@@ -1,11 +1,15 @@
 //! API HTTP error, shaped as `{"code": "...", "message": "..."}`.
+//!
+//! Database errors may add `sqlstate`, `details`, `hint` and `constraint`
+//! (each omitted when absent), straight from Postgres, so a client can tell a
+//! unique violation from a check violation without parsing the message.
 
 use axum::{
     Json,
     http::{HeaderValue, StatusCode, header},
     response::{IntoResponse, Response},
 };
-use serde_json::json;
+use serde::Serialize;
 use tokio_postgres::error::SqlState;
 
 use crate::Role;
@@ -19,12 +23,87 @@ pub struct ErrorInfo {
     pub message: String,
 }
 
+/// What Postgres said about a database error, besides its message.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+struct DbFields {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sqlstate: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    details: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    hint: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    constraint: Option<String>,
+}
+
 #[derive(Debug)]
 pub struct ApiError {
     status: StatusCode,
     code: &'static str,
     message: String,
     retry_after_secs: Option<u64>,
+    db: Option<Box<DbFields>>,
+}
+
+/// The response body: the two fixed fields plus the optional database ones.
+#[derive(Serialize)]
+struct Body<'a> {
+    code: &'static str,
+    message: &'a str,
+    #[serde(flatten)]
+    db: Option<&'a DbFields>,
+}
+
+/// How a SQLSTATE is answered.
+#[derive(Debug, PartialEq, Eq)]
+enum Class {
+    /// A client error (`db_error`) with this status.
+    Client(StatusCode),
+    /// Transient: the same request may succeed if retried (503 `unavailable`).
+    Transient,
+    /// Not the client's fault: a hidden 500.
+    Internal,
+}
+
+/// Classifies a SQLSTATE. Missing privileges become 401 for `anon` (must
+/// sign in) and 403 for the other roles, as in PostgREST.
+fn classify(state: &SqlState, role: Role) -> Class {
+    let code = state.code();
+    let status = match *state {
+        SqlState::INSUFFICIENT_PRIVILEGE if role == Role::Anon => StatusCode::UNAUTHORIZED,
+        SqlState::INSUFFICIENT_PRIVILEGE => StatusCode::FORBIDDEN,
+        SqlState::UNDEFINED_TABLE => StatusCode::NOT_FOUND,
+        SqlState::UNIQUE_VIOLATION
+        | SqlState::FOREIGN_KEY_VIOLATION
+        | SqlState::EXCLUSION_VIOLATION => StatusCode::CONFLICT,
+        SqlState::QUERY_CANCELED => StatusCode::GATEWAY_TIMEOUT,
+        // Serialization failure, deadlock, lock not available, too many
+        // connections, server shutting down or starting: retrying helps.
+        SqlState::T_R_SERIALIZATION_FAILURE
+        | SqlState::T_R_DEADLOCK_DETECTED
+        | SqlState::LOCK_NOT_AVAILABLE
+        | SqlState::TOO_MANY_CONNECTIONS
+        | SqlState::ADMIN_SHUTDOWN
+        | SqlState::CRASH_SHUTDOWN
+        | SqlState::CANNOT_CONNECT_NOW => return Class::Transient,
+        // Incompatible type/operator, generated column: a client error, not a
+        // server one. Upserts: `on_conflict` matching no unique constraint, or
+        // a batch that hits the same key twice.
+        SqlState::UNDEFINED_FUNCTION
+        | SqlState::UNDEFINED_COLUMN
+        | SqlState::DATATYPE_MISMATCH
+        | SqlState::GENERATED_ALWAYS
+        | SqlState::INVALID_COLUMN_REFERENCE
+        | SqlState::CARDINALITY_VIOLATION => StatusCode::BAD_REQUEST,
+        // Class 22 (invalid data), 23 (integrity) and P0 (PL/pgSQL: `RAISE
+        // EXCEPTION` with the default P0001 or a custom `ERRCODE` such as
+        // P0002, `ASSERT` failures): 400 with the function's message.
+        _ if code.starts_with("22") || code.starts_with("23") || code.starts_with("P0") => {
+            StatusCode::BAD_REQUEST
+        }
+        _ => return Class::Internal,
+    };
+    Class::Client(status)
 }
 
 impl ApiError {
@@ -34,19 +113,24 @@ impl ApiError {
             code,
             message: message.into(),
             retry_after_secs: None,
+            db: None,
         }
     }
 
     /// 429 with `Retry-After`.
     pub fn rate_limited(retry_after_secs: u64) -> Self {
-        ApiError {
-            retry_after_secs: Some(retry_after_secs.max(1)),
-            ..Self::new(
-                StatusCode::TOO_MANY_REQUESTS,
-                "rate_limited",
-                "too many attempts; wait and try again",
-            )
-        }
+        Self::new(
+            StatusCode::TOO_MANY_REQUESTS,
+            "rate_limited",
+            "too many attempts; wait and try again",
+        )
+        .retry_after(retry_after_secs)
+    }
+
+    /// Adds `Retry-After` (at least one second).
+    pub fn retry_after(mut self, secs: u64) -> Self {
+        self.retry_after_secs = Some(secs.max(1));
+        self
     }
 
     /// Token missing when required, invalid, expired or with an unknown role.
@@ -86,8 +170,14 @@ impl ApiError {
         &self.message
     }
 
-    /// Maps a Postgres error. Missing privileges become 401 for `anon` (must
-    /// sign in) and 403 for the other roles, as in PostgREST.
+    /// The SQLSTATE of a database error, when the error came from Postgres.
+    pub fn sqlstate(&self) -> Option<&str> {
+        self.db.as_ref().and_then(|db| db.sqlstate.as_deref())
+    }
+
+    /// Maps a Postgres error: client errors keep the database's message,
+    /// detail, hint and constraint; transient ones become a retryable 503;
+    /// anything else is logged and hidden behind a 500.
     pub fn from_db(err: tokio_postgres::Error, role: Role) -> Self {
         let Some(db) = err.as_db_error() else {
             tracing::error!(error = %err, "failed to communicate with Postgres");
@@ -101,37 +191,28 @@ impl ApiError {
                 "the JSON response exceeds the 8 MiB budget; narrow the selection or page the results",
             );
         }
-        let status = match *db.code() {
-            SqlState::INSUFFICIENT_PRIVILEGE if role == Role::Anon => StatusCode::UNAUTHORIZED,
-            SqlState::INSUFFICIENT_PRIVILEGE => StatusCode::FORBIDDEN,
-            SqlState::UNDEFINED_TABLE => StatusCode::NOT_FOUND,
-            SqlState::UNIQUE_VIOLATION
-            | SqlState::FOREIGN_KEY_VIOLATION
-            | SqlState::EXCLUSION_VIOLATION => StatusCode::CONFLICT,
-            SqlState::QUERY_CANCELED => StatusCode::GATEWAY_TIMEOUT,
-            // Incompatible type/operator, generated column, RAISE EXCEPTION in a
-            // user function: a client error, not a server one.
-            // Upserts: `on_conflict` matching no unique constraint, or a batch
-            // that hits the same key twice.
-            SqlState::UNDEFINED_FUNCTION
-            | SqlState::UNDEFINED_COLUMN
-            | SqlState::DATATYPE_MISMATCH
-            | SqlState::GENERATED_ALWAYS
-            | SqlState::RAISE_EXCEPTION
-            | SqlState::INVALID_COLUMN_REFERENCE
-            | SqlState::CARDINALITY_VIOLATION => StatusCode::BAD_REQUEST,
-            // Class 22 (invalid data) and 23 (integrity): 400.
-            _ if code.starts_with("22") || code.starts_with("23") => StatusCode::BAD_REQUEST,
-            _ => {
-                tracing::error!(code = db.code().code(), error = %db, "unexpected Postgres error");
+        let (status, api_code) = match classify(db.code(), role) {
+            Class::Client(status) => (status, "db_error"),
+            Class::Transient => {
+                tracing::warn!(code, error = %db, "transient Postgres error");
+                (StatusCode::SERVICE_UNAVAILABLE, "unavailable")
+            }
+            Class::Internal => {
+                tracing::error!(code, error = %db, "unexpected Postgres error");
                 return Self::internal();
             }
         };
-        Self::new(
-            status,
-            "db_error",
-            format!("{} ({})", db.message(), db.code().code()),
-        )
+        let mut error = Self::new(status, api_code, format!("{} ({code})", db.message()));
+        error.db = Some(Box::new(DbFields {
+            sqlstate: Some(code.to_owned()),
+            details: db.detail().map(str::to_owned),
+            hint: db.hint().map(str::to_owned),
+            constraint: db.constraint().map(str::to_owned),
+        }));
+        if status == StatusCode::SERVICE_UNAVAILABLE {
+            error = error.retry_after(1);
+        }
+        error
     }
 
     pub fn from_pool(err: deadpool_postgres::PoolError) -> Self {
@@ -142,11 +223,12 @@ impl ApiError {
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
-        let mut response = (
-            self.status,
-            Json(json!({ "code": self.code, "message": self.message })),
-        )
-            .into_response();
+        let body = Body {
+            code: self.code,
+            message: &self.message,
+            db: self.db.as_deref(),
+        };
+        let mut response = (self.status, Json(body)).into_response();
         response.extensions_mut().insert(ErrorInfo {
             code: self.code,
             message: self.message,
@@ -163,5 +245,77 @@ impl IntoResponse for ApiError {
                 .insert(header::RETRY_AFTER, HeaderValue::from(secs));
         }
         response
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    async fn body(error: ApiError) -> (Response, serde_json::Value) {
+        let response = error.into_response();
+        let (parts, body) = response.into_parts();
+        let bytes = axum::body::to_bytes(body, 1 << 16).await.unwrap();
+        (
+            Response::from_parts(parts, axum::body::Body::empty()),
+            serde_json::from_slice(&bytes).unwrap(),
+        )
+    }
+
+    #[tokio::test]
+    async fn plain_errors_keep_the_two_field_shape() {
+        let (_, json) = body(ApiError::new(StatusCode::BAD_REQUEST, "x", "y")).await;
+        assert_eq!(json, serde_json::json!({ "code": "x", "message": "y" }));
+    }
+
+    #[tokio::test]
+    async fn database_fields_appear_only_when_present() {
+        let mut error = ApiError::new(StatusCode::CONFLICT, "db_error", "dup (23505)");
+        error.db = Some(Box::new(DbFields {
+            sqlstate: Some("23505".into()),
+            details: Some("Key (id)=(1) already exists.".into()),
+            hint: None,
+            constraint: Some("t_pkey".into()),
+        }));
+        let (_, json) = body(error).await;
+        assert_eq!(
+            json,
+            serde_json::json!({
+                "code": "db_error",
+                "message": "dup (23505)",
+                "sqlstate": "23505",
+                "details": "Key (id)=(1) already exists.",
+                "constraint": "t_pkey",
+            })
+        );
+    }
+
+    #[test]
+    fn sqlstates_are_classified() {
+        let client = |code: &str, role| classify(&SqlState::from_code(code), role);
+        assert_eq!(
+            client("42501", Role::Anon),
+            Class::Client(StatusCode::UNAUTHORIZED)
+        );
+        assert_eq!(
+            client("42501", Role::Authenticated),
+            Class::Client(StatusCode::FORBIDDEN)
+        );
+        assert_eq!(
+            client("23505", Role::Anon),
+            Class::Client(StatusCode::CONFLICT)
+        );
+        for raise in ["P0001", "P0002", "P0004"] {
+            assert_eq!(
+                client(raise, Role::Anon),
+                Class::Client(StatusCode::BAD_REQUEST),
+                "{raise}"
+            );
+        }
+        for transient in ["40001", "40P01", "53300", "55P03", "57P01"] {
+            assert_eq!(client(transient, Role::Anon), Class::Transient, "{transient}");
+        }
+        assert_eq!(client("XX000", Role::Anon), Class::Internal);
+        assert_eq!(client("42P07", Role::Anon), Class::Internal);
     }
 }

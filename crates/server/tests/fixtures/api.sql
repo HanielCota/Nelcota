@@ -51,3 +51,16 @@ CREATE FUNCTION public.service_only() RETURNS text
     LANGUAGE sql AS $$ SELECT 'ok' $$;
 REVOKE EXECUTE ON FUNCTION public.service_only() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.service_only() TO service_role;
+
+-- RAISE with its own SQLSTATE (class P0), detail and hint.
+CREATE FUNCTION public.fail_with_detail() RETURNS integer
+    LANGUAGE plpgsql AS $$
+    BEGIN
+        RAISE EXCEPTION 'nothing to ship'
+            USING ERRCODE = 'P0002', DETAIL = 'the cart is empty', HINT = 'add an item first';
+    END $$;
+
+-- Transient failure: a serialization error the client may retry.
+CREATE FUNCTION public.fail_transient() RETURNS integer
+    LANGUAGE plpgsql AS $$
+    BEGIN RAISE EXCEPTION 'could not serialize access' USING ERRCODE = '40001'; END $$;

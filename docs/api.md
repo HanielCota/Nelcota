@@ -186,8 +186,11 @@ the keys wins.
 | scalar or composite | JSON value |
 | `void` | 204 |
 
-`RAISE EXCEPTION` becomes 400 with the message. The function runs with the
-JWT's role (unless it is `SECURITY DEFINER`): `auth.uid()` works inside it.
+`RAISE EXCEPTION` becomes 400 with the message, also with a custom SQLSTATE of
+class `P0` (`USING ERRCODE = 'P0002'`) and for a failed `ASSERT`; its `DETAIL`
+and `HINT` come back as `details` and `hint` (see [Errors](#errors)). The
+function runs with the JWT's role (unless it is `SECURITY DEFINER`):
+`auth.uid()` works inside it.
 
 > **Warning:** By default, Postgres grants `EXECUTE` on new functions to
 > `PUBLIC` (including `anon`). For sensitive functions:
