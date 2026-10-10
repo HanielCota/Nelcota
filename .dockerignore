@@ -3,3 +3,7 @@ target
 .env
 backups
 crates/admin/ui/node_modules
+.nelcota
+output
+.playwright-cli
+sdk/typescript/node_modules
