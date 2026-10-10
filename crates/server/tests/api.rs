@@ -1231,6 +1231,59 @@ async fn patch_and_delete_refuse_order_limit_and_offset() {
 }
 
 #[tokio::test]
+async fn patch_and_delete_report_the_rows_changed_with_count_exact() {
+    let app = TestApp::spawn().await;
+    let s = service_token();
+    let count = ("prefer", "count=exact");
+    let reply = app
+        .request_with(
+            Method::PATCH,
+            "/rest/v1/products?stock=gt.0",
+            Some(&s),
+            Some(json!({ "stock": 7 })),
+            &[count],
+        )
+        .await;
+    assert_eq!(reply.status, StatusCode::NO_CONTENT);
+    assert_eq!(reply.headers[header::CONTENT_RANGE], "*/3");
+    assert_eq!(reply.headers["preference-applied"], "count=exact");
+
+    let reply = app
+        .request_with(
+            Method::DELETE,
+            "/rest/v1/products?stock=eq.7",
+            Some(&s),
+            None,
+            &[("prefer", "count=exact, return=representation")],
+        )
+        .await;
+    assert_eq!(reply.status, StatusCode::OK);
+    assert_eq!(reply.body.as_array().unwrap().len(), 3);
+    assert_eq!(reply.headers[header::CONTENT_RANGE], "*/3");
+
+    // Matching nothing is a count too; without the preference, no header.
+    let reply = app
+        .request_with(
+            Method::DELETE,
+            "/rest/v1/products?id=eq.999",
+            Some(&s),
+            None,
+            &[count],
+        )
+        .await;
+    assert_eq!(reply.headers[header::CONTENT_RANGE], "*/0");
+    let reply = app
+        .request(
+            Method::DELETE,
+            "/rest/v1/products?id=eq.999",
+            Some(&s),
+            None,
+        )
+        .await;
+    assert!(!reply.headers.contains_key(header::CONTENT_RANGE));
+}
+
+#[tokio::test]
 async fn cors_exposes_what_a_browser_client_reads() {
     let app = TestApp::spawn().await;
     let reply = app

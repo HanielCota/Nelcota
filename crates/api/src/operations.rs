@@ -18,6 +18,11 @@ pub(crate) struct WriteResult {
     pub body: Option<String>,
     pub resolution: Option<Resolution>,
 }
+/// A PATCH/DELETE: the representation (if asked for) and the rows changed.
+pub(crate) struct ChangeResult {
+    pub body: Option<String>,
+    pub rows: u64,
+}
 #[derive(Default)]
 pub(crate) struct WriteOptions {
     pub representation: bool,
@@ -156,18 +161,23 @@ pub(crate) async fn read(
     })
 }
 
+/// Runs a write; returns the representation (if asked for) and how many
+/// rows it wrote.
 async fn write(
     pool: &Pool,
     claims: &Claims,
     sql: Sql,
     representation: bool,
-) -> Result<Option<String>, ApiError> {
+) -> Result<ChangeResult, ApiError> {
     if representation {
-        let (body, _) = in_request_tx!(pool, claims, |tx| { fetch_json(&tx, &sql).await });
-        Ok(Some(body))
+        let (body, rows) = in_request_tx!(pool, claims, |tx| { fetch_json(&tx, &sql).await });
+        Ok(ChangeResult {
+            body: Some(body),
+            rows: u64::try_from(rows).unwrap_or_default(),
+        })
     } else {
-        in_request_tx!(pool, claims, |tx| { execute(&tx, &sql).await });
-        Ok(None)
+        let rows = in_request_tx!(pool, claims, |tx| { execute(&tx, &sql).await });
+        Ok(ChangeResult { body: None, rows })
     }
 }
 
@@ -209,7 +219,7 @@ pub(crate) async fn create(
     )
     .map_err(bad_query)?;
     Ok(WriteResult {
-        body: write(pool, claims, sql, options.representation).await?,
+        body: write(pool, claims, sql, options.representation).await?.body,
         resolution: options.resolution,
     })
 }
@@ -222,7 +232,7 @@ pub(crate) async fn update(
     pairs: &[(String, String)],
     bytes: &[u8],
     representation: bool,
-) -> Result<Option<String>, ApiError> {
+) -> Result<ChangeResult, ApiError> {
     let table = catalog
         .table(name)
         .ok_or_else(|| not_found("table", name))?;
@@ -248,7 +258,7 @@ pub(crate) async fn remove(
     name: &str,
     pairs: &[(String, String)],
     representation: bool,
-) -> Result<Option<String>, ApiError> {
+) -> Result<ChangeResult, ApiError> {
     let table = catalog
         .table(name)
         .ok_or_else(|| not_found("table", name))?;

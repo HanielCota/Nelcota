@@ -151,6 +151,9 @@ transactional behavior and missing columns still receive their defaults.
 - `order`, `limit` and `offset` are refused on `PATCH`/`DELETE` (400
   `invalid_query`): they change every row the filters match, so narrow the
   filters instead.
+- With `Prefer: count=exact`, `PATCH`/`DELETE` answer `Content-Range: */<n>`
+  with the number of rows changed (and `Preference-Applied: count=exact`),
+  with or without `return=representation`.
 - `return=representation` runs `RETURNING`, which requires `SELECT`
   permission (GRANT + policy) on the written rows.
 
