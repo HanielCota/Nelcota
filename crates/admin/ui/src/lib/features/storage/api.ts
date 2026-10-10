@@ -6,7 +6,7 @@ export const storageBrowserAdapter: StorageBrowserAdapter = {
   async info(bucket, signal) {
     const data = await api.get<StorageOverview>('/storage', { signal })
     const found = data.enabled ? data.buckets.find(item => item.id === bucket) : undefined
-    return data.enabled && found ? { bucket: found, publicOrigin: data.public_url ?? location.origin } : null
+    return data.enabled && found ? { bucket: found, publicOrigin: data.public_url ?? location.origin, serverLimit: data.max_file_size } : null
   },
   list: (target, offset, signal) => api.get<StorageListing>(
     `/storage/buckets/${enc(target.bucket)}/objects?${new URLSearchParams({ prefix: target.prefix, offset: String(offset) })}`, { signal }),

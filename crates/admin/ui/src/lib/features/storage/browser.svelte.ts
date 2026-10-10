@@ -5,7 +5,8 @@ import { UploadQueue, type UploadTarget } from './upload-queue.svelte'
 /** Files per bulk deletion request (the server's limit, MAX_BULK_DELETE). */
 export const BULK_DELETE_BATCH = 200
 
-export type BucketInfo ={ bucket: Bucket; publicOrigin: string } | null
+/** A bucket with what its page needs: the public origin and the server's per-file limit. */
+export type BucketInfo = { bucket: Bucket; publicOrigin: string; serverLimit: number } | null
 export interface StorageBrowserAdapter {
   info(bucket: string, signal: AbortSignal): Promise<BucketInfo>
   list(target: UploadTarget, offset: number, signal: AbortSignal): Promise<StorageListing>

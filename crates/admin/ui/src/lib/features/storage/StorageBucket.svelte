@@ -21,6 +21,7 @@
   import ChevronRight from '@lucide/svelte/icons/chevron-right'
   import ShieldCheck from '@lucide/svelte/icons/shield-check'
   import X from '@lucide/svelte/icons/x'
+  import Settings from '@lucide/svelte/icons/settings'
   import { Checkbox } from '$lib/components/ui/checkbox'
   import { toast } from 'svelte-sonner'
   import PageHeader from '$lib/components/shared/PageHeader.svelte'
@@ -29,6 +30,7 @@
   import ConfirmDialog from '$lib/components/shared/ConfirmDialog.svelte'
   import LoadError from '$lib/components/shared/LoadError.svelte'
   import FilePreviewDialog from '$lib/features/storage/components/FilePreviewDialog.svelte'
+  import BucketDialog from '$lib/features/storage/components/BucketDialog.svelte'
   import { StorageBrowser } from '$lib/features/storage/browser.svelte'
   import { storageBrowserAdapter } from '$lib/features/storage/api'
   import { type UploadTarget } from '$lib/features/storage/upload-queue.svelte'
@@ -62,6 +64,7 @@
   const error = $derived(filesResource.error ? errorMessage(filesResource.error) : '')
   const infoError = $derived(infoResource.error ? errorMessage(infoResource.error) : '')
   const infoLoading = $derived(infoResource.loading)
+  let settingsOpen = $state(false)
   let preview = $state<StoredFile | null>(null)
   let previewOpen = $state(false)
   let dragging = $state(false)
@@ -169,7 +172,7 @@
   </nav>
   <PageHeader
     title={bucket}
-    description={info ? `${info.bucket.public ? t('storage.public') : t('storage.private')} · ${size(info.bucket.bytes)}` : undefined}
+    description={info ? [info.bucket.public ? t('storage.public') : t('storage.private'), t('storage.browser.fileCount', { count: info.bucket.files }), size(info.bucket.bytes)].join(' · ') : undefined}
   >
     {#snippet actions()}
       {#if info}
@@ -179,6 +182,7 @@
           {uploading ? t('storage.browser.uploading', uploading) : t('storage.browser.upload')}
         </Button>
         <Button variant="outline" href="#bucket-access" aria-label={t('storage.browser.access')}><ShieldCheck data-icon="inline-start" aria-hidden="true" /><span class="sm:hidden">{t('storage.browser.accessShort')}</span><span class="hidden sm:inline">{t('storage.browser.access')}</span></Button>
+        <Button variant="outline" size="icon" aria-label={t('storage.browser.settings')} title={t('storage.browser.settings')} onclick={() => (settingsOpen = true)}><Settings aria-hidden="true" /></Button>
       {/if}
     {/snippet}
   </PageHeader>
@@ -188,7 +192,11 @@
   <div class="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
   <section class="min-w-0" aria-label={t('storage.browser.files')}>
   {#if info}
-    <button type="button" disabled={uploading !== null} class={['mb-4 flex w-full cursor-pointer flex-col items-center gap-2 rounded-3xl border-2 border-dashed border-border bg-card px-4 py-6 text-sm text-muted-foreground transition-colors hover:border-brand/50 hover:text-foreground disabled:cursor-wait', dragging && 'border-brand bg-brand/5 text-brand']} onclick={() => picker?.click()}><Upload class="size-5" aria-hidden="true" />{t('storage.browser.dropHint')}</button>
+    <button type="button" disabled={uploading !== null} class={['mb-4 flex w-full cursor-pointer flex-col items-center gap-2 rounded-3xl border-2 border-dashed border-border bg-card px-4 py-6 text-sm text-muted-foreground transition-colors hover:border-brand/50 hover:text-foreground disabled:cursor-wait', dragging && 'border-brand bg-brand/5 text-brand']} aria-label={t('storage.browser.dropHint')} aria-describedby="drop-limits" onclick={() => picker?.click()}>
+      <Upload class="size-5" aria-hidden="true" />
+      <span class="font-medium"><span class="hidden sm:inline">{t('storage.browser.dropHint')}</span><span class="sm:hidden">{t('storage.browser.tapHint')}</span></span>
+      <span id="drop-limits" class="text-xs text-muted-foreground">{t('storage.browser.dropLimits', { size: size(info.bucket.file_size_limit ?? info.serverLimit), types: info.bucket.allowed_mime_types?.join(', ') ?? t('storage.anyType').toLowerCase() })}</span>
+    </button>
   {/if}
   {#if queue.length}
     <section class="mb-4 grid gap-3 rounded-3xl bg-card p-4" aria-label={t('storage.browser.uploadProgress')}>
@@ -218,10 +226,10 @@
     {:else}
       <div class="overflow-hidden rounded-3xl bg-card">
         {#if selectedNames.length}
-          <div class="flex min-h-12 flex-wrap items-center gap-2 border-b border-brand/20 bg-brand/5 px-4 py-2 text-sm" role="region" aria-label={t('storage.browser.selection.selected', { count: selectedNames.length })}>
-            <span class="font-medium text-foreground" aria-live="polite">{t('storage.browser.selection.selected', { count: selectedNames.length })}</span>
-            <div class="ml-auto flex flex-wrap items-center gap-2">
-              <Button variant="destructive" size="sm" onclick={() => { removeManyCount = selectedNames.length; removeManyOpen = true }}><Trash2 />{t('storage.browser.selection.delete')}</Button>
+          <div class="flex min-h-12 items-center gap-2 border-b border-brand/20 bg-brand/5 px-4 py-2 text-sm" role="region" aria-label={t('storage.browser.selection.selected', { count: selectedNames.length })}>
+            <span class="min-w-0 flex-1 truncate font-medium text-foreground" aria-live="polite">{t('storage.browser.selection.selected', { count: selectedNames.length })}</span>
+            <div class="flex shrink-0 items-center gap-2">
+              <Button variant="destructive" size="sm" aria-label={t('storage.browser.selection.delete')} onclick={() => { removeManyCount = selectedNames.length; removeManyOpen = true }}><Trash2 aria-hidden="true" /><span class="sm:hidden">{t('storage.browser.delete')}</span><span class="hidden sm:inline">{t('storage.browser.selection.delete')}</span></Button>
               <Button variant="ghost" size="icon-sm" aria-label={t('storage.browser.selection.clear')} title={t('storage.browser.selection.clear')} onclick={() => (selected = new Set())}><X /></Button>
             </div>
           </div>
@@ -264,7 +272,7 @@
                   <Checkbox checked={selected.has(file.name)} onCheckedChange={(v) => toggleFile(file.name, v === true)} aria-label={t('storage.browser.selection.selectFile', { name: baseName(file.name) })} />
                 </Table.Cell>
                 <Table.Cell class="max-w-0 font-medium"><button type="button" class="flex w-full min-w-0 cursor-pointer items-center gap-2 text-left hover:text-brand" onclick={() => showPreview(file)} title={file.name}><Icon class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" /><span class="truncate">{baseName(file.name)}</span></button></Table.Cell>
-                <Table.Cell class="text-right font-mono text-xs tabular-nums">{size(file.size)}</Table.Cell>
+                <Table.Cell class="text-right tabular-nums text-muted-foreground">{size(file.size)}</Table.Cell>
                 <Table.Cell class="hidden font-mono text-xs text-muted-foreground 2xl:table-cell">{file.mime_type}</Table.Cell>
                 <Table.Cell class="hidden text-muted-foreground md:table-cell xl:hidden 2xl:table-cell">{date.format(new Date(file.updated_at))}</Table.Cell>
                 <Table.Cell class="text-right">
@@ -328,6 +336,7 @@
   </div>
 </div>
 
+{#if info}<BucketDialog bind:open={settingsOpen} bucket={info.bucket} serverLimit={info.serverLimit} onsaved={loadInfo} />{/if}
 {#if preview}<FilePreviewDialog bind:open={previewOpen} file={preview} url={fileHref(preview.name)} />{/if}
 
 <ConfirmDialog
