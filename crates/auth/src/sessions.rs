@@ -139,6 +139,28 @@ pub(crate) async fn refresh(state: &AuthState, token: Option<String>) -> Result<
     if session_revoked {
         return Err(invalid_grant("session ended"));
     }
+    let user = SessionUser {
+        id: row.get(5),
+        email: row.get(6),
+        json: row.get(7),
+    };
+    if revoked && is_retry(&tx, session_id, token_id).await? {
+        // The client lost the answer to its rotation (network drop, two tabs
+        // racing) and is retrying with the token it still has. Hand out a
+        // fresh pair in the same session and retire whatever the lost answer
+        // carried, so only the newest token stays valid.
+        tx.execute(
+            "UPDATE auth.refresh_tokens SET revoked = true
+             WHERE session_id = $1 AND id > $2 AND NOT revoked",
+            &[&session_id, &token_id],
+        )
+        .await
+        .map_err(db_error)?;
+        let session = issue_tokens(state, &tx, session_id, &user).await?;
+        tx.commit().await.map_err(db_error)?;
+        tracing::info!(session_id = %session_id, "refresh token retried within the grace window");
+        return Ok(session);
+    }
     if revoked {
         // Reuse: someone holds a copy of an already rotated token. End the whole
         // session (every token of the family stops working).
@@ -168,14 +190,38 @@ pub(crate) async fn refresh(state: &AuthState, token: Option<String>) -> Result<
     )
     .await
     .map_err(db_error)?;
-    let user = SessionUser {
-        id: row.get(5),
-        email: row.get(6),
-        json: row.get(7),
-    };
     let session = issue_tokens(state, &tx, session_id, &user).await?;
     tx.commit().await.map_err(db_error)?;
     Ok(session)
+}
+
+/// How long after a rotation the rotated token still counts as a retry.
+const REUSE_GRACE_SECS: f64 = 10.0;
+
+/// Whether presenting the revoked token `token_id` is a retry of the latest
+/// rotation rather than a stolen copy: it must be the token that rotation
+/// consumed (its first successor was created by the session's latest
+/// rotation, which sets `refreshed_at` in the same transaction) and that
+/// rotation must be under [`REUSE_GRACE_SECS`] old. Retries do not move
+/// `refreshed_at`, so they cannot stretch the window; once the newer token is
+/// rotated in turn, the old one is plain reuse again.
+async fn is_retry(tx: &Transaction<'_>, session_id: Uuid, token_id: i64) -> Result<bool, ApiError> {
+    let row = tx
+        .query_opt(
+            "SELECT s.refreshed_at = next.created_at
+                    AND next.created_at > now() - make_interval(secs => $3)
+             FROM auth.refresh_tokens next
+             JOIN auth.sessions s ON s.id = next.session_id
+             WHERE next.session_id = $1 AND next.id > $2
+             ORDER BY next.id
+             LIMIT 1",
+            &[&session_id, &token_id, &REUSE_GRACE_SECS],
+        )
+        .await
+        .map_err(db_error)?;
+    Ok(row
+        .and_then(|r| r.get::<_, Option<bool>>(0))
+        .unwrap_or(false))
 }
 
 pub(crate) fn session_of(claims: &nelcota_core::Claims) -> Result<(Uuid, Uuid), ApiError> {

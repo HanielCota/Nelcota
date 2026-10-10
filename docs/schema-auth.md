@@ -74,9 +74,14 @@ One row per login.
 3. If R1 is used **again** (someone has a copy), the whole session is revoked:
    R2, R3... stop working. The user's other sessions continue.
 
-Two simultaneous refreshes with the same token (two tabs) also trigger the
-detection. The client should serialize refreshes. A grace window may come
-later, if needed.
+**Retry grace window.** A client that lost the answer to step 2 (network drop,
+two tabs refreshing at once) still holds only R1. For **10 seconds** after the
+rotation, presenting R1 again is treated as a retry: the server revokes R2 (and
+any other live token of the session issued after R1) and answers with a fresh
+pair for the **same session**. Retries never extend the window, which counts
+from the original rotation (its `refreshed_at`). Once R2's successor has been
+rotated in turn, or after the window, R1 is reuse again and step 3 applies.
+The client should still serialize refreshes; the window only absorbs retries.
 
 ## `auth.one_time_tokens`
 

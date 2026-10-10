@@ -205,6 +205,76 @@ async fn refresh_rotates_and_reuse_voids_the_family() {
 }
 
 #[tokio::test]
+async fn refresh_retry_within_the_grace_window_keeps_the_session() {
+    let app = TestApp::spawn().await;
+    let session = signup(&app, "retry@example.com", "strong-pass-123")
+        .await
+        .body;
+    let r1 = str_field(&session, "refresh_token").to_owned();
+
+    // R1 -> R2, but the client never saw the answer and retries with R1.
+    let lost = refresh(&app, &r1).await;
+    assert_eq!(lost.status, StatusCode::OK);
+    let r2 = str_field(&lost.body, "refresh_token").to_owned();
+    let retried = refresh(&app, &r1).await;
+    assert_eq!(retried.status, StatusCode::OK, "{}", retried.body);
+    let r3 = str_field(&retried.body, "refresh_token").to_owned();
+    assert_ne!(r3, r2);
+    assert_eq!(
+        retried.body["user"]["email"], "retry@example.com",
+        "{}",
+        retried.body
+    );
+    let claims = |body: &Value| {
+        let payload = str_field(body, "access_token").split('.').nth(1).unwrap();
+        let bytes =
+            base64::Engine::decode(&base64::engine::general_purpose::URL_SAFE_NO_PAD, payload)
+                .unwrap();
+        serde_json::from_slice::<Value>(&bytes).unwrap()
+    };
+    assert_eq!(
+        claims(&retried.body)["session_id"],
+        claims(&lost.body)["session_id"],
+        "the retry stays in the same session"
+    );
+
+    // Only the newest token works: R3 rotates on; the lost R2 is gone.
+    let next = refresh(&app, &r3).await;
+    assert_eq!(next.status, StatusCode::OK, "{}", next.body);
+    let r4 = str_field(&next.body, "refresh_token").to_owned();
+    // Once R3 has rotated, presenting R1 again is reuse, not a retry.
+    let reuse = refresh(&app, &r1).await;
+    assert_eq!(reuse.status, StatusCode::BAD_REQUEST);
+    assert_eq!(refresh(&app, &r4).await.status, StatusCode::BAD_REQUEST);
+    assert_eq!(refresh(&app, &r2).await.status, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn refresh_reuse_after_the_grace_window_revokes_the_session() {
+    let app = TestApp::spawn().await;
+    let session = signup(&app, "late@example.com", "strong-pass-123")
+        .await
+        .body;
+    let r1 = str_field(&session, "refresh_token").to_owned();
+    let rotated = refresh(&app, &r1).await;
+    assert_eq!(rotated.status, StatusCode::OK);
+    let r2 = str_field(&rotated.body, "refresh_token").to_owned();
+
+    // The rotation happened a minute ago.
+    app.admin_client
+        .batch_execute(
+            "UPDATE auth.refresh_tokens SET created_at = created_at - interval '1 minute';
+             UPDATE auth.sessions SET refreshed_at = refreshed_at - interval '1 minute';",
+        )
+        .await
+        .unwrap();
+    let reuse = refresh(&app, &r1).await;
+    assert_eq!(reuse.status, StatusCode::BAD_REQUEST);
+    assert_eq!(reuse.body["code"], "invalid_grant");
+    assert_eq!(refresh(&app, &r2).await.status, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
 async fn logout_ends_the_session() {
     let app = TestApp::spawn().await;
     let session = signup(&app, "gabi@example.com", "strong-pass-123")
