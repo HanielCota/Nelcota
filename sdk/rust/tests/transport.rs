@@ -384,6 +384,43 @@ async fn error_bodies_keep_postgres_fields_and_bodyless_codes() {
 }
 
 #[tokio::test]
+async fn default_headers_are_sent_and_validated() {
+    let router = Router::new().fallback(any(|request: Request| async move {
+        let get = |name: &str| {
+            request
+                .headers()
+                .get(name)
+                .map(|v| v.to_str().unwrap().to_owned())
+        };
+        Response::new(Body::from(
+            json!([get("x-app"), get("x-trace"), get("authorization")]).to_string(),
+        ))
+    }));
+    let (url, task) = serve(router).await;
+    let client = Client::builder(&url)
+        .header("x-app", "first")
+        .header("X-App", "notes")
+        .header("x-trace", "abc")
+        .access_token("token")
+        .build()
+        .unwrap();
+    let seen = client.from("t").execute::<Value>().await.unwrap().data;
+    assert_eq!(seen, json!(["notes", "abc", "Bearer token"]));
+    for (name, value) in [
+        ("authorization", "Bearer x"),
+        ("bad name", "v"),
+        ("x-ok", "a\nb"),
+    ] {
+        let error = Client::builder(&url)
+            .header(name, value)
+            .build()
+            .unwrap_err();
+        assert_eq!(error.code(), "invalid_input");
+    }
+    task.abort();
+}
+
+#[tokio::test]
 async fn unsafe_input_is_rejected_without_network() {
     let client = Client::builder("http://127.0.0.1:1").build().unwrap();
     for query in [

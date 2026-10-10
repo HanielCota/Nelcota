@@ -2,6 +2,8 @@
 
 ## 0.1.0 (unreleased)
 
+- `ClientBuilder::header(name, value)` sends a header with every request.
+
 - **Breaking:** `UploadOptions::content_type` is an `Option<String>`. `None`
   (the default) guesses the type from the object name's extension for common
   types (`storage::guess_content_type`) instead of always sending

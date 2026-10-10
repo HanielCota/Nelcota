@@ -240,7 +240,10 @@ buffered body; refresh and backoff are separate. Drop a request future or use
 `CancellationToken` to cancel; an already accepted server write cannot be undone
 by cancelling the client. Raw stream lifetime is managed by reqwest/caller.
 
-Custom `http_client` instances must disable their own auth/mutation retries.
+`Client::builder(url).header("x-app", "notes")` adds a header to every request;
+`build` refuses invalid headers and `Authorization`, which comes from
+`access_token` or the session. Custom `http_client` instances must disable
+their own auth/mutation retries.
 The default client uses explicit rustls/ring and Mozilla roots without a global
 crypto-provider initialization. It can be reused across tasks.
 
