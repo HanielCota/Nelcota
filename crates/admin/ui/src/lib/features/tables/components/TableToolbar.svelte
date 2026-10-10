@@ -132,16 +132,18 @@
             <Button variant="ghost" size="sm" title={t('tables.toolbar.export')} {...props}><Download /><span class="max-sm:sr-only">{t('tables.toolbar.export')}</span></Button>
           {/snippet}
         </DropdownMenu.Trigger>
-        <DropdownMenu.Content align="end" class="w-56">
+        <DropdownMenu.Content align="end" class="w-72">
           <DropdownMenu.Label class="text-xs font-normal text-muted-foreground">
             {filterCount ? t('tables.toolbar.exportFiltered') : t('tables.toolbar.exportAll')}
           </DropdownMenu.Label>
-          <DropdownMenu.Item>
-            {#snippet child({ props })}<a {...props} href={exportHref('csv')} download>CSV</a>{/snippet}
-          </DropdownMenu.Item>
-          <DropdownMenu.Item>
-            {#snippet child({ props })}<a {...props} href={exportHref('json')} download>JSON</a>{/snippet}
-          </DropdownMenu.Item>
+          {#each [{ format: 'csv', label: 'CSV', hint: t('tables.toolbar.csvHint') }, { format: 'json', label: 'JSON', hint: t('tables.toolbar.jsonHint') }] as const as option (option.format)}
+            <DropdownMenu.Item class="flex-col items-start gap-0">
+              {#snippet child({ props })}<a {...props} href={exportHref(option.format)} download>
+                  <span class="font-medium">{option.label}</span>
+                  <span class="text-xs text-muted-foreground">{option.hint}</span>
+                </a>{/snippet}
+            </DropdownMenu.Item>
+          {/each}
         </DropdownMenu.Content>
       </DropdownMenu.Root>
       <Button variant="ghost" size="icon-sm" disabled={loading} onclick={onreload} aria-label={t('tables.toolbar.reload')} title={t('tables.toolbar.reload')}>
