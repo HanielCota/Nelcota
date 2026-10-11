@@ -15,6 +15,7 @@ client ──HTTPS──▶ Caddy ──▶ nelcota (single binary) ──▶ Po
 | `nelcota-auth` | `JwtVerifier` trait, EdDSA/HS256 keys and JWKS, `Auth` extractor, signup/login/refresh/logout, email links (recovery, confirmation, magic link), OAuth/OIDC providers, argon2id, rate limit |
 | `nelcota-api`  | catalog introspection, SQL builder, CRUD/RPC, OpenAPI, TS types |
 | `nelcota-storage` | files: buckets and objects under RLS (`storage` schema), bytes on disk or S3 (`object_store`), signed URLs, orphan collector |
+| `nelcota-webhooks` | transactional row events, persistent delivery leases, signing, safe HTTP dispatch, retries and retention |
 | `nelcota-admin` | panel at `/admin`: JSON API (`/admin/api`) + embedded Svelte SPA (`ui/dist`) |
 | `nelcota-cli`  | host with N projects (`init`, `up`, `projects`, `remove`, `migrate`, `backup`, `upgrade`, `panel-login`...). Modules: `host` (registry), `naming`, `scaffold`, `caddy`, `registry`, `panel_login`, `lifecycle`, `backup`, `upgrade` |
 | `nelcota-server` | the `nelcota` binary: dispatches the CLI or starts the server (trace, timeout, CORS, gzip) |
@@ -52,6 +53,13 @@ The CLI separates project lifecycle and version upgrades from backup workflows.
 `backup/workflow` coordinates capture, retention and restore; `backup/remote`
 owns S3 transport. Database and immutable file capture retain one owner so
 their snapshot consistency remains intact.
+
+Webhooks separate panel configuration/history (`management`), destination and
+DNS policy (`destination`), HMAC (`signing`), lease persistence (`queue`), HTTP
+delivery (`transport`) and async scheduling (`worker`). A PostgreSQL trigger
+commits events with business rows; a dedicated two-connection pool and four
+concurrent sends keep outbound work independent of API and panel traffic.
+See [events and webhooks](webhooks.md) for delivery guarantees and limits.
 
 Panel wire DTOs live in `admin/src/contracts.rs` and the existing structure/DDL
 types. Their generated TypeScript and JSON Schemas are versioned with the UI;

@@ -1,10 +1,12 @@
 //! Integration test harness: starts a real Postgres 17 (testcontainers),
 //! applies the migrations and builds the same `Router` as production.
 //!
-//! Requires Docker to be running.
+//! Uses Docker by default, or isolated databases in a disposable cluster set
+//! through NELCOTA_TEST_DATABASE_URL.
 #![allow(dead_code)]
 
 pub mod panel;
+mod postgres;
 
 use std::{sync::Arc, time::Duration};
 
@@ -173,7 +175,8 @@ pub struct TestApp {
     pub storage: nelcota_storage::StorageState,
     /// Root of the disk store.
     pub storage_dir: std::path::PathBuf,
-    _container: ContainerAsync<Postgres>,
+    _container: Option<ContainerAsync<Postgres>>,
+    _external_database: Option<postgres::ExternalDatabase>,
 }
 
 pub struct Reply {
@@ -189,28 +192,38 @@ impl TestApp {
     }
 
     pub async fn spawn_with(options: Options) -> Self {
-        let container = Postgres::default()
-            .with_tag("17-alpine")
-            .with_cmd([
-                "postgres",
-                "-c",
-                "fsync=off",
-                "-c",
-                "shared_preload_libraries=pg_stat_statements",
-            ])
-            .start()
-            .await
-            .expect("Docker must be running for the integration tests");
-        let host = container.get_host().await.unwrap();
-        let port = container.get_host_port_ipv4(5432).await.unwrap();
-        let admin: tokio_postgres::Config =
-            format!("postgres://postgres:postgres@{host}:{port}/postgres")
-                .parse()
-                .unwrap();
+        let (container, external_database, admin) =
+            if let Ok(url) = std::env::var("NELCOTA_TEST_DATABASE_URL") {
+                let database = postgres::ExternalDatabase::create(&url).await;
+                let config = database.config();
+                (None, Some(database), config)
+            } else {
+                let container = Postgres::default()
+                    .with_tag("17-alpine")
+                    .with_cmd([
+                        "postgres",
+                        "-c",
+                        "fsync=off",
+                        "-c",
+                        "shared_preload_libraries=pg_stat_statements",
+                    ])
+                    .start()
+                    .await
+                    .expect("Docker must be running for the integration tests");
+                let host = container.get_host().await.unwrap();
+                let port = container.get_host_port_ipv4(5432).await.unwrap();
+                let admin: tokio_postgres::Config =
+                    format!("postgres://postgres:postgres@{host}:{port}/postgres")
+                        .parse()
+                        .unwrap();
+                (Some(container), None, admin)
+            };
 
-        db::bootstrap(&admin, AUTHENTICATOR_PASSWORD, 10)
-            .await
-            .unwrap();
+        if external_database.is_none() {
+            db::bootstrap(&admin, AUTHENTICATOR_PASSWORD, 10)
+                .await
+                .unwrap();
+        }
 
         // Fixture: the example table + one row per user, inserted as the
         // superuser (which bypasses RLS).
@@ -260,6 +273,7 @@ impl TestApp {
         };
         let passwords = Arc::new(Passwords::new(2));
         let panel = nelcota_admin::AdminState {
+            webhooks: nelcota_webhooks::destination::Policy::default(),
             sql: Arc::default(),
             db: db::admin_pool(&admin, 2),
             db_config: admin.clone(),
@@ -370,6 +384,7 @@ impl TestApp {
             user_b,
             outbox,
             _container: container,
+            _external_database: external_database,
         }
     }
 

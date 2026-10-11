@@ -1,0 +1,11 @@
+Generated with the built-in image_gen tool.
+
+Use case: identity-preserve
+Asset type: Square GitHub organization profile avatar, 1024 x 1024 pixels.
+Primary request: Create a polished avatar for Nelcota using the exact existing mascot in the reference.
+Input images: Image 1 is the identity reference for the Nelcota mascot. Preserve its identity faithfully.
+Subject: The same friendly mint-green pear-shaped mascot with two rounded top tufts, short rounded arms and feet, large tilted cream oval eyes with dark brown pupils, thin curved eyebrows, tiny smiling mouth and gentle mint shading.
+Style/medium: Clean high-resolution 2D digital illustration, smooth crisp edges, restrained soft shading matching the original. Preserve silhouette, facial features, proportions, colors and friendly expression. Do not transform into 3D.
+Scene/backdrop: Solid deep forest green background complementing the mint-green mascot and the green brand palette.
+Composition/framing: One mascot centered, front view, full body. Mascot occupies about 74% of the canvas height, with generous even padding. Entire silhouette, tufts, arms and feet must fit safely inside a centered circular avatar crop. Face immediately readable at 40 pixels.
+Constraints: Single mascot only. No text, no lettering, no border, no badges, no additional props, no watermark. Produce one square profile image. Background must be opaque.

@@ -4246,5 +4246,684 @@
     ],
     "title": "UsersResponse",
     "type": "object"
+  },
+  "WebhookAttempt": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "duration_ms": {
+        "format": "int64",
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "error": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "finished_at": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "number": {
+        "format": "int32",
+        "type": "integer"
+      },
+      "started_at": {
+        "type": "string"
+      },
+      "status_code": {
+        "format": "int32",
+        "type": [
+          "integer",
+          "null"
+        ]
+      }
+    },
+    "required": [
+      "number",
+      "started_at",
+      "finished_at",
+      "status_code",
+      "duration_ms",
+      "error"
+    ],
+    "title": "WebhookAttempt",
+    "type": "object"
+  },
+  "WebhookCleared": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "deleted": {
+        "format": "uint64",
+        "minimum": 0,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "deleted"
+    ],
+    "title": "WebhookCleared",
+    "type": "object"
+  },
+  "WebhookDeliveries": {
+    "$defs": {
+      "WebhookDelivery": {
+        "properties": {
+          "attempts": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "endpoint_enabled": {
+            "type": "boolean"
+          },
+          "endpoint_id": {
+            "type": "string"
+          },
+          "endpoint_name": {
+            "type": "string"
+          },
+          "event": {
+            "type": "string"
+          },
+          "event_id": {
+            "type": "string"
+          },
+          "finished_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "last_error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "last_status": {
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "max_attempts": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "next_attempt_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "replay_of": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "schema": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "table": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "endpoint_id",
+          "endpoint_name",
+          "endpoint_enabled",
+          "event_id",
+          "replay_of",
+          "schema",
+          "table",
+          "event",
+          "url",
+          "status",
+          "attempts",
+          "max_attempts",
+          "created_at",
+          "next_attempt_at",
+          "finished_at",
+          "last_status",
+          "last_error"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "deliveries": {
+        "items": {
+          "$ref": "#/$defs/WebhookDelivery"
+        },
+        "type": "array"
+      },
+      "next_cursor": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "required": [
+      "deliveries",
+      "next_cursor"
+    ],
+    "title": "WebhookDeliveries",
+    "type": "object"
+  },
+  "WebhookDelivery": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "attempts": {
+        "format": "int32",
+        "type": "integer"
+      },
+      "created_at": {
+        "type": "string"
+      },
+      "endpoint_enabled": {
+        "type": "boolean"
+      },
+      "endpoint_id": {
+        "type": "string"
+      },
+      "endpoint_name": {
+        "type": "string"
+      },
+      "event": {
+        "type": "string"
+      },
+      "event_id": {
+        "type": "string"
+      },
+      "finished_at": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "id": {
+        "type": "string"
+      },
+      "last_error": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "last_status": {
+        "format": "int32",
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "max_attempts": {
+        "format": "int32",
+        "type": "integer"
+      },
+      "next_attempt_at": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "replay_of": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "schema": {
+        "type": "string"
+      },
+      "status": {
+        "type": "string"
+      },
+      "table": {
+        "type": "string"
+      },
+      "url": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "endpoint_id",
+      "endpoint_name",
+      "endpoint_enabled",
+      "event_id",
+      "replay_of",
+      "schema",
+      "table",
+      "event",
+      "url",
+      "status",
+      "attempts",
+      "max_attempts",
+      "created_at",
+      "next_attempt_at",
+      "finished_at",
+      "last_status",
+      "last_error"
+    ],
+    "title": "WebhookDelivery",
+    "type": "object"
+  },
+  "WebhookDetail": {
+    "$defs": {
+      "WebhookAttempt": {
+        "properties": {
+          "duration_ms": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "finished_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "number": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "started_at": {
+            "type": "string"
+          },
+          "status_code": {
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "number",
+          "started_at",
+          "finished_at",
+          "status_code",
+          "duration_ms",
+          "error"
+        ],
+        "type": "object"
+      },
+      "WebhookDelivery": {
+        "properties": {
+          "attempts": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "endpoint_enabled": {
+            "type": "boolean"
+          },
+          "endpoint_id": {
+            "type": "string"
+          },
+          "endpoint_name": {
+            "type": "string"
+          },
+          "event": {
+            "type": "string"
+          },
+          "event_id": {
+            "type": "string"
+          },
+          "finished_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "last_error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "last_status": {
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "max_attempts": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "next_attempt_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "replay_of": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "schema": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "table": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "endpoint_id",
+          "endpoint_name",
+          "endpoint_enabled",
+          "event_id",
+          "replay_of",
+          "schema",
+          "table",
+          "event",
+          "url",
+          "status",
+          "attempts",
+          "max_attempts",
+          "created_at",
+          "next_attempt_at",
+          "finished_at",
+          "last_status",
+          "last_error"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "attempts": {
+        "items": {
+          "$ref": "#/$defs/WebhookAttempt"
+        },
+        "type": "array"
+      },
+      "delivery": {
+        "$ref": "#/$defs/WebhookDelivery"
+      },
+      "payload": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "delivery",
+      "payload",
+      "attempts"
+    ],
+    "title": "WebhookDetail",
+    "type": "object"
+  },
+  "WebhookEndpoint": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "created_at": {
+        "type": "string"
+      },
+      "enabled": {
+        "type": "boolean"
+      },
+      "events": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "id": {
+        "type": "string"
+      },
+      "max_attempts": {
+        "format": "int32",
+        "type": "integer"
+      },
+      "name": {
+        "type": "string"
+      },
+      "schema": {
+        "type": "string"
+      },
+      "table": {
+        "type": "string"
+      },
+      "table_available": {
+        "type": "boolean"
+      },
+      "url": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "name",
+      "schema",
+      "table",
+      "table_available",
+      "url",
+      "events",
+      "enabled",
+      "max_attempts",
+      "created_at"
+    ],
+    "title": "WebhookEndpoint",
+    "type": "object"
+  },
+  "WebhookEndpoints": {
+    "$defs": {
+      "WebhookEndpoint": {
+        "properties": {
+          "created_at": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "events": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "id": {
+            "type": "string"
+          },
+          "max_attempts": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "schema": {
+            "type": "string"
+          },
+          "table": {
+            "type": "string"
+          },
+          "table_available": {
+            "type": "boolean"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "schema",
+          "table",
+          "table_available",
+          "url",
+          "events",
+          "enabled",
+          "max_attempts",
+          "created_at"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "allow_loopback": {
+        "type": "boolean"
+      },
+      "endpoints": {
+        "items": {
+          "$ref": "#/$defs/WebhookEndpoint"
+        },
+        "type": "array"
+      },
+      "outstanding": {
+        "format": "int64",
+        "type": "integer"
+      },
+      "retained": {
+        "format": "int64",
+        "type": "integer"
+      },
+      "tables": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "endpoints",
+      "tables",
+      "allow_loopback",
+      "outstanding",
+      "retained"
+    ],
+    "title": "WebhookEndpoints",
+    "type": "object"
+  },
+  "WebhookReplay": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "id": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "title": "WebhookReplay",
+    "type": "object"
+  },
+  "WebhookSecret": {
+    "$defs": {
+      "WebhookEndpoint": {
+        "properties": {
+          "created_at": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "events": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "id": {
+            "type": "string"
+          },
+          "max_attempts": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "schema": {
+            "type": "string"
+          },
+          "table": {
+            "type": "string"
+          },
+          "table_available": {
+            "type": "boolean"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "schema",
+          "table",
+          "table_available",
+          "url",
+          "events",
+          "enabled",
+          "max_attempts",
+          "created_at"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "endpoint": {
+        "$ref": "#/$defs/WebhookEndpoint"
+      },
+      "secret": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "endpoint",
+      "secret"
+    ],
+    "title": "WebhookSecret",
+    "type": "object"
   }
 }

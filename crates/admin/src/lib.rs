@@ -34,6 +34,7 @@ mod storage_access;
 mod tables;
 mod tokens;
 mod users;
+mod webhooks;
 
 pub use denied::{DeniedLog, now_rfc3339};
 pub use metrics::{Area, Metrics};
@@ -67,6 +68,24 @@ pub fn router(state: AdminState) -> Router {
         .route("/admin/api/sign-in", get(sign_in::get))
         .route("/admin/api/denied", get(denied::list))
         .route("/admin/api/metrics", get(metrics::get))
+        .route(
+            "/admin/api/webhooks",
+            get(webhooks::list).post(webhooks::create),
+        )
+        .route(
+            "/admin/api/webhooks/deliveries",
+            get(webhooks::history).delete(webhooks::clear_history),
+        )
+        .route("/admin/api/webhooks/deliveries/{id}", get(webhooks::detail))
+        .route(
+            "/admin/api/webhooks/deliveries/{id}/replay",
+            post(webhooks::replay),
+        )
+        .route(
+            "/admin/api/webhooks/{id}",
+            put(webhooks::update).delete(webhooks::delete),
+        )
+        .route("/admin/api/webhooks/{id}/rotate", post(webhooks::rotate))
         .route(
             "/admin/api/tables",
             get(tables::tables).post(tables::create),

@@ -17,6 +17,7 @@ nelcota-api = { path = "crates/api" }
 nelcota-cli = { path = "crates/cli" }
 nelcota-admin = { path = "crates/admin" }
 nelcota-storage = { path = "crates/storage" }
+nelcota-webhooks = { path = "crates/webhooks" }
 
 anyhow = "1.0.104"
 argon2 = "0.6.0"
@@ -34,6 +35,7 @@ getrandom = "0.4.3"
 # Keyed GCRA rate limiter, in memory. std clock only: no quanta, no jitter (rand).
 governor = { version = "0.10.4", default-features = false, features = ["std", "dashmap"] }
 http-body-util = "0.1.5"
+hmac = "0.13.0"
 # HTTP client for the panel's project health probes (hyper is already in the tree via axum).
 hyper-util = { version = "0.1.21", default-features = false, features = ["client-legacy", "http1", "tokio"] }
 jsonwebtoken = { version = "11.1.0", default-features = false, features = ["rust_crypto", "use_pem"] }

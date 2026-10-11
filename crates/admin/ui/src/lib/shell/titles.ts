@@ -14,12 +14,15 @@ const titles: Record<string, MessageKey> = {
   '/projects': 'shell.pages.projects',
   '/connect': 'shell.pages.connect',
   '/guides': 'shell.pages.guides',
+  '/webhooks': 'shell.pages.webhooks',
 }
 
 export type Crumb = { label: string; path?: string }
 
 /** Breadcrumb of the current page (topbar); joined, it is the tab title. */
 export function crumbsFor(path: string): Crumb[] {
+  const delivery = match('/webhooks/deliveries/:id', path.replace(/\/$/, ''))
+  if (delivery) return [{ label: t('shell.pages.webhooks'), path: '/webhooks?tab=deliveries' }, { label: t('webhooks.deliveryTitle', { id: delivery.id }) }]
   const guide = match('/guides/:id', path.replace(/\/$/, ''))
   const guideTitle = `guides.entries.${guide?.id}.title`
   if (guide && hasMessage(guideTitle)) return [{ label: t('shell.pages.guides'), path: '/guides' }, { label: t(guideTitle as MessageKey) }]

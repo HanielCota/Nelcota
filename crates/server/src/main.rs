@@ -148,6 +148,9 @@ async fn serve(config: Config) -> anyhow::Result<()> {
     let admin = match (&config.admin_email, &config.admin_password_hash) {
         (Some(email), Some(hash)) if !email.is_empty() && !hash.expose().is_empty() => {
             Some(nelcota_admin::AdminState {
+                webhooks: nelcota_webhooks::destination::Policy {
+                    allow_loopback: config.webhooks_allow_loopback,
+                },
                 sql: Arc::default(),
                 // 3: a long export holds its own and the panel keeps going with the others.
                 db: db::admin_pool(&admin, 3),
@@ -195,12 +198,23 @@ async fn serve(config: Config) -> anyhow::Result<()> {
         .await
         .with_context(|| format!("could not listen on {}", config.listen))?;
     tracing::info!(addr = %config.listen, "nelcota is up");
-    axum::serve(
+    // A dedicated pool isolates dispatch/retention from API and panel SQL.
+    let webhooks = nelcota_webhooks::Worker::new(
+        db::admin_pool(&config.database_config()?, 2),
+        nelcota_webhooks::destination::Policy {
+            allow_loopback: config.webhooks_allow_loopback,
+        },
+    )
+    .context("could not initialize webhook dispatch")?
+    .spawn();
+    let result = axum::serve(
         listener,
         router.into_make_service_with_connect_info::<SocketAddr>(),
     )
     .with_graceful_shutdown(shutdown_signal())
-    .await?;
+    .await;
+    webhooks.shutdown().await;
+    result?;
     Ok(())
 }
 

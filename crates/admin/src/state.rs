@@ -6,6 +6,8 @@ use nelcota_auth::{Passwords, RateLimiter};
 use std::sync::Arc;
 #[derive(Clone)]
 pub struct AdminState {
+    /// Server-owned egress policy, also used by the background worker.
+    pub webhooks: nelcota_webhooks::destination::Policy,
     /// Bounded SQL executions shared by all panel sessions.
     pub sql: Arc<SqlExecutor>,
     /// Admin pool (role that owns the schema).

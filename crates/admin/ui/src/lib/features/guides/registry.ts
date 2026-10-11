@@ -11,6 +11,7 @@ export const guides = [
   { id: 'auth', group: 'develop', source: 'docs/schema-auth.md', action: '/sign-in' },
   { id: 'roles', group: 'develop', source: 'docs/jwt-and-roles.md', action: '/policies' },
   { id: 'storage', group: 'develop', source: 'docs/storage.md', action: '/storage' },
+  { id: 'webhooks', group: 'develop', source: 'docs/webhooks.md', action: '/webhooks' },
   { id: 'sdk-rust', group: 'develop', source: 'sdk/rust/README.md', action: '/connect' },
   { id: 'rust-start', group: 'develop', source: 'sdk/rust/docs/quickstart.pt-BR.md', language: 'pt-BR', action: '/connect' },
   { id: 'example', group: 'develop', source: 'examples/notes.sql', code: 'sql', action: '/sql' },

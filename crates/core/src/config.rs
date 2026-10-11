@@ -132,6 +132,9 @@ pub struct Config {
     /// `statement_timeout` of the API connections.
     pub statement_timeout_secs: u64,
     pub log_format: LogFormat,
+    /// Development-only HTTP webhooks to localhost/127.0.0.1/::1. LAN and
+    /// metadata addresses stay blocked. Public destinations require HTTPS.
+    pub webhooks_allow_loopback: bool,
     /// File storage: `off`, `disk` or `s3`.
     pub storage_backend: StorageBackend,
     /// Directory of the disk backend.
@@ -205,6 +208,7 @@ impl Default for Config {
             request_timeout_secs: 15,
             statement_timeout_secs: 10,
             log_format: LogFormat::Text,
+            webhooks_allow_loopback: false,
             storage_backend: StorageBackend::Off,
             storage_dir: None,
             storage_s3_endpoint: None,

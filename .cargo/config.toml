@@ -1,0 +1,7 @@
+[build]
+# Cap parallel rustc processes so local builds don't saturate the machine.
+jobs = 4
+
+[env]
+# Default for `cargo test`; `--test-threads=N` on the command line still wins.
+RUST_TEST_THREADS = "2"

@@ -3,7 +3,11 @@ import type { CodeLang } from '$lib/components/shared/highlight'
 import { guideLink } from './content'
 import { translateTokens, type TranslationCatalog } from './prose'
 
-const assets = import.meta.glob<string>('../../../../../../../docs/assets/*.png', { query: '?url', import: 'default', eager: true })
+// Branding drafts are kept in the repository but are not guide illustrations.
+const assets = import.meta.glob<string>([
+  '../../../../../../../docs/assets/*.png',
+  '!../../../../../../../docs/assets/nelcota-github-avatar*.png',
+], { query: '?url', import: 'default', eager: true })
 const escape = (value: string) => value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;')
 // Anchor IDs have their own character allowlist; they are never parsed as HTML.
 export const headingSlug = (text: string) => text.toLowerCase().replace(/[^\p{L}\p{N}_\-\s]/gu, '').replace(/\s/g, '-')

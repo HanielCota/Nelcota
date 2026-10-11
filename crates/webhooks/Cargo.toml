@@ -1,0 +1,29 @@
+[package]
+name = "nelcota-webhooks"
+description = "Transactional database events, durable deliveries and bounded signed HTTP dispatch."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+nelcota-core.workspace = true
+deadpool-postgres.workspace = true
+getrandom.workspace = true
+hmac.workspace = true
+reqwest.workspace = true
+rustls.workspace = true
+webpki-root-certs = "1.0.9"
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+tokio = { workspace = true, features = ["time", "sync"] }
+tokio-postgres.workspace = true
+tracing.workspace = true
+url.workspace = true
+uuid = { workspace = true, features = ["v4"] }
+
+[lints]
+workspace = true

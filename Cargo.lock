@@ -2054,6 +2054,7 @@ dependencies = [
  "nelcota-auth",
  "nelcota-core",
  "nelcota-storage",
+ "nelcota-webhooks",
  "refinery",
  "rust-embed",
  "schemars 1.2.2",
@@ -2200,6 +2201,7 @@ dependencies = [
  "nelcota-client",
  "nelcota-core",
  "nelcota-storage",
+ "nelcota-webhooks",
  "refinery",
  "reqwest",
  "rustls",
@@ -2243,6 +2245,28 @@ dependencies = [
  "tracing",
  "unicode-normalization",
  "uuid",
+]
+
+[[package]]
+name = "nelcota-webhooks"
+version = "0.3.1"
+dependencies = [
+ "deadpool-postgres",
+ "getrandom 0.4.3",
+ "hmac 0.13.0",
+ "nelcota-core",
+ "reqwest",
+ "rustls",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "thiserror 2.0.21",
+ "tokio",
+ "tokio-postgres",
+ "tracing",
+ "url",
+ "uuid",
+ "webpki-root-certs",
 ]
 
 [[package]]

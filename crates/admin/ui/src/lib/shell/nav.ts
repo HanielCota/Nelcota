@@ -11,6 +11,7 @@ import Plug from '@lucide/svelte/icons/plug'
 import HardDrive from '@lucide/svelte/icons/hard-drive'
 import LogIn from '@lucide/svelte/icons/log-in'
 import BookOpen from '@lucide/svelte/icons/book-open'
+import Webhook from '@lucide/svelte/icons/webhook'
 import type { MessageKey } from '$lib/i18n/index.svelte'
 import { route } from '$lib/router.svelte'
 
@@ -40,6 +41,7 @@ export const navPills: NavItem[] = [
   { title: 'shell.pages.storage', pill: 'shell.pills.storage', path: '/storage', icon: HardDrive },
   { title: 'shell.pages.users', pill: 'shell.pills.users', path: '/users', icon: Users, also: ['/sign-in'] },
   { title: 'shell.pages.policies', pill: 'shell.pills.policies', path: '/policies', icon: ShieldCheck },
+  { title: 'shell.pages.webhooks', pill: 'shell.pills.webhooks', path: '/webhooks', icon: Webhook },
   { title: 'shell.pages.connect', pill: 'shell.pills.connect', path: '/connect', icon: Plug },
 ]
 

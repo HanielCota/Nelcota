@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { svelte } from '@sveltejs/vite-plugin-svelte'
 import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath, URL } from 'node:url'
@@ -40,4 +41,6 @@ export default defineConfig({
     // to each page fast (the e2e tests open many pages in parallel).
     warmup: { clientFiles: ['./src/main.ts', './src/lib/shell/**/*.svelte', './src/lib/features/**/*.svelte'] },
   },
+  // The default (CPUs - 1 workers) saturates dev machines when Rust tests run too.
+  test: { maxWorkers: 2 },
 })
