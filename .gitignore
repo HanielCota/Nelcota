@@ -14,3 +14,4 @@ sdk/typescript/test/contract/generated/
 # Local scratch output (screenshots, browser logs, layout backups)
 /output/
 /.playwright-cli/
+/.claude/worktrees/

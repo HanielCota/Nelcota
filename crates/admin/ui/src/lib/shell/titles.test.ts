@@ -11,6 +11,7 @@ describe('documentTitle', () => {
     expect(title('/sql')).toBe('Editor SQL · Nelcota')
     expect(title('/migrations')).toBe('Migrações · Nelcota')
     expect(title('/users/')).toBe('Usuários · Nelcota')
+    expect(title('/guides/storage')).toBe('Arquivos e S3 · Guias e referências · Nelcota')
   })
 
   it('puts the most specific part first (fits the tab)', () => {
@@ -28,5 +29,6 @@ describe('documentTitle', () => {
     i18n.locale = 'en'
     expect(title('/tables/orders/structure')).toBe('Structure · orders · Tables · Nelcota')
     expect(title('/nope')).toBe('Page not found · Nelcota')
+    expect(title('/guides/sdk')).toBe('JavaScript and TypeScript SDK · Guides and references · Nelcota')
   })
 })

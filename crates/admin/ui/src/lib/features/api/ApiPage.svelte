@@ -3,7 +3,6 @@
   import * as Select from '$lib/components/ui/select'
   import BookOpen from '@lucide/svelte/icons/book-open'
   import Plug from '@lucide/svelte/icons/plug'
-  import ArrowUpRight from '@lucide/svelte/icons/arrow-up-right'
   import Globe from '@lucide/svelte/icons/globe'
   import UserRound from '@lucide/svelte/icons/user-round'
   import Server from '@lucide/svelte/icons/server'
@@ -36,7 +35,6 @@
   // The SDK is the recommended way in; curl and plain fetch stay a click away.
   const lang = $derived<Lang>(route.query.get('lang') === 'js' ? 'js' : route.query.get('lang') === 'curl' ? 'curl' : 'ts')
   const setup = sdkSetup(base)
-  const sdkDocs = 'https://github.com/HanielCota/Nelcota/blob/main/sdk/typescript/README.md'
   const topic = $derived(route.query.get('topic') === 'auth' ? 'auth' : 'tables')
   const snippets = $derived(topic === 'auth' ? authSnippets(base) : snippetsResource.data ?? [])
   const tableError = $derived(tablesResource.error ? errorMessage(tablesResource.error) : '')
@@ -137,8 +135,8 @@
   <PageHeader title={t('connect.title')} description={t('connect.description')}>
     {#snippet actions()}
       <Button href="#api-sdk"><Plug data-icon="inline-start" aria-hidden="true" />{t('connect.start')}</Button>
-      <Button variant="outline" href="/rest/v1/" target="_blank" rel="noopener">
-        <BookOpen data-icon="inline-start" aria-hidden="true" />{t('connect.openapi')}<ArrowUpRight data-icon="inline-end" aria-hidden="true" />
+      <Button variant="outline" href={href('/guides/openapi')}>
+        <BookOpen data-icon="inline-start" aria-hidden="true" />{t('connect.openapi')}
       </Button>
     {/snippet}
   </PageHeader>
@@ -210,7 +208,7 @@
           <h2 class="text-lg font-semibold">{t('connect.sdk.title')}</h2>
           <p class="text-sm text-muted-foreground">
             {t('connect.sdk.text')}
-            <a class="underline underline-offset-4 hover:text-foreground" href={sdkDocs} target="_blank" rel="noopener">{t('connect.sdk.docs')}</a>
+            <a class="underline underline-offset-4 hover:text-foreground" href={href('/guides/sdk')}>{t('connect.sdk.docs')}</a>
           </p>
         </div>
         <ol class="grid gap-5">

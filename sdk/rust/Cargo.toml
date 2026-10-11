@@ -15,7 +15,7 @@ include = ["src/**", "examples/**", "tests/**", "test/**", "README.md", "CHANGEL
 base64.workspace = true
 bytes.workspace = true
 getrandom.workspace = true
-httpdate = "1.0"
+httpdate = "1.0.3"
 reqwest = { workspace = true, features = ["json", "stream"] }
 rustls.workspace = true
 serde.workspace = true
@@ -23,10 +23,10 @@ serde_json = { workspace = true, features = ["arbitrary_precision"] }
 sha2.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, features = ["fs", "io-util", "sync", "time"] }
-tokio-util = { version = "0.7", features = ["rt", "io"] }
-unicode-normalization = "0.1"
+tokio-util = { version = "0.7.20", features = ["rt", "io"] }
+unicode-normalization = "0.1.25"
 url.workspace = true
-webpki-roots = "1"
+webpki-roots = "1.0.9"
 
 [dev-dependencies]
 axum.workspace = true

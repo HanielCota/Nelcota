@@ -133,6 +133,31 @@ Use JSON export when you need the original text without this neutralization.
   the token. Reads that RLS filters are not refusals (they return fewer rows)
   and do not show here.
 
+## Guides and references
+
+The book icon in the top bar opens **Guides and references** at `/admin/guides`.
+The reader includes the project documentation, JavaScript/TypeScript and Rust
+SDK references, SQL examples and server recipes. Search matches the full text,
+code blocks have copy buttons, and a table of contents links to each section.
+On phones, a guide selector replaces the sidebar. Guides and references follow
+the panel language, with Portuguese translations of the English sources. Code
+examples, inline code, URLs and section identifiers remain unchanged. Translations
+live in `docs/i18n/pt-BR/`; `npm run guides:check` verifies every prose fragment
+against its source and fails on missing or outdated translations. Code-only
+changes flow straight from the source without requiring a translation update.
+
+SDK help on the API page and the S3 guide on the Storage page open in this
+reader. Links between repository documents stay in the panel, including
+section links that can be shared and survive a reload. Sources and images are
+bundled into the panel build, so reading them needs no GitHub access.
+
+**API → OpenAPI documentation**, also available from the command palette,
+opens the live reference inside the panel. It fetches `/rest/v1/` as `anon`,
+shows available routes, parameters, request bodies, responses and schema models,
+and can download the complete JSON. The panel administrator session does not
+grant extra API privileges. An empty catalog points to the table access screen;
+a failed request can be retried.
+
 ## RLS warnings
 
 - **without RLS**: a regular table with a GRANT to `anon` or `authenticated`
@@ -161,7 +186,8 @@ because of the `$`), followed by `docker compose up -d --force-recreate app`.
   which requires the session. Every state-changing request must come from the
   same origin.
 - CSP without inline scripts (`script-src 'self'`), `X-Frame-Options: DENY`.
-- Svelte escapes all text; the panel never uses `{@html}`.
+- Svelte escapes interface text. The guide reader renders Markdown with raw HTML
+  escaped and unsafe links rejected; code examples are rendered as text.
 - DDL made by the panel (tables, columns, policies): the interface sends a
   typed specification, and the server builds the SQL with identifiers always
   quoted and types from a closed list. Expressions (`DEFAULT`, `USING`,

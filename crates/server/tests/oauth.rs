@@ -107,7 +107,7 @@ async fn token(
     if good {
         (
             StatusCode::OK,
-            Json(json!({ "access_token": "provider-token" })),
+            Json(json!({ "access_token": "provider-token", "token_type": "bearer" })),
         )
     } else {
         (

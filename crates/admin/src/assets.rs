@@ -35,13 +35,17 @@ fn ui_file(path: &str) -> Response {
         .into_response()
 }
 
-/// Files with a hash in their name (built by Vite): long, immutable cache.
+/// Hashed assets are immutable; the reference's HTML always revalidates.
 pub(crate) async fn asset(Path(file): Path<String>) -> Response {
     let mut response = ui_file(&format!("assets/{file}"));
     if response.status().is_success() {
         response.headers_mut().insert(
             header::CACHE_CONTROL,
-            HeaderValue::from_static("public, max-age=31536000, immutable"),
+            if file.ends_with(".html") {
+                HeaderValue::from_static("no-cache")
+            } else {
+                HeaderValue::from_static("public, max-age=31536000, immutable")
+            },
         );
     }
     response

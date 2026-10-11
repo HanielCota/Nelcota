@@ -178,7 +178,10 @@ cd crates/admin/ui && npm install && npm run dev
 <br>
 
 The panel build (`crates/admin/ui/dist`) is versioned: compiling the binary
-does not need Node.
+does not need Node. Running `nelcota dev` or `nelcota serve` serves the panel,
+API reference and all browser assets directly from Rust at `/admin/`.
+Node is only needed when rebuilding the panel or running its development tools;
+no Vite or Node server is needed to use the application.
 
 For hot reload, run the panel command in a second terminal and open
 `http://127.0.0.1:5173/admin/`. Vite proxies the API to `http://127.0.0.1:8000`;

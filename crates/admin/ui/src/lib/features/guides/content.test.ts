@@ -1,0 +1,50 @@
+import { describe, expect, it } from 'vitest'
+import { guides, guideLink, guideSource } from './content'
+import { headingSlug, readMarkdown } from './markdown'
+
+describe('bundled guides', () => {
+  it('includes every reference without fetching remote documentation', () => {
+    for (const guide of guides.filter(guide => guide.id !== 'openapi')) {
+      expect(guideSource(guide), guide.source).not.toBe('')
+      if (!('code' in guide)) expect(readMarkdown(guideSource(guide), guide.source).length, guide.source).toBeGreaterThan(0)
+    }
+  })
+
+  it('keeps relative and GitHub documentation links in the panel, including sections', () => {
+    expect(guideLink('api.md#errors', 'docs/storage.md')).toBe('/admin/guides/api?section=errors')
+    expect(guideLink('docs/contract.md', 'sdk/typescript/README.md')).toBe('/admin/guides/sdk-contract')
+    expect(guideLink('https://github.com/HanielCota/Nelcota/blob/main/docs/storage.md', 'sdk/typescript/README.md')).toBe('/admin/guides/storage')
+    expect(guideLink('../examples/notes.sql', 'docs/quickstart.md')).toBe('/admin/guides/example')
+    expect(guideLink('#errors', 'docs/api.md')).toBe('/admin/guides/api?section=errors')
+    expect(guideLink('https://github.com/other/repo', 'docs/api.md')).toBeNull()
+    expect(guideLink('javascript:alert(1)', 'docs/api.md')).toBeNull()
+    expect(guideLink('%invalid', 'docs/api.md')).toBeNull()
+  })
+})
+
+describe('guide reader', () => {
+  it.each(['<script', '<<script>alert(1)</script>', '<scr<script>ipt>', '\" onfocus=\"alert(1)'])('limits anchor characters for malformed markup: %s', value => {
+    expect(headingSlug(value)).toMatch(/^[\p{L}\p{N}_-]*$/u)
+  })
+
+  it('keeps existing Unicode, code and punctuation heading anchors', () => {
+    expect(headingSlug('JWT e regras de acesso')).toBe('jwt-e-regras-de-acesso')
+    expect(headingSlug('`getUser()` — configuração')).toBe('getuser--configuração')
+  })
+
+  it('keeps code copyable and gives duplicate headings distinct anchors', () => {
+    const blocks = readMarkdown('# Title\n\n## Results and errors\n\n```ts\nconst value = "<script>"\n```\n\n## Results and errors', 'docs/api.md')
+    expect(blocks.filter(block => block.type === 'heading').map(block => block.id)).toEqual(['results-and-errors', 'results-and-errors-1'])
+    expect(blocks.find(block => block.type === 'code')).toEqual({ type: 'code', code: 'const value = "<script>"', lang: 'ts' })
+  })
+
+  it('renders scrollable tables and escapes raw HTML and unsafe links', () => {
+    const blocks = readMarkdown('| Key | Value |\n| --- | --- |\n| a | b |\n\n<script>alert(1)</script>\n\n[Unsafe](javascript:alert) [API](api.md)', 'docs/storage.md')
+    const html = blocks.filter(block => block.type === 'html').map(block => block.html).join('')
+    expect(html).toContain('class="guide-table"')
+    expect(html).toContain('&lt;script&gt;')
+    expect(html).not.toContain('<script>')
+    expect(html).not.toContain('href="javascript:')
+    expect(html).toContain('href="/admin/guides/api"')
+  })
+})

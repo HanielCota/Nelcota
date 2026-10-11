@@ -1,10 +1,11 @@
 //! PKCE (RFC 7636) with S256, the only method accepted.
-use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
-use sha2::{Digest, Sha256};
+use oauth2::{PkceCodeChallenge, PkceCodeVerifier};
 
 /// The S256 challenge of a verifier: base64url(SHA-256(verifier)).
 pub(super) fn challenge(verifier: &str) -> String {
-    URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes()))
+    PkceCodeChallenge::from_code_verifier_sha256(&PkceCodeVerifier::new(verifier.into()))
+        .as_str()
+        .into()
 }
 
 /// A verifier as RFC 7636 defines it: 43 to 128 unreserved characters.

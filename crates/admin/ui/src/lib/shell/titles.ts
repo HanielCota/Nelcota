@@ -1,5 +1,5 @@
 // Page names: the topbar breadcrumb and the browser tab title.
-import { t, type MessageKey } from '$lib/i18n/index.svelte'
+import { hasMessage, t, type MessageKey } from '$lib/i18n/index.svelte'
 import { match } from '$lib/route-match'
 
 const titles: Record<string, MessageKey> = {
@@ -13,12 +13,16 @@ const titles: Record<string, MessageKey> = {
   '/policies': 'shell.pages.policies',
   '/projects': 'shell.pages.projects',
   '/connect': 'shell.pages.connect',
+  '/guides': 'shell.pages.guides',
 }
 
 export type Crumb = { label: string; path?: string }
 
 /** Breadcrumb of the current page (topbar); joined, it is the tab title. */
 export function crumbsFor(path: string): Crumb[] {
+  const guide = match('/guides/:id', path.replace(/\/$/, ''))
+  const guideTitle = `guides.entries.${guide?.id}.title`
+  if (guide && hasMessage(guideTitle)) return [{ label: t('shell.pages.guides'), path: '/guides' }, { label: t(guideTitle as MessageKey) }]
   const table = match('/tables/:name', path)
   if (table) return [{ label: t('shell.pages.tables'), path: '/tables' }, { label: table.name }]
   const bucket = match('/storage/:bucket', path)

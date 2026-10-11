@@ -25,6 +25,7 @@ import sql from './messages/sql'
 import palette from './messages/palette'
 import errors from './messages/errors'
 import guided from './messages/guided'
+import guides from './messages/guides'
 
 export type Locale = 'pt-BR' | 'en'
 export const LOCALES: Locale[] = ['pt-BR', 'en']
@@ -47,6 +48,7 @@ const catalogs = {
   palette,
   errors,
   guided,
+  guides,
 }
 
 /** `{ one, other }` entries pick a form from `params.count`. */

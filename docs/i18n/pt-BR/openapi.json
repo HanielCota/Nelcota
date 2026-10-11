@@ -1,0 +1,18 @@
+{
+  "Nelcota REST API": "API REST do Nelcota",
+  "API generated from the Postgres schema. Authorization: RLS. Send Authorization: Bearer <jwt>.": "API gerada a partir do esquema do Postgres. Autorização: RLS. Envie Authorization: Bearer <jwt>.",
+  "Postgres type: {}": "Tipo Postgres: {}",
+  "return=representation | return=minimal; count=exact; on POST, resolution=merge-duplicates | resolution=ignore-duplicates (upsert)": "return=representation | return=minimal; count=exact; em POST, resolution=merge-duplicates | resolution=ignore-duplicates (upsert)",
+  "Filter: eq, neq, gt, gte, lt, lte, like, ilike, in, is (e.g. eq.value, in.(a,b), not.is.null)": "Filtro: eq, neq, gt, gte, lt, lte, like, ilike, in, is (por exemplo eq.value, in.(a,b), not.is.null)",
+  "Group of filters joined with {}: ({logic}=(col.op.value,...)); nests with and(...)/or(...), negate with not.{logic}": "Grupo de filtros combinados com {}: ({logic}=(col.op.value,...)); aninha com and(...)/or(...), nega com not.{logic}",
+  "Columns: col1,col2 or *; embed related rows through foreign keys: customers(name), items(*), alias:table!fk_column(...), nested: orders(id,items(*)); filter, order and page embedded rows with items.qty=gt.1, items.order=qty.desc, items.limit=5": "Colunas: col1,col2 ou *; inclua linhas relacionadas por chaves estrangeiras: customers(name), items(*), alias:table!fk_column(...), aninhadas: orders(id,items(*)); filtre, ordene e pagine linhas embutidas com items.qty=gt.1, items.order=qty.desc, items.limit=5",
+  "col.asc|desc[.nullsfirst|nullslast],...": "col.asc|desc[.nullsfirst|nullslast],...",
+  "Visible rows (RLS)": "Linhas visíveis (RLS)",
+  "Upsert key: col1,col2 (a unique constraint); defaults to the primary key. Needs Prefer: resolution=...": "Chave do upsert: col1,col2 (uma restrição única); usa a chave primária por padrão. Exige Prefer: resolution=...",
+  "Created (body only with return=representation)": "Criado (corpo apenas com return=representation)",
+  "Updated (return=representation)": "Atualizado (return=representation)",
+  "Updated": "Atualizado",
+  "Deleted (return=representation)": "Excluído (return=representation)",
+  "Deleted": "Excluído",
+  "Result": "Resultado"
+}

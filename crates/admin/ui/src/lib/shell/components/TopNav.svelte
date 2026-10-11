@@ -2,6 +2,7 @@
   import * as Sheet from '$lib/components/ui/sheet'
   import Menu from '@lucide/svelte/icons/menu'
   import Search from '@lucide/svelte/icons/search'
+  import BookOpen from '@lucide/svelte/icons/book-open'
   import ProjectSwitcher from '$lib/features/projects/components/ProjectSwitcher.svelte'
   import AccountMenu from './AccountMenu.svelte'
   import { palette } from '$lib/shell/palette.svelte'
@@ -60,6 +61,7 @@
     </nav>
 
     <div class="flex min-w-0 items-center justify-end gap-2">
+      <a href={href('/guides')} aria-label={t('shell.pages.guides')} title={t('shell.pages.guides')} aria-current={isActive('/guides') ? 'page' : undefined} class={['grid size-10 shrink-0 place-items-center rounded-full transition-colors sm:size-14', isActive('/guides') ? 'bg-nav-active text-nav-active-foreground' : 'bg-nav text-muted-foreground hover:bg-accent hover:text-foreground']}><BookOpen class="size-5" aria-hidden="true" /></a>
       {@render search()}
       <AccountMenu />
     </div>

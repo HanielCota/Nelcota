@@ -32,6 +32,25 @@ async fn embedded_spa_with_security_headers() {
     assert_eq!(deep.status, StatusCode::OK);
     assert_eq!(deep.text, index.text);
 
+    let reference = app
+        .raw(
+            Method::GET,
+            "/admin/assets/reference.html",
+            &[],
+            String::new(),
+        )
+        .await;
+    assert_eq!(reference.status, StatusCode::OK);
+    assert_eq!(reference.headers[header::X_FRAME_OPTIONS], "SAMEORIGIN");
+    assert_eq!(reference.headers[header::CACHE_CONTROL], "no-cache");
+    let policy = reference.headers[header::CONTENT_SECURITY_POLICY]
+        .to_str()
+        .unwrap();
+    assert!(policy.contains("frame-ancestors 'self'"));
+    assert!(policy.contains("script-src 'self';"));
+    assert!(!reference.text.contains("<script>"));
+    assert!(reference.text.contains("/admin/assets/reference-"));
+
     // The referenced bundle exists, with an immutable cache.
     let script = index
         .text

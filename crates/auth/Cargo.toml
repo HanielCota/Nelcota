@@ -19,6 +19,8 @@ getrandom.workspace = true
 governor.workspace = true
 jsonwebtoken.workspace = true
 lettre.workspace = true
+oauth2.workspace = true
+openidconnect.workspace = true
 # Code exchange and profile requests to OAuth providers.
 reqwest.workspace = true
 rustls.workspace = true

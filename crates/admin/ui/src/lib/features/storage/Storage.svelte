@@ -12,7 +12,7 @@
   import Pencil from '@lucide/svelte/icons/pencil'
   import Trash2 from '@lucide/svelte/icons/trash-2'
   import ShieldCheck from '@lucide/svelte/icons/shield-check'
-  import ArrowUpRight from '@lucide/svelte/icons/arrow-up-right'
+  import ArrowRight from '@lucide/svelte/icons/arrow-right'
   import { Badge } from '$lib/components/ui/badge'
   import { toast } from 'svelte-sonner'
   import PageHeader from '$lib/components/shared/PageHeader.svelte'
@@ -29,7 +29,6 @@
   import type { Bucket, StorageOverview } from '$lib/types'
   import { errorMessage, intlLocale, t } from '$lib/i18n/index.svelte'
 
-  const STORAGE_DOCS = 'https://github.com/HanielCota/Nelcota/blob/main/docs/storage.md'
   const resource = new RemoteResource<StorageOverview>()
   const data = $derived(resource.data)
   const loading = $derived(resource.loading)
@@ -215,7 +214,7 @@
           <div class="grid min-w-0 gap-1">
             <h2 id="storage-disk-note" class="text-sm font-semibold">{t('storage.notes.disk.title')}</h2>
             <p class="text-sm text-muted-foreground">{t('storage.notes.disk.text')}</p>
-            <Button variant="outline" size="sm" class="mt-2 w-fit" href={STORAGE_DOCS} target="_blank" rel="noopener">{t('storage.notes.disk.action')}<ArrowUpRight data-icon="inline-end" aria-hidden="true" /></Button>
+            <Button variant="outline" size="sm" class="mt-2 w-fit" href={href('/guides/storage?section=turning-it-on')}>{t('storage.notes.disk.action')}<ArrowRight data-icon="inline-end" aria-hidden="true" /></Button>
           </div>
         </aside>
       {/if}

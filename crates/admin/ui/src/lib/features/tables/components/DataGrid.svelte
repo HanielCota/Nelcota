@@ -1,5 +1,6 @@
 <script lang="ts">
   import { tick } from 'svelte'
+  import { createTable, tableFeatures, columnVisibilityFeature, rowSelectionFeature } from '@tanstack/svelte-table'
   import { Checkbox } from '$lib/components/ui/checkbox'
   import Maximize2 from '@lucide/svelte/icons/maximize-2'
   import ArrowUpRight from '@lucide/svelte/icons/arrow-up-right'
@@ -41,11 +42,29 @@
     disabled?: boolean
   } = $props()
 
-  const columns = $derived(
-    data.table.columns
-      .filter((c) => !hidden.includes(c.name))
-      .map((c) => ({ column: c, kind: columnKind(c), width: columnWidth(c) })),
-  )
+  const selectionState = $derived(Object.fromEntries([...selected].flatMap(index => {
+    const row = data.rows[index]
+    return row ? [[rowKey(row, data.table.primary_key, index), true as const]] : []
+  })))
+  const table = createTable({
+    features: tableFeatures({ columnVisibilityFeature, rowSelectionFeature }),
+    get data() { return data.rows },
+    get columns() { return data.table.columns.map(column => ({ id: column.name, accessorFn: (row: RowData) => row[column.name] })) },
+    getRowId: (row, index) => rowKey(row, data.table.primary_key, index),
+    get enableRowSelection() { return data.table.editable && !disabled },
+    get state() {
+      return { columnVisibility: Object.fromEntries(hidden.map(name => [name, false])), rowSelection: selectionState }
+    },
+    onRowSelectionChange: updater => {
+      const next = typeof updater === 'function' ? updater(selectionState) : updater
+      selected = new Set(data.rows.flatMap((row, index) => next[rowKey(row, data.table.primary_key, index)] ? [index] : []))
+    },
+  })
+  const columns = $derived(table.getVisibleLeafColumns().map(visible => {
+    const column = data.table.columns.find(column => column.name === visible.id)!
+    return { column, kind: columnKind(column), width: columnWidth(column) }
+  }))
+  const gridRows = $derived(table.getRowModel().rows)
   const editable = $derived(data.table.editable)
 
   // Inline editing: the cell (row, column) being edited and the draft.
@@ -160,16 +179,11 @@
   }
 
   function toggleRow(index: number, on: boolean) {
-    if (disabled) return
-    const next = new Set(selected)
-    if (on) next.add(index)
-    else next.delete(index)
-    selected = next
+    if (!disabled) table.getRowModel().rows[index]?.toggleSelected(on)
   }
 
   function toggleAll(on: boolean) {
-    if (disabled) return
-    selected = on ? new Set(data.rows.map((_, i) => i)) : new Set()
+    if (!disabled) table.toggleAllPageRowsSelected(on)
   }
 
   const sortOf = (name: string) => (sort?.column === name ? (sort.desc ? 'desc' : 'asc') : null)
@@ -198,8 +212,8 @@
       {#if editable}
         <th class={[stickyCell, 'z-[2] bg-card px-3.5 py-2.5 text-left shadow-[inset_0_-1px_0_var(--border)]']}>
           <Checkbox
-            checked={selected.size > 0 && selected.size === data.rows.length}
-            indeterminate={selected.size > 0 && selected.size < data.rows.length}
+            checked={table.getIsAllPageRowsSelected()}
+            indeterminate={!table.getIsAllPageRowsSelected() && table.getIsSomePageRowsSelected()}
             onCheckedChange={(v) => toggleAll(v === true)}
             aria-label={t('tables.grid.selectAll')}
             {disabled}
@@ -223,8 +237,10 @@
     </tr>
   </thead>
   <tbody>
-    {#each data.rows as row, i (rowKey(row, data.table.primary_key, i))}
-      {@const isSelected = selected.has(i)}
+    {#each gridRows as gridRow (gridRow.id)}
+      {@const row = gridRow.original}
+      {@const i = gridRow.index}
+      {@const isSelected = gridRow.getIsSelected()}
       <tr aria-selected={editable ? isSelected : undefined} class={['group transition-colors', isSelected ? 'bg-brand/[0.07]' : 'hover:bg-muted/60']}>
         {#if editable}
           <td role="gridcell" class={[stickyCell, 'px-3.5 py-2', isSelected ? 'bg-[color-mix(in_oklch,var(--brand)_7%,var(--background))]' : 'group-hover:bg-[color-mix(in_oklch,var(--muted)_60%,var(--background))]']}>

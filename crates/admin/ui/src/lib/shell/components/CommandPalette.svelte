@@ -119,7 +119,7 @@
       <Command.Item value={t('palette.actions.themeKeywords')} onSelect={() => run(toggleMode)}>
         <SunMoon />{t('palette.actions.theme')}
       </Command.Item>
-      <Command.Item value={t('palette.actions.docsKeywords')} onSelect={() => run(() => window.open('/rest/v1/', '_blank', 'noopener'))}>
+      <Command.Item value={t('palette.actions.docsKeywords')} onSelect={() => run(() => navigate('/guides/openapi'))}>
         <BookOpen />{t('palette.actions.docs')}
       </Command.Item>
       <Command.Item value={t('palette.actions.signOutKeywords')} onSelect={() => run(logout)}>
