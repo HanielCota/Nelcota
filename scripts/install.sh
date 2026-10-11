@@ -1,7 +1,7 @@
 #!/bin/sh
 # nelcota installer: downloads the binary, checks the checksum and installs it.
 #
-#   curl -fsSL https://nelcota.com/install | sh
+#   curl -fsSL https://raw.githubusercontent.com/Nelcota/Nelcota/main/scripts/install.sh | sh
 #
 # Optional variables:
 #   NELCOTA_VERSION=0.3.0     version (default: the latest)

@@ -3,7 +3,7 @@
 **Fresh VPS → HTTPS in 3 commands.**
 
 ```sh
-curl -fsSL https://nelcota.com/install | sh     # binary (with checksum) + Docker if missing
+curl -fsSL https://raw.githubusercontent.com/Nelcota/Nelcota/main/scripts/install.sh | sh     # binary (with checksum) + Docker if missing
 mkdir -p /opt/nelcota && cd /opt/nelcota
 nelcota init api.yourdomain.com                 # creates the host and the first project
 nelcota up                                      # starts projects + Caddy, waits for the healthcheck
@@ -119,7 +119,7 @@ container, which is what can reach Postgres. Outside a host, they use
 On a small VPS that will only ever hold one project, Nelcota can skip Docker:
 
 ```sh
-curl -fsSL https://nelcota.com/install | NELCOTA_SKIP_DOCKER=1 sh
+curl -fsSL https://raw.githubusercontent.com/Nelcota/Nelcota/main/scripts/install.sh | NELCOTA_SKIP_DOCKER=1 sh
 mkdir -p /opt/nelcota && cd /opt/nelcota
 nelcota init api.yourdomain.com --runtime systemd
 nelcota up
@@ -235,7 +235,7 @@ with the project's `NELCOTA_VERSION` first:
   binary on a systemd host);
 - older target: refused, because the older app does not know the newer
   migrations. When the CLI itself is the older one, reinstall it
-  (`curl -fsSL https://nelcota.com/install | sh`); to go back on purpose, pass
+  (`curl -fsSL https://raw.githubusercontent.com/Nelcota/Nelcota/main/scripts/install.sh | sh`); to go back on purpose, pass
   `--allow-downgrade`;
 - `--dry-run` prints `current → target` for each project and changes nothing.
 

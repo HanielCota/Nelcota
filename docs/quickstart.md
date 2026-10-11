@@ -11,7 +11,7 @@ the client, Node 22+ or Rust.
 On Linux:
 
 ```sh
-curl -fsSL https://nelcota.com/install | NELCOTA_SKIP_DOCKER=1 sh   # keep your own Docker
+curl -fsSL https://raw.githubusercontent.com/Nelcota/Nelcota/main/scripts/install.sh | NELCOTA_SKIP_DOCKER=1 sh   # keep your own Docker
 ```
 
 On macOS or Windows, build it with Cargo (it installs the `nelcota` command):

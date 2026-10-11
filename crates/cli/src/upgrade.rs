@@ -52,7 +52,7 @@ pub fn run(
             let hint = if version.is_none() {
                 format!(
                     "this nelcota CLI ({this_binary}) is older than the app ({current}); \
-                     reinstall the CLI (curl -fsSL https://nelcota.com/install | sh) or pass \
+                     reinstall the CLI (curl -fsSL https://raw.githubusercontent.com/Nelcota/Nelcota/main/scripts/install.sh | sh) or pass \
                      --version"
                 )
             } else {

@@ -50,7 +50,7 @@ Plain Postgres + one Rust binary + a 5-minute deploy on a VPS.
 ## Deploy: fresh VPS → HTTPS
 
 ```sh
-curl -fsSL https://nelcota.com/install | sh
+curl -fsSL https://raw.githubusercontent.com/Nelcota/Nelcota/main/scripts/install.sh | sh
 nelcota init api.yourdomain.com
 nelcota up
 ```
