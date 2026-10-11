@@ -18,6 +18,7 @@ nelcota-api.workspace = true
 nelcota-cli.workspace = true
 nelcota-admin.workspace = true
 nelcota-storage.workspace = true
+nelcota-webhooks.workspace = true
 anyhow.workspace = true
 clap.workspace = true
 axum.workspace = true

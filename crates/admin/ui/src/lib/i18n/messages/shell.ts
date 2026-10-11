@@ -18,6 +18,7 @@ const ptBR = {
     notFound: 'Página não encontrada',
     signIn: 'Entrar',
     userSignIn: 'Login dos usuários',
+    webhooks: 'Eventos e webhooks',
   },
   // Short page names for the top pills; page titles keep the full names.
   pills: {
@@ -30,6 +31,7 @@ const ptBR = {
     users: 'Usuários',
     policies: 'Acesso',
     connect: 'API',
+    webhooks: 'Eventos',
   },
   nav: {
     main: 'Navegação principal',
@@ -86,6 +88,7 @@ const en: Messages<typeof ptBR> = {
     notFound: 'Page not found',
     signIn: 'Sign in',
     userSignIn: 'User sign-in',
+    webhooks: 'Events and webhooks',
   },
   pills: {
     database: 'Database',
@@ -97,6 +100,7 @@ const en: Messages<typeof ptBR> = {
     users: 'Users',
     policies: 'Access',
     connect: 'API',
+    webhooks: 'Events',
   },
   nav: {
     main: 'Main navigation',

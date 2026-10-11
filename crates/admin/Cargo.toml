@@ -12,6 +12,7 @@ nelcota-core.workspace = true
 nelcota-auth.workspace = true
 nelcota-storage.workspace = true
 nelcota-api.workspace = true
+nelcota-webhooks.workspace = true
 axum.workspace = true
 base64.workspace = true
 bytes.workspace = true

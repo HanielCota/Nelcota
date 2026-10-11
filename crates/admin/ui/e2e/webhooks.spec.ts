@@ -1,0 +1,129 @@
+import { expect, test, type Page } from '@playwright/test'
+import { fixture } from './fixtures'
+
+const stamp = '2026-10-11T12:00:00Z'
+const endpointId = '00000000-0000-4000-8000-000000000001'
+const eventId = '00000000-0000-4000-8000-000000000002'
+const secret = `whsec_${'a'.repeat(64)}`
+const deliveryId = '9223372036854775800'
+type Hook = { id: string; name: string; schema: string; table: string; table_available: boolean; url: string; events: string[]; enabled: boolean; max_attempts: number; created_at: string }
+const initial: Hook = { id: endpointId, name: 'Pedidos pagos', schema: 'public', table: 'notes', table_available: true, url: 'https://example.com/hook', events: ['INSERT', 'UPDATE'], enabled: true, max_attempts: 6, created_at: stamp }
+
+async function setup(page: Page, empty = false) {
+  await fixture(page)
+  let hooks: Hook[] = empty ? [] : [{ ...initial }]
+  let resent = false
+  const writes: { method: string; path: string; body: unknown }[] = []
+  const historyQueries: string[] = []
+  const delivery = () => ({ id: deliveryId, endpoint_id: endpointId, endpoint_name: initial.name, endpoint_enabled: hooks[0]?.enabled ?? false, event_id: eventId, replay_of: null, schema: 'public', table: 'notes', event: 'UPDATE', url: initial.url, status: 'failed', attempts: 2, max_attempts: 6, created_at: stamp, next_attempt_at: null, finished_at: stamp, last_status: 503, last_error: 'http_error' })
+  await page.route('**/admin/api/webhooks**', async route => {
+    const request = route.request(), url = new URL(request.url()), path = url.pathname.slice('/admin/api'.length)
+    if (request.method() !== 'GET') writes.push({ method: request.method(), path, body: request.postDataJSON() })
+    let data: unknown
+    if (path === '/webhooks' && request.method() === 'GET') data = { endpoints: hooks, tables: ['notes', 'orders'], allow_loopback: false, outstanding: resent ? 1 : 0, retained: resent ? 2 : 1 }
+    else if (path === '/webhooks' && request.method() === 'POST') {
+      const input = request.postDataJSON() as Omit<Hook, 'id' | 'schema' | 'table_available' | 'created_at'>
+      const endpoint = { ...initial, ...input }; hooks = [endpoint]; data = { endpoint, secret }
+    } else if (path === `/webhooks/${endpointId}` && request.method() === 'PUT') {
+      hooks = [{ ...hooks[0], ...request.postDataJSON() }]; data = hooks[0]
+    } else if (path === `/webhooks/${endpointId}` && request.method() === 'DELETE') {
+      hooks = []; return route.fulfill({ status: 204 })
+    } else if (path === `/webhooks/${endpointId}/rotate`) data = { endpoint: hooks[0], secret }
+    else if (path === '/webhooks/deliveries' && request.method() === 'DELETE') data = { deleted: 1 }
+    else if (path === '/webhooks/deliveries') { historyQueries.push(url.search); data = { deliveries: [delivery()], next_cursor: url.searchParams.has('before') ? null : '50' } }
+    else if (path === `/webhooks/deliveries/${deliveryId}/replay`) { resent = true; data = { id: '9223372036854775801' } }
+    else if (path.startsWith('/webhooks/deliveries/')) {
+      const replay = path.endsWith('5801')
+      data = { delivery: replay ? { ...delivery(), id: '9223372036854775801', status: 'pending', attempts: 0, last_status: null, last_error: null, finished_at: null, next_attempt_at: stamp, replay_of: deliveryId } : delivery(), payload: JSON.stringify({ id: eventId, type: 'UPDATE', record: { title: '<script>window.webhookXss = true</script>' } }), attempts: replay ? [] : [{ number: 2, started_at: stamp, finished_at: stamp, status_code: 503, duration_ms: 25, error: 'http_error' }, { number: 1, started_at: stamp, finished_at: stamp, status_code: null, duration_ms: null, error: 'worker_interrupted' }] }
+    } else return route.fulfill({ status: 404, json: { code: 'webhook_not_found', error: 'Not found' } })
+    return route.fulfill({ json: data })
+  })
+  await page.goto('/admin/webhooks')
+  return { writes, historyQueries }
+}
+
+test('create shows the key once, then edit/pause/rotate/delete remain usable', async ({ page }) => {
+  const { writes } = await setup(page, true)
+  await page.getByRole('button', { name: 'Novo webhook', exact: true }).first().click()
+  const dialog = page.getByRole('dialog')
+  await dialog.getByLabel('Nome', { exact: true }).fill('Notificar pedidos')
+  await dialog.getByLabel('Tabela', { exact: true }).selectOption('orders')
+  await dialog.getByLabel('URL de destino', { exact: true }).fill('https://example.com/orders')
+  await dialog.getByRole('checkbox', { name: 'Linha alterada', exact: true }).check()
+  await dialog.getByRole('button', { name: 'Salvar', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Guarde a chave de assinatura' })).toBeVisible()
+  await expect(page.getByText(secret, { exact: true })).toBeVisible()
+  await page.getByRole('dialog').getByRole('button', { name: 'Fechar', exact: true }).last().click()
+  await expect(page.getByText(secret, { exact: true })).toHaveCount(0)
+  expect(await page.evaluate(() => JSON.stringify(Object.entries(localStorage)))).not.toContain(secret)
+  expect(writes[0].body).toMatchObject({ name: 'Notificar pedidos', table: 'orders', events: ['INSERT', 'UPDATE'], enabled: true, max_attempts: 6 })
+  await page.getByRole('button', { name: 'Pausar', exact: true }).click()
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Confirmar', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Ativar', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Ativar', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Pausar', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Trocar chave', exact: true }).click()
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Confirmar', exact: true }).click()
+  await expect(page.getByText(secret, { exact: true })).toBeVisible()
+  await page.getByRole('dialog').getByRole('button', { name: 'Fechar', exact: true }).last().click()
+  await page.getByRole('button', { name: 'Apagar', exact: true }).click()
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Confirmar', exact: true }).click()
+  await expect(page.getByText('Conecte o banco aos seus serviços', { exact: true })).toBeVisible()
+})
+
+test('history filters and cursor survive URL navigation; resend preserves the event and opens the new delivery', async ({ page }) => {
+  const { writes, historyQueries } = await setup(page)
+  await page.getByRole('button', { name: 'Histórico de entregas', exact: true }).click()
+  await expect(page.getByRole('link', { name: 'Ver entrega', exact: true })).toBeVisible()
+  await page.getByLabel('Filtrar por estado').selectOption('failed')
+  await expect(page).toHaveURL(new RegExp(`endpoint=${endpointId}.*status=failed`))
+  await page.getByRole('button', { name: 'Mais antigas' }).click()
+  await expect(page).toHaveURL(/before=50/)
+  await page.reload()
+  await expect(page.getByLabel('Filtrar por estado')).toHaveValue('failed')
+  await expect(page.getByLabel('Filtrar por webhook')).toHaveValue(endpointId)
+  expect(historyQueries.some(query => query.includes('before=50') && query.includes('status=failed'))).toBe(true)
+  await page.getByRole('link', { name: 'Ver entrega', exact: true }).click()
+  await expect(page.getByRole('heading', { name: `Entrega #${deliveryId}` })).toBeVisible()
+  await expect(page.getByText('O envio foi interrompido; a fila recuperou a tentativa.')).toBeVisible()
+  await expect(page.getByText('<script>window.webhookXss = true</script>', { exact: false })).toBeVisible()
+  expect(await page.evaluate(() => Reflect.get(window, 'webhookXss'))).toBeUndefined()
+  await page.getByRole('button', { name: 'Reenviar', exact: true }).click()
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Reenviar', exact: true }).click()
+  await expect(page).toHaveURL(/deliveries\/9223372036854775801$/)
+  await expect(page.getByText('Aguardando', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Reenviar', exact: true })).toBeDisabled()
+  await expect(page.getByRole('link', { name: `Reenvio da entrega #${deliveryId}` })).toBeVisible()
+  expect(writes.filter(write => write.path.endsWith('/replay'))).toHaveLength(1)
+})
+
+test('unsaved configuration and server errors keep the editor open', async ({ page }) => {
+  await setup(page, true)
+  await page.getByRole('button', { name: 'Novo webhook', exact: true }).first().click()
+  await page.getByRole('dialog').getByLabel('Nome', { exact: true }).fill('Rascunho')
+  await page.getByRole('dialog').getByRole('button', { name: 'Cancelar', exact: true }).click()
+  await expect(page.getByRole('alertdialog', { name: 'Descartar alterações?' })).toBeVisible()
+  await page.getByRole('button', { name: 'Continuar editando' }).click()
+  await page.getByLabel('Tabela', { exact: true }).selectOption('notes')
+  await page.getByLabel('URL de destino', { exact: true }).fill('https://127.0.0.1/hook')
+  await page.route('**/admin/api/webhooks', route => route.request().method() === 'POST' ? route.fulfill({ status: 400, json: { code: 'webhook_invalid_url', error: 'Unsafe destination' } }) : route.fallback())
+  await page.getByRole('dialog').getByRole('button', { name: 'Salvar', exact: true }).click()
+  await expect(page.getByRole('dialog').getByRole('alert')).toContainText('Use uma URL HTTPS pública')
+  await expect(page.getByRole('dialog').getByLabel('Nome', { exact: true })).toHaveValue('Rascunho')
+})
+
+for (const locale of ['pt-BR', 'en']) {
+  test(`events controls and guide remain usable at 320px in ${locale}`, async ({ page }) => {
+    await page.addInitScript(locale => localStorage.setItem('nelcota.locale', locale), locale)
+    await setup(page)
+    await page.setViewportSize({ width: 320, height: 900 })
+    await expect(page.getByRole('heading', { name: locale === 'en' ? 'Events and webhooks' : 'Eventos e webhooks', exact: true })).toBeVisible()
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+    await page.getByRole('button', { name: locale === 'en' ? 'Edit' : 'Editar', exact: true }).click()
+    await expect(page.getByLabel(locale === 'en' ? 'Destination URL' : 'URL de destino', { exact: true })).toHaveValue(initial.url)
+    await page.getByRole('dialog').getByRole('button', { name: locale === 'en' ? 'Cancel' : 'Cancelar', exact: true }).click()
+    await page.getByRole('link', { name: locale === 'en' ? 'How to receive and verify events' : 'Como receber e verificar eventos' }).click()
+    await expect(page).toHaveURL(/guides\/webhooks$/)
+    await expect(page.getByRole('heading', { name: locale === 'en' ? 'Verify signatures' : 'Verificar assinaturas', exact: true })).toBeVisible()
+  })
+}

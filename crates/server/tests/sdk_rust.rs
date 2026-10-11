@@ -682,8 +682,9 @@ async fn rust_types_cli_reads_the_real_catalog_and_keeps_the_typescript_default(
     #[cfg(not(unix))]
     let tokio_postgres::config::Host::Tcp(host) = &live.app.admin.get_hosts()[0];
     let database_url = format!(
-        "postgres://postgres:postgres@{host}:{}/postgres",
-        live.app.admin.get_ports()[0]
+        "postgres://postgres:postgres@{host}:{}/{}",
+        live.app.admin.get_ports()[0],
+        live.app.admin.get_dbname().unwrap_or("postgres")
     );
     for language in [Some("rust"), None] {
         let database_url = database_url.clone();

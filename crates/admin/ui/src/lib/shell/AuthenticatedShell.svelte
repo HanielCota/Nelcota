@@ -16,6 +16,7 @@
   const tableName = $derived(match('/tables/:name', path)?.name ?? structureName)
   const bucketName = $derived(match('/storage/:bucket', path)?.bucket)
   const guide = $derived(match('/guides/:id', path)?.id)
+  const deliveryId = $derived(match('/webhooks/deliveries/:id', path)?.id)
   // Data/Structure keeps the editor mounted; a different table gets fresh state.
   const pageKey = $derived(tableName ? `/tables/${tableName}` : route.path)
   let content = $state<HTMLElement>()
@@ -95,6 +96,14 @@
             {#await import('$lib/features/policies/Policies.svelte')}
               {@render loading()}
             {:then m}<m.default />{:catch error}{@render failed(error)}{/await}
+          {:else if path === '/webhooks'}
+            {#await import('$lib/features/webhooks/Webhooks.svelte')}
+              {@render loading()}
+            {:then m}<m.default />{:catch error}{@render failed(error)}{/await}
+          {:else if deliveryId}
+            {#await import('$lib/features/webhooks/DeliveryDetail.svelte')}
+              {@render loading()}
+            {:then m}<m.default id={deliveryId} />{:catch error}{@render failed(error)}{/await}
           {:else if path === '/projects'}
             {#await import('$lib/features/projects/Projects.svelte')}
               {@render loading()}

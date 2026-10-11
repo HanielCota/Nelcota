@@ -1,0 +1,12 @@
+Generated with the built-in image_gen tool.
+
+Use case: identity-preserve
+Asset type: Professional GitHub organization profile avatar for Nelcota, square 1:1.
+Primary request: Redesign the reference avatar to feel like a professionally art-directed technology brand while preserving the existing Nelcota mascot's recognizable identity. Make a deliberate, refined mascot portrait with strong visual clarity at small sizes.
+Input images: Image 1 is the current Nelcota mascot avatar and the exact identity reference.
+Subject invariants: Preserve the mint-green pear-shaped silhouette, two rounded lobes at the top, cream oval eyes with large dark brown pupils tilted as in the reference, thin curved eyebrows, small friendly smile, and characteristic asymmetry. Keep the character recognizable. No humanization, clothing, suit or accessories.
+Style/medium: High-end stylized 3D character render. Smooth matte mint material with restrained depth and beautifully clean contours. Precisely controlled soft studio lighting, delicate ambient occlusion and very subtle highlights; professional and calm.
+Composition/framing: A close upper-body portrait, centered on a square canvas. The face is the main focus and fills substantially more of the avatar than in the reference. Crop the lower body out naturally below the chest; no feet. Keep the entire top silhouette and facial features inside a circular safe area, leaving about 12% padding above the tufts and balanced negative space at the sides. Straight-on face with a subtle sculptural sense of volume.
+Scene/backdrop: Minimal deep charcoal-green background with an extremely restrained tonal gradient, complementary to the existing green brand. Clean single-color impression at thumbnail scale.
+Lighting/mood: Soft key light from upper left, gentle fill and a faint edge light for separation. Refined, reassuring, understated.
+Constraints: One mascot, clear face, simple composition, high visual consistency, opaque square output. No typography, no letters, no added symbols, no ring or badge, no decoration, no particles, no heavy glow, no watermark.

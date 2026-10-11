@@ -43,6 +43,7 @@ Plain Postgres + one Rust binary + a 5-minute deploy on a VPS.
 | **REST API** | Generated from your schema: filters, ordering, writes, RPC and OpenAPI at `/rest/v1/` ([api.md](docs/api.md)) |
 | **Auth** | EdDSA JWT + JWKS, argon2id, refresh with rotation, password recovery, email confirmation, magic link, sign-in with Google or GitHub ([jwt-and-roles.md](docs/jwt-and-roles.md)) |
 | **Storage** | Files under the same RLS policies, bytes on disk or in any S3 bucket, signed URLs ([storage.md](docs/storage.md)) |
+| **Events and webhooks** | Committed table changes, signed HTTPS delivery, a persistent queue, retries and delivery history with resend ([webhooks.md](docs/webhooks.md)) |
 | **Admin panel** | Table editor with inline editing, SQL editor with autocomplete, users, RLS policies, files and migrations generated from panel changes, in English and Portuguese ([panel.md](docs/panel.md)) |
 | **Deploy CLI** | Fresh VPS to HTTPS, several isolated projects per server, backups and point-in-time recovery ([deploy.md](docs/deploy.md)) |
 | **SDKs** | [`@nelcota/client`](sdk/typescript/README.md) for JavaScript/TypeScript and [`nelcota-client`](sdk/rust/README.md) for Rust, plus generated types |

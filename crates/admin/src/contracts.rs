@@ -120,6 +120,18 @@ dto!(SignInProviders {
 });
 dto!(SignIn { signup_enabled: bool, email: bool, email_confirmation: bool, password_recovery: bool, magic_link: bool, providers: SignInProviders, redirect_urls: Vec<String>, callback_url: Option<String>, access_ttl_secs: u64, refresh_ttl_days: u32, rate_limit_per_minute: u32 });
 dto!(TypesResponse { base: Vec<String>, enums: Vec<String> });
+dto!(WebhookEndpoint { id: String, name: String, schema: String, table: String, table_available: bool, url: String, events: Vec<String>, enabled: bool, max_attempts: i32, created_at: String });
+dto!(WebhookEndpoints { endpoints: Vec<WebhookEndpoint>, tables: Vec<String>, allow_loopback: bool, outstanding: i64, retained: i64 });
+dto!(WebhookSecret {
+    endpoint: WebhookEndpoint,
+    secret: String
+});
+dto!(WebhookDelivery { id: String, endpoint_id: String, endpoint_name: String, endpoint_enabled: bool, event_id: String, replay_of: Option<String>, schema: String, table: String, event: String, url: String, status: String, attempts: i32, max_attempts: i32, created_at: String, next_attempt_at: Option<String>, finished_at: Option<String>, last_status: Option<i32>, last_error: Option<String> });
+dto!(WebhookDeliveries { deliveries: Vec<WebhookDelivery>, next_cursor: Option<String> });
+dto!(WebhookAttempt { number: i32, started_at: String, finished_at: Option<String>, status_code: Option<i32>, duration_ms: Option<i64>, error: Option<String> });
+dto!(WebhookDetail { delivery: WebhookDelivery, payload: String, attempts: Vec<WebhookAttempt> });
+dto!(WebhookReplay { id: String });
+dto!(WebhookCleared { deleted: u64 });
 
 #[derive(Default, Serialize, Deserialize, JsonSchema, TS)]
 pub struct DdlResult {
@@ -219,6 +231,15 @@ pub fn exports() -> (String, String) {
         SignInProviders,
         SignIn,
         TypesResponse,
+        WebhookEndpoint,
+        WebhookEndpoints,
+        WebhookSecret,
+        WebhookDelivery,
+        WebhookDeliveries,
+        WebhookAttempt,
+        WebhookDetail,
+        WebhookReplay,
+        WebhookCleared,
         DdlResult,
         SqlResult,
         SqlError,

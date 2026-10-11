@@ -21,6 +21,13 @@ cd crates/admin/ui && npm ci && npm run check && npm test   # panel
 The panel build (`crates/admin/ui/dist`) is committed: after changing the
 panel, run `npm run build` and commit `dist` in its own commit.
 
+Without Docker, server integration tests can use an existing **disposable**
+Postgres 17 cluster with `pg_stat_statements` preloaded. Set
+`NELCOTA_TEST_DATABASE_URL` to its admin connection URL; each test creates an
+isolated database and initializes cluster-wide roles. Never point this variable
+at a development or production database. Docker-specific CLI and S3 tests still
+require their respective services.
+
 ## Pull requests
 
 - One logical change per commit, with tests in the same commit as the code

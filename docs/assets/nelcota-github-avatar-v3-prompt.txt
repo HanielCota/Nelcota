@@ -1,0 +1,10 @@
+Generated with the built-in image_gen tool.
+
+Use case: logo-brand
+Asset type: Minimalist square GitHub organization profile image for Nelcota.
+Primary request: Transform the referenced Nelcota mascot into a truly minimal, professionally designed flat brand symbol. The result must read as a restrained company icon, with no illustrative rendering.
+Input images: Image 1 is the mascot identity reference. Extract only its essential recognizable features.
+Design: A single mint-green head silhouette centered on a solid very dark green background. Preserve the pear-like outline and the two distinctive softly rounded top tufts. Remove the arms, feet, body detailing, eyebrows, and cream eye surrounds. Inside the silhouette use two simple dark oval eyes with the slight natural tilt of the reference and one tiny dark curved smile. The face must feel like the same mascot reduced to its simplest recognizable logo form.
+Style: Strictly flat 2D, clean geometric contours, solid color fills, smooth precise edges, professional optical balance. Exactly two solid colors: mint green and very dark green. Crisp vector-like raster finish.
+Composition: One compact isolated symbol, centered both horizontally and vertically, occupying about 62% of the square height. Generous even negative space, all essential features comfortably fit in a circular avatar crop. Eyes and smile should remain readable at 32 pixels. Head silhouette without separate body or neck.
+Constraints: No 3D, no light effects, no shading, no gradients, no texture, no shadows, no outlines, no glows, no rings, no badges, no props, no text, no letters, no watermarks. Opaque square image. Do not place the design on a mockup. Deliver only the finished two-color profile image.
