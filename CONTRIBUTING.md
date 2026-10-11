@@ -28,6 +28,24 @@ isolated database and initializes cluster-wide roles. Never point this variable
 at a development or production database. Docker-specific CLI and S3 tests still
 require their respective services.
 
+The upgrade regression requires Python 3.11+, Docker and Linux amd64. It
+downloads checksum-pinned published binaries and creates one disposable
+Postgres 17 cluster per run, because cluster-wide roles must start clean:
+
+```sh
+cargo build --locked -p nelcota-server
+nice -n 19 ionice -c3 python3 scripts/test-upgrade.py  # 0.3.1 → this checkout
+nice -n 19 ionice -c3 python3 scripts/test-upgrade.py --published-target  # 0.3.1 → 0.4.0
+```
+
+Use `sg docker -c 'nice -n 19 ionice -c3 python3 scripts/test-upgrade.py'` if
+the current login has not picked up Docker group membership. The test compares
+existing rows, exact numeric values, sequences, schema objects, RLS and disk
+files, then exercises auth continuity, signed webhooks, rollback, retries,
+restart and pre-upgrade backup restore. It removes only its own container;
+diagnostics stay in `target/upgrade-tests/`. CI runs both scenarios, including
+the current checkout so a published-release check cannot hide a PR regression.
+
 ## Pull requests
 
 - One logical change per commit, with tests in the same commit as the code

@@ -58,6 +58,37 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
+  upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d
+        with:
+          toolchain: '1.99.0'
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - run: cargo build --locked -p nelcota-server
+      # Check both the published release and this PR's binary. A fresh cluster
+      # per scenario also exercises V13's new cluster-wide role creation.
+      - name: upgrade v0.3.1 to the checkout
+        run: python3 scripts/test-upgrade.py
+      - name: upgrade v0.3.1 to published v0.4.0
+        run: python3 scripts/test-upgrade.py --published-target
+      - name: upgrade diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: upgrade-diagnostics
+          path: |
+            target/upgrade-tests/**/*.log
+            target/upgrade-tests/**/report.json
+            target/upgrade-tests/**/before.json
+            target/upgrade-tests/**/after.json
+          if-no-files-found: ignore
+          retention-days: 7
+
   # The panel build (crates/admin/ui/dist) is versioned so `cargo build` does
   # not depend on Node. This job makes sure it is up to date.
   admin-ui:
