@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.1 — 2026-10-11
+
+- Update repository and documentation links to `Nelcota/Nelcota` after the
+  organization transfer. The client API and server compatibility are unchanged.
+- Publish from the organization with GitHub Actions trusted publishing (OIDC).
+
 ## 0.1.0 — 2026-10-10
 
 First npm release. Changes since the release candidate:
