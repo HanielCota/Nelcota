@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.2 — 2026-10-11
+
+- Bound HTTP error bodies to 64 KiB while preserving status and `Retry-After`.
+- Share one background refresh worker across concurrent callers. Cancelling
+  waiters does not create a task per waiter or stop an accepted token rotation.
+- Fence refresh results across logout and client disposal so a stale completion
+  cannot replace the current session.
+- Verify packaging, native platform support and the real-server contract against
+  Nelcota 0.4.0. The minimum supported server remains 0.3.0 and Rust remains 1.88.
+
 ## 0.1.1 — 2026-10-11
 
 - Update repository and documentation links to `Nelcota/Nelcota` after the
