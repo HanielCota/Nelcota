@@ -1,5 +1,5 @@
 //! Google, through OpenID Connect's userinfo endpoint.
-use serde::Deserialize;
+use openidconnect::{EmptyAdditionalClaims, UserInfoClaims, core::CoreGenderClaim};
 use serde_json::Value;
 
 use super::provider::{ProviderEndpoints, ProviderError, ProviderIdentity, get_json};
@@ -25,23 +25,25 @@ pub(super) async fn profile(
 }
 
 fn identity(data: Value) -> Result<ProviderIdentity, ProviderError> {
-    #[derive(Deserialize)]
-    struct UserInfo {
-        sub: String,
-        email: Option<String>,
-        #[serde(default)]
-        email_verified: bool,
-        name: Option<String>,
-        picture: Option<String>,
-    }
-    let info: UserInfo = serde_json::from_value(data.clone())
-        .map_err(|error| ProviderError(format!("unexpected Google profile: {error}")))?;
+    let info: UserInfoClaims<EmptyAdditionalClaims, CoreGenderClaim> =
+        UserInfoClaims::from_json::<ProviderError>(
+            &serde_json::to_vec(&data)
+                .map_err(|_| ProviderError("unexpected Google profile".into()))?,
+            None,
+        )
+        .map_err(|_| ProviderError("unexpected Google profile".into()))?;
     Ok(ProviderIdentity {
-        subject: info.sub,
-        email: info.email,
-        email_verified: info.email_verified,
-        name: info.name,
-        avatar_url: info.picture,
+        subject: info.subject().as_str().into(),
+        email: info.email().map(|email| email.as_str().into()),
+        email_verified: info.email_verified().unwrap_or(false),
+        name: info
+            .name()
+            .and_then(|name| name.get(None))
+            .map(|name| name.as_str().into()),
+        avatar_url: info
+            .picture()
+            .and_then(|picture| picture.get(None))
+            .map(|url| url.as_str().into()),
         data,
     })
 }

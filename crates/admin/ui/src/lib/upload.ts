@@ -1,0 +1,30 @@
+import type { Body, Meta } from '@uppy/core'
+
+/** Uppy owns the XHR lifecycle; Nelcota owns its JSON and session contract. */
+export async function upload<T>(path: string, file: File, parse: (response: Response) => Promise<T>, progress?: (loaded: number, total: number) => void): Promise<T> {
+  const [{ default: Uppy }, { default: XHRUpload }] = await Promise.all([import('@uppy/core'), import('@uppy/xhr-upload')])
+  const uppy = new Uppy<Meta, Body>({ autoProceed: false, allowMultipleUploadBatches: false })
+  let result!: T
+  let failure: unknown
+  uppy.use(XHRUpload, {
+    endpoint: `/admin/api${path}`, method: 'POST', formData: false, withCredentials: true,
+    headers: { 'content-type': file.type || 'application/octet-stream' },
+    // POST can commit before a connection fails. A retry must remain an
+    // explicit action so an ambiguous upload never overwrites an object.
+    shouldRetry: () => false,
+    onAfterResponse: async xhr => {
+      result = await parse(new Response([204, 205, 304].includes(xhr.status) ? null : xhr.responseText, { status: xhr.status }))
+    },
+    getResponseData: () => ({}),
+  })
+  uppy.on('upload-progress', (_file, status) => progress?.(status.bytesUploaded ?? 0, status.bytesTotal ?? file.size))
+  uppy.on('upload-error', (_file, error) => { failure = error })
+  try {
+    uppy.addFile({ name: file.name, type: file.type, data: file })
+    const outcome = await uppy.upload()
+    if (failure) throw failure
+    if (!outcome?.successful?.length) throw new Error('Upload failed')
+    progress?.(file.size, file.size)
+    return result
+  } finally { uppy.destroy() }
+}

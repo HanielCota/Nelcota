@@ -15,6 +15,7 @@
   const structureName = $derived(match('/tables/:name/structure', path)?.name)
   const tableName = $derived(match('/tables/:name', path)?.name ?? structureName)
   const bucketName = $derived(match('/storage/:bucket', path)?.bucket)
+  const guide = $derived(match('/guides/:id', path)?.id)
   // Data/Structure keeps the editor mounted; a different table gets fresh state.
   const pageKey = $derived(tableName ? `/tables/${tableName}` : route.path)
   let content = $state<HTMLElement>()
@@ -100,6 +101,10 @@
             {:then m}<m.default />{:catch error}{@render failed(error)}{/await}
           {:else if path === '/connect'}
             {#await import('$lib/features/api/ApiPage.svelte')}
+              {@render loading()}
+            {:then m}<m.default />{:catch error}{@render failed(error)}{/await}
+          {:else if path === '/guides' || guide}
+            {#await import('$lib/features/guides/Guides.svelte')}
               {@render loading()}
             {:then m}<m.default />{:catch error}{@render failed(error)}{/await}
           {:else}<NotFound />{/if}

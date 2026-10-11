@@ -36,7 +36,7 @@ rustls.workspace = true
 unicode-normalization = "0.1.25"
 
 [dev-dependencies]
-tempfile = "3"
+tempfile = "3.27.0"
 
 [lints]
 workspace = true

@@ -124,11 +124,15 @@ pub(crate) async fn authorize(
     )
     .await?;
     tx.commit().await.map_err(db_error)?;
-    Ok(provider.authorize_url(
-        &oauth.callback_url,
-        &flow_state,
-        &pkce::challenge(&provider_verifier),
-    ))
+    provider
+        .authorize_url(&oauth.callback_url, &flow_state, &provider_verifier)
+        .map_err(|_| {
+            ApiError::new(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "provider_error",
+                "Could not start provider sign-in",
+            )
+        })
 }
 
 /// What the provider sent back to `/auth/v1/callback`.

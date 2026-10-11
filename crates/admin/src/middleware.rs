@@ -40,20 +40,31 @@ fn forbidden_origin() -> Response {
 }
 
 pub(crate) async fn security_headers(request: Request, next: Next) -> Response {
+    // Only Scalar's static document may be framed by this same origin. The
+    // panel and authenticated API keep their existing anti-framing policy.
+    let reference = request.uri().path() == "/admin/assets/reference.html";
     let mut response = next.run(request).await;
     let headers = response.headers_mut();
     // Scripts only from this server. Inline styles are allowed because
     // Svelte transitions, CodeMirror and menu positioning (floating-ui)
     // inject styles at runtime.
     // A file downloaded through the panel keeps its own (sandboxed) policy.
+    let policy = if reference {
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; \
+         img-src 'self' data:; font-src 'self'; connect-src 'self'; \
+         frame-ancestors 'self'; form-action 'self'; base-uri 'none'"
+    } else {
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; \
+         img-src 'self' data:; font-src 'self'; connect-src 'self'; \
+         frame-ancestors 'none'; form-action 'self'; base-uri 'none'"
+    };
     headers
         .entry(header::CONTENT_SECURITY_POLICY)
-        .or_insert(HeaderValue::from_static(
-            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; \
-             img-src 'self' data:; font-src 'self'; connect-src 'self'; \
-             frame-ancestors 'none'; form-action 'self'; base-uri 'none'",
-        ));
-    headers.insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("DENY"));
+        .or_insert(HeaderValue::from_static(policy));
+    headers.insert(
+        header::X_FRAME_OPTIONS,
+        HeaderValue::from_static(if reference { "SAMEORIGIN" } else { "DENY" }),
+    );
     headers.insert(
         header::X_CONTENT_TYPE_OPTIONS,
         HeaderValue::from_static("nosniff"),

@@ -3,7 +3,7 @@
   import Check from '@lucide/svelte/icons/check'
   import { t } from '$lib/i18n/index.svelte'
   import { copyText } from '$lib/clipboard'
-  import { highlight, type CodeLang } from '$lib/components/shared/highlight'
+  import { highlight, type CodeLang, type Token } from '$lib/components/shared/highlight'
 
   let {
     code,
@@ -20,7 +20,14 @@
   } = $props()
 
   let copied = $state(false)
-  const tokens = $derived(lang ? highlight(code, lang) : null)
+  let tokens = $state<Token[] | null>(null)
+  $effect(() => {
+    const source = code, language = lang
+    let active = true
+    tokens = null
+    if (language) void highlight(source, language).then(value => { if (active) tokens = value }).catch(() => {})
+    return () => { active = false }
+  })
   const COLOURS = {
     keyword: 'text-[var(--syntax-keyword)]',
     function: 'text-[var(--syntax-function)]',

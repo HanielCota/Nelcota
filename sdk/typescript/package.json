@@ -69,7 +69,7 @@
     "prepublishOnly": "npm run check && npm test && npm run test:types && npm run build && npm run size && npm run test:package"
   },
   "devDependencies": {
-    "@types/node": "^26.6.4",
+    "@types/node": "^26.6.5",
     "fast-check": "^4.10.2",
     "playwright-core": "^1.64.0",
     "typescript": "^7.0.2",

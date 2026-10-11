@@ -10,6 +10,7 @@ import Boxes from '@lucide/svelte/icons/boxes'
 import Plug from '@lucide/svelte/icons/plug'
 import HardDrive from '@lucide/svelte/icons/hard-drive'
 import LogIn from '@lucide/svelte/icons/log-in'
+import BookOpen from '@lucide/svelte/icons/book-open'
 import type { MessageKey } from '$lib/i18n/index.svelte'
 import { route } from '$lib/router.svelte'
 
@@ -52,6 +53,7 @@ export const navItems: NavItem[] = [
   ...navPills.slice(2),
   { title: 'shell.pages.userSignIn', path: '/sign-in', icon: LogIn },
   { title: 'shell.pages.projects', path: '/projects', icon: Boxes },
+  { title: 'shell.pages.guides', path: '/guides', icon: BookOpen },
 ]
 
 const matches = (path: string) => (path === '/' ? route.path === '/' : route.path === path || route.path.startsWith(path + '/'))

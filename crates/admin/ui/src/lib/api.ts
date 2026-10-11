@@ -2,6 +2,7 @@
 import { session } from './features/auth/session.svelte'
 import { responseContract } from './contracts'
 import { t } from './i18n/index.svelte'
+import { clearQuerySession, invalidateReads, queryRead } from './query-client'
 
 /**
  * Failed request. `message` is the server's English text; `code` and `params`
@@ -19,6 +20,7 @@ export class ApiError extends Error {
 }
 
 async function request<T>(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
+  if (['/login', '/logout', '/sso'].includes(path)) clearQuerySession()
   const res = await fetch(`/admin/api${path}`, {
     method,
     signal,
@@ -26,36 +28,17 @@ async function request<T>(method: string, path: string, body?: unknown, signal?:
     headers: body === undefined ? {} : { 'content-type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),
   })
-  return parse<T>(res, path, method)
+  const result = await parseResponse<T>(res, path, method)
+  return result
 }
 
 /** Sends a file as the raw request body (storage uploads). */
 export async function uploadFile<T>(path: string, file: File, onprogress?: (loaded: number, total: number) => void): Promise<T> {
-  if (onprogress) {
-    return new Promise<T>((resolve, reject) => {
-      const request = new XMLHttpRequest()
-      request.open('POST', `/admin/api${path}`)
-      request.withCredentials = true
-      request.setRequestHeader('content-type', file.type || 'application/octet-stream')
-      request.upload.onprogress = (event) => onprogress(event.loaded, event.lengthComputable ? event.total : file.size)
-      request.onerror = () => reject(new Error(t('common.requestFailed')))
-      request.onabort = () => reject(new DOMException('Aborted', 'AbortError'))
-      request.onload = () => {
-        Promise.resolve().then(() => parse<T>(new Response([204, 205, 304].includes(request.status) ? null : request.responseText, { status: request.status }), path, 'POST')).then(resolve, reject)
-      }
-      request.send(file)
-    })
-  }
-  const res = await fetch(`/admin/api${path}`, {
-    method: 'POST',
-    credentials: 'same-origin',
-    headers: { 'content-type': file.type || 'application/octet-stream' },
-    body: file,
-  })
-  return parse<T>(res, path, 'POST')
+  const { upload } = await import('./upload')
+  return upload(path, file, response => parseResponse<T>(response, path, 'POST'), onprogress)
 }
 
-async function parse<T>(res: Response, path: string, method: string): Promise<T> {
+export async function parseResponse<T>(res: Response, path: string, method: string): Promise<T> {
   const text = await res.text()
   let data: unknown = null
   let json = true
@@ -67,6 +50,7 @@ async function parse<T>(res: Response, path: string, method: string): Promise<T>
   }
   if (!res.ok) {
     if (res.status === 401 && path !== '/login') {
+      clearQuerySession()
       if (session.email) session.expired = true
       session.email = null
     }
@@ -79,6 +63,7 @@ async function parse<T>(res: Response, path: string, method: string): Promise<T>
   }
   const validate = responseContract(method, path)
   if (validate && !validate(data)) throw new ApiError(t('common.invalidResponse'), 502, 'invalid_response')
+  if (method !== 'GET') invalidateReads()
   return data as T
 }
 
@@ -92,8 +77,9 @@ export function httpError(status: number): ApiError {
 }
 
 export const api = {
-  get: <T>(path: string, options: { signal?: AbortSignal } = {}) =>
-    request<T>('GET', path, undefined, options.signal),
+  get: <T>(path: string, options: { signal?: AbortSignal; freshForMs?: number } = {}) =>
+    path === '/session' ? request<T>('GET', path, undefined, options.signal)
+      : queryRead(path, session.email, signal => request<T>('GET', path, undefined, signal), options.signal, options.freshForMs ?? 0),
   post: <T>(path: string, body: unknown = {}, options: { signal?: AbortSignal } = {}) =>
     request<T>('POST', path, body, options.signal),
   patch: <T>(path: string, body: unknown, options: { signal?: AbortSignal } = {}) =>

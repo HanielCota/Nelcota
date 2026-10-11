@@ -866,6 +866,35 @@ Later passes settled the rules new screens follow:
 - **Contrast:** text tones are checked against every surface in both themes
   (4.5:1 or more for body text), not eyeballed.
 
+## Established libraries for protocols and panel infrastructure
+
+The panel uses TanStack Query for concurrent read deduplication and optional
+freshness windows. Explicit reloads still fetch from the server. Mutations
+invalidate reads; session changes clear both cached and pending results, and
+callers receive independent clones so editing a row cannot edit shared data.
+TanStack Table owns row selection and column visibility using stable primary
+keys; the existing keyboard editing, server ordering and permissions remain
+part of the grid.
+
+Uppy and XHRUpload handle raw-body storage uploads and progress. Automatic
+retries are disabled because a failed connection can follow an already committed
+upload. Destination snapshots and conflict decisions stay in the upload queue.
+Shiki replaces regular-expression highlighting with lazy-loaded language
+grammars and its JavaScript engine. Tokens remain escaped Svelte text; no
+runtime `eval`, WebAssembly or Node APIs are needed in the browser.
+
+Scalar renders the anonymous OpenAPI catalog in a same-origin frame, isolating
+its styles and hash navigation from the panel. Its assets are included in the
+Rust binary; external fonts, telemetry, the agent and request proxy are disabled.
+Only that reference document permits same-origin framing. The rest of the panel
+keeps its frame restrictions. Scalar is loaded only when the reference is opened.
+
+The Rust oauth2 library builds authorization URLs, S256 PKCE and token exchanges;
+openidconnect parses Google's typed user-info claims. Both use the existing
+bounded reqwest transport, without adding a second HTTP stack. Nelcota retains
+its one-time state, account linking and session policies. These dependencies
+do not add a JavaScript server: Rust serves the compiled panel and backend.
+
 ### Known pending items
 
 - Filtering parent rows by their embeds (`!inner`) and self-referencing embeds.
