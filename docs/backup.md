@@ -100,7 +100,7 @@ have no historical file manifest; they remain usable for database-only restores.
 ### Restore on a new VPS
 
 ```sh
-curl -fsSL https://nelcota.com/install | sh
+curl -fsSL https://raw.githubusercontent.com/Nelcota/Nelcota/main/scripts/install.sh | sh
 mkdir -p /opt/nelcota && cd /opt/nelcota
 nelcota init api.shop.com --yes
 cp /safe/place/shop.env projects/shop/.env   # optional: keeps the JWT key

@@ -52,8 +52,9 @@ export function guideLink(link: string, source: string): string | null {
   let path: string
   try { path = decodeURIComponent(url.pathname).replace(/^\//, '') } catch { return null }
   if (url.hostname === 'github.com') {
-    const prefix = 'HanielCota/Nelcota/'
-    if (!path.startsWith(prefix)) return null
+    // Keep links from documentation published before the organization transfer.
+    const prefix = ['Nelcota/Nelcota/', 'HanielCota/Nelcota/'].find(prefix => path.startsWith(prefix))
+    if (!prefix) return null
     path = path.slice(prefix.length).replace(/^(?:blob|tree)\/[^/]+\//, '')
     if (!path) return '/admin/guides'
   } else if (url.hostname !== 'nelcota.local') {

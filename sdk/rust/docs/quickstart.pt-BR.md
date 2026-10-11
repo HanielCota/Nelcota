@@ -5,7 +5,7 @@ O SDK usa Tokio e requer Rust 1.88+. Até a primeira publicação, adicione
 aplicativo, junto de serde, serde_json e tokio (veja o README).
 
 1. Inicie o Nelcota com `cargo run -- dev` ou use um projeto implantado.
-2. Aplique [examples/notes.sql](https://github.com/HanielCota/Nelcota/blob/main/examples/notes.sql) (o mesmo do SDK JavaScript) pelo
+2. Aplique [examples/notes.sql](https://github.com/Nelcota/Nelcota/blob/main/examples/notes.sql) (o mesmo do SDK JavaScript) pelo
    editor SQL do painel ou como migração (`nelcota migrate`).
 3. Defina `NELCOTA_URL`, `NELCOTA_EMAIL` e `NELCOTA_PASSWORD` para um usuário
    existente. Como alternativa, passe `NELCOTA_ACCESS_TOKEN`.

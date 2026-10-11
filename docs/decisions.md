@@ -514,7 +514,7 @@ variables in the CLI's own process. pgBackRest reads the same settings as on
 Docker, written as `/etc/pgbackrest/pgbackrest.conf` (archive_command runs
 under the Postgres unit, which does not get the `.env`).
 
-**D76. The image is `ghcr.io/hanielcota/nelcota-server`.** The name that
+**D76. The image is `ghcr.io/nelcota/nelcota-server`.** The name that
 matches the repository, `ghcr.io/hanielcota/nelcota`, is a package from an
 earlier project (now NelcotaScreenShare) whose production still pulls its
 `latest` tag. Pushing there would overwrite that tag, and deleting it would
@@ -899,4 +899,4 @@ do not add a JavaScript server: Rust serves the compiled panel and backend.
 
 - Filtering parent rows by their embeds (`!inner`) and self-referencing embeds.
 - `nelcota.com/install` should redirect to
-  `https://raw.githubusercontent.com/HanielCota/Nelcota/main/scripts/install.sh`.
+  `https://raw.githubusercontent.com/Nelcota/Nelcota/main/scripts/install.sh`.

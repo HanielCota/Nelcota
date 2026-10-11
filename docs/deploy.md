@@ -3,7 +3,7 @@
 **Fresh VPS → HTTPS in 3 commands.**
 
 ```sh
-curl -fsSL https://nelcota.com/install | sh     # binary (with checksum) + Docker if missing
+curl -fsSL https://raw.githubusercontent.com/Nelcota/Nelcota/main/scripts/install.sh | sh     # binary (with checksum) + Docker if missing
 mkdir -p /opt/nelcota && cd /opt/nelcota
 nelcota init api.yourdomain.com                 # creates the host and the first project
 nelcota up                                      # starts projects + Caddy, waits for the healthcheck
@@ -78,7 +78,7 @@ leaves no half-created host behind.
 | `--panel-login shared\|per-project` | panel login mode when the host is created (default `shared`) |
 | `--email <email>` | administrator email (default `admin@<domain>`) |
 | `-y`, `--yes` | asks no questions (defaults and flags only) |
-| `--image <image>` | app image (default `ghcr.io/hanielcota/nelcota-server`, or `NELCOTA_IMAGE`) |
+| `--image <image>` | app image (default `ghcr.io/nelcota/nelcota-server`, or `NELCOTA_IMAGE`) |
 | `--version <tag>` | image tag (default: the CLI's version) |
 | `--profile 1gb\|2gb\|4gb\|8gb` | Postgres profile (default: by the RAM split across the projects) |
 | `--s3-endpoint`, `--s3-bucket`, `--s3-access-key`, `--s3-secret-key`, `--s3-region` | backup bucket, written to `host.env` (all four or none; region defaults to `us-east-1`). Without them, an interactive `init` asks, reading the secret key without echo |
@@ -119,7 +119,7 @@ container, which is what can reach Postgres. Outside a host, they use
 On a small VPS that will only ever hold one project, Nelcota can skip Docker:
 
 ```sh
-curl -fsSL https://nelcota.com/install | NELCOTA_SKIP_DOCKER=1 sh
+curl -fsSL https://raw.githubusercontent.com/Nelcota/Nelcota/main/scripts/install.sh | NELCOTA_SKIP_DOCKER=1 sh
 mkdir -p /opt/nelcota && cd /opt/nelcota
 nelcota init api.yourdomain.com --runtime systemd
 nelcota up
@@ -235,7 +235,7 @@ with the project's `NELCOTA_VERSION` first:
   binary on a systemd host);
 - older target: refused, because the older app does not know the newer
   migrations. When the CLI itself is the older one, reinstall it
-  (`curl -fsSL https://nelcota.com/install | sh`); to go back on purpose, pass
+  (`curl -fsSL https://raw.githubusercontent.com/Nelcota/Nelcota/main/scripts/install.sh | sh`); to go back on purpose, pass
   `--allow-downgrade`;
 - `--dry-run` prints `current → target` for each project and changes nothing.
 

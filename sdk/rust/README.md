@@ -266,10 +266,10 @@ their own auth/mutation retries.
 The default client uses explicit rustls/ring and Mozilla roots without a global
 crypto-provider initialization. It can be reused across tasks.
 
-Start with the [quickstart](https://github.com/HanielCota/Nelcota/blob/main/docs/quickstart.md)
+Start with the [quickstart](https://github.com/Nelcota/Nelcota/blob/main/docs/quickstart.md)
 (local server, migration, generated types). The examples in `examples/` use
-the shared [examples/notes.sql](https://github.com/HanielCota/Nelcota/blob/main/examples/notes.sql)
+the shared [examples/notes.sql](https://github.com/Nelcota/Nelcota/blob/main/examples/notes.sql)
 schema. Empty results, 401/403 or a 1000-row cap? See
-[troubleshooting](https://github.com/HanielCota/Nelcota/blob/main/docs/troubleshooting.md).
+[troubleshooting](https://github.com/Nelcota/Nelcota/blob/main/docs/troubleshooting.md).
 Portuguese guide: [quickstart.pt-BR.md](docs/quickstart.pt-BR.md).
 Contract: [contract.md](docs/contract.md). Release: [releasing.md](docs/releasing.md).

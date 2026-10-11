@@ -7,8 +7,8 @@
 **Open source backend-as-a-service, simple and lock-in free.**<br>
 Plain Postgres + one Rust binary + a 5-minute deploy on a VPS.
 
-[![CI](https://github.com/HanielCota/Nelcota/actions/workflows/ci.yml/badge.svg)](https://github.com/HanielCota/Nelcota/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/HanielCota/Nelcota?color=1a7a45)](https://github.com/HanielCota/Nelcota/releases/latest)
+[![CI](https://github.com/Nelcota/Nelcota/actions/workflows/ci.yml/badge.svg)](https://github.com/Nelcota/Nelcota/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/Nelcota/Nelcota?color=1a7a45)](https://github.com/Nelcota/Nelcota/releases/latest)
 [![License](https://img.shields.io/badge/license-Apache--2.0-1a7a45)](LICENSE)
 ![Postgres 17](https://img.shields.io/badge/Postgres-17-336791?logo=postgresql&logoColor=white)
 ![Rust](https://img.shields.io/badge/Rust-stable-b7410e?logo=rust&logoColor=white)
@@ -50,7 +50,7 @@ Plain Postgres + one Rust binary + a 5-minute deploy on a VPS.
 ## Deploy: fresh VPS → HTTPS
 
 ```sh
-curl -fsSL https://nelcota.com/install | sh
+curl -fsSL https://raw.githubusercontent.com/Nelcota/Nelcota/main/scripts/install.sh | sh
 nelcota init api.yourdomain.com
 nelcota up
 ```

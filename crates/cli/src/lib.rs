@@ -312,7 +312,7 @@ pub struct InitArgs {
     #[arg(
         long,
         env = "NELCOTA_IMAGE",
-        default_value = "ghcr.io/hanielcota/nelcota-server"
+        default_value = "ghcr.io/nelcota/nelcota-server"
     )]
     pub image: String,
     /// Image tag (default: this binary's version).
