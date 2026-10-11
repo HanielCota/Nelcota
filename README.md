@@ -13,7 +13,7 @@ Plain Postgres + one Rust binary + a 5-minute deploy on a VPS.
 ![Postgres 17](https://img.shields.io/badge/Postgres-17-336791?logo=postgresql&logoColor=white)
 ![Rust](https://img.shields.io/badge/Rust-stable-b7410e?logo=rust&logoColor=white)
 
-[Quickstart](docs/quickstart.md) · [Deploy](docs/deploy.md) · [REST API](docs/api.md) · [Panel](docs/panel.md) · [Docs](#documentation) · [nelcota.com](https://nelcota.com)
+[Quickstart](docs/quickstart.md) · [Deploy](docs/deploy.md) · [REST API](docs/api.md) · [Panel](docs/panel.md) · [Changelog](CHANGELOG.md) · [Docs](#documentation) · [nelcota.com](https://nelcota.com)
 
 </div>
 

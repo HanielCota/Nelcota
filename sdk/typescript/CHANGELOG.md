@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.2 — 2026-10-11
+
+- Bound HTTP error bodies to 64 KiB while preserving status and `Retry-After`.
+- Preserve newer in-memory sessions when storage writes or removal fail; stale
+  storage and cross-tab reloads cannot restore a spent token or signed-out state.
+- Expose the optional `auth.onBackgroundError` handler for background adapter
+  failures. Automatic refresh pauses until persistence succeeds; handler
+  exceptions are isolated.
+- Ignore coordination messages after disposal and keep cancellation cleanup
+  bounded when transport cancellation does not settle.
+- Verify the package and real-server contract against Nelcota 0.4.0. The minimum
+  supported server remains 0.3.0; no webhook-management SDK API is introduced.
+
 ## 0.1.1 — 2026-10-11
 
 - Update repository and documentation links to `Nelcota/Nelcota` after the
