@@ -14,6 +14,7 @@ describe('bundled guides', () => {
     expect(guideLink('api.md#errors', 'docs/storage.md')).toBe('/admin/guides/api?section=errors')
     expect(guideLink('docs/contract.md', 'sdk/typescript/README.md')).toBe('/admin/guides/sdk-contract')
     expect(guideLink('https://github.com/HanielCota/Nelcota/blob/main/docs/storage.md', 'sdk/typescript/README.md')).toBe('/admin/guides/storage')
+    expect(guideLink('https://github.com/Nelcota/Nelcota/blob/main/docs/storage.md#signed-urls', 'sdk/typescript/README.md')).toBe('/admin/guides/storage?section=signed-urls')
     expect(guideLink('../examples/notes.sql', 'docs/quickstart.md')).toBe('/admin/guides/example')
     expect(guideLink('#errors', 'docs/api.md')).toBe('/admin/guides/api?section=errors')
     expect(guideLink('https://github.com/other/repo', 'docs/api.md')).toBeNull()

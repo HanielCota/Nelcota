@@ -3,7 +3,7 @@
 ## Reporting a vulnerability
 
 Please **do not open a public issue**. Report it privately through
-[GitHub's private vulnerability reporting](https://github.com/HanielCota/Nelcota/security/advisories/new)
+[GitHub's private vulnerability reporting](https://github.com/Nelcota/Nelcota/security/advisories/new)
 (Security → Report a vulnerability).
 
 Include what you can: the affected version or commit, how to reproduce it,
@@ -32,6 +32,6 @@ a misconfiguration, not a vulnerability in Nelcota.
 Release binaries and images carry signed build provenance:
 
 ```sh
-gh attestation verify nelcota-x86_64-unknown-linux-musl -R HanielCota/Nelcota
-gh attestation verify oci://ghcr.io/hanielcota/nelcota-server:<version> -R HanielCota/Nelcota
+gh attestation verify nelcota-x86_64-unknown-linux-musl -R Nelcota/Nelcota
+gh attestation verify oci://ghcr.io/nelcota/nelcota-server:<version> -R Nelcota/Nelcota
 ```

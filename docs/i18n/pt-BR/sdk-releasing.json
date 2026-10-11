@@ -7,7 +7,7 @@
   "npm account setup": "Configuração da conta npm",
   "The maintainer needs access to the `@nelcota` scope. Authenticate locally with\n`npm login` and verify with `npm whoami`; never put a token in this repository.\nIf npm does not yet expose package settings, complete the initial authenticated\npublish of the validated candidate before configuring subsequent OIDC releases.\nUse `npm publish --access public` from this directory for that first publish.\nThe publication hook runs local checks; the integration gate must also have\npassed for the same source before this manual bootstrap.": "O mantenedor precisa de acesso ao escopo `@nelcota`. Autentique-se localmente com `npm login` e verifique com `npm whoami`; nunca coloque um token neste repositório. Se o npm ainda não disponibilizar as configurações do pacote, conclua a primeira publicação autenticada da versão candidata validada antes de configurar as próximas publicações com OIDC. Use `npm publish --access public` neste diretório para essa primeira publicação. O hook de publicação executa as verificações locais; a etapa de integração também deve ter passado para o mesmo código-fonte antes dessa configuração manual inicial.",
   "Configure npm trusted publishing using:": "Configure a publicação confiável do npm com:",
-  "Owner: `HanielCota`": "Proprietário: `HanielCota`",
+  "Owner: `Nelcota`": "Proprietário: `Nelcota`",
   "Repository: `Nelcota`": "Repositório: `Nelcota`",
   "Workflow filename: `sdk-release.yml`": "Nome do arquivo de workflow: `sdk-release.yml`",
   "Environment: `npm`": "Ambiente: `npm`",

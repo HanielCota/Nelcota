@@ -3,9 +3,12 @@
 The Rust package has independent semver. A release targets the documented
 server protocol, rather than requiring matching server/package versions.
 
-Before the first release, confirm ownership/availability of `nelcota-client`
-on crates.io. Configure the GitHub `crates-io` environment with a scoped
-`CARGO_REGISTRY_TOKEN` permitted to publish this crate.
+The maintainer needs ownership of `nelcota-client` on crates.io. Configure its
+trusted publisher for GitHub owner `Nelcota`, repository `Nelcota`, workflow
+`sdk-rust-release.yml`, and environment `crates-io`. The GitHub-hosted publish
+job exchanges its OIDC identity for a short-lived token with
+`rust-lang/crates-io-auth-action`; it does not use a stored registry token.
+After a repository transfer, update the publisher's owner before releasing.
 This repository does not contain registry credentials.
 
 1. Run SDK checks and `cargo test -p nelcota-server --test sdk_rust` with Docker.

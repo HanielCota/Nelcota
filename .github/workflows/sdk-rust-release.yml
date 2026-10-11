@@ -58,7 +58,7 @@ jobs:
         id: published
         run: |
           version=${GITHUB_REF_NAME#rust-sdk-v}
-          if curl -fsS -A "nelcota-release (github.com/HanielCota/Nelcota)" "https://crates.io/api/v1/crates/nelcota-client/$version" >/dev/null 2>&1; then
+          if curl -fsS -A "nelcota-release (github.com/Nelcota/Nelcota)" "https://crates.io/api/v1/crates/nelcota-client/$version" >/dev/null 2>&1; then
             echo "::notice::nelcota-client $version is already on crates.io"
             echo "skip=true" >> "$GITHUB_OUTPUT"
           fi

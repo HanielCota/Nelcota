@@ -19,7 +19,7 @@
   "panel login mode when the host is created (default `shared`)": "modo de login do painel na criação do host (padrão `shared`)",
   "administrator email (default `admin@<domain>`)": "e-mail do administrador (padrão `admin@<domain>`)",
   "asks no questions (defaults and flags only)": "não faz perguntas (apenas padrões e opções)",
-  "app image (default `ghcr.io/hanielcota/nelcota-server`, or `NELCOTA_IMAGE`)": "imagem do aplicativo (padrão `ghcr.io/hanielcota/nelcota-server` ou `NELCOTA_IMAGE`)",
+  "app image (default `ghcr.io/nelcota/nelcota-server`, or `NELCOTA_IMAGE`)": "imagem do aplicativo (padrão `ghcr.io/nelcota/nelcota-server` ou `NELCOTA_IMAGE`)",
   "image tag (default: the CLI's version)": "tag da imagem (padrão: versão da CLI)",
   "Postgres profile (default: by the RAM split across the projects)": "perfil do Postgres (padrão: conforme a RAM dividida entre os projetos)",
   "backup bucket, written to `host.env` (all four or none; region defaults to `us-east-1`). Without them, an interactive `init` asks, reading the secret key without echo": "bucket de backup, escrito em `host.env` (as quatro opções ou nenhuma; região padrão `us-east-1`). Sem elas, um `init` interativo pergunta, lendo a chave secreta sem exibi-la",

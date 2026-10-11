@@ -41,7 +41,7 @@ passed for the same source before this manual bootstrap.
 
 Configure npm trusted publishing using:
 
-- Owner: `HanielCota`
+- Owner: `Nelcota`
 - Repository: `Nelcota`
 - Workflow filename: `sdk-release.yml`
 - Environment: `npm`

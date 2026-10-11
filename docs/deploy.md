@@ -78,7 +78,7 @@ leaves no half-created host behind.
 | `--panel-login shared\|per-project` | panel login mode when the host is created (default `shared`) |
 | `--email <email>` | administrator email (default `admin@<domain>`) |
 | `-y`, `--yes` | asks no questions (defaults and flags only) |
-| `--image <image>` | app image (default `ghcr.io/hanielcota/nelcota-server`, or `NELCOTA_IMAGE`) |
+| `--image <image>` | app image (default `ghcr.io/nelcota/nelcota-server`, or `NELCOTA_IMAGE`) |
 | `--version <tag>` | image tag (default: the CLI's version) |
 | `--profile 1gb\|2gb\|4gb\|8gb` | Postgres profile (default: by the RAM split across the projects) |
 | `--s3-endpoint`, `--s3-bucket`, `--s3-access-key`, `--s3-secret-key`, `--s3-region` | backup bucket, written to `host.env` (all four or none; region defaults to `us-east-1`). Without them, an interactive `init` asks, reading the secret key without echo |

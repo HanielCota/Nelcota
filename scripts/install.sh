@@ -5,7 +5,7 @@
 #
 # Optional variables:
 #   NELCOTA_VERSION=0.3.0     version (default: the latest)
-#   NELCOTA_REPO=owner/repo   GitHub repository (default: HanielCota/Nelcota)
+#   NELCOTA_REPO=owner/repo   GitHub repository (default: Nelcota/Nelcota)
 #   PREFIX=/usr/local/bin     where to install
 #   NELCOTA_SKIP_DOCKER=1     do not install Docker (for `nelcota init --runtime systemd`)
 #
@@ -13,7 +13,7 @@
 # releases page and check them with `sha256sum -c`. This script does exactly that.
 set -eu
 
-REPO="${NELCOTA_REPO:-HanielCota/Nelcota}"
+REPO="${NELCOTA_REPO:-Nelcota/Nelcota}"
 VERSION="${NELCOTA_VERSION:-latest}"
 PREFIX="${PREFIX:-/usr/local/bin}"
 

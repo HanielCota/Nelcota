@@ -1,14 +1,14 @@
 # @nelcota/client
 
-JavaScript and TypeScript client for [Nelcota](https://github.com/HanielCota/Nelcota): the
+JavaScript and TypeScript client for [Nelcota](https://github.com/Nelcota/Nelcota): the
 REST API under RLS, auth and storage.
 
-Start with the [quickstart](https://github.com/HanielCota/Nelcota/blob/main/docs/quickstart.md)
+Start with the [quickstart](https://github.com/Nelcota/Nelcota/blob/main/docs/quickstart.md)
 (also in [Portuguese](docs/quickstart.pt-BR.md)), the
 [runnable examples](examples/) (their schema is
-[examples/notes.sql](https://github.com/HanielCota/Nelcota/blob/main/examples/notes.sql))
+[examples/notes.sql](https://github.com/Nelcota/Nelcota/blob/main/examples/notes.sql))
 or the [client contract](docs/contract.md). Empty results, 401/403 or a
-1000-row cap? See [troubleshooting](https://github.com/HanielCota/Nelcota/blob/main/docs/troubleshooting.md).
+1000-row cap? See [troubleshooting](https://github.com/Nelcota/Nelcota/blob/main/docs/troubleshooting.md).
 
 - **Thin.** Operations map directly to HTTP; session refresh and read retries
   may add requests. There is no hidden data cache, and
@@ -318,7 +318,7 @@ before HTTP, so an omitted field cannot silently clear an existing restriction.
 
 Who may read or write which file is up to the policies on
 `storage.objects`; see the server's
-[storage docs](https://github.com/HanielCota/Nelcota/blob/main/docs/storage.md).
+[storage docs](https://github.com/Nelcota/Nelcota/blob/main/docs/storage.md).
 
 ## Recipes
 
@@ -459,5 +459,5 @@ engines. Browser checks include the runnable demo, simultaneous refresh across
 two real tabs and sign-out broadcasts. Each run owns unique container names
 and dynamically assigned ports, so it can coexist with development services.
 
-See [releasing.md](https://github.com/HanielCota/Nelcota/blob/main/sdk/typescript/docs/releasing.md) (in the repository) for the account setup, candidate checks
+See [releasing.md](https://github.com/Nelcota/Nelcota/blob/main/sdk/typescript/docs/releasing.md) (in the repository) for the account setup, candidate checks
 and tagged release procedure. [CHANGELOG.md](CHANGELOG.md) tracks SDK changes.

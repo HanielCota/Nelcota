@@ -5,10 +5,10 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/HanielCota/Nelcota.git",
+    "url": "git+https://github.com/Nelcota/Nelcota.git",
     "directory": "sdk/typescript"
   },
-  "homepage": "https://github.com/HanielCota/Nelcota/blob/main/sdk/typescript/README.md",
+  "homepage": "https://github.com/Nelcota/Nelcota/blob/main/sdk/typescript/README.md",
   "keywords": [
     "nelcota",
     "postgres",
