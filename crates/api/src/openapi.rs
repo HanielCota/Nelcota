@@ -116,7 +116,7 @@ pub fn document(catalog: &Catalog, role: Role) -> Value {
         let mut item = Map::new();
         if privileges.select {
             let mut parameters = vec![
-                json!({ "name": "select", "in": "query", "schema": { "type": "string" }, "description": "Columns: col1,col2 or *; embed related rows through foreign keys: customers(name), items(*), alias:table!fk_column(...), nested: orders(id,items(*)); filter, order and page embedded rows with items.qty=gt.1, items.order=qty.desc, items.limit=5" }),
+                json!({ "name": "select", "in": "query", "schema": { "type": "string" }, "description": "Columns: `col1,col2` or `*`; embed related rows through foreign keys: `customers(name)`, `items(*)`, `alias:table!fk_column(...)`, nested: `orders(id,items(*))`; filter, order and page embedded rows with `items.qty=gt.1`, `items.order=qty.desc`, `items.limit=5`" }),
                 json!({ "name": "order", "in": "query", "schema": { "type": "string" }, "description": "col.asc|desc[.nullsfirst|nullslast],..." }),
                 json!({ "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 0 } }),
                 json!({ "name": "offset", "in": "query", "schema": { "type": "integer", "minimum": 0 } }),
@@ -218,7 +218,7 @@ pub fn document(catalog: &Catalog, role: Role) -> Value {
         "info": {
             "title": "Nelcota REST API",
             "version": env!("CARGO_PKG_VERSION"),
-            "description": "API generated from the Postgres schema. Authorization: RLS. Send Authorization: Bearer <jwt>.",
+            "description": "API generated from the Postgres schema. Authorization: RLS. Requests without a token use `anon`. For a signed-in user or your backend, send `Authorization: Bearer <jwt>`.",
         },
         "servers": [{ "url": "/rest/v1" }],
         "paths": paths,
@@ -226,6 +226,76 @@ pub fn document(catalog: &Catalog, role: Role) -> Value {
             "schemas": schemas,
             "securitySchemes": { "bearer": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" } },
         },
-        "security": [{ "bearer": [] }],
+        "security": if role == Role::Anon { json!([{}, { "bearer": [] }]) } else { json!([{ "bearer": [] }]) },
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::catalog::Privileges;
+
+    fn catalog() -> Catalog {
+        let table = |name: &str, privileges| Table {
+            name: name.into(),
+            kind: TableKind::Table,
+            columns: vec![],
+            primary_key: vec![],
+            foreign_keys: vec![],
+            rls_enabled: true,
+            rls_forced: false,
+            comment: None,
+            privileges,
+        };
+        let read = Privileges {
+            select: true,
+            ..Privileges::default()
+        };
+        Catalog {
+            schema: "public".into(),
+            tables: [
+                ("public_notes".into(), table("public_notes", [read; 3])),
+                (
+                    "private_notes".into(),
+                    table("private_notes", [Privileges::default(), read, read]),
+                ),
+            ]
+            .into(),
+            functions: Default::default(),
+        }
+    }
+
+    #[test]
+    fn anonymous_document_allows_tokenless_calls_without_exposing_private_tables() {
+        let doc = document(&catalog(), Role::Anon);
+        assert_eq!(doc["security"], json!([{}, { "bearer": [] }]));
+        assert!(doc["paths"].get("/public_notes").is_some());
+        assert!(doc["paths"].get("/private_notes").is_none());
+        assert!(doc["components"]["schemas"].get("private_notes").is_none());
+    }
+
+    #[test]
+    fn authenticated_and_service_documents_require_their_bearer_token() {
+        for role in [Role::Authenticated, Role::ServiceRole] {
+            let doc = document(&catalog(), role);
+            assert_eq!(doc["security"], json!([{ "bearer": [] }]));
+            assert!(doc["paths"].get("/private_notes").is_some());
+        }
+    }
+
+    #[test]
+    fn generated_markdown_preserves_jwt_placeholders_and_select_wildcards() {
+        let doc = document(&catalog(), Role::Anon);
+        assert!(
+            doc["info"]["description"]
+                .as_str()
+                .unwrap()
+                .contains("`Authorization: Bearer <jwt>`")
+        );
+        let select = &doc["paths"]["/public_notes"]["get"]["parameters"][0];
+        let description = select["description"].as_str().unwrap();
+        assert!(description.contains("`*`"));
+        assert!(description.contains("`items(*)`"));
+        assert!(description.contains("`orders(id,items(*))`"));
+    }
 }
