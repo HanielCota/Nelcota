@@ -39,10 +39,9 @@ pub fn normalize_email(email: &str) -> Result<String, InvalidCredential> {
         })
         && email.parse::<lettre::Address>().is_ok();
     if valid {
-        Ok(email)
-    } else {
-        Err(InvalidCredential("invalid email"))
+        return Ok(email);
     }
+    Err(InvalidCredential("invalid email"))
 }
 
 pub fn validate_password(password: &str) -> Result<(), InvalidCredential> {

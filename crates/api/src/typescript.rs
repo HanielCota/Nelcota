@@ -50,10 +50,9 @@ fn key(name: &str) -> String {
         .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
         && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_');
     if simple {
-        name.to_owned()
-    } else {
-        serde_json::to_string(name).unwrap_or_default()
+        return name.to_owned();
     }
+    serde_json::to_string(name).unwrap_or_default()
 }
 
 /// A TypeScript string literal (JSON escaping is valid TypeScript).

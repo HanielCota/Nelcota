@@ -94,6 +94,9 @@ pub(crate) async fn signup(
         Some(data @ Value::Object(_)) => data,
         Some(_) => return Err(validation("data must be a JSON object")),
     };
+    let mail_slot = confirmation::required(state)
+        .then(|| state.mail_delivery.reserve())
+        .transpose()?;
 
     let hash = state
         .passwords
@@ -121,15 +124,15 @@ pub(crate) async fn signup(
         }
         Err(err) => return Err(db_error(err)),
     };
-    if !confirmation::required(state) {
+    let Some(mail_slot) = mail_slot else {
         let session = start_session(state, &tx, user_id, ip, user_agent).await?;
         tx.commit().await.map_err(db_error)?;
         return Ok(session);
-    }
+    };
     let (pending, token) = confirmation::pending_signup(&tx, user_id).await?;
     tx.commit().await.map_err(db_error)?;
     if let Some(token) = token {
-        links::deliver(state, LinkKind::Signup, &email, &token);
+        links::deliver(state, LinkKind::Signup, &email, &token, mail_slot);
     }
     Ok(pending)
 }

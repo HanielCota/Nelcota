@@ -177,11 +177,10 @@ impl Error {
 
     pub(crate) fn network(error: reqwest::Error) -> Self {
         if error.is_timeout() {
-            Self::Timeout
-        } else {
-            // URLs may contain signed storage tokens. Never include them in errors.
-            Self::Network(error.without_url().to_string())
+            return Self::Timeout;
         }
+        // URLs may contain signed storage tokens. Never include them in errors.
+        Self::Network(error.without_url().to_string())
     }
 }
 

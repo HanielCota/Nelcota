@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { api, ApiError } from './api'
+import { api, ApiError, parseResponse } from './api'
 import { errorMessage, i18n } from './i18n/index.svelte'
 import { session } from './features/auth/session.svelte'
 
@@ -19,6 +19,41 @@ async function failure(): Promise<ApiError> {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('error responses', () => {
+  it.each([undefined, '1', '1000000'])('cancels oversized proxy errors with length %s', async length => {
+    const cancel = vi.fn()
+    let chunks = 0
+    const pull = vi.fn((controller: ReadableStreamDefaultController<Uint8Array>) => {
+      if (chunks++ === 10) { controller.close(); return }
+      controller.enqueue(new Uint8Array(8192))
+    })
+    const body = new ReadableStream({ pull, cancel }, { highWaterMark: 0 })
+    const headers = length ? { 'content-length': length } : undefined
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(body, { status: 502, headers })))
+    const error = await failure()
+    expect(error).toBeInstanceOf(ApiError)
+    expect(error).toMatchObject({ status: 502, code: 'server_unreachable' })
+    expect(cancel).toHaveBeenCalledOnce()
+    expect(pull.mock.calls.length).toBe(length === '1000000' ? 0 : 9)
+    expect(body.locked).toBe(false)
+  })
+
+  it('preserves a valid error at the exact byte boundary', async () => {
+    const error = JSON.stringify({ error: 'ação', code: 'db_error' })
+    respond(error + ' '.repeat(65536 - new TextEncoder().encode(error).length), 409)
+    expect(await failure()).toMatchObject({ status: 409, code: 'db_error', message: 'ação' })
+  })
+
+  it('an oversized 401 still expires the local session', async () => {
+    session.email = 'admin@example.com'
+    session.expired = false
+    // The query cache cancels callers on sign-out; inspect the parser's
+    // HTTP failure directly while still exercising the session boundary.
+    await expect(parseResponse(new Response(' '.repeat(65537), { status: 401 }), '/anything', 'GET'))
+      .rejects.toMatchObject({ status: 401 })
+    expect(session.email).toBeNull()
+    expect(session.expired).toBe(true)
+  })
+
   it('keeps the code and text of a panel error', async () => {
     respond(JSON.stringify({ error: 'bucket not found', code: 'bucket_not_found' }), 404)
     const error = await failure()

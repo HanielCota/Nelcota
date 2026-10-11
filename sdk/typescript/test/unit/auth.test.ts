@@ -72,6 +72,22 @@ describe('session storage keys', () => {
 });
 
 describe('password sign-in', () => {
+  it('persists a pending sign-in after disposal without broadcasting on a closed channel', async () => {
+    vi.stubGlobal('window', {});
+    vi.stubGlobal('document', {});
+    let finish!: (response: Response) => void;
+    let started!: () => void;
+    const begun = new Promise<void>(resolve => { started = resolve; });
+    const response = new Promise<Response>(resolve => { finish = resolve; });
+    const { nelcota, storage } = setup(memoryStorage(), async () => { started(); return response; });
+    const pending = nelcota.auth.signInWithPassword({ email: 'a@x.com', password: 'pw' });
+    await begun;
+    nelcota.dispose();
+    nelcota.dispose();
+    finish(json(session()));
+    expect((await pending).error).toBeNull();
+    expect(JSON.parse((await storage.getItem(KEY))!).refresh_token).toBe('refresh-1');
+  });
   it('accepts cancellation options without sending an aborted sign-in', async () => {
     const { nelcota, calls } = setup();
     const controller = new AbortController();
@@ -322,7 +338,113 @@ describe('refresh', () => {
   });
 });
 
+describe('background adapter failures', () => {
+  it.each([false, true, 'async'])('observes startup storage failure and isolates its handler (throws: %s)', async throws => {
+    vi.useFakeTimers();
+    const failed = new Error('storage unavailable');
+    const storage = memoryStorage();
+    vi.spyOn(storage, 'getItem').mockRejectedValue(failed);
+    const onBackgroundError = vi.fn(() => {
+      if (throws === 'async') return Promise.reject(new Error('handler failed'));
+      if (throws) throw new Error('handler failed');
+    });
+    const nelcota = createClient('https://api.example.com', { auth: { storage, autoRefresh: true, onBackgroundError } });
+    try {
+      await vi.advanceTimersByTimeAsync(0);
+      expect(onBackgroundError).toHaveBeenCalledExactlyOnceWith(failed);
+      expect(vi.getTimerCount()).toBe(0);
+      await expect(nelcota.auth.getSession()).rejects.toBe(failed);
+    } finally { nelcota.dispose(); vi.useRealTimers(); }
+  });
+
+  it('pauses on a failed background write and resumes with the replacement token', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('window', {});
+    vi.stubGlobal('document', {});
+    let channel!: { onmessage?: (event: { data: string }) => void };
+    vi.stubGlobal('BroadcastChannel', class {
+      onmessage?: (event: { data: string }) => void;
+      constructor() { channel = this; }
+      close() {}
+      postMessage() {}
+    });
+    const storage = stored(session(120));
+    const failed = new Error('storage unavailable');
+    vi.spyOn(storage, 'setItem').mockRejectedValueOnce(failed);
+    const onBackgroundError = vi.fn();
+    const mock = mockFetch(json(session(900, 'refresh-2', 'access-2')), json(session(900, 'refresh-3', 'access-3')));
+    const nelcota = createClient('https://api.example.com', { fetch: mock.fetch, auth: { storage, autoRefresh: true, onBackgroundError } });
+    try {
+      await vi.advanceTimersByTimeAsync(61_000);
+      expect(onBackgroundError).toHaveBeenCalledExactlyOnceWith(failed);
+      expect((await nelcota.auth.getSession()).data?.refresh_token).toBe('refresh-2');
+      expect(vi.getTimerCount()).toBe(0);
+      channel.onmessage?.({ data: 'changed' });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(vi.getTimerCount()).toBe(0);
+      await nelcota.auth.refreshSession();
+      expect(JSON.parse(mock.calls[1]!.body!).refresh_token).toBe('refresh-2');
+      expect(vi.getTimerCount()).toBe(1);
+    } finally { nelcota.dispose(); vi.useRealTimers(); }
+  });
+
+  it('observes a failed reload from another tab even without auto-refresh', async () => {
+    vi.stubGlobal('window', {});
+    vi.stubGlobal('document', {});
+    let channel!: { onmessage?: (event: { data: string }) => void };
+    vi.stubGlobal('BroadcastChannel', class {
+      onmessage?: (event: { data: string }) => void;
+      constructor() { channel = this; }
+      close() {}
+      postMessage() {}
+    });
+    const storage = stored(session());
+    const failed = new Error('storage unavailable');
+    const onBackgroundError = vi.fn();
+    const nelcota = createClient('https://api.example.com', { auth: { storage, autoRefresh: false, onBackgroundError } });
+    try {
+      await nelcota.auth.getSession();
+      vi.spyOn(storage, 'getItem').mockRejectedValueOnce(failed);
+      channel.onmessage?.({ data: 'changed' });
+      await vi.waitFor(() => expect(onBackgroundError).toHaveBeenCalledExactlyOnceWith(failed));
+    } finally { nelcota.dispose(); }
+  });
+});
+
 describe('sign-out and user', () => {
+  it('never reuses a spent refresh token after persistence fails', async () => {
+    const storage = stored(session(30));
+    const failed = new Error('storage unavailable');
+    const setItem = vi.spyOn(storage, 'setItem').mockRejectedValueOnce(failed);
+    const { nelcota, calls } = setup(storage,
+      json(session(900, 'refresh-2', 'access-2')),
+      json(session(900, 'refresh-3', 'access-3')),
+    );
+    try {
+      await expect(nelcota.auth.refreshSession()).rejects.toBe(failed);
+      expect((await nelcota.auth.getSession()).data?.refresh_token).toBe('refresh-2');
+      await nelcota.auth.refreshSession();
+      expect(JSON.parse(calls[1]!.body!).refresh_token).toBe('refresh-2');
+      expect(setItem).toHaveBeenCalledTimes(2);
+      expect(JSON.parse((await storage.getItem(KEY))!).refresh_token).toBe('refresh-3');
+    } finally { nelcota.dispose(); }
+  });
+
+  it('does not restore a revoked session after local deletion fails', async () => {
+    const storage = stored(session());
+    const failed = new Error('storage unavailable');
+    vi.spyOn(storage, 'removeItem').mockRejectedValueOnce(failed);
+    const { nelcota, calls } = setup(storage, empty());
+    try {
+      await expect(nelcota.auth.signOut()).rejects.toBe(failed);
+      expect((await nelcota.auth.getSession()).data).toBeNull();
+      expect((await nelcota.auth.refreshSession()).error?.code).toBe('session_missing');
+      await nelcota.auth.signOut();
+      expect(calls).toHaveLength(1);
+      expect(await storage.getItem(KEY)).toBeNull();
+    } finally { nelcota.dispose(); }
+  });
+
   it('updateUser sends snake_case fields and stores the returned user', async () => {
     const changed = { ...session().user, user_metadata: { plan: 'pro' } };
     const { nelcota, calls, storage, events } = setup(stored(session()), json(changed));

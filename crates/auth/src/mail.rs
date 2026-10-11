@@ -5,7 +5,11 @@
 //! of its own: it uses whatever SMTP the project configures (Postmark, SES,
 //! Resend, Gmail, the hosting provider's...).
 
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
+
+use axum::http::StatusCode;
+use nelcota_core::ApiError;
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 use futures_util::future::BoxFuture;
 use lettre::{
@@ -28,6 +32,61 @@ pub struct MailError(pub String);
 
 pub trait Mailer: Send + Sync + 'static {
     fn send(&self, email: Email) -> BoxFuture<'_, Result<(), MailError>>;
+}
+
+/// Admission and lifetime budget shared by every auth email flow.
+/// Reserve before issuing a token; overload must not consume its cooldown.
+pub struct MailDelivery {
+    slots: Arc<Semaphore>,
+    timeout: Duration,
+}
+
+impl Default for MailDelivery {
+    fn default() -> Self {
+        Self::new(16, Duration::from_secs(30))
+    }
+}
+
+impl MailDelivery {
+    pub fn new(max_in_flight: usize, timeout: Duration) -> Self {
+        Self {
+            slots: Arc::new(Semaphore::new(max_in_flight.max(1))),
+            timeout,
+        }
+    }
+
+    pub(crate) fn reserve(&self) -> Result<MailSlot, ApiError> {
+        let permit = self.slots.clone().try_acquire_owned().map_err(|_| {
+            ApiError::new(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "mail_busy",
+                "all email delivery slots are busy; retry later",
+            )
+        })?;
+        Ok(MailSlot {
+            _permit: permit,
+            timeout: self.timeout,
+        })
+    }
+}
+
+pub(crate) struct MailSlot {
+    _permit: OwnedSemaphorePermit,
+    timeout: Duration,
+}
+
+impl MailSlot {
+    pub(crate) fn send(self, mailer: Arc<dyn Mailer>, message: Email, kind: &'static str) {
+        tokio::spawn(async move {
+            let slot = self;
+            match tokio::time::timeout(slot.timeout, mailer.send(message)).await {
+                Ok(Ok(())) => {}
+                Ok(Err(err)) => tracing::error!(error = %err, kind, "failed to send a link email"),
+                Err(_) => tracing::error!(kind, "link email delivery timed out"),
+            }
+            drop(slot);
+        });
+    }
 }
 
 /// SMTP configured by URL, in lettre's format:
@@ -77,7 +136,54 @@ impl Mailer for SmtpMailer {
 
 #[cfg(test)]
 mod tests {
-    use super::SmtpMailer;
+    use super::*;
+
+    #[tokio::test]
+    async fn delivery_deadline_drops_the_mailer_future_and_returns_capacity() {
+        struct NeverMailer {
+            started: tokio::sync::Notify,
+            dropped: Arc<std::sync::atomic::AtomicBool>,
+        }
+        impl Mailer for NeverMailer {
+            fn send(&self, _: Email) -> BoxFuture<'_, Result<(), MailError>> {
+                struct Guard(Arc<std::sync::atomic::AtomicBool>);
+                impl Drop for Guard {
+                    fn drop(&mut self) {
+                        self.0.store(true, std::sync::atomic::Ordering::Release);
+                    }
+                }
+                Box::pin(async {
+                    let _guard = Guard(self.dropped.clone());
+                    self.started.notify_one();
+                    std::future::pending().await
+                })
+            }
+        }
+        let delivery = MailDelivery::new(1, Duration::from_millis(50));
+        let dropped = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let mailer = Arc::new(NeverMailer {
+            started: tokio::sync::Notify::new(),
+            dropped: dropped.clone(),
+        });
+        delivery.reserve().unwrap().send(
+            mailer.clone(),
+            Email {
+                to: "test@example.com".into(),
+                subject: "test".into(),
+                text: "test".into(),
+            },
+            "recovery",
+        );
+        mailer.started.notified().await;
+        assert!(delivery.reserve().is_err());
+        let permit = tokio::time::timeout(Duration::from_secs(1), delivery.slots.acquire())
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(dropped.load(std::sync::atomic::Ordering::Acquire));
+        drop(permit);
+        assert!(delivery.reserve().is_ok());
+    }
 
     #[test]
     fn valid_and_invalid_settings() {

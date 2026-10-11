@@ -28,6 +28,9 @@ panel, run `npm run build` and commit `dist` in its own commit.
   (`feat(storage): ...`, `fix(cli): ...`), imperative, with a body saying why.
 - Code, comments, docs and commit messages are in English. Only the panel's
   interface is translated (pt-BR and en, through the i18n catalogs).
+- Prefer guard clauses and early returns to nested `if`/`else` control flow;
+  use `match` or `switch` for distinct cases. Rust `let ... else`, conditional
+  value expressions and Svelte rendering branches remain appropriate.
 - Security-sensitive code (auth, RLS, SQL building, storage) needs a test that
   proves the boundary holds, e.g. that one user cannot reach another's data.
 - Migrations in `migrations/` are never edited once released: add a new one.

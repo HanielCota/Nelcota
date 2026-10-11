@@ -55,9 +55,13 @@ export function rowPayload(
     const value = f.isNull ? null : f.value
     if (original) {
       if (value !== original[c.name]) values[c.name] = value
-    } else if (f.isNull) {
+      continue
+    }
+    if (f.isNull) {
       values[c.name] = null
-    } else if (f.value !== '') {
+      continue
+    }
+    if (f.value !== '') {
       values[c.name] = f.value
     }
   }

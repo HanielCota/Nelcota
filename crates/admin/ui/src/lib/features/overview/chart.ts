@@ -37,12 +37,10 @@ export function monotonePath(points: readonly Point[]): string {
   for (let i = 1; i < n - 1; i++) {
     const s0 = slope[i - 1]!
     const s1 = slope[i]!
-    if (s0 * s1 <= 0) tangent.push(0)
-    else {
-      const w0 = 2 * dx[i]! + dx[i - 1]!
-      const w1 = dx[i]! + 2 * dx[i - 1]!
-      tangent.push((w0 + w1) / (w0 / s0 + w1 / s1))
-    }
+    if (s0 * s1 <= 0) { tangent.push(0); continue }
+    const w0 = 2 * dx[i]! + dx[i - 1]!
+    const w1 = dx[i]! + 2 * dx[i - 1]!
+    tangent.push((w0 + w1) / (w0 / s0 + w1 / s1))
   }
   tangent.push(slope[n - 2]!)
   let path = `M${round(first.x)},${round(first.y)}`

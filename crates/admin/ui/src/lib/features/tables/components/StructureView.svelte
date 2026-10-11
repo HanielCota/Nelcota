@@ -65,14 +65,12 @@
   async function alter(actions: AlterAction[]) {
     if (actions.length === 0) return
     try {
-      const result = await ddl.alterTable(name, actions)
+      await ddl.alterTable(name, actions)
       toast.success(t('tables.toast.tableAltered'))
       const renamed = actions.findLast((a) => a.action === 'rename_table')
-      if (renamed) onrenamed(renamed.name)
-      else {
-        await load()
-        onaltered?.()
-      }
+      if (renamed) { onrenamed(renamed.name); return }
+      await load()
+      onaltered?.()
     } catch (e) {
       toast.error(errorMessage(e))
       throw e

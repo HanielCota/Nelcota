@@ -56,8 +56,8 @@
   })
 
   function chooseRunAs(viewer: Viewer) {
-    if (viewer.mode === 'authenticated' && viewer.user) setRunAs('authenticated', viewer.user)
-    else setRunAs(viewer.mode === 'anon' ? 'anon' : 'owner')
+    if (viewer.mode === 'authenticated' && viewer.user) { setRunAs('authenticated', viewer.user); return }
+    setRunAs(viewer.mode === 'anon' ? 'anon' : 'owner')
   }
   import { SQL_SNIPPETS } from '$lib/features/sql/sql-snippets'
   import { sqlStore, type SavedQuery, type SqlDraft } from '$lib/features/sql/sql-store.svelte'
@@ -129,9 +129,9 @@
     if (current) {
       sqlStore.save(current.name)
       toast.success(t('sql.editor.savedToast', { name: current.name }))
-    } else {
-      openDialog({ mode: 'save' })
+      return
     }
+    openDialog({ mode: 'save' })
   }
 
   function openDialog(next: { mode: 'save' | 'rename'; query?: SavedQuery }) {
@@ -142,10 +142,10 @@
   function submitName(name: string) {
     if (dialog?.mode === 'rename' && dialog.query) {
       sqlStore.rename(dialog.query.id, name)
-    } else {
-      sqlStore.save(name, true)
-      toast.success(t('sql.editor.savedToast', { name }))
+      return
     }
+    sqlStore.save(name, true)
+    toast.success(t('sql.editor.savedToast', { name }))
   }
 
   function askDelete(query: SavedQuery) {
@@ -156,8 +156,8 @@
   function exportResult(result: SqlResult, index: number, format: 'csv' | 'json') {
     const base = (sqlStore.current?.name ?? t('sql.editor.exportBaseName')).replace(/[^\w-]+/g, '_')
     const name = `${base}${index > 0 ? `-${index + 1}` : ''}.${format}`
-    if (format === 'csv') downloadText(name, toCsv(result.columns, result.rows), 'text/csv;charset=utf-8')
-    else downloadText(name, toJson(result.columns, result.rows), 'application/json')
+    if (format === 'csv') { downloadText(name, toCsv(result.columns, result.rows), 'text/csv;charset=utf-8'); return }
+    downloadText(name, toJson(result.columns, result.rows), 'application/json')
   }
 
   function onKeydown(event: KeyboardEvent) {

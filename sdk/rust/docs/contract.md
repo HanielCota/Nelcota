@@ -24,9 +24,14 @@ Responses become Rust Result values; empty bodies become JSON null (decode to
 unit or an appropriate Option). `Response<T>` carries status, count and headers.
 Auth/storage convenience methods return the decoded model or structured error.
 
+HTTP error bodies larger than 64 KiB are discarded; status, a generic error
+code and Retry-After remain available. Successful responses keep their existing
+buffering or streaming contract.
+
 One Client and its clones share lifecycle coordination. Explicit token clones
 control REST/storage and get_user only; other auth methods manage the shared
-login session. Per-request cancellation does not stop an accepted rotation.
+login session. Refresh waiters share one background rotation task; cancelling
+or dropping them does not leave a task per waiter or stop an accepted rotation.
 Default sessions never persist outside memory. Shared stores across independently
 constructed clients/processes require their own coordination.
 

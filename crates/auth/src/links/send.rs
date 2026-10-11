@@ -11,6 +11,7 @@ use crate::{
     credentials::normalize_email,
     db::{begin_auth, db_error},
     error::invalid_email,
+    mail::MailSlot,
 };
 
 fn disabled(kind: LinkKind) -> ApiError {
@@ -49,6 +50,9 @@ pub(crate) fn ensure_enabled(
 pub(crate) async fn send(state: &AuthState, kind: LinkKind, email: &str) -> Result<(), ApiError> {
     ensure_enabled(state, kind)?;
     let email = normalize_email(email).map_err(invalid_email)?;
+    // Admission precedes the account lookup for the same overload response
+    // whether or not the account exists. No committed token is dropped.
+    let slot = state.mail_delivery.reserve()?;
 
     let mut client = state.pool.get().await.map_err(ApiError::from_pool)?;
     let tx = begin_auth(&mut client).await?;
@@ -68,7 +72,7 @@ pub(crate) async fn send(state: &AuthState, kind: LinkKind, email: &str) -> Resu
     tx.commit().await.map_err(db_error)?;
 
     if let Some(token) = token {
-        deliver(state, kind, &email, &token);
+        deliver(state, kind, &email, &token, slot);
     }
     Ok(())
 }
@@ -76,16 +80,11 @@ pub(crate) async fn send(state: &AuthState, kind: LinkKind, email: &str) -> Resu
 /// Sends a committed link in the background: the response time does not
 /// reveal whether the account exists, and an SMTP failure is not the
 /// requester's error (it goes to the log).
-pub(crate) fn deliver(state: &AuthState, kind: LinkKind, to: &str, token: &str) {
+pub(crate) fn deliver(state: &AuthState, kind: LinkKind, to: &str, token: &str, slot: MailSlot) {
     // Links are only issued while their flow is enabled.
     let Ok((mailer, page_url)) = ensure_enabled(state, kind) else {
         return;
     };
     let message = compose(kind, to, page_url, token);
-    let mailer = mailer.clone();
-    tokio::spawn(async move {
-        if let Err(err) = mailer.send(message).await {
-            tracing::error!(error = %err, kind = kind.as_str(), "failed to send a link email");
-        }
-    });
+    slot.send(mailer.clone(), message, kind.as_str());
 }

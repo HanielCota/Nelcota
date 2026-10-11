@@ -39,6 +39,33 @@ export interface RequestSpec {
 }
 
 const MAX_RETRY_WAIT_MS = 30_000;
+const MAX_ERROR_BYTES = 64 * 1024;
+
+/** Error pages are metadata, even when a proxy sends a large or endless body. */
+async function errorBody(response: Response): Promise<string | null> {
+  if (!response.body) return '';
+  const length = response.headers.get('content-length');
+  if (length !== null && /^\d+$/.test(length) && Number(length) > MAX_ERROR_BYTES) {
+    void response.body.cancel().catch(() => {});
+    return null;
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  const parts: string[] = [];
+  let size = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) return parts.join('') + decoder.decode();
+      size += value.byteLength;
+      if (size > MAX_ERROR_BYTES) {
+        void reader.cancel().catch(() => {});
+        return null;
+      }
+      parts.push(decoder.decode(value, { stream: true }));
+    }
+  } finally { reader.releaseLock(); }
+}
 
 function nonNegativeInteger(value: number, name: string, maximum = Number.MAX_SAFE_INTEGER): void {
   if (!Number.isSafeInteger(value) || value < 0 || value > maximum) {
@@ -86,9 +113,9 @@ export async function errorFromResponse(response: Response): Promise<NelcotaErro
   let code = codeForStatus(response.status);
   let message = response.statusText || `HTTP ${response.status}`;
   let record: Record<string, unknown> = {};
-  const text = await response.text();
+  const text = await errorBody(response);
   try {
-    const body: unknown = JSON.parse(text);
+    const body: unknown = text === null ? null : JSON.parse(text);
     if (typeof body === 'object' && body !== null && !Array.isArray(body)) {
       record = body as Record<string, unknown>;
       code = optionalString(record, 'code') ?? code;
@@ -168,9 +195,8 @@ export class HttpClient {
     for (const [name, value] of Object.entries(spec.headers ?? {})) headers.set(name, value);
     if (spec.auth === false) headers.delete('authorization');
 
-    let token: string | null = null;
-    if (typeof spec.auth === 'string') token = spec.auth;
-    else if (spec.auth !== false) {
+    let token: string | null = typeof spec.auth === 'string' ? spec.auth : null;
+    if (spec.auth !== false && typeof spec.auth !== 'string') {
       const result = await abortable(Promise.resolve(this.#options.token()), spec.signal);
       if (result.error) return { data: null, response: null, error: result.error };
       token = result.data;
@@ -225,11 +251,10 @@ export class HttpClient {
         if (spec.signal?.aborted) {
           return { data: null, response: null, error: clientError('aborted', 'The request was aborted', cause) };
         }
-        if ((signal?.aborted && signal.reason?.name === 'TimeoutError') || (cause instanceof DOMException && cause.name === 'TimeoutError')) {
-          failure = clientError('timeout', `No response within ${timeout} ms`, cause);
-        } else {
-          failure = clientError('network_error', 'The server could not be reached', cause);
-        }
+        const timedOut = (signal?.aborted && signal.reason?.name === 'TimeoutError') || (cause instanceof DOMException && cause.name === 'TimeoutError');
+        failure = timedOut
+          ? clientError('timeout', `No response within ${timeout} ms`, cause)
+          : clientError('network_error', 'The server could not be reached', cause);
         if (attempt >= retries) return { data: null, response: null, error: failure };
       }
       try {

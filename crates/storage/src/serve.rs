@@ -99,10 +99,9 @@ fn parse_range(value: &str, size: u64) -> Ranged {
         _ => return Ranged::Full,
     };
     if size == 0 || range.0 >= size {
-        Ranged::Unsatisfiable
-    } else {
-        Ranged::Part(range.0, range.1)
+        return Ranged::Unsatisfiable;
     }
+    Ranged::Part(range.0, range.1)
 }
 
 fn etag_matches(list: &str, etag: &str) -> bool {

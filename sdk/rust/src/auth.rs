@@ -15,7 +15,7 @@ use std::{
     },
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
-use tokio::sync::{Mutex, broadcast};
+use tokio::sync::{Mutex, broadcast, watch};
 use url::Url;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -196,8 +196,10 @@ struct State {
     session: Option<Session>,
     last_refresh: Option<Result<Session>>,
 }
+type RefreshReceiver = watch::Receiver<Option<Result<Session>>>;
 pub(crate) struct Manager {
     gate: Mutex<State>,
+    refreshing: std::sync::Mutex<Option<RefreshReceiver>>,
     epoch: AtomicU64,
     storage: Arc<dyn SessionStorage>,
     margin: Duration,
@@ -207,6 +209,7 @@ impl Manager {
     pub(crate) fn new(storage: Arc<dyn SessionStorage>, margin: Duration) -> Self {
         Self {
             gate: Mutex::new(State::default()),
+            refreshing: std::sync::Mutex::new(None),
             epoch: AtomicU64::new(0),
             storage,
             margin,
@@ -329,53 +332,85 @@ impl AuthClient {
         {
             return Err(Error::Cancelled);
         }
-        let mut auth = self.clone();
-        // Rotation continues if a waiter is dropped/cancelled after the server consumes the token.
-        auth.client.options.cancellation = None;
-        let task = tokio::spawn(async move {
-            let manager = &auth.client.inner.auth;
-            let mut state = manager.gate.lock().await;
-            manager.load(&mut state).await?;
-            if manager.epoch.load(Ordering::Acquire) != observed {
-                if let Some(result) = &state.last_refresh {
-                    return result.clone();
+        // Keep one detached rotation, rather than one task waiting for the
+        // lifecycle lock per caller. Cancelling waiters must not retain them.
+        let mut receiver = {
+            let manager = &self.client.inner.auth;
+            let mut running = manager.refreshing.lock().unwrap_or_else(|e| e.into_inner());
+            match running.as_ref().filter(|r| r.has_changed().is_ok()) {
+                Some(receiver) => receiver.clone(),
+                None => {
+                    let (sender, receiver) = watch::channel(None);
+                    *running = Some(receiver.clone());
+                    let mut auth = self.clone();
+                    // Once started, rotation continues when its waiters cancel.
+                    auth.client.options.cancellation = None;
+                    tokio::spawn(async move {
+                        let result = auth.rotate_since(observed).await;
+                        let manager = &auth.client.inner.auth;
+                        let mut running =
+                            manager.refreshing.lock().unwrap_or_else(|e| e.into_inner());
+                        sender.send_replace(Some(result));
+                        *running = None;
+                    });
+                    receiver
                 }
-                return state.session.clone().ok_or(Error::SessionMissing);
             }
-            let current = state.session.as_ref().ok_or(Error::SessionMissing)?;
-            let result = auth
-                .token(
-                    "refresh_token",
-                    json!({"refresh_token": current.refresh_token}),
-                )
-                .await;
-            let result = match result {
-                Ok(session) => manager
-                    .save(&mut state, Some(session.clone()), AuthEventKind::Refreshed)
-                    .await
-                    .map(|()| session),
-                Err(error) => {
-                    if error.code() == "invalid_grant" {
-                        let _ = manager
-                            .save(&mut state, None, AuthEventKind::SignedOut)
-                            .await;
-                    }
-                    Err(error)
+        };
+        let wait = async move {
+            loop {
+                let result = receiver.borrow_and_update().clone();
+                if let Some(result) = result {
+                    return result;
                 }
-            };
-            manager.epoch.fetch_add(1, Ordering::Release);
-            state.last_refresh = Some(result.clone());
-            result
-        });
-        let wait = async {
-            task.await
-                .map_err(|_| Error::Network("refresh task failed".into()))?
+                if receiver.changed().await.is_err() {
+                    return receiver
+                        .borrow()
+                        .clone()
+                        .unwrap_or_else(|| Err(Error::Network("refresh task failed".into())));
+                }
+            }
         };
         if let Some(token) = &self.client.options.cancellation {
-            tokio::select! { biased; _ = token.cancelled() => Err(Error::Cancelled), result = wait => result }
-        } else {
-            wait.await
+            return tokio::select! { biased; _ = token.cancelled() => Err(Error::Cancelled), result = wait => result };
         }
+        wait.await
+    }
+
+    async fn rotate_since(&self, observed: u64) -> Result<Session> {
+        let manager = &self.client.inner.auth;
+        let mut state = manager.gate.lock().await;
+        manager.load(&mut state).await?;
+        if manager.epoch.load(Ordering::Acquire) != observed {
+            if let Some(result) = &state.last_refresh {
+                return result.clone();
+            }
+            return state.session.clone().ok_or(Error::SessionMissing);
+        }
+        let current = state.session.as_ref().ok_or(Error::SessionMissing)?;
+        let result = self
+            .token(
+                "refresh_token",
+                json!({"refresh_token": current.refresh_token}),
+            )
+            .await;
+        let result = match result {
+            Ok(session) => manager
+                .save(&mut state, Some(session.clone()), AuthEventKind::Refreshed)
+                .await
+                .map(|()| session),
+            Err(error) => {
+                if error.code() == "invalid_grant" {
+                    let _ = manager
+                        .save(&mut state, None, AuthEventKind::SignedOut)
+                        .await;
+                }
+                Err(error)
+            }
+        };
+        manager.epoch.fetch_add(1, Ordering::Release);
+        state.last_refresh = Some(result.clone());
+        result
     }
 
     pub async fn set_session(&self, session: Session) -> Result<()> {
@@ -426,16 +461,15 @@ impl AuthClient {
             manager
                 .save(&mut state, Some(session.clone()), AuthEventKind::SignedIn)
                 .await?;
-            Ok(SignUp {
+            return Ok(SignUp {
                 user: session.user.clone(),
                 session: Some(session),
-            })
-        } else {
-            Ok(SignUp {
-                user: decode(response.data["user"].clone(), response.status)?,
-                session: None,
-            })
+            });
         }
+        Ok(SignUp {
+            user: decode(response.data["user"].clone(), response.status)?,
+            session: None,
+        })
     }
 
     pub async fn sign_in_with_password(&self, email: &str, password: &str) -> Result<Session> {
@@ -797,10 +831,9 @@ impl EmailLink {
 fn address(email: &str) -> Result<&str> {
     let email = email.trim();
     if email.is_empty() {
-        Err(Error::Usage("email is required".into()))
-    } else {
-        Ok(email)
+        return Err(Error::Usage("email is required".into()));
     }
+    Ok(email)
 }
 fn decode<T: serde::de::DeserializeOwned>(value: Value, status: u16) -> Result<T> {
     serde_json::from_value(value).map_err(|e| Error::InvalidResponse {

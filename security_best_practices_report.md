@@ -2,6 +2,276 @@
 
 Auditorias: 09/10 e 10/10/2026. Correções: 10/10/2026. Projeto: `D:/Nelcota`.
 
+## Pull request integration verification — 2026-10-11 (Linux)
+
+Applied the review commit to a dedicated `codex/security-review` worktree based
+on the current `origin/main` (`2d89458`). Only generated panel assets conflicted;
+they were regenerated using clean `npm ci` dependencies and the integrated
+sources. Upstream OpenAPI fixes, organization links, release metadata and
+published server/SDK versions are preserved. Pending changes in the original
+worktree remain outside this branch.
+
+Final integration validation passed:
+
+- **416 Rust tests**: all 415 workspace cases, including SDK doctests, plus the
+  explicit S3 case against a fresh RustFS 1.0.1 container. S3 covers small and
+  multipart uploads, exact bytes, signed expiry and physical object deletion.
+- Rustfmt, Clippy for all workspace targets with warnings denied and the
+  await-holding-lock lint, server build, Rust SDK documentation, verified crate
+  packaging and an external archive consumer.
+- **295 panel unit tests and 37 Chromium E2E tests**, Svelte/TypeScript checks
+  with no diagnostics, generated contracts, translations, both clean production
+  builds and unchanged versioned assets on the second build.
+- **128 TypeScript SDK unit tests, 15 type tests and 29 real server contracts**,
+  Chromium/CORS smoke checks, two-tab refresh/sign-out and the runnable demo.
+  Node 26 runtime, external package consumers and gzip budgets also passed.
+- Cargo Audit/Deny and both npm audits. The existing documented RSA advisory
+  exception is unchanged. Source/documentation whitespace checks passed.
+
+Local Rust validation obeyed the machine's low-priority/resource limits. Its
+shared Postgres 17 fixture was a temporary adapter, not a committed change.
+Two workers exposed a cluster-wide role collision in the idempotency test;
+serial execution passed. The CLI fixture also needed to target its isolated
+rather than control database. That local adjustment passed and was restored.
+After the SDK fixture failed, only the remaining suites and doctests were run;
+all preceding successful serial suites count once in the totals above. The
+committed testcontainers harness remains unchanged apart from the review fixes.
+All temporary fixture edits were restored, and the task-owned containers removed.
+
+The real-server contracts initially failed to receive magic-link and recovery
+emails. The Mailpit SMTP greeting was delayed for Docker bridge clients while
+container-loopback SMTP responded immediately. Setting
+`MP_SMTP_DISABLE_RDNS=true` in the contract runner eliminated external DNS
+from this fixture; all 29 contracts and Chromium flows then passed. This
+additional test-runner correction is included in the review commit. The option
+and test-network delay are documented in the
+[Mailpit runtime options](https://mailpit.axllent.org/docs/configuration/runtime-options/).
+
+Validation here uses Linux, Rust 1.99, Node 26 and Chromium. Other supported
+runtimes, browser engines and operating systems remain covered by GitHub CI.
+The original working files, local `main` and index were preserved.
+
+## Final diff and commit verification — 2026-10-11 (Linux)
+
+Compared the final sources with the saved pre-review working tree and applied
+only the review changes to the committed baseline in an isolated directory.
+Pre-existing webhook features, migrations, configuration, dependency changes
+and images were excluded. Two control-flow simplifications in new, untracked
+webhook files remain with that pending feature; they are not part of this
+commit. A concurrent Vitest worker-limit change was also preserved and excluded.
+The embedded panel was rebuilt from the selected sources, so its compiled
+assets do not incorporate pending webhook or image changes.
+
+The selected commit content passed:
+
+- **413 Rust tests**: 412 workspace tests, including SDK doctests, plus the
+  explicit S3 test against an isolated RustFS 1.0.1 service. Rustfmt and Clippy
+  passed with warnings denied and the await-holding-lock check enabled.
+- **294 panel unit tests and 37 Chromium E2E tests**, Svelte/TypeScript checks
+  with zero diagnostics, guide translation checks and production build.
+- **128 TypeScript SDK unit tests, 15 type tests and 29 real server contracts**
+  with PostgreSQL 17 and Mailpit. Chromium browser, two-tab refresh/sign-out,
+  runnable demo, Node 26 runtime, external package consumer and size checks
+  passed after the final cross-tab persistence fix.
+- Cargo Audit/Deny and both npm audits passed, with the existing RSA advisory
+  exception unchanged. All source/documentation whitespace checks passed.
+
+These counts are lower than the full working-tree counts below because the
+uncommitted webhook feature and its related tests were excluded from the
+commit. The initial isolated E2E attempt lacked Playwright's required browser;
+the matching Chromium was installed and all 37 cases passed in the final run
+without retries. Symlinked dependencies produced dev-server font access
+warnings in the isolated copy; the production build contains the font assets.
+The generated vendor bundle retains literal whitespace emitted by Vite inside
+a template literal; compiled assets are excluded from the source whitespace
+check rather than edited manually.
+
+## Second full review — 2026-10-11 (Linux)
+
+Re-examined the current project and the first review's changes, concentrating
+on cancellation, background task ownership, failed persistence, resource
+admission and HTTP reception. Cross-checked authentication, RLS/query limits,
+storage, webhook egress/leases, CLI/deployment code, migrations and CI. The
+existing working changes were preserved; no migration or dependency version
+was changed in this round.
+
+### Additional confirmed findings and fixes
+
+| Finding | Priority | Fix and evidence |
+|---|---|---|
+| Oversized response cleanup can hang or replace the HTTP error | P2 | The shared panel reader waited for cancellation promises, which can remain pending with a tee branch/custom source or reject. Overflow now requests cancellation without awaiting cleanup, observes its rejection, and releases the reader immediately. Four regressions cover declared and streamed overflow with pending or failed cleanup. |
+| Upload replies bypass the panel's streaming budget | P2 | Uppy/XHR buffered the whole `responseText` before the limited parser ran. Upload replies now use Blob reception, reject oversized declared lengths at headers, monitor received bytes, and check the final Blob before parsing. The 64 KiB limit applies to these small upload acknowledgements. Cancellation goes through Uppy's signal so its promise settles. Browser tests confirm no `responseText` access and no parsing of oversized replies, preserve normal/conflict results, and verify that oversized 401 replies still expire the panel session. |
+| Unlimited detached auth email sends | P2 | All email flows share 16 admission slots and a 30-second send deadline by default. Admission happens before account lookup/token issuance, or before confirmation signup creates an account. `503 mail_busy` is identical for existing and unknown accounts; overload neither emits a token nor consumes its resend cooldown. A hanging-mailer integration test covers recovery, magic link, resend and confirmation signup. A unit test verifies that timeout drops the send future and returns capacity. |
+| Failed session persistence reloads a spent or revoked session | P2 | The TypeScript manager tracks unsaved local state and refuses to overwrite it with stale storage. A second explicit refresh uses the replacement token after a failed write; a second sign-out retries local deletion without restoring/revoking the old session again. Lifecycle listeners observe the local transition even when storage fails. Explicit methods still reject storage failures. |
+| Background auth failures escape as unhandled rejections | P2 | Startup reads, refresh timers and cross-tab reloads now observe rejected operations. The optional `auth.onBackgroundError` receives adapter errors, and both synchronous and asynchronous handler failures are isolated. Unexpected adapter errors pause automatic refresh; successful session persistence resumes it. Cross-tab reloads leave unsaved local state untouched, so another tab cannot restart a timer paused after failed persistence. Ordinary network-result failures retain the existing bounded retry policy. |
+| Cancelled Rust refresh waiters retain one task each | P2 | Client clones share one detached rotation and subscribe to its result, instead of spawning a task per waiter behind the lifecycle mutex. The regression leaves 100 cancelled callers with exactly one worker, then releases the store and verifies that worker exits. Rotation still completes after cancellation and preserves its replacement token. |
+
+Added **20 unit/integration cases and four browser cases**. Before their fixes,
+eight new regression cases failed with the expected behavior: four panel reader
+cases, two TypeScript persistence cases, one Rust task-count case and the email
+overload integration case. These now pass. The additional background-error and
+XHR tests exercise the new failure handling and reception limits.
+
+Final diff inspection extended the background-write regression with a
+cross-tab notification: it failed because a paused refresh timer was restarted.
+Reloads now return while local state is unsaved; the regression passes and a
+successful explicit refresh still persists the replacement token and resumes
+automatic refresh.
+
+### Validation
+
+- Rust: **434 passed, zero failures**, including SDK doctests. The workspace
+  run passed 433 tests across 41 suite summaries; its one ignored S3 test was
+  then executed explicitly and passed, completing Rust test coverage for this
+  round. The final Rust SDK source also passed its standalone suite after the
+  control-flow cleanup.
+- S3 integration: `cargo test -p nelcota-server --test storage_s3 -- --ignored`
+  passed against an isolated RustFS 1.0.1 container with a fresh bucket created
+  through an authenticated S3 request. It verified small and 20 MiB multipart
+  uploads, exact download bytes, presigned redirects, signed-grant expiration
+  (including already-expired grants), and physical object deletion. No failure
+  or additional source fix was needed; the isolated container was removed.
+- Panel: **296 unit cases and 42 Chromium E2E cases**, Svelte/TypeScript checks
+  with zero diagnostics, guide translation validation and production build.
+- TypeScript SDK: **128 unit cases**, **15 type cases**, **29 contracts** against
+  the rebuilt server with PostgreSQL 17 and Mailpit. Chromium checks passed for
+  the real browser client, cross-tab refresh/sign-out and the runnable demo.
+- Both SDK package checks passed in external consumers. Native Node 26 runtime
+  smoke checks passed. The TypeScript auth import budget rose from 8,250 to
+  8,350 gzip bytes intentionally; final measured size is 8,279 bytes. Combined
+  import size remains within its existing 14,100-byte budget at 14,097 bytes.
+- Rustfmt, Clippy (all targets, warnings denied, including await-holding-lock),
+  `git diff --check`, Cargo Audit/Deny and both npm audits passed. The existing
+  RSA advisory exception documented in the first review remains unchanged;
+  these audit passes do not mean that exception was fixed.
+- Panel production assets were regenerated and the server rebuilt to embed
+  the current panel. Existing large-chunk build warnings remain visible.
+
+### Practical limits
+
+Browser checks cover Chromium, not Firefox/WebKit. Node 26 was exercised
+locally, not the full runtime matrix. Live external OAuth accounts and
+production load/RSS profiling
+were not exercised. Task-count and stream-budget tests verify specific resource
+invariants rather than a process-wide memory ceiling.
+
+XHR progress notifications can be coalesced or count compressed bytes: a final
+Blob-size check therefore precedes parsing as well. This avoids an unbounded
+JavaScript string and stops further reception when overflow is observed; it
+does not promise that the browser never temporarily receives beyond the budget.
+
+Email delivery remains a bounded, best-effort background operation rather than
+a durable queue. A TypeScript session that could not persist is protected in
+that client; another tab/process cannot recover its replacement token from the
+failed adapter. The updated auth/SDK contract guides describe these behaviors
+and retain their Portuguese translations.
+
+## Whole-project review — 2026-10-11 (Linux)
+
+Reviewed the Rust backend and CLI, PostgreSQL migrations, both SDKs, the
+Svelte panel, new webhook implementation, deployment scripts and CI. The
+working tree already contained extensive changes, including webhooks and
+panel assets; those changes were preserved. This section records this review
+separately from the historical Windows reviews below.
+
+### Confirmed findings and fixes
+
+| Finding | Priority | Change and evidence |
+|---|---|---|
+| Unbounded catalog notification queue | P2 | `crates/api/src/catalog/listener.rs` now retains one pending reload and uses nonblocking `try_send`. The database connection driver continues processing messages while introspection waits. The integration test holds every pool connection, sends 2,000 distinct notifications and verifies the final schema is loaded after releasing the pool. |
+| Unbounded health response buffering and probe fan-out | P2 | `crates/admin/src/projects.rs` limits each health body to 16 KiB and each status request to eight concurrent probes, preserving project order and the existing two-second probe deadline. Oversized fixed-length and chunked responses are rejected. |
+| Unbounded HTTP error bodies in clients | P2 | The TypeScript SDK, Rust SDK and panel stop reading error bodies beyond 64 KiB. Declared oversize is rejected before reading; missing or understated lengths are checked while streaming. Oversized bodies produce generic HTTP errors while preserving status and SDK Retry-After. Normal successful-response contracts remain unchanged. The panel shares its bounded reader with file previews. |
+| Auth completion after disposal uses a closed channel | P2 | `sdk/typescript/src/auth/coordination.ts` makes channel closure idempotent and prevents notifications after closure. An in-flight sign-in still succeeds and persists its session after `dispose()`, matching the existing lifecycle contract. |
+| Malformed route encoding crashes navigation | P3 | `crates/admin/ui/src/lib/route-match.ts` returns no match for invalid percent encoding instead of throwing `URIError`. Tests cover incomplete encodings, invalid UTF-8, Unicode names and encoded separators. |
+
+Added **18 permanent test cases**: three Rust, five TypeScript SDK and ten
+panel unit cases. Extended the existing catalog integration test with pool
+contention and notification bursts. Against isolated copies of the original
+sources, **11 regression cases failed for the expected reasons** (four SDK,
+seven panel); the corresponding current tests pass. The catalog test checks
+reconciliation under load; it does not measure process RSS or queue allocation.
+
+Control flow was simplified with guards, early returns, `continue` and
+`switch` across backend, CLI, SDK and panel code. Rust `let ... else`, small
+conditional value expressions and Svelte rendering branches are preserved.
+The contribution guide records this preference, and the workspace enables
+Clippy's `redundant_else` lint. No migration was rewritten.
+
+### Security and async boundaries examined
+
+- JWT algorithm/key selection and allowed roles; password verification and
+  hashing permits; refresh rotation, reuse detection and cancellation;
+  single-use email/OAuth tokens and callback state claims.
+- RLS on reads and writes, session-local transaction settings, SQL identifiers
+  and bound values, query grammar limits and response byte budgets. Existing
+  isolation, injection, role and connection-reuse tests continue to pass.
+- Storage path normalization, quotas, upload admission/deadlines, cleanup,
+  inert download headers, preview cancellation and strict signed-URL expiry
+  on disk and S3. The S3 test exercises real RustFS, multipart uploads and
+  presigned URLs.
+- Webhook destination validation and DNS/IP checks, redirects/proxy behavior,
+  signatures, durable leasing/fencing, retries, retention and payload limits.
+  The newly added webhook unit, integration and browser suites are included.
+- Panel session/CSRF checks, generated response validators, navigation,
+  cache invalidation and listener/timer/request cleanup; CLI subprocess
+  arguments, private files/backups, installer checksums and CI permissions.
+
+The single pending catalog signal follows Tokio's documented bounded-channel
+semantics; using `try_send` also avoids waiting inside the task that drives
+PostgreSQL replies. See the [Tokio channel documentation](https://docs.rs/tokio/latest/tokio/sync/mpsc/fn.channel.html).
+
+### Validation
+
+| Check | Result |
+|---|---|
+| Full workspace: `cargo test --workspace -- --test-threads=4` | **430 passed**, zero failed; one S3 test is ignored by default |
+| S3: `cargo test -p nelcota-server --test storage_s3 -- --ignored` | **1 passed** with RustFS 1.0.1; **431 distinct Rust tests** including documentation examples passed across both runs |
+| Catalog contention/burst scenario | Passed separately after extending the existing integration test |
+| `cargo fmt --all --check`; Clippy all targets with warnings denied and `await_holding_lock` | Passed |
+| Panel contracts, guide translations and `npm run check` | Passed; zero Svelte errors or warnings |
+| Panel unit tests | **286 passed** |
+| Panel Chromium E2E | **38 passed** in the final complete run with one worker (CI timeouts/retry policy); no test required a retry in that run |
+| Panel build and `cargo build -p nelcota-server --bin nelcota` | Passed; versioned panel assets regenerated and server rebuilt |
+| TypeScript SDK unit/type tests | **121 unit and 15 type cases passed** |
+| Real server SDK contract | **29 passed** against PostgreSQL 17 and Mailpit; generated declarations compile |
+| TypeScript SDK browser smoke | Chromium passed, including cross-tab rotation/sign-out and the runnable app example |
+| TypeScript package/build/runtime/size | Passed; all four installed entry points and Node 26 native Web API smoke checks passed |
+| Rust package verification and external consumer | Passed; packaged archive compiled and the isolated consumer ran successfully |
+| Dependencies | `cargo audit --quiet`, `cargo deny check` passed; both npm audits reported zero vulnerabilities |
+| Whitespace | `git diff --check` passed |
+
+The bounded HTTP reader adds about 200 compressed bytes to the TypeScript
+HTTP import closure. The explicit entry-point budgets were adjusted to
+14,100 / 8,750 / 8,250 / 6,600 bytes; measured gzip sizes were
+13,957 / 8,674 / 8,132 / 6,549 bytes for combined / REST / auth / storage.
+These budgets cover unminified compiled imports, not runtime heap usage.
+
+### Remaining scope and qualifications
+
+The existing Rust dependency exception for
+[RUSTSEC-2023-0071](https://rustsec.org/advisories/RUSTSEC-2023-0071.html)
+remains documented in `deny.toml` and `.cargo/audit.toml`. The advisory concerns
+RSA private-key timing behavior; the reviewed application signs with EdDSA or
+HS256 and uses provider RSA keys for public verification. No dependency patch
+for that advisory was available at review time. Audit success includes this
+explicit exception.
+
+Bun, Deno, Firefox, WebKit, the complete Node-version matrix, live Google/GitHub
+provider accounts and privileged deployment/restore acceptance scripts were
+not exercised locally. The isolated RustFS service and SDK contract containers
+started for this review were removed after use. Other pre-existing or
+concurrently created containers were preserved.
+
+Chromium encountered `ERR_NETWORK_CHANGED` while Docker networks were being
+created; failed browser cases were rerun. These infrastructure failures are
+not hidden by changing assertions. The panel build still reports a large
+lazy-loaded API-reference chunk (about 1.2 MB before gzip). Existing lazy
+loading remains in place; no bundle-size warning was suppressed.
+
+This review includes source inspection, dependency checks and regression,
+integration and browser tests. It does not claim production penetration-test,
+heap-profile, sustained-load, or formal memory-safety coverage.
+
 ## Correções da quarta revisão — 10/10/2026
 
 Os achados **18, 19, 20 e 21 receberam correções e testes de regressão**.

@@ -25,12 +25,12 @@ const MAX_PAGE_SIZE: i64 = 500;
 pub(crate) fn raw_text(value: Option<&RawValue>) -> Option<String> {
     let raw = value?.get();
     if raw == "null" {
-        None
-    } else if raw.starts_with('"') {
-        serde_json::from_str::<String>(raw).ok()
-    } else {
-        Some(raw.to_owned())
+        return None;
     }
+    if raw.starts_with('"') {
+        return serde_json::from_str::<String>(raw).ok();
+    }
+    Some(raw.to_owned())
 }
 
 pub async fn tables(
@@ -262,15 +262,14 @@ fn view_error(err: tokio_postgres::Error, claims: &nelcota_core::Claims) -> ApiE
         .is_some_and(|db| *db.code() == tokio_postgres::error::SqlState::INSUFFICIENT_PRIVILEGE);
     if denied {
         let role = claims.role().as_str();
-        ApiError::new(
+        return ApiError::new(
             axum::http::StatusCode::FORBIDDEN,
             "view_denied",
             format!("{role} has no access to this table (no GRANT)"),
         )
-        .params(json!({ "role": role }))
-    } else {
-        user_query_error(err)
+        .params(json!({ "role": role }));
     }
+    user_query_error(err)
 }
 
 pub async fn table(

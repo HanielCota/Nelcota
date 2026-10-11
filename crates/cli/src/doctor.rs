@@ -142,11 +142,13 @@ fn disk(report: &mut Report, mb: u64) {
         report.problem(format!(
             "free disk: {gb:.1} GB (backups and Postgres need room)"
         ));
-    } else if mb < DISK_WARN_MB {
-        warn(&format!("free disk: {gb:.1} GB (getting low)"));
-    } else {
-        ok(&format!("free disk: {gb:.1} GB"));
+        return;
     }
+    if mb < DISK_WARN_MB {
+        warn(&format!("free disk: {gb:.1} GB (getting low)"));
+        return;
+    }
+    ok(&format!("free disk: {gb:.1} GB"));
 }
 
 fn is_recent(time: SystemTime, now: SystemTime) -> bool {

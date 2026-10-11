@@ -112,6 +112,8 @@ pub struct Options {
     pub pool_size: usize,
     /// Password recovery and magic link on (with the [`Outbox`] instead of SMTP).
     pub mail: bool,
+    /// Another mailer for delivery failure and resource-budget tests.
+    pub mailer: Option<Arc<dyn Mailer>>,
     /// Signup waits for the email to be confirmed (needs `mail`).
     pub confirm_email: bool,
     /// Sign-in providers (pointed at a local fake).
@@ -136,6 +138,7 @@ impl Default for Options {
         Options {
             pool_size: 4,
             mail: true,
+            mailer: None,
             confirm_email: false,
             oauth: None,
             signup_enabled: true,
@@ -302,7 +305,13 @@ impl TestApp {
         };
         let outbox = Arc::new(Outbox::default());
         let auth = AuthState {
-            mailer: options.mail.then(|| outbox.clone() as Arc<dyn Mailer>),
+            mail_delivery: Arc::default(),
+            mailer: options.mail.then(|| {
+                options
+                    .mailer
+                    .clone()
+                    .unwrap_or_else(|| outbox.clone() as Arc<dyn Mailer>)
+            }),
             oauth: options.oauth.clone(),
             pool: pool.clone(),
             keys: keys.clone(),

@@ -34,8 +34,8 @@
     void tick().then(() => {
       if (selected.id !== id) return
       const target = section && article ? Array.from(article.querySelectorAll<HTMLElement>('[id]')).find(element => element.id === section) : null
-      if (target) target.scrollIntoView({ block: 'start' })
-      else document.getElementById('conteudo')?.scrollTo({ top: 0 })
+      if (target) { target.scrollIntoView({ block: 'start' }); return }
+      document.getElementById('conteudo')?.scrollTo({ top: 0 })
     })
   })
 </script>

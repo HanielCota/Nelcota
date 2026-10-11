@@ -11,6 +11,26 @@ use std::{
     time::{Duration, SystemTime},
 };
 
+const MAX_ERROR_BYTES: usize = 64 * 1024;
+
+/// Error pages are metadata; drop oversized bodies and keep the HTTP status.
+async fn error_body(response: &mut reqwest::Response) -> Result<Option<Bytes>> {
+    if response
+        .content_length()
+        .is_some_and(|len| len > MAX_ERROR_BYTES as u64)
+    {
+        return Ok(None);
+    }
+    let mut body = bytes::BytesMut::new();
+    while let Some(chunk) = response.chunk().await.map_err(Error::network)? {
+        if chunk.len() > MAX_ERROR_BYTES - body.len() {
+            return Ok(None);
+        }
+        body.extend_from_slice(&chunk);
+    }
+    Ok(Some(body.freeze()))
+}
+
 /// A zero timeout disables the deadline. Cancellation covers retries and buffered bodies.
 #[derive(Clone, Debug, Default)]
 pub struct RequestOptions {
@@ -64,10 +84,9 @@ impl Spec {
 
 async fn cancel<T>(options: &RequestOptions, future: impl Future<Output = Result<T>>) -> Result<T> {
     if let Some(token) = &options.cancellation {
-        tokio::select! { biased; _ = token.cancelled() => Err(Error::Cancelled), result = future => result }
-    } else {
-        future.await
+        return tokio::select! { biased; _ = token.cancelled() => Err(Error::Cancelled), result = future => result };
     }
+    future.await
 }
 
 impl Client {
@@ -165,8 +184,10 @@ impl Client {
                             .get(RETRY_AFTER)
                             .and_then(|h| h.to_str().ok()),
                     );
-                    let bytes = response.bytes().await.map_err(Error::network)?;
-                    let value: Value = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
+                    let value: Value = error_body(&mut response)
+                        .await?
+                        .and_then(|body| serde_json::from_slice(&body).ok())
+                        .unwrap_or(Value::Null);
                     return Err(Error::Http {
                         status,
                         code: value["code"]
@@ -194,12 +215,11 @@ impl Client {
             };
             let result = cancel(&self.options, async {
                 if timeout.is_zero() {
-                    operation.await
-                } else {
-                    tokio::time::timeout(timeout, operation)
-                        .await
-                        .map_err(|_| Error::Timeout)?
+                    return operation.await;
                 }
+                tokio::time::timeout(timeout, operation)
+                    .await
+                    .map_err(|_| Error::Timeout)?
             })
             .await;
             match result {

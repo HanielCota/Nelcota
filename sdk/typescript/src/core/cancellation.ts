@@ -17,7 +17,7 @@ export function abortable<T>(operation: Promise<T>, signal?: AbortSignal): Promi
       signal.removeEventListener('abort', abort);
       reject(error);
     });
-    if (signal.aborted) abort();
-    else signal.addEventListener('abort', abort, { once: true });
+    if (signal.aborted) { abort(); return; }
+    signal.addEventListener('abort', abort, { once: true });
   });
 }

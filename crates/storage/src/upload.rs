@@ -284,10 +284,9 @@ async fn receive(
         size += chunk.len() as u64;
         hasher.update(chunk);
         if size > limit {
-            Err(too_large(limit))
-        } else {
-            reservation.check(size)
+            return Err(too_large(limit));
         }
+        reservation.check(size)
     };
 
     // The first bytes decide the type before anything is written.

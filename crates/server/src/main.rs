@@ -103,6 +103,7 @@ async fn serve(config: Config) -> anyhow::Result<()> {
     let passwords = Arc::new(Passwords::new(hash_concurrency()));
     let auth = AuthState {
         mailer,
+        mail_delivery: Arc::default(),
         oauth,
         pool: pool.clone(),
         keys: keys.clone(),

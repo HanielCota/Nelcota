@@ -29,8 +29,8 @@ export class HiddenColumns {
   }
 
   toggle(column: string) {
-    if (this.has(column)) this.show(column)
-    else this.hide(column)
+    if (this.has(column)) { this.show(column); return }
+    this.hide(column)
   }
 
   showAll() {

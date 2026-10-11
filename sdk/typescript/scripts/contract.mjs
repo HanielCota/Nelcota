@@ -86,7 +86,8 @@ process.on('SIGINT', () => {
 let status = 1;
 try {
   run('docker', ['run', '-d', '--name', PG, '-e', 'POSTGRES_PASSWORD=postgres', '-p', '127.0.0.1::5432', 'postgres:17-alpine']);
-  run('docker', ['run', '-d', '--name', MAIL, '-p', '127.0.0.1::1025', '-p', '127.0.0.1::8025', 'axllent/mailpit:v1.27.0']);
+  // SMTP fixtures must not depend on reverse DNS for Docker bridge addresses.
+  run('docker', ['run', '-d', '--name', MAIL, '-e', 'MP_SMTP_DISABLE_RDNS=true', '-p', '127.0.0.1::1025', '-p', '127.0.0.1::8025', 'axllent/mailpit:v1.27.0']);
   const PG_PORT = mappedPort(PG, '5432/tcp');
   const SMTP_PORT = mappedPort(MAIL, '1025/tcp');
   const MAIL_PORT = mappedPort(MAIL, '8025/tcp');

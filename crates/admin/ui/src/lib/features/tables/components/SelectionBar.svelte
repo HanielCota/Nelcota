@@ -36,8 +36,8 @@
 
   function exportAs(format: 'csv' | 'json') {
     const name = `${table.replace(/[^\w-]+/g, '_')}-${t('tables.selection.fileSuffix')}.${format}`
-    if (format === 'csv') downloadText(name, toCsv(columns, matrix), 'text/csv;charset=utf-8')
-    else downloadText(name, toJson(columns, matrix), 'application/json')
+    if (format === 'csv') { downloadText(name, toCsv(columns, matrix), 'text/csv;charset=utf-8'); return }
+    downloadText(name, toJson(columns, matrix), 'application/json')
   }
 </script>
 

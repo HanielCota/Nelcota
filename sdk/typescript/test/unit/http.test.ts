@@ -1,12 +1,38 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createClient, NelcotaUsageError } from '../../src/index.js';
-import { baseUrl, parseRetryAfter } from '../../src/core/http.js';
+import { baseUrl, errorFromResponse, parseRetryAfter } from '../../src/core/http.js';
 import { assertTokenAllowed } from '../../src/core/jwt.js';
 import { empty, json, jwt, mockFetch, session } from './helpers.js';
 
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
+});
+
+describe('error response budgets', () => {
+  it.each([undefined, '1', '1000000'])('cancels oversized error pages with length %s', async length => {
+    const cancel = vi.fn();
+    let chunks = 0;
+    const pull = vi.fn((controller: ReadableStreamDefaultController<Uint8Array>) => {
+      if (chunks++ === 10) { controller.close(); return; }
+      controller.enqueue(new Uint8Array(8192));
+    });
+    const headers = new Headers({ 'retry-after': '90' });
+    if (length !== undefined) headers.set('content-length', length);
+    const body = new ReadableStream({ pull, cancel }, { highWaterMark: 0 });
+    const error = await errorFromResponse(new Response(body, { status: 503, headers }));
+    expect(error).toMatchObject({ status: 503, code: 'unavailable', retryAfter: 90 });
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(pull.mock.calls.length).toBe(length === '1000000' ? 0 : 9);
+    expect(body.locked).toBe(false);
+  });
+
+  it('decodes a complete error at the exact byte boundary', async () => {
+    const text = JSON.stringify({ code: 'db_error', message: 'ação' });
+    const data = new TextEncoder().encode(text + ' '.repeat(65536 - new TextEncoder().encode(text).length));
+    const body = new ReadableStream({ start(controller) { controller.enqueue(data); controller.close(); } });
+    expect(await errorFromResponse(new Response(body, { status: 409 }))).toMatchObject({ status: 409, code: 'db_error', message: 'ação' });
+  });
 });
 
 function client(mock: ReturnType<typeof mockFetch>, options: Parameters<typeof createClient>[1] = {}) {

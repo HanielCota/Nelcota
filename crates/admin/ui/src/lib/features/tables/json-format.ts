@@ -11,16 +11,20 @@ export function formatJson(value: string): string {
       result += token
       depth++
       if (tokens[i + 1] !== '}' && tokens[i + 1] !== ']') newline()
-    } else if (token === '}' || token === ']') {
+      continue
+    }
+    if (token === '}' || token === ']') {
       depth--
       if (tokens[i - 1] !== '{' && tokens[i - 1] !== '[') newline()
       result += token
-    } else if (token === ',') {
+      continue
+    }
+    if (token === ',') {
       result += token
       newline()
-    } else {
-      result += token === ':' ? ': ' : token
+      continue
     }
+    result += token === ':' ? ': ' : token
   }
   return result
 }

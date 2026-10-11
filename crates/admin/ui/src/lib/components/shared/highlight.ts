@@ -35,8 +35,8 @@ export async function highlight(code: string, lang: CodeLang): Promise<Token[]> 
   const output: Token[] = []
   const push = (text: string, tokenKind?: TokenKind) => {
     const last = output.at(-1)
-    if (last && last.kind === tokenKind) last.text += text
-    else output.push(tokenKind ? { text, kind: tokenKind } : { text })
+    if (last && last.kind === tokenKind) { last.text += text; return }
+    output.push(tokenKind ? { text, kind: tokenKind } : { text })
   }
   lines.forEach((line, index) => {
     for (const token of line) push(token.content, kind(token.explanation?.flatMap(part => part.scopes.map(scope => scope.scopeName)) ?? []))

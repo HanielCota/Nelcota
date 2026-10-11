@@ -113,15 +113,15 @@ fn csv_field(value: &str) -> String {
     if spreadsheet_formula(value) {
         // A quoted tab prefix makes this a text cell in Excel. CSV quoting
         // alone does not stop formulas. JSON export preserves the original.
-        format!("\"\t{}\"", value.replace('"', "\"\""))
-    } else if value.contains([',', '"', '\n', '\r'])
+        return format!("\"\t{}\"", value.replace('"', "\"\""));
+    }
+    if value.contains([',', '"', '\n', '\r'])
         || value.starts_with(char::is_whitespace)
         || value.ends_with(char::is_whitespace)
     {
-        format!("\"{}\"", value.replace('"', "\"\""))
-    } else {
-        value.to_owned()
+        return format!("\"{}\"", value.replace('"', "\"\""));
     }
+    value.to_owned()
 }
 
 fn spreadsheet_formula(value: &str) -> bool {

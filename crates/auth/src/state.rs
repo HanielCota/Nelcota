@@ -1,6 +1,7 @@
 //! Authentication dependencies and configuration.
 use crate::{
-    JwtVerifier, Keys, Mailer, OAuth, Passwords, RateLimiter, SharedVerifier, links::LinkKind,
+    JwtVerifier, Keys, MailDelivery, Mailer, OAuth, Passwords, RateLimiter, SharedVerifier,
+    links::LinkKind,
 };
 use axum::extract::FromRef;
 use deadpool_postgres::Pool;
@@ -50,6 +51,8 @@ pub struct AuthState {
     pub settings: Arc<AuthSettings>,
     /// Email sending; without it, every email link flow is off.
     pub mailer: Option<Arc<dyn Mailer>>,
+    /// Shared admission and deadline for background email delivery.
+    pub mail_delivery: Arc<MailDelivery>,
     /// Sign-in through external providers; without it, `/authorize` answers
     /// `provider_disabled`.
     pub oauth: Option<Arc<OAuth>>,

@@ -39,23 +39,26 @@ pub(super) fn parse_select(
                 return Err(invalid("duplicate '*' in select"));
             }
             select.star = true;
-        } else if item.contains('(') {
+            continue;
+        }
+        if item.contains('(') {
             let Some(catalog) = catalog else {
                 return Err(invalid("embedding relations is not available here"));
             };
             select
                 .embeds
                 .push(parse_embed(item, table, catalog, depth + 1)?);
-        } else if item.contains(':') {
+            continue;
+        }
+        if item.contains(':') {
             return Err(invalid(format!(
                 "column aliases are not supported: '{item}'"
             )));
-        } else {
-            if select.columns.iter().any(|c| c == item) {
-                return Err(invalid(format!("duplicate column '{item}' in select")));
-            }
-            select.columns.push(column(table, item)?.name.clone());
         }
+        if select.columns.iter().any(|c| c == item) {
+            return Err(invalid(format!("duplicate column '{item}' in select")));
+        }
+        select.columns.push(column(table, item)?.name.clone());
     }
     // '*' already includes the explicit columns; emit each field only once.
     if select.star {
@@ -160,10 +163,9 @@ pub(super) fn embedded_param<'s, 'k>(
         .split_once('.')
         .is_some_and(|(next, _)| embed.select.embeds.iter().any(|e| e.alias == next));
     if deeper {
-        embedded_param(&mut embed.select, rest)
-    } else {
-        Some((embed, rest))
+        return embedded_param(&mut embed.select, rest);
     }
+    Some((embed, rest))
 }
 
 /// A filter, logic tree, `order`, `limit` or `offset` aimed at an embed.
