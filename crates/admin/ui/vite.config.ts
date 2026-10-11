@@ -19,7 +19,11 @@ export default defineConfig({
     chunkSizeWarningLimit: 900,
   },
   server: {
-    // `npm run dev`: the panel API comes from nelcota running locally.
-    proxy: { '/admin/api': { target: process.env.NELCOTA_API_URL ?? 'http://127.0.0.1:8000', changeOrigin: true } },
+    // `npm run dev`: the panel API comes from nelcota running locally. `||`:
+    // .env.example exports NELCOTA_API_URL empty, which is not a proxy target.
+    proxy: { '/admin/api': { target: process.env.NELCOTA_API_URL || 'http://127.0.0.1:8000', changeOrigin: true } },
+    // Pages are lazy modules; transforming them up front keeps the first visit
+    // to each page fast (the e2e tests open many pages in parallel).
+    warmup: { clientFiles: ['./src/main.ts', './src/lib/shell/**/*.svelte', './src/lib/features/**/*.svelte'] },
   },
 })
