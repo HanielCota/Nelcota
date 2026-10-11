@@ -138,7 +138,7 @@
     <div class="relative w-full max-w-[440px] pt-24">
       <Mascot {pose} lookAt={caret} class="pointer-events-none absolute top-0 right-6 size-32 sm:right-9" />
 
-      <form class="relative flex flex-col gap-5 rounded-[2rem] bg-card px-6 pt-8 pb-7 sm:px-9 sm:pt-9 sm:pb-8" onsubmit={submit} aria-busy={loading} novalidate>
+      <form class="relative flex flex-col gap-5 rounded-3xl bg-card px-6 pt-8 pb-7 sm:px-9 sm:pt-9 sm:pb-8" onsubmit={submit} aria-busy={loading} novalidate>
         <div>
           <h1 class="text-2xl font-semibold tracking-tight sm:text-[1.75rem]">{t('login.title')}</h1>
           <p class="mt-1.5 text-[15px] text-muted-foreground">{t('login.subtitle')}</p>

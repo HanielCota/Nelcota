@@ -24,7 +24,7 @@
   }
 </script>
 
-<InputGroup.Root class="rounded-full">
+<InputGroup.Root>
   <InputGroup.Input bind:ref={input} bind:value type="search" aria-label={label} {placeholder} autocomplete="off" spellcheck={false} oninput={() => oninput?.()} class="[&::-webkit-search-cancel-button]:appearance-none" />
   <InputGroup.Addon><Search aria-hidden="true" /></InputGroup.Addon>
   {#if value}

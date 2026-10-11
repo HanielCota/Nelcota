@@ -92,7 +92,7 @@
           <p class="text-sm text-muted-foreground">{t('signIn.providers.pages')}</p>
           {#if settings.redirect_urls.length}
             <ul class="flex flex-wrap gap-2">
-              {#each settings.redirect_urls as url (url)}<li class="max-w-full"><code class="block rounded-full bg-well px-3 py-1 text-xs break-all">{url}</code></li>{/each}
+              {#each settings.redirect_urls as url (url)}<li class="max-w-full"><code class="block rounded-lg bg-well px-3 py-1 text-xs break-all">{url}</code></li>{/each}
             </ul>
           {:else}
             <p class="text-sm text-warning">{t('signIn.providers.noPages')}</p>
