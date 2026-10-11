@@ -3,9 +3,8 @@ import type { Messages } from '../index.svelte'
 
 const ptBR = {
   title: 'Entrar no Nelcota',
-  projectLabel: 'Projeto:',
-  projectPanel: 'Painel do projeto',
-  adminPanel: 'Painel administrativo',
+  project: 'Projeto',
+  subtitle: 'Use a conta de administrador deste servidor.',
   email: 'Email',
   emailPlaceholder: 'voce@empresa.com',
   password: 'Senha',
@@ -20,9 +19,8 @@ const ptBR = {
 
 const en: Messages<typeof ptBR> = {
   title: 'Sign in to Nelcota',
-  projectLabel: 'Project:',
-  projectPanel: 'Panel of project',
-  adminPanel: 'Admin panel',
+  project: 'Project',
+  subtitle: "Use this server's admin account.",
   email: 'Email',
   emailPlaceholder: 'you@company.com',
   password: 'Password',
