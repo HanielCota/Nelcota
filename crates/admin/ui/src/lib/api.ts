@@ -3,6 +3,7 @@ import { session } from './features/auth/session.svelte'
 import { responseContract } from './contracts'
 import { t } from './i18n/index.svelte'
 import { clearQuerySession, invalidateReads, queryRead } from './query-client'
+import { readBody } from './read-body'
 
 /**
  * Failed request. `message` is the server's English text; `code` and `params`
@@ -35,11 +36,25 @@ async function request<T>(method: string, path: string, body?: unknown, signal?:
 /** Sends a file as the raw request body (storage uploads). */
 export async function uploadFile<T>(path: string, file: File, onprogress?: (loaded: number, total: number) => void): Promise<T> {
   const { upload } = await import('./upload')
-  return upload(path, file, response => parseResponse<T>(response, path, 'POST'), onprogress)
+  try { return await upload(path, file, response => parseResponse<T>(response, path, 'POST'), onprogress) }
+  catch (error) {
+    // A response aborted at the XHR budget never reaches parseResponse.
+    if (error instanceof ApiError) expireSession(error.status, path)
+    throw error
+  }
+}
+
+function expireSession(status: number, path: string) {
+  if (status !== 401 || path === '/login') return
+  clearQuerySession()
+  if (session.email) session.expired = true
+  session.email = null
 }
 
 export async function parseResponse<T>(res: Response, path: string, method: string): Promise<T> {
-  const text = await res.text()
+  // Error pages are metadata; a proxy cannot force the panel to buffer its body.
+  const body = res.ok ? null : await readBody(res, 64 * 1024)
+  const text = res.ok ? await res.text() : (await body?.text() ?? '')
   let data: unknown = null
   let json = true
   try {
@@ -49,11 +64,7 @@ export async function parseResponse<T>(res: Response, path: string, method: stri
     data = { error: text }
   }
   if (!res.ok) {
-    if (res.status === 401 && path !== '/login') {
-      clearQuerySession()
-      if (session.email) session.expired = true
-      session.email = null
-    }
+    expireSession(res.status, path)
     // Not our JSON error (e.g. a reverse proxy's HTML 502 page): never show
     // the raw body, say what happened in the user's language instead.
     if (!json) throw httpError(res.status)

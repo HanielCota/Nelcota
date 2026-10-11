@@ -45,6 +45,7 @@ export type ServerErrorCode =
   | 'weak_password'
   | 'invalid_credentials'
   | 'email_not_confirmed'
+  | 'mail_busy'
   | 'user_already_exists'
   | 'user_not_found'
   | 'signup_disabled'

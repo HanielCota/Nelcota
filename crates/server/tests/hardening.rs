@@ -19,6 +19,92 @@ use std::{
 use tower::ServiceExt;
 
 #[tokio::test]
+async fn mail_delivery_overload_does_not_issue_tokens_or_reveal_accounts() {
+    struct SlowMailer {
+        started: tokio::sync::mpsc::Sender<()>,
+        release: Arc<tokio::sync::Semaphore>,
+    }
+    impl nelcota_auth::Mailer for SlowMailer {
+        fn send(
+            &self,
+            _: nelcota_auth::Email,
+        ) -> futures_util::future::BoxFuture<'_, Result<(), nelcota_auth::MailError>> {
+            Box::pin(async {
+                self.started.send(()).await.unwrap();
+                self.release.acquire().await.unwrap().forget();
+                Ok(())
+            })
+        }
+    }
+    let (started, mut receiver) = tokio::sync::mpsc::channel(16);
+    let release = Arc::new(tokio::sync::Semaphore::new(0));
+    let app = TestApp::spawn_with(Options {
+        mailer: Some(Arc::new(SlowMailer {
+            started,
+            release: release.clone(),
+        })),
+        confirm_email: true,
+        ..Options::default()
+    })
+    .await;
+    app.admin_client.batch_execute("INSERT INTO auth.users(email) SELECT 'mail-budget-' || n || '@example.com' FROM generate_series(1,17) n").await.unwrap();
+    for n in 1..=16 {
+        let reply = app
+            .post(
+                "/auth/v1/recover",
+                None,
+                json!({"email":format!("mail-budget-{n}@example.com")}),
+            )
+            .await;
+        assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+        tokio::time::timeout(Duration::from_secs(2), receiver.recv())
+            .await
+            .unwrap()
+            .unwrap();
+    }
+    for path in ["/auth/v1/recover", "/auth/v1/magiclink", "/auth/v1/resend"] {
+        for email in ["mail-budget-17@example.com", "unknown@example.com"] {
+            let reply = app
+                .post(path, None, json!({"email":email,"type":"signup"}))
+                .await;
+            assert_eq!(
+                reply.status,
+                StatusCode::SERVICE_UNAVAILABLE,
+                "{path}: {}",
+                reply.body
+            );
+            assert_eq!(reply.body["code"], "mail_busy");
+        }
+    }
+    let reply = app
+        .post(
+            "/auth/v1/signup",
+            None,
+            json!({"email":"mail-busy-signup@example.com","password":"a-secure-password"}),
+        )
+        .await;
+    assert_eq!(
+        reply.status,
+        StatusCode::SERVICE_UNAVAILABLE,
+        "{}",
+        reply.body
+    );
+    let tokens: i64 = app.admin_client.query_one("SELECT count(*) FROM auth.one_time_tokens t JOIN auth.users u ON u.id=t.user_id WHERE u.email='mail-budget-17@example.com'", &[]).await.unwrap().get(0);
+    assert_eq!(tokens, 0, "overload must not consume the resend cooldown");
+    assert!(
+        app.admin_client
+            .query_opt(
+                "SELECT id FROM auth.users WHERE email='mail-busy-signup@example.com'",
+                &[]
+            )
+            .await
+            .unwrap()
+            .is_none()
+    );
+    release.add_permits(16);
+}
+
+#[tokio::test]
 async fn api_caps_every_collection_bytes_and_prepared_cache() {
     let app = TestApp::spawn_with(Options {
         pool_size: 1,

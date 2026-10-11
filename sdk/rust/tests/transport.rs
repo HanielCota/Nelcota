@@ -28,6 +28,62 @@ async fn serve(router: Router) -> (String, tokio::task::JoinHandle<()>) {
     (url, task)
 }
 
+#[tokio::test]
+async fn error_bodies_are_bounded_without_losing_status_or_retry_after() {
+    let router = Router::new().fallback(any(|request: Request| async move {
+        let text = format!(
+            "{}{}",
+            r#"{"code":"too_large","message":"ignored"}"#,
+            " ".repeat(65536)
+        );
+        let body = match request.uri().path().rsplit('/').next() {
+            Some("chunked") => {
+                Body::from_stream(futures_util::stream::iter([Ok::<_, std::io::Error>(
+                    bytes::Bytes::from(text),
+                )]))
+            }
+            _ => Body::from(text),
+        };
+        Response::builder()
+            .status(503)
+            .header("retry-after", "90")
+            .body(body)
+            .unwrap()
+    }));
+    let (url, task) = serve(router).await;
+    let client = Client::builder(url).build().unwrap();
+    for table in ["length", "chunked"] {
+        let error = client.from(table).execute::<Value>().await.unwrap_err();
+        assert_eq!(error.status(), Some(503));
+        assert_eq!(error.code(), "unavailable");
+        assert_eq!(error.retry_after(), Some(Duration::from_secs(90)));
+    }
+    task.abort();
+}
+
+#[tokio::test]
+async fn exact_error_body_budget_preserves_the_server_error() {
+    let router = Router::new().fallback(any(|| async {
+        let text = r#"{"code":"db_error","message":"ação"}"#;
+        let body = format!("{text}{}", " ".repeat(65536 - text.len()));
+        Response::builder()
+            .status(409)
+            .body(Body::from(body))
+            .unwrap()
+    }));
+    let (url, task) = serve(router).await;
+    let error = Client::builder(url)
+        .build()
+        .unwrap()
+        .from("notes")
+        .execute::<Value>()
+        .await
+        .unwrap_err();
+    assert_eq!(error.status(), Some(409));
+    assert_eq!(error.code(), "db_error");
+    task.abort();
+}
+
 #[test]
 fn negation_uses_the_server_grammar_and_double_negation_restores_conditions() {
     let client = Client::builder("https://api.example.com").build().unwrap();

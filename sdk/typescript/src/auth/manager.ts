@@ -16,6 +16,8 @@ export interface AuthOptions {
   autoRefresh?: boolean;
   /** Refresh when fewer than this many seconds remain. Default 60. */
   refreshMargin?: number;
+  /** Unexpected storage/adapter failures in background auth. Automatic refresh pauses until a session is written successfully. */
+  onBackgroundError?: (error: unknown) => void | Promise<void>;
 }
 export interface AuthRequestOptions {
   signal?: AbortSignal;
@@ -36,7 +38,9 @@ export class SessionManager {
   readonly #autoRefresh: boolean;
   readonly #listeners = new Set<AuthListener>();
   readonly #broadcast: Broadcast | undefined;
+  readonly #onBackgroundError: AuthOptions['onBackgroundError'];
   #session: Session | null | undefined;
+  #dirty = false;
   #refreshing: Promise<Result<Session>> | null = null;
   #timer: ReturnType<typeof setTimeout> | undefined;
   #disposed = false;
@@ -50,8 +54,9 @@ export class SessionManager {
     this.key = options.storageKey ?? `nelcota.${url.host}${path}.session`;
     this.#margin = options.refreshMargin ?? 60;
     this.#autoRefresh = options.autoRefresh ?? isBrowser();
-    if (isBrowser()) this.#broadcast = new Broadcast(`${this.key}.channel`, () => void this.#reload());
-    if (this.#autoRefresh) void this.current().then(session => this.#schedule(session));
+    this.#onBackgroundError = options.onBackgroundError;
+    if (isBrowser()) this.#broadcast = new Broadcast(`${this.key}.channel`, () => this.#background(this.#reload()));
+    if (this.#autoRefresh) this.#background(this.current().then(session => this.#schedule(session)));
   }
 
   onChange(listener: AuthListener): () => void {
@@ -69,6 +74,9 @@ export class SessionManager {
     return withLock(`${this.key}.refresh`, task);
   }
   async #read(force = false): Promise<Session | null> {
+    // Storage may still contain a spent token or a session already signed out.
+    // Keep the newer local state until a later persistence attempt succeeds.
+    if (this.#dirty) return this.#session ?? null;
     if (!force && this.#session !== undefined) return this.#session;
     const stored = await this.storage.getItem(this.key);
     this.#session = parseSession(stored);
@@ -78,21 +86,34 @@ export class SessionManager {
   current(): Promise<Session | null> { return this.#locked(() => this.#read()); }
   async #reload(): Promise<void> {
     await this.#locked(async () => {
+      if (this.#dirty) return;
       const before = this.#session;
       const after = await this.#read(true);
       this.#schedule(after);
-      if (after === null && before) this.#emit('signed_out', null);
-      else if (after && !before) this.#emit('signed_in', after);
-      else if (after) this.#emit('refreshed', after);
+      if (after === null) {
+        if (before) this.#emit('signed_out', null);
+        return;
+      }
+      this.#emit(before ? 'refreshed' : 'signed_in', after);
     });
   }
   async #write(session: Session | null, event: AuthEvent): Promise<void> {
     this.#session = session;
-    if (session) await this.storage.setItem(this.key, JSON.stringify(session));
-    else await this.storage.removeItem(this.key);
+    this.#dirty = true;
+    this.#schedule(null);
+    try {
+      await this.#persist();
+      this.#schedule(session);
+    }
+    finally {
+      this.#emit(event, session);
+    }
+  }
+  async #persist(): Promise<void> {
+    const session = this.#session;
+    await (session ? this.storage.setItem(this.key, JSON.stringify(session)) : this.storage.removeItem(this.key));
+    this.#dirty = false;
     this.#broadcast?.notify();
-    this.#schedule(session);
-    this.#emit(event, session);
   }
   set(session: Session): Promise<void> {
     if (!isSession(session)) throw new TypeError('Not a Nelcota session');
@@ -156,9 +177,14 @@ export class SessionManager {
   signOut(revoke: (session: Session) => Promise<Result<null>>): Promise<Result<null>> {
     return this.#locked(async () => {
       const current = await this.#read(true);
-      const result = current ? await revoke(current) : ok(null);
-      if (current) await this.#write(null, 'signed_out');
-      else { this.#session = null; this.#schedule(null); }
+      if (!current) {
+        this.#session = null;
+        if (this.#dirty) await this.#persist();
+        this.#schedule(null);
+        return ok(null);
+      }
+      const result = await revoke(current);
+      await this.#write(null, 'signed_out');
       return result;
     });
   }
@@ -168,13 +194,24 @@ export class SessionManager {
     if (this.#disposed || !this.#autoRefresh || !session) return;
     const due = delayMs ?? Math.max(0, (secondsLeft(session) - this.#margin) * 1000 - Math.random() * 5000);
     this.#timer = setTimeout(() => {
-      void this.refresh().then(({ error }) => {
+      this.#background(this.refresh().then(async ({ error }) => {
         if (error && error.code !== 'invalid_grant' && error.code !== 'session_missing') {
-          void this.current().then(current => this.#schedule(current, RETRY_REFRESH_MS));
+          this.#schedule(await this.current(), RETRY_REFRESH_MS);
         }
-      });
+      }));
     }, Math.min(due, 2 ** 31 - 1));
     (this.#timer as { unref?: () => void }).unref?.();
+  }
+  #background(operation: Promise<unknown>): void {
+    void operation.catch(error => {
+      if (this.#disposed) return;
+      clearTimeout(this.#timer);
+      this.#timer = undefined;
+      // A caller can observe and repair its adapter. Neither the operation nor
+      // a throwing error handler may create an unhandled background rejection.
+      try { void Promise.resolve(this.#onBackgroundError?.(error)).catch(() => {}); }
+      catch { /* Error handlers are isolated. */ }
+    });
   }
   dispose(): void {
     this.#disposed = true;

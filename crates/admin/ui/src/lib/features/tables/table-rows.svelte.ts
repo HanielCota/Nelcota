@@ -57,14 +57,13 @@ export class TableRows {
     this.saving = true
     try {
       const result = await this.adapter.update(table, { ...pk }, { [column]: value })
-      if (this.target?.table === table) {
-        if (this.data === data) {
-          const row = data.rows.find(candidate => rowKey(candidate, data.table.primary_key) === key)
-          if (row && result.count > 0) row[column] = value
-        } else {
-          await this.reload(table)
-        }
+      if (this.target?.table !== table) return result.count
+      if (this.data === data) {
+        const row = data.rows.find(candidate => rowKey(candidate, data.table.primary_key) === key)
+        if (row && result.count > 0) row[column] = value
+        return result.count
       }
+      await this.reload(table)
       return result.count
     } finally {
       this.saving = false

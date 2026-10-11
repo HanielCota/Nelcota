@@ -189,6 +189,14 @@ Links: `403 recovery_disabled`, `confirmation_disabled` or `magiclink_disabled`
 (the project has not configured that flow), `400 invalid_grant` (invalid,
 expired, already used or other-kind link), `400 unsupported_type`.
 
+Email flows share **16 delivery slots** per process and a **30-second** total
+send deadline, including custom mailers. Overload returns `503 mail_busy`
+before creating an account or issuing a token, with the same response for
+existing and unknown accounts. An admitted background send owns its slot until
+it completes or times out.
+SMTP errors and timeouts are logged; sending remains a best-effort background
+operation rather than a durable delivery queue.
+
 Password: 8 to 256 characters. Rate limit:
 `NELCOTA_AUTH_RATE_LIMIT_PER_MINUTE` per IP (default 30) and the same limit
 per email on password login. Refreshes and PKCE redemptions

@@ -34,6 +34,8 @@ at runtime. RLS and GRANTs always remain server/Postgres decisions.
   `invalid_response`; it never succeeds with null or another shape.
 - HTTP failures preserve server `code`, `message` and status. Network, abort,
   timeout and interrupted buffered bodies return status 0 and client codes.
+- HTTP error bodies larger than 64 KiB are discarded; status, a generic code
+  and Retry-After remain available.
 - Invalid JSON returns `invalid_response` with the response's HTTP status.
 - Invalid developer configuration and unsafe identifiers/paths throw
   `NelcotaUsageError`. Errors thrown by user-supplied token/storage/fetch
@@ -70,6 +72,15 @@ refresh, without aborting an operation shared by other callers. `signOut()` wait
 for a pending refresh and clears locally even when server revocation fails.
 `dispose()` stops timers, closes channels and clears listeners; it neither
 revokes the session nor aborts requests already in flight.
+
+Failed session writes keep the newer state in memory: this client never reloads
+a spent refresh token or restores a signed-out session from stale storage.
+Storage errors still reject explicit auth methods. Unexpected background
+adapter errors are observed through the optional `auth.onBackgroundError`
+handler; automatic refresh pauses until a session is written successfully.
+Handler exceptions are isolated. Network errors returned in results keep the
+existing bounded refresh retry. Other clients and processes cannot recover a
+session that failed to persist; repair the adapter before sharing its state.
 
 An explicit `accessToken` controls REST/storage requests and disables automatic
 session refresh in the combined client. Auth methods remain available and may

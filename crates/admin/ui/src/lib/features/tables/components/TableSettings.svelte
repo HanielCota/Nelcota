@@ -79,8 +79,8 @@
       onsubmit={(e) => {
         e.preventDefault()
         // A new name moves the REST endpoint: confirm before breaking clients.
-        if (identityChanges.some((a) => a.action === 'rename_table')) renameOpen = true
-        else apply(identityChanges, 'identity').catch(() => {})
+        if (identityChanges.some((a) => a.action === 'rename_table')) { renameOpen = true; return }
+        apply(identityChanges, 'identity').catch(() => {})
       }}
     >
       <div class="grid gap-2">
@@ -118,8 +118,8 @@
         disabled={busy !== null}
         onclick={() => {
           // No policy yet: RLS would hide every row from the API; ask first.
-          if (policies === 0) enableRlsOpen = true
-          else apply([{ action: 'set_rls', enabled: true }], 'rls').catch(() => {})
+          if (policies === 0) { enableRlsOpen = true; return }
+          apply([{ action: 'set_rls', enabled: true }], 'rls').catch(() => {})
         }}>{#if busy === 'rls'}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{:else}<ShieldCheck data-icon="inline-start" aria-hidden="true" />{/if}{t('tables.settings.enableRls')}</Button>
     {/if}
   </section>

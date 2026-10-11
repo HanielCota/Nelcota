@@ -78,10 +78,9 @@ fn check_id(value: &str) -> Result<(), ApiError> {
             .zip([8, 4, 4, 4, 12])
             .all(|(part, len)| part.len() == len && part.chars().all(|c| c.is_ascii_hexdigit()))
     {
-        Ok(())
-    } else {
-        Err(ApiError::bad_request("invalid_id", "invalid id"))
+        return Ok(());
     }
+    Err(ApiError::bad_request("invalid_id", "invalid id"))
 }
 
 pub(super) async fn revoke_sessions(pool: &Pool, id: &str) -> Result<u64, ApiError> {

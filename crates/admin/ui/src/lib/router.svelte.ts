@@ -10,8 +10,7 @@ export const route = $state({ path: current(), query: new URLSearchParams(locati
 
 export function navigate(to: string, replace = false) {
   const url = BASE + (to.startsWith('/') ? to : `/${to}`)
-  if (replace) history.replaceState(null, '', url)
-  else history.pushState(null, '', url)
+  history[replace ? 'replaceState' : 'pushState'](null, '', url)
   sync()
 }
 

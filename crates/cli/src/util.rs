@@ -83,10 +83,9 @@ pub fn ask(question: &str, default: &str) -> String {
     let _ = std::io::stdin().lock().read_line(&mut line);
     let line = line.trim();
     if line.is_empty() {
-        default.to_owned()
-    } else {
-        line.to_owned()
+        return default.to_owned();
     }
+    line.to_owned()
 }
 
 /// Question whose answer is not echoed (a secret). Uses `stty` on Unix, so

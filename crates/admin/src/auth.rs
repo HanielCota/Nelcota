@@ -87,16 +87,15 @@ pub(crate) async fn require_session(
     next: Next,
 ) -> Response {
     let ok = session_token(request.headers()).is_some_and(|t| state.sessions.valid(&t));
-    if ok {
-        next.run(request).await
-    } else {
-        ApiError::new(
+    if !ok {
+        return ApiError::new(
             StatusCode::UNAUTHORIZED,
             "session_expired",
             "session expired: sign in again",
         )
-        .into_response()
+        .into_response();
     }
+    next.run(request).await
 }
 
 #[derive(Deserialize)]

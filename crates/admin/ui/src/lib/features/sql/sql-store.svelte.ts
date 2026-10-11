@@ -85,12 +85,9 @@ class SqlStore {
   /** Opens a text in the editor; with `id`, starts editing that saved query. */
   open(sql: string, id: string | null = null) {
     const existing = id ? this.drafts.find((item) => item.queryId === id) : this.drafts.find((item) => !item.queryId && item.sql === sql)
-    if (existing) this.activeDraftId = existing.id
-    else {
-      const draft: SqlDraft = { id: newId(), queryId: id, sql }
-      this.drafts.push(draft)
-      this.activeDraftId = draft.id
-    }
+    const draft: SqlDraft = existing ?? { id: newId(), queryId: id, sql }
+    if (!existing) this.drafts.push(draft)
+    this.activeDraftId = draft.id
     this.persistWorkspace()
   }
 
@@ -103,8 +100,8 @@ class SqlStore {
   removeDraft(id: string) {
     this.drafts = this.drafts.filter((item) => item.id !== id)
     if (this.activeDraftId === id) {
-      if (this.drafts.length) this.activeDraftId = this.drafts[0].id
-      else this.open('')
+      if (!this.drafts.length) { this.open(''); return }
+      this.activeDraftId = this.drafts[0].id
     }
     this.persistWorkspace()
   }
@@ -127,11 +124,13 @@ class SqlStore {
       ? { ...existing, name, sql: this.draft, updatedAt: now }
       : { id: newId(), name, sql: this.draft, updatedAt: now }
     this.saved = existing ? this.saved.map((q) => (q.id === query.id ? query : q)) : [...this.saved, query]
-    if (asNew && this.currentId) {
+    const separateDraft = asNew && this.currentId
+    if (!separateDraft) this.activeDraft.queryId = query.id
+    if (separateDraft) {
       const draft = { id: newId(), queryId: query.id, sql: query.sql }
       this.drafts.push(draft)
       this.activeDraftId = draft.id
-    } else this.activeDraft.queryId = query.id
+    }
     this.persist()
     this.persistWorkspace()
     return query

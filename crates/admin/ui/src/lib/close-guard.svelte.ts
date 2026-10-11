@@ -6,8 +6,8 @@ export class CloseGuard {
 
   request = () => {
     if (this.busy()) return
-    if (this.dirty()) this.pending = true
-    else this.close()
+    if (this.dirty()) { this.pending = true; return }
+    this.close()
   }
 
   discard = () => {

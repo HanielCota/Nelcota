@@ -191,8 +191,11 @@ export class Query<S extends GenericSchema, Name extends string, Row, Out, Head 
     if (options.nullsFirst !== undefined) term += options.nullsFirst ? '.nullsfirst' : '.nullslast';
     const params = [...this.#state.params];
     const index = params.findIndex(([k]) => k === key);
-    if (index >= 0) params[index] = [key, `${params[index]![1]},${term}`];
-    else params.push([key, term]);
+    if (index >= 0) {
+      params[index] = [key, `${params[index]![1]},${term}`];
+      return this.#with({ params });
+    }
+    params.push([key, term]);
     return this.#with({ params });
   }
 

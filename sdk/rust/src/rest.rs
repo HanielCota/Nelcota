@@ -526,11 +526,11 @@ impl Query {
         self
     }
     pub fn head(mut self) -> Self {
-        if self.method == Method::GET {
-            self.method = Method::HEAD;
-        } else {
+        if self.method != Method::GET {
             self.record::<()>(Err(Error::Usage("head is only valid for reads".into())));
+            return self;
         }
+        self.method = Method::HEAD;
         self
     }
     pub fn single(mut self) -> Self {

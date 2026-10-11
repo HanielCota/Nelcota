@@ -189,14 +189,13 @@ async fn write(
 ) -> Result<ChangeResult, ApiError> {
     if representation {
         let (body, rows) = in_request_tx!(pool, claims, |tx| { fetch_json(&tx, &sql).await });
-        Ok(ChangeResult {
+        return Ok(ChangeResult {
             body: Some(body),
             rows: u64::try_from(rows).unwrap_or_default(),
-        })
-    } else {
-        let rows = in_request_tx!(pool, claims, |tx| { execute(&tx, &sql).await });
-        Ok(ChangeResult { body: None, rows })
+        });
     }
+    let rows = in_request_tx!(pool, claims, |tx| { execute(&tx, &sql).await });
+    Ok(ChangeResult { body: None, rows })
 }
 
 pub(crate) async fn create(

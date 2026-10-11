@@ -64,12 +64,14 @@
   function key(event: KeyboardEvent) {
     if (!points.length) return
     const last = points.length - 1
-    if (event.key === 'ArrowLeft') active = Math.max(0, (active ?? last) - 1)
-    else if (event.key === 'ArrowRight') active = Math.min(last, (active ?? last) + 1)
-    else if (event.key === 'Home') active = 0
-    else if (event.key === 'End') active = last
-    else if (event.key === 'Escape') active = null
-    else return
+    switch (event.key) {
+      case 'ArrowLeft': active = Math.max(0, (active ?? last) - 1); break
+      case 'ArrowRight': active = Math.min(last, (active ?? last) + 1); break
+      case 'Home': active = 0; break
+      case 'End': active = last; break
+      case 'Escape': active = null; break
+      default: return
+    }
     event.preventDefault()
   }
 </script>

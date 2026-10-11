@@ -24,11 +24,13 @@ process.on('exit', () => rmSync(dist, { recursive: true, force: true }));
 const BUDGETS = {
   // Includes shared cancellation, explicit row/bucket contract validation and
   // the optional Postgres error fields, pages() and throwOnError()/unwrap().
-  'index.js': 13_900,
+  // Bounded streaming error reads add about 200 B gzip to the HTTP closure.
+  'index.js': 14_100,
   // Standalone factories include HTTP and keep the other feature modules out.
-  'rest/index.js': 8_500,
-  'auth/index.js': 8_050,
-  'storage/index.js': 6_350,
+  'rest/index.js': 8_750,
+  // Failed persistence must retain rotated tokens; background failures are observed.
+  'auth/index.js': 8_350,
+  'storage/index.js': 6_600,
 };
 
 function closure(entry, seen = new Set()) {

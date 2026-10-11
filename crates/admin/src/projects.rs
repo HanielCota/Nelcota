@@ -14,13 +14,17 @@ use axum::{
     http::{StatusCode, Uri},
 };
 use bytes::Bytes;
-use http_body_util::{BodyExt, Empty};
+use futures_util::{StreamExt, stream};
+use http_body_util::{BodyExt, Empty, Limited};
 use hyper_util::{client::legacy::Client, rt::TokioExecutor};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use tokio::time::timeout;
 
 use crate::{AdminState, ApiError, sso::Sso};
+
+const HEALTH_BYTES: usize = 16 * 1024;
+const PROBE_CONCURRENCY: usize = 8;
 
 /// How this app fits into the host.
 pub struct HostLink {
@@ -115,7 +119,11 @@ async fn probe_url(url: &str) -> Value {
     let response = timeout(Duration::from_secs(2), async {
         let response = client.get(uri).await.ok()?;
         let status = response.status();
-        let body = response.into_body().collect().await.ok()?.to_bytes();
+        let body = Limited::new(response.into_body(), HEALTH_BYTES)
+            .collect()
+            .await
+            .ok()?
+            .to_bytes();
         Some((status, body))
     })
     .await;
@@ -138,17 +146,17 @@ pub async fn status(
     State(state): State<AdminState>,
 ) -> Result<Json<crate::contracts::ProjectsStatusData>, ApiError> {
     let registry = read_registry(&state.host);
-    let probes = registry.projects.iter().map(|p| {
-        let name = p.name.clone();
-        async move {
-            if valid_name(&name) {
-                probe(&name).await
-            } else {
-                json!({ "healthy": false, "version": null, "latency_ms": null })
-            }
+    let names: Vec<_> = registry.projects.iter().map(|p| p.name.clone()).collect();
+    let probes = names.into_iter().map(|name| async move {
+        if !valid_name(&name) {
+            return json!({ "healthy": false, "version": null, "latency_ms": null });
         }
+        probe(&name).await
     });
-    let results = futures_util::future::join_all(probes).await;
+    let results: Vec<_> = stream::iter(probes)
+        .buffered(PROBE_CONCURRENCY)
+        .collect()
+        .await;
     let projects: Vec<Value> = registry
         .projects
         .iter()
@@ -207,6 +215,29 @@ mod tests {
         assert_eq!(status["healthy"], false);
         assert_eq!(status["version"], "1.2.3");
         assert!(status["latency_ms"].is_u64());
+    }
+
+    #[tokio::test]
+    async fn oversized_health_bodies_are_refused_with_and_without_length() {
+        for chunked in [false, true] {
+            let app = axum::Router::new().route(
+                "/health",
+                axum::routing::get(move || async move {
+                    let bytes = Bytes::from(vec![b' '; HEALTH_BYTES + 1]);
+                    if !chunked {
+                        return axum::body::Body::from(bytes);
+                    }
+                    axum::body::Body::from_stream(stream::iter([
+                        Ok::<_, std::convert::Infallible>(bytes),
+                    ]))
+                }),
+            );
+            let status = probe_url(&format!("{}/health", serve(app).await)).await;
+            assert_eq!(
+                status,
+                json!({ "healthy": false, "version": null, "latency_ms": null })
+            );
+        }
     }
 
     #[tokio::test]

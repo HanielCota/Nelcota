@@ -1,4 +1,9 @@
 import type { Body, Meta } from '@uppy/core'
+import { httpError } from './api'
+import { guardUploadResponse } from './upload-response'
+
+const RESPONSE_BYTES = 64 * 1024
+const responseError = (status: number) => httpError(status >= 400 ? status : 502)
 
 /** Uppy owns the XHR lifecycle; Nelcota owns its JSON and session contract. */
 export async function upload<T>(path: string, file: File, parse: (response: Response) => Promise<T>, progress?: (loaded: number, total: number) => void): Promise<T> {
@@ -6,19 +11,32 @@ export async function upload<T>(path: string, file: File, parse: (response: Resp
   const uppy = new Uppy<Meta, Body>({ autoProceed: false, allowMultipleUploadBatches: false })
   let result!: T
   let failure: unknown
+  let responseCleanup = () => {}
   uppy.use(XHRUpload, {
     endpoint: `/admin/api${path}`, method: 'POST', formData: false, withCredentials: true,
     headers: { 'content-type': file.type || 'application/octet-stream' },
+    // Blob reception avoids allocating an unbounded JavaScript responseText.
+    responseType: 'blob',
+    onBeforeRequest: xhr => {
+      responseCleanup = guardUploadResponse(xhr, RESPONSE_BYTES, () => {
+        failure = responseError(xhr.status)
+        // Uppy owns the abort signal; aborting XHR alone leaves its promise pending.
+        uppy.cancelAll()
+      })
+    },
     // POST can commit before a connection fails. A retry must remain an
     // explicit action so an ambiguous upload never overwrites an object.
     shouldRetry: () => false,
     onAfterResponse: async xhr => {
-      result = await parse(new Response([204, 205, 304].includes(xhr.status) ? null : xhr.responseText, { status: xhr.status }))
+      const body: Blob | null = xhr.response
+      // Progress events can be coalesced or count compressed transfer bytes.
+      if (body && body.size > RESPONSE_BYTES) throw responseError(xhr.status)
+      result = await parse(new Response([204, 205, 304].includes(xhr.status) ? null : body, { status: xhr.status }))
     },
     getResponseData: () => ({}),
   })
   uppy.on('upload-progress', (_file, status) => progress?.(status.bytesUploaded ?? 0, status.bytesTotal ?? file.size))
-  uppy.on('upload-error', (_file, error) => { failure = error })
+  uppy.on('upload-error', (_file, error) => { failure ??= error })
   try {
     uppy.addFile({ name: file.name, type: file.type, data: file })
     const outcome = await uppy.upload()
@@ -26,5 +44,6 @@ export async function upload<T>(path: string, file: File, parse: (response: Resp
     if (!outcome?.successful?.length) throw new Error('Upload failed')
     progress?.(file.size, file.size)
     return result
-  } finally { uppy.destroy() }
+  } catch (error) { throw failure ?? error }
+  finally { responseCleanup(); uppy.destroy() }
 }

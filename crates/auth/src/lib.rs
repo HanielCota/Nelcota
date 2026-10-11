@@ -36,7 +36,7 @@ use nelcota_core::{ApiError, Claims};
 pub use credentials::{InvalidCredential, normalize_email, validate_password};
 pub use handlers::router;
 pub use keys::{KeyError, Keys, generate_ed25519_private_key};
-pub use mail::{Email, MailError, Mailer, SmtpMailer};
+pub use mail::{Email, MailDelivery, MailError, Mailer, SmtpMailer};
 pub use oauth::{OAuth, Provider, ProviderEndpoints, ProviderKind};
 pub use password::{Passwords, hash_password, verify_password};
 pub use prune::{Pruned, prune, spawn_pruner};

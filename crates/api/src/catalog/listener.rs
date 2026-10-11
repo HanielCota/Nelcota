@@ -33,13 +33,16 @@ async fn listen_once(
     config: &tokio_postgres::Config,
 ) -> Result<(), tokio_postgres::Error> {
     let (client, mut connection) = config.connect(NoTls).await?;
-    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+    // A notification means "reload the current catalog", not a separate job.
+    // Keep one pending reload while introspection is slow. Never wait on the
+    // sender: this task also drives replies to LISTEN on the same connection.
+    let (tx, mut rx) = tokio::sync::mpsc::channel(1);
     let driver = tokio::spawn(async move {
         let mut messages = stream::poll_fn(move |cx| connection.poll_message(cx));
         while let Some(message) = messages.next().await {
             match message {
                 Ok(AsyncMessage::Notification(_)) => {
-                    let _ = tx.send(());
+                    let _ = tx.try_send(());
                 }
                 Ok(_) => {}
                 Err(err) => return Err(err),

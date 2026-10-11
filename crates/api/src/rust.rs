@@ -92,13 +92,11 @@ fn scalar(name: &str) -> String {
 fn column_type(column: &Column, enums: &BTreeMap<String, String>) -> String {
     if let Some(name) = enums.get(&column.name) {
         if column.category == 'A' {
-            format!("Vec<Option<{name}>>")
-        } else {
-            name.clone()
+            return format!("Vec<Option<{name}>>");
         }
-    } else {
-        scalar(&column.type_name)
+        return name.clone();
     }
+    scalar(&column.type_name)
 }
 
 /// Generate a self-contained Rust module using serde, serde_json and nelcota-client.

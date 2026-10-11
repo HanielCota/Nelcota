@@ -12,9 +12,9 @@ export async function openProject(project: ProjectLink, sso: boolean) {
   if (sso) {
     const { url } = await api.post<{ url: string }>('/sso/handoff', { project: project.name })
     location.href = url
-  } else {
-    location.href = `${project.url.replace(/\/$/, '')}/admin/`
+    return
   }
+  location.href = `${project.url.replace(/\/$/, '')}/admin/`
 }
 
 /** Handoff token in the fragment (`#sso=...`), removed from the URL right away. */

@@ -138,6 +138,77 @@ async fn rotation_finishes_when_waiter_is_cancelled_and_failed_rotation_is_share
 }
 
 #[tokio::test]
+async fn cancelled_refresh_waiters_leave_only_one_background_rotation() {
+    struct SlowStorage {
+        started: tokio::sync::Notify,
+        release: tokio::sync::Notify,
+    }
+    impl nelcota_client::auth::SessionStorage for SlowStorage {
+        fn load(&self) -> nelcota_client::auth::StorageFuture<'_, Option<Session>> {
+            Box::pin(async {
+                self.started.notify_one();
+                self.release.notified().await;
+                Ok(None)
+            })
+        }
+        fn save<'a>(
+            &'a self,
+            _: Option<&'a Session>,
+        ) -> nelcota_client::auth::StorageFuture<'a, ()> {
+            Box::pin(async { Ok(()) })
+        }
+    }
+    let runtime = tokio::runtime::Handle::current();
+    let baseline = runtime.metrics().num_alive_tasks();
+    let storage = Arc::new(SlowStorage {
+        started: tokio::sync::Notify::new(),
+        release: tokio::sync::Notify::new(),
+    });
+    let client = Client::builder("http://127.0.0.1:1")
+        .session_storage(storage.clone())
+        .build()
+        .unwrap();
+    let cancellation = nelcota_client::CancellationToken::new();
+    let (started, mut receiver) = tokio::sync::mpsc::channel(100);
+    let mut callers = Vec::new();
+    for _ in 0..100 {
+        let auth = client
+            .with_options(RequestOptions {
+                timeout: None,
+                cancellation: Some(cancellation.clone()),
+            })
+            .auth();
+        let started = started.clone();
+        callers.push(tokio::spawn(async move {
+            started.send(()).await.unwrap();
+            auth.refresh_session().await
+        }));
+    }
+    for _ in 0..100 {
+        receiver.recv().await.unwrap();
+    }
+    storage.started.notified().await;
+    cancellation.cancel();
+    for caller in callers {
+        assert_eq!(caller.await.unwrap().unwrap_err().code(), "aborted");
+    }
+    tokio::task::yield_now().await;
+    assert_eq!(
+        runtime.metrics().num_alive_tasks(),
+        baseline + 1,
+        "cancelled waiters must not leave a task per caller"
+    );
+    storage.release.notify_one();
+    tokio::time::timeout(Duration::from_secs(1), async {
+        while runtime.metrics().num_alive_tasks() > baseline {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
 async fn logout_serializes_with_rotation_and_sessions_are_redacted() {
     let (url, count, server_task) = server(false).await;
     let client = Client::builder(url).build().unwrap();

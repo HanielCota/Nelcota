@@ -39,8 +39,8 @@
   }
 
   function onkeydown(event: KeyboardEvent) {
-    if (event.key === 'Enter') commit()
-    else if (event.key === 'Escape') editing = false
+    if (event.key === 'Enter') { commit(); return }
+    if (event.key === 'Escape') editing = false
   }
 </script>
 

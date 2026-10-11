@@ -143,7 +143,9 @@
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault()
       commitEdit()
-    } else if (event.key === 'Escape') {
+      return
+    }
+    if (event.key === 'Escape') {
       event.preventDefault()
       cancelEdit()
     }
@@ -165,14 +167,21 @@
     const column = columns[col].column
     if (event.key === 'Enter' || event.key === 'F2') {
       event.preventDefault()
-      if (editable && !column.generated) startEdit(row, column)
-      else { detail = { title: column.name, value: data.rows[row][column.name] }; detailOpen = true }
-    } else if (event.key === ' ' && editable) {
+      if (editable && !column.generated) { startEdit(row, column); return }
+      detail = { title: column.name, value: data.rows[row][column.name] }
+      detailOpen = true
+      return
+    }
+    if (event.key === ' ' && editable) {
       event.preventDefault()
       toggleRow(row, !selected.has(row))
-    } else if (event.key === 'Escape' && selected.size) {
+      return
+    }
+    if (event.key === 'Escape' && selected.size) {
       selected = new Set()
-    } else if (ctrl && event.key.toLowerCase() === 'c' && !window.getSelection()?.toString()) {
+      return
+    }
+    if (ctrl && event.key.toLowerCase() === 'c' && !window.getSelection()?.toString()) {
       event.preventDefault()
       copyCell(data.rows[row][column.name])
     }

@@ -57,10 +57,9 @@ pub fn inline(mime: &str) -> bool {
 /// `Content-Type` header: text gets an explicit charset.
 pub fn content_type(mime: &str) -> String {
     if mime.starts_with("text/") {
-        format!("{mime}; charset=utf-8")
-    } else {
-        mime.to_owned()
+        return format!("{mime}; charset=utf-8");
     }
+    mime.to_owned()
 }
 
 #[cfg(test)]

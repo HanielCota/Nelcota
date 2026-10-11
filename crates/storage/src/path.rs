@@ -29,12 +29,11 @@ pub fn bucket(id: &str) -> Result<&str, ApiError> {
         && id.len() <= 63
         && !RESERVED.contains(&id);
     if valid {
-        Ok(id)
-    } else {
-        Err(invalid(
-            "invalid bucket name: lowercase letters, digits, '-' and '_', up to 63",
-        ))
+        return Ok(id);
     }
+    Err(invalid(
+        "invalid bucket name: lowercase letters, digits, '-' and '_', up to 63",
+    ))
 }
 
 /// An object name, normalized to NFC. Segments are separated by `/`; none

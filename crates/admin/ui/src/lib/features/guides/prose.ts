@@ -13,12 +13,18 @@ function visit(tokens: Token[], apply: (fragment: Prose) => void) {
   for (const token of tokens) {
     if (token.type === 'heading' || token.type === 'paragraph' || (token.type === 'text' && token.tokens)) {
       apply(token as Prose)
-    } else if (token.type === 'table') {
+      continue
+    }
+    if (token.type === 'table') {
       const table = token as Tokens.Table
       for (const cell of [...table.header, ...table.rows.flat()]) apply(cell)
-    } else if (token.type === 'list') {
+      continue
+    }
+    if (token.type === 'list') {
       for (const item of (token as Tokens.List).items) visit(item.tokens, apply)
-    } else if (token.type === 'blockquote') visit((token as Tokens.Blockquote).tokens, apply)
+      continue
+    }
+    if (token.type === 'blockquote') visit((token as Tokens.Blockquote).tokens, apply)
   }
 }
 
@@ -52,8 +58,11 @@ export function validateTranslations(markdown: string, catalog: TranslationCatal
   const errors: string[] = []
   for (const fragment of fragments) {
     const translated = catalog[fragment]
-    if (typeof translated !== 'string' || !translated.trim()) errors.push(`Missing translation: ${fragment}`)
-    else if (JSON.stringify(protectedInline(fragment)) !== JSON.stringify(protectedInline(translated))) errors.push(`Changed inline code or link: ${fragment}`)
+    if (typeof translated !== 'string' || !translated.trim()) {
+      errors.push(`Missing translation: ${fragment}`)
+      continue
+    }
+    if (JSON.stringify(protectedInline(fragment)) !== JSON.stringify(protectedInline(translated))) errors.push(`Changed inline code or link: ${fragment}`)
   }
   for (const fragment of Object.keys(catalog)) if (!current.has(fragment)) errors.push(`Outdated translation: ${fragment}`)
   return errors

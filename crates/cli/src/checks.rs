@@ -48,12 +48,11 @@ pub fn docker() -> anyhow::Result<()> {
 /// Why `docker version` failed, from its error output.
 fn docker_failure(stderr: &str) -> String {
     if stderr.to_lowercase().contains("permission denied") {
-        "this user may not use it: run with sudo, or add the user to the docker group \
+        return "this user may not use it: run with sudo, or add the user to the docker group \
          (sudo usermod -aG docker $USER, then log in again)"
-            .to_owned()
-    } else {
-        "the daemon does not answer (systemctl start docker)".to_owned()
+            .to_owned();
     }
+    "the daemon does not answer (systemctl start docker)".to_owned()
 }
 
 /// Caddy needs 80 and 443: another web server there makes HTTPS fail later.

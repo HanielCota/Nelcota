@@ -1,1 +1,0 @@
-import{A as e,S as t,j as n}from"./router.svelte-CGcerT3I.js";var r=new Set([`$$slots`,`$$events`,`$$legacy`]);function i(i,a){let o=e(a,r),s={name:`arrow-right`,size:24,node:[[`path`,{d:`M5 12h14`}],[`path`,{d:`m12 5 7 7-7 7`}]]};t(i,n(()=>o,{get icon(){return s}}))}export{i as t};

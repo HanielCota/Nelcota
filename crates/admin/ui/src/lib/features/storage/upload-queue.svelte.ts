@@ -27,10 +27,12 @@ export class UploadQueue {
           item.loaded = file.size
           sent++
         } catch (error) {
-          if (this.isConflict(error)) { conflicts.push(file); item.status = 'conflict' }
-          else { errors.push({ file, error }); item.status = 'error' }
+          if (this.isConflict(error)) { conflicts.push(file); item.status = 'conflict'; continue }
+          errors.push({ file, error })
+          item.status = 'error'
+        } finally {
+          this.progress = { done: index + 1, total: files.length }
         }
-        this.progress = { done: index + 1, total: files.length }
       }
       return { target, sent, conflicts, errors }
     } finally { this.progress = null }

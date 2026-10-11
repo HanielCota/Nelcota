@@ -662,6 +662,56 @@ async fn catalog_reloads_on_its_own_after_ddl() {
     }
     let (status, _) = app.get("/rest/v1/news?read=is.false", None).await;
     assert_eq!(status, StatusCode::OK);
+
+    // A slow introspection must coalesce notices without blocking the
+    // PostgreSQL connection driver or losing the final schema snapshot.
+    let mut held = Vec::new();
+    for _ in 0..app.pool.status().max_size {
+        held.push(app.pool.get().await.unwrap());
+    }
+    app.admin_client
+        .batch_execute("NOTIFY nelcota, 'blocked-refresh'")
+        .await
+        .unwrap();
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while app.pool.status().waiting == 0 {
+        assert!(
+            Instant::now() < deadline,
+            "listener did not request a reload"
+        );
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    app.admin_client
+        .batch_execute(
+            "ALTER TABLE public.news ADD COLUMN priority int DEFAULT 1;
+             SELECT pg_notify('nelcota', i::text) FROM generate_series(1, 2000) i;",
+        )
+        .await
+        .unwrap();
+    assert!(
+        app.catalog
+            .get()
+            .table("news")
+            .unwrap()
+            .column("priority")
+            .is_none()
+    );
+    drop(held);
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while app
+        .catalog
+        .get()
+        .table("news")
+        .unwrap()
+        .column("priority")
+        .is_none()
+    {
+        assert!(
+            Instant::now() < deadline,
+            "burst lost the final catalog change"
+        );
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
 }
 
 /// Not a benchmark (that lives in `bench/`): it only ensures a simple read does
