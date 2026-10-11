@@ -22,5 +22,7 @@
   "Session keys isolate projects served under different URL base paths.": "Chaves de sessão isolam projetos servidos em caminhos-base de URL diferentes.",
   "Packed-package checks in clean JavaScript and TypeScript consumers, contract\ntests against Postgres and Nelcota, and browser/runtime checks.": "Verificações do pacote empacotado em consumidores JavaScript e TypeScript limpos, testes de contrato com Postgres e Nelcota e verificações em navegadores e ambientes de execução.",
   "Runnable browser, Node and per-request server examples; Portuguese quickstart.": "Exemplos executáveis para navegador, Node e servidor por requisição; guia de início rápido em português.",
-  "The candidate becomes a public release only after a successful npm publish.": "A versão candidata só se torna uma versão pública após uma publicação bem-sucedida no npm."
+  "The candidate becomes a public release only after a successful npm publish.": "A versão candidata só se torna uma versão pública após uma publicação bem-sucedida no npm.",
+  "Update repository and documentation links to `Nelcota/Nelcota` after the\norganization transfer. The client API and server compatibility are unchanged.": "Atualiza os links do repositório e da documentação para `Nelcota/Nelcota` após a transferência para a organização. A API do cliente e a compatibilidade com o servidor permanecem iguais.",
+  "Publish from the organization with GitHub Actions trusted publishing (OIDC).": "Publica pela organização usando publicação confiável do GitHub Actions (OIDC)."
 }
