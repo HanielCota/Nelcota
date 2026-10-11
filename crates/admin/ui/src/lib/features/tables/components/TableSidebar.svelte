@@ -69,7 +69,7 @@
         title={rlsTitle(table.rls)}
         aria-current={table.name === current ? 'page' : undefined}
         class={cn(
-          'flex h-11 items-center gap-2.5 rounded-full px-3.5 text-sm text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground md:h-9',
+          'flex h-11 items-center gap-2.5 rounded-xl px-3.5 text-sm text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground md:h-9',
           table.name === current && 'bg-accent font-medium text-foreground',
         )}
       >

@@ -66,7 +66,7 @@
   <div class="flex min-w-0 items-center gap-2 max-sm:basis-full">
     <a
       href={href('/tables')}
-      class="-ml-1 grid size-9 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-accent hover:text-foreground lg:hidden"
+      class="-ml-1 grid size-9 shrink-0 place-items-center rounded-xl text-muted-foreground hover:bg-accent hover:text-foreground lg:hidden"
       aria-label={t('tables.toolbar.back')}><ChevronLeft class="size-4" /></a
     >
     <h1 class="min-w-0 truncate text-base font-semibold" title={name}>{name}</h1>
@@ -87,7 +87,7 @@
   {#if view === 'data'}
     <div class="flex min-w-0 items-center gap-2 max-sm:order-last max-sm:basis-full sm:ml-auto">
       <RunAsPicker {viewer} labels={viewerLabels} onchange={onviewer} />
-      <div class="flex h-10 min-w-0 items-center gap-0.5 overflow-x-auto rounded-full bg-well p-1 max-sm:ml-auto">
+      <div class="flex h-10 min-w-0 items-center gap-0.5 overflow-x-auto rounded-xl bg-well p-1 max-sm:ml-auto">
       <Button
         variant={filterOpen || filterCount ? 'secondary' : 'ghost'}
         size="sm"

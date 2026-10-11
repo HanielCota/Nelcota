@@ -249,7 +249,7 @@
           </nav>
           {#if topic === 'tables' && tables.length}
             <Select.Root type="single" value={table} onValueChange={(table) => choose({ table })}>
-              <Select.Trigger class="w-52 max-w-full rounded-full font-mono text-xs" aria-label={t('connect.table')}><span class="truncate">{table}</span></Select.Trigger>
+              <Select.Trigger class="w-52 max-w-full font-mono text-xs" aria-label={t('connect.table')}><span class="truncate">{table}</span></Select.Trigger>
               <Select.Content>
                 <Select.Group>
                 {#each tables as item (item.name)}

@@ -15,7 +15,7 @@
     <p class="mt-2 font-mono text-sm text-muted-foreground">404</p>
     <h1 class="mt-1 text-2xl font-semibold tracking-tight">{t('overview.notFound.title')}</h1>
     <p class="mt-1 text-sm text-muted-foreground">{t('overview.notFound.description')}</p>
-    <p class="mt-3 max-w-full truncate rounded-full bg-well px-3 py-1 font-mono text-xs text-muted-foreground" title={route.path}>{route.path}</p>
+    <p class="mt-3 max-w-full truncate rounded-lg bg-well px-3 py-1 font-mono text-xs text-muted-foreground" title={route.path}>{route.path}</p>
     <div class="mt-6 flex flex-wrap justify-center gap-2">
       <Button href={href('/')}>{t('overview.notFound.back')}</Button>
       <Button variant="outline" onclick={() => (palette.open = true)}><Search data-icon="inline-start" aria-hidden="true" />{t('overview.notFound.search')}</Button>
