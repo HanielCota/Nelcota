@@ -12,6 +12,8 @@
   import { mode, toggleMode } from 'mode-watcher'
   import { api } from '$lib/api'
   import { session } from '$lib/features/auth/session.svelte'
+  import Flag from '$lib/shell/components/Flag.svelte'
+  import Logo from '$lib/shell/components/Logo.svelte'
   import Mascot, { type Pose } from '$lib/shell/components/Mascot.svelte'
   import type { Point } from '$lib/shell/mascot'
   import { LOCALES, errorMessage, i18n, setLocale, t, type Locale } from '$lib/i18n/index.svelte'
@@ -87,129 +89,143 @@
   }
 </script>
 
-<main class="relative flex min-h-dvh flex-col items-center bg-background px-4 pt-[max(10rem,27vh)] pb-12">
-  <!-- Language and theme, in the corner (the account menu is not there yet). -->
-  <div class="absolute top-4 right-4 flex items-center gap-2 sm:top-6 sm:right-6">
-    <div class="flex items-center gap-1 rounded-full bg-card p-1" role="group" aria-label={t('shell.account.language')}>
-      {#each LOCALES as locale (locale)}
-        {@const current = i18n.locale === locale}
-        <button
-          type="button"
-          lang={locale}
-          aria-pressed={current}
-          aria-label={t(`shell.languages.${locale}`)}
-          title={t(`shell.languages.${locale}`)}
-          class={[
-            'h-8 cursor-pointer rounded-full px-3 text-xs font-medium transition-colors',
-            current ? 'bg-nav-active text-nav-active-foreground' : 'text-muted-foreground hover:text-foreground',
-          ]}
-          onclick={() => setLocale(locale)}>{CODES[locale]}</button
-        >
-      {/each}
-    </div>
-    <button
-      type="button"
-      class="grid size-10 cursor-pointer place-items-center rounded-full bg-card text-muted-foreground transition-colors hover:text-foreground"
-      onclick={toggleMode}
-      aria-label={mode.current === 'dark' ? t('shell.account.lightTheme') : t('shell.account.darkTheme')}
-      title={mode.current === 'dark' ? t('shell.account.lightTheme') : t('shell.account.darkTheme')}
-    >
-      {#if mode.current === 'dark'}<Sun class="size-[18px]" aria-hidden="true" />{:else}<Moon class="size-[18px]" aria-hidden="true" />{/if}
-    </button>
-  </div>
-
-  <div class="relative w-full max-w-[400px]">
-    <Mascot {pose} lookAt={caret} class="pointer-events-none absolute -top-[8.6rem] left-1/2 size-36 -translate-x-1/2" />
-
-    <form class="flex flex-col gap-5 rounded-3xl bg-card px-6 pt-10 pb-6 sm:px-8 sm:pb-8" onsubmit={submit} aria-busy={loading} novalidate>
-      <div class="text-center">
-        <h1 class="text-xl font-semibold tracking-tight">{t('login.title')}</h1>
-        <p class="mt-1 text-sm text-muted-foreground [overflow-wrap:anywhere]">
-          {#if project}{t('login.projectPanel')} <span class="font-medium text-foreground" translate="no">{project}</span>{:else}{t('login.adminPanel')}{/if}
-        </p>
-      </div>
-      {#if session.expired}
-        <p class="rounded-2xl bg-well px-4 py-3 text-center text-sm text-muted-foreground" role="status">{t('login.sessionExpired')}</p>
+<div class="flex min-h-dvh flex-col bg-background px-4 py-4 sm:px-6 sm:py-6">
+  <!-- The same bar as the signed-in panel: who this server is on the left,
+       language and theme on the right (the account menu is not there yet). -->
+  <header class="flex items-center justify-between gap-3">
+    <div class="flex min-w-0 items-center gap-2 rounded-full bg-card py-1.5 ps-1.5 pe-4">
+      <!-- On a phone the mark alone, so the project name has the room. -->
+      <span class="flex shrink-0 sm:hidden"><Logo mark /></span>
+      <span class="hidden shrink-0 sm:flex"><Logo /></span>
+      {#if project}
+        <span class="mx-1 h-5 w-px shrink-0 bg-border-strong" aria-hidden="true"></span>
+        <span class="hidden text-sm text-muted-foreground sm:inline">{t('login.project')}</span>
+        <span class="truncate text-sm font-semibold" translate="no">{project}</span>
       {/if}
+    </div>
+    <div class="flex shrink-0 items-center gap-2">
+      <div class="flex items-center gap-1 rounded-full bg-card p-1" role="group" aria-label={t('shell.account.language')}>
+        {#each LOCALES as locale (locale)}
+          {@const current = i18n.locale === locale}
+          <button
+            type="button"
+            lang={locale}
+            aria-pressed={current}
+            aria-label={t(`shell.languages.${locale}`)}
+            title={t(`shell.languages.${locale}`)}
+            class={[
+              'flex h-9 cursor-pointer items-center gap-1.5 rounded-full ps-2 pe-3 text-xs font-medium transition-colors',
+              current ? 'bg-nav-active text-nav-active-foreground' : 'text-muted-foreground hover:text-foreground',
+            ]}
+            onclick={() => setLocale(locale)}><Flag {locale} class="size-[18px]" />{CODES[locale]}</button
+          >
+        {/each}
+      </div>
+      <button
+        type="button"
+        class="grid size-11 cursor-pointer place-items-center rounded-full bg-card text-muted-foreground transition-colors hover:text-foreground"
+        onclick={toggleMode}
+        aria-label={mode.current === 'dark' ? t('shell.account.lightTheme') : t('shell.account.darkTheme')}
+        title={mode.current === 'dark' ? t('shell.account.lightTheme') : t('shell.account.darkTheme')}
+      >
+        {#if mode.current === 'dark'}<Sun class="size-[18px]" aria-hidden="true" />{:else}<Moon class="size-[18px]" aria-hidden="true" />{/if}
+      </button>
+    </div>
+  </header>
 
-      <Field.Group class="gap-5">
-        <Field.Field data-invalid={missing === 'email' ? true : undefined}>
-          <Field.Label for="email">{t('login.email')}</Field.Label>
-          <Input
-            id="email"
-            name="email"
-            type="email"
-            autocomplete="username"
-            spellcheck={false}
-            placeholder={t('login.emailPlaceholder')}
-            class="h-10"
-            readonly={loading}
-            bind:value={email}
-            onfocus={followCaret}
-            onkeyup={followCaret}
-            onclick={followCaret}
-            onblur={() => (caret = null)}
-            oninput={(e) => {
-              failure = null
-              if (missing === 'email') missing = null
-              followCaret(e)
-            }}
-            required
-            aria-invalid={missing === 'email' ? true : undefined}
-            aria-describedby={missing === 'email' ? 'login-email-error' : undefined}
-          />
-          {#if missing === 'email'}<p id="login-email-error" class="text-sm text-destructive" role="alert">{t('login.emailRequired')}</p>{/if}
-        </Field.Field>
-        <Field.Field data-invalid={failure || missing === 'password' ? true : undefined}>
-          <Field.Label for="password">{t('login.password')}</Field.Label>
-          <InputGroup.Root class="h-10">
-            <InputGroup.Input
-              id="password"
-              name="password"
-              type={showPassword ? 'text' : 'password'}
-              autocomplete="current-password"
-              class="h-full"
+  <main class="flex flex-1 flex-col items-center justify-center gap-5 pt-6 pb-10">
+    <!-- The mascot peeks over the card's top edge, its feet hidden behind it. -->
+    <div class="relative w-full max-w-[440px] pt-24">
+      <Mascot {pose} lookAt={caret} class="pointer-events-none absolute top-0 right-6 size-32 sm:right-9" />
+
+      <form class="relative flex flex-col gap-5 rounded-[2rem] bg-card px-6 pt-8 pb-7 sm:px-9 sm:pt-9 sm:pb-8" onsubmit={submit} aria-busy={loading} novalidate>
+        <div>
+          <h1 class="text-2xl font-semibold tracking-tight sm:text-[1.75rem]">{t('login.title')}</h1>
+          <p class="mt-1.5 text-[15px] text-muted-foreground">{t('login.subtitle')}</p>
+        </div>
+        {#if session.expired}
+          <p class="rounded-2xl bg-well px-4 py-3 text-sm text-muted-foreground" role="status">{t('login.sessionExpired')}</p>
+        {/if}
+
+        <Field.Group class="gap-5">
+          <Field.Field data-invalid={missing === 'email' ? true : undefined}>
+            <Field.Label for="email">{t('login.email')}</Field.Label>
+            <Input
+              id="email"
+              name="email"
+              type="email"
+              autocomplete="username"
+              spellcheck={false}
+              placeholder={t('login.emailPlaceholder')}
+              class="h-11"
               readonly={loading}
-              bind:value={password}
-              onfocus={() => (typingPassword = true)}
-              onblur={() => { typingPassword = false; capsLock = false }}
-              onkeydown={checkCapsLock}
-              onkeyup={checkCapsLock}
-              oninput={() => {
+              bind:value={email}
+              onfocus={followCaret}
+              onkeyup={followCaret}
+              onclick={followCaret}
+              onblur={() => (caret = null)}
+              oninput={(e) => {
                 failure = null
-                if (missing === 'password') missing = null
+                if (missing === 'email') missing = null
+                followCaret(e)
               }}
               required
-              aria-invalid={failure || missing === 'password' ? true : undefined}
-              aria-describedby={failure || missing === 'password' ? 'login-error' : capsLock ? 'login-caps-lock' : undefined}
+              aria-invalid={missing === 'email' ? true : undefined}
+              aria-describedby={missing === 'email' ? 'login-email-error' : undefined}
             />
-            <InputGroup.Addon align="inline-end" class="py-0">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                disabled={loading}
-                aria-label={t(showPassword ? 'common.hidePassword' : 'common.showPassword')}
-                aria-pressed={showPassword}
-                onclick={() => { showPassword = !showPassword; document.getElementById('password')?.focus() }}
-              >
-                {#if showPassword}<EyeOff aria-hidden="true" />{:else}<Eye aria-hidden="true" />{/if}
-              </Button>
-            </InputGroup.Addon>
-          </InputGroup.Root>
-          <!-- One line kept for the error or the Caps Lock hint, so the button
-               does not jump when either appears; a longer error grows the card. -->
-          <div class="-mt-1 min-h-5 text-sm leading-5">
-            <p id="login-error" class="break-words text-destructive" role="alert">{failure ? errorMessage(failure) : missing === 'password' ? t('login.passwordRequired') : ''}</p>
-            <p id="login-caps-lock" class="text-warning" role="status" aria-live="polite">{!failure && !missing && capsLock ? t('login.capsLock') : ''}</p>
-          </div>
-        </Field.Field>
-      </Field.Group>
+            {#if missing === 'email'}<p id="login-email-error" class="text-sm text-destructive" role="alert">{t('login.emailRequired')}</p>{/if}
+          </Field.Field>
+          <Field.Field data-invalid={failure || missing === 'password' ? true : undefined}>
+            <Field.Label for="password">{t('login.password')}</Field.Label>
+            <InputGroup.Root class="h-11">
+              <InputGroup.Input
+                id="password"
+                name="password"
+                type={showPassword ? 'text' : 'password'}
+                autocomplete="current-password"
+                class="h-full"
+                readonly={loading}
+                bind:value={password}
+                onfocus={() => (typingPassword = true)}
+                onblur={() => { typingPassword = false; capsLock = false }}
+                onkeydown={checkCapsLock}
+                onkeyup={checkCapsLock}
+                oninput={() => {
+                  failure = null
+                  if (missing === 'password') missing = null
+                }}
+                required
+                aria-invalid={failure || missing === 'password' ? true : undefined}
+                aria-describedby={failure || missing === 'password' ? 'login-error' : capsLock ? 'login-caps-lock' : undefined}
+              />
+              <InputGroup.Addon align="inline-end" class="py-0">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  disabled={loading}
+                  aria-label={t(showPassword ? 'common.hidePassword' : 'common.showPassword')}
+                  aria-pressed={showPassword}
+                  onclick={() => { showPassword = !showPassword; document.getElementById('password')?.focus() }}
+                >
+                  {#if showPassword}<EyeOff aria-hidden="true" />{:else}<Eye aria-hidden="true" />{/if}
+                </Button>
+              </InputGroup.Addon>
+            </InputGroup.Root>
+            <!-- One line kept for the error or the Caps Lock hint, so the button
+                 does not jump when either appears; a longer error grows the card. -->
+            <div class="-mt-1 min-h-5 text-sm leading-5">
+              <p id="login-error" class="break-words text-destructive" role="alert">{failure ? errorMessage(failure) : missing === 'password' ? t('login.passwordRequired') : ''}</p>
+              <p id="login-caps-lock" class="text-warning" role="status" aria-live="polite">{!failure && !missing && capsLock ? t('login.capsLock') : ''}</p>
+            </div>
+          </Field.Field>
+        </Field.Group>
 
-      <Button type="submit" class="h-10 w-full" disabled={loading}>{#if loading}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{/if}{loading ? t('login.signingIn') : t('login.signIn')}</Button>
-    </form>
+        <Button type="submit" class="mt-1 h-12 w-full text-[15px]" disabled={loading}>{#if loading}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{/if}{loading ? t('login.signingIn') : t('login.signIn')}</Button>
+      </form>
 
-    <p class="sr-only" role="status" aria-live="polite" aria-atomic="true">{loading ? t('login.signingIn') : ''}</p>
-    <p class="mt-6 text-center text-sm text-muted-foreground">{t('login.restricted')}</p>
-  </div>
-</main>
+      <p class="sr-only" role="status" aria-live="polite" aria-atomic="true">{loading ? t('login.signingIn') : ''}</p>
+    </div>
+    <p class="text-center text-sm text-muted-foreground">{t('login.restricted')}</p>
+  </main>
+</div>
