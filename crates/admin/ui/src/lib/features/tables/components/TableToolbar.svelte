@@ -87,10 +87,10 @@
   {#if view === 'data'}
     <!-- Who reads, then the tools as plain buttons: one height, no boxes
          around them, a hairline between the two. -->
-    <div class="flex min-w-0 items-center gap-2 max-sm:order-last max-sm:basis-full sm:ml-auto">
+    <div class="flex min-w-0 flex-wrap items-center gap-2 max-sm:order-last max-sm:basis-full sm:ml-auto">
       <RunAsPicker {viewer} labels={viewerLabels} onchange={onviewer} />
       <span class="h-5 w-px shrink-0 bg-border-strong max-sm:hidden" aria-hidden="true"></span>
-      <div class="flex min-w-0 items-center gap-0.5 max-sm:ml-auto">
+      <div class="flex shrink-0 items-center gap-0.5 max-sm:ml-auto">
       <Button
         variant={filterOpen || filterCount ? 'secondary' : 'ghost'}
         size="sm"
