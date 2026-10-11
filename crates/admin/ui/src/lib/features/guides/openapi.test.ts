@@ -1,6 +1,29 @@
 import { expect, it } from 'vitest'
-import { isOpenApiDocument, operations } from './openapi'
+import { isOpenApiDocument, object, operations, type OpenApiDocument } from './openapi'
 import { translateOpenApi } from './openapi-prose'
+import { marked } from 'marked'
+import prose from '../../../../../../../docs/i18n/pt-BR/openapi.json'
+
+it('renders generated JWT placeholders and wildcard examples literally in both languages', () => {
+  const description = Object.keys(prose).find(value => value.startsWith('API generated'))!
+  const columns = Object.keys(prose).find(value => value.startsWith('Columns:'))!
+  for (const locale of ['en', 'pt-BR']) {
+    const source: OpenApiDocument = {
+      openapi: '3.0.3', info: { description }, security: [{}, { bearer: [] }],
+      paths: { '/notes': { get: { parameters: [{ name: 'select', description: columns }] } } },
+    }
+    const translated = translateOpenApi(source, locale)
+    const parameters = operations(translated)[0].operation.parameters
+    const select = object(Array.isArray(parameters) ? parameters[0] : null)
+    const html = marked.parse(`${object(translated.info).description}\n\n${select.description}`) as string
+    expect(html).toContain('<code>Authorization: Bearer &lt;jwt&gt;</code>')
+    expect(html).toContain('<code>*</code>')
+    expect(html).toContain('<code>items(*)</code>')
+    expect(html).toContain('<code>orders(id,items(*))</code>')
+    expect(html).not.toContain('<em>')
+    expect(translated.security).toEqual([{}, { bearer: [] }])
+  }
+})
 
 it('rejects non-OpenAPI responses and invalid paths', () => {
   for (const value of [null, '<html>', {}, { openapi: '2.0', paths: {} }, { openapi: '3.0.3', paths: [] }, { openapi: '3.0.3', paths: { '/notes': null } }]) expect(isOpenApiDocument(value)).toBe(false)
