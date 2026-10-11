@@ -133,14 +133,14 @@
   <!-- The id is what policies and support tickets use: shown whole on hover, one click to copy. -->
   <span class="group/id flex min-w-0 items-center gap-1">
     <span class="min-w-0 truncate font-mono text-xs text-muted-foreground" title={user.id}>{user.id}</span>
-    <button type="button" class="grid size-6 shrink-0 cursor-pointer place-items-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none" aria-label={t('users.copyIdOf', { email: user.email })} title={t('users.copyId')} onclick={() => copyText(user.id, t('users.idCopied'))}><Copy class="size-3.5" aria-hidden="true" /></button>
+    <button type="button" class="grid size-6 shrink-0 cursor-pointer place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none" aria-label={t('users.copyIdOf', { email: user.email })} title={t('users.copyId')} onclick={() => copyText(user.id, t('users.idCopied'))}><Copy class="size-3.5" aria-hidden="true" /></button>
   </span>
 {/snippet}
 
 {#snippet methods(user: User)}
   {@const list = signInMethods(user)}
-  <span title={list[0].kind === 'linkOnly' ? t('users.methods.linkOnlyHint') : undefined}>
-    {#each list as method, i (i)}{#if i > 0}<span class="text-muted-foreground" aria-hidden="true">{' · '}</span>{/if}{#if method.kind === 'password'}{t('users.methods.password')}{:else if method.kind === 'provider'}{method.name}{:else}<span class="text-muted-foreground">{t('users.methods.linkOnly')}</span>{/if}{/each}
+  <span class="inline-flex flex-wrap gap-1" title={list[0].kind === 'linkOnly' ? t('users.methods.linkOnlyHint') : undefined}>
+    {#each list as method, i (i)}<span class={['rounded-md bg-well px-2 py-0.5 text-xs font-medium', method.kind === 'linkOnly' ? 'text-muted-foreground' : '']}>{#if method.kind === 'password'}{t('users.methods.password')}{:else if method.kind === 'provider'}{method.name}{:else}{t('users.methods.linkOnly')}{/if}</span>{/each}
   </span>
 {/snippet}
 
@@ -213,7 +213,7 @@
           </div>
           <dl class="mt-4 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2 text-xs">
             <dt class="text-muted-foreground">{t('users.columns.signIn')}</dt><dd class="text-right">{@render methods(user)}</dd>
-            <dt class="text-muted-foreground">{t('users.columns.lastSignIn')}</dt><dd class="text-right">{user.last_sign_in_at ? when(user.last_sign_in_at) : t('users.neverSignedIn')}</dd>
+            <dt class="text-muted-foreground">{t('users.columns.lastSignIn')}</dt><dd class={['text-right', user.last_sign_in_at ? '' : 'text-muted-foreground']}>{user.last_sign_in_at ? when(user.last_sign_in_at) : t('users.neverSignedIn')}</dd>
             <dt class="text-muted-foreground">{t('users.columns.created')}</dt><dd class="text-right">{when(user.created_at)}</dd>
             <dt class="text-muted-foreground">{t('users.columns.sessions')}</dt><dd class="text-right tabular-nums">{user.sessions}</dd>
           </dl>
@@ -238,7 +238,7 @@
               <Table.Cell>
                 <div class="flex items-center gap-3">
                   <span
-                    class="grid size-8 shrink-0 place-items-center rounded-full border border-border-strong bg-muted text-xs font-medium"
+                    class="grid size-9 shrink-0 place-items-center rounded-full bg-well text-xs font-semibold text-muted-foreground"
                     aria-hidden="true">{user.email.charAt(0).toUpperCase()}</span
                   >
                   <div class="min-w-0">
@@ -248,9 +248,10 @@
                 </div>
               </Table.Cell>
               <Table.Cell>{@render methods(user)}</Table.Cell>
-              <Table.Cell class="text-muted-foreground">{when(user.created_at)}</Table.Cell>
-              <Table.Cell class="text-muted-foreground">{user.last_sign_in_at ? when(user.last_sign_in_at) : t('users.neverSignedIn')}</Table.Cell>
-              <Table.Cell class="text-right tabular-nums">{user.sessions}</Table.Cell>
+              <!-- Dates stay secondary to the email; no sessions reads as muted, like "never". -->
+              <Table.Cell class="text-muted-foreground tabular-nums">{when(user.created_at)}</Table.Cell>
+              <Table.Cell class="text-muted-foreground tabular-nums">{user.last_sign_in_at ? when(user.last_sign_in_at) : t('users.neverSignedIn')}</Table.Cell>
+              <Table.Cell class={['text-right tabular-nums', user.sessions ? '' : 'text-muted-foreground']}>{user.sessions}</Table.Cell>
               <Table.Cell class="text-right">
                 {@render userActions(user)}
               </Table.Cell>
