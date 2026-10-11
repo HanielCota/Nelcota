@@ -1,0 +1,21 @@
+-- Seeded through the published 0.3.1 binary, before applying V13.
+CREATE TABLE public.upgrade_notes (id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, user_id uuid NOT NULL DEFAULT auth.uid() REFERENCES auth.users(id), title text NOT NULL CHECK(length(title)>0), extra jsonb, amount numeric(24,8), tags text[] NOT NULL DEFAULT '{}', created_at timestamptz NOT NULL DEFAULT now());
+CREATE INDEX upgrade_notes_owner ON public.upgrade_notes(user_id);
+ALTER TABLE public.upgrade_notes ENABLE ROW LEVEL SECURITY;
+CREATE POLICY own_notes ON public.upgrade_notes FOR ALL TO authenticated USING(user_id=auth.uid()) WITH CHECK(user_id=auth.uid());
+GRANT SELECT,INSERT,UPDATE,DELETE ON public.upgrade_notes TO authenticated,service_role;
+GRANT USAGE,SELECT ON SEQUENCE public.upgrade_notes_id_seq TO authenticated,service_role;
+CREATE TABLE public.upgrade_audit (id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, operation text NOT NULL, note_id bigint NOT NULL);
+CREATE FUNCTION public.audit_upgrade_note() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$ BEGIN INSERT INTO public.upgrade_audit(operation,note_id) VALUES(TG_OP, coalesce(NEW.id,OLD.id)); RETURN NULL; END $$;
+CREATE TRIGGER existing_audit AFTER INSERT OR UPDATE OR DELETE ON public.upgrade_notes FOR EACH ROW EXECUTE FUNCTION public.audit_upgrade_note();
+CREATE FUNCTION public.upgrade_add_note(title text) RETURNS SETOF public.upgrade_notes LANGUAGE sql AS $$ INSERT INTO public.upgrade_notes(title) VALUES(title) RETURNING * $$;
+REVOKE ALL ON FUNCTION public.upgrade_add_note(text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.upgrade_add_note(text) TO authenticated;
+INSERT INTO public.upgrade_notes(user_id,title,extra,amount,tags) VALUES (:'alice'::uuid,'preservação 🐘', '{"nested":{"nullable":null},"list":[1,"á",true]}',1234567890123456.12345678,ARRAY['one','dois']),(:'bob'::uuid,'Bob private row',NULL,0.00000001,ARRAY[]::text[]);
+INSERT INTO storage.buckets(id) VALUES('upgrade-files');
+CREATE POLICY own_upgrade_files ON storage.objects FOR ALL TO authenticated USING(bucket_id='upgrade-files' AND owner=auth.uid()) WITH CHECK(bucket_id='upgrade-files' AND owner=auth.uid());
+INSERT INTO nelcota.admin_avatar(email,content_type,image) VALUES('admin@example.com','image/png',decode('89504e470d0a1a0a','hex'));
+INSERT INTO auth.identities(user_id,provider,provider_id,email,identity_data) VALUES(:'alice'::uuid,'github','upgrade-fixture-identity','alice-upgrade@example.com','{"login":"alice"}');
+INSERT INTO auth.one_time_tokens(user_id,kind,token_hash,expires_at) VALUES(:'alice'::uuid,'recovery',decode(repeat('12',32),'hex'),now()+interval '1 day');
+INSERT INTO auth.flow_states(state_hash,provider,provider_verifier,code_challenge,redirect_to,user_id,expires_at) VALUES(decode(repeat('23',32),'hex'),'github','fixture-verifier','fixture-challenge','https://example.com/callback',:'alice'::uuid,now()+interval '1 day');
+INSERT INTO nelcota.panel_changes(summary,statements,kind) VALUES('Upgrade fixture schema',ARRAY['CREATE TABLE public.upgrade_notes (...)'],'table_created');

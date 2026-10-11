@@ -1,0 +1,15 @@
+{
+  "repository": "Nelcota/Nelcota",
+  "baseline": {
+    "version": "0.3.1",
+    "tag": "v0.3.1",
+    "sha256": "0f346d23dec216a9765c8ffb5346e3e72804e0500956d9bceeae182a18a117bc"
+  },
+  "target": {
+    "version": "0.4.0",
+    "tag": "v0.4.0",
+    "sha256": "d9e999287b0bd78d38baa7c9d21c06a975dff38ae96eaf9ade49bf575d0e66ed"
+  },
+  "asset": "nelcota-x86_64-unknown-linux-musl",
+  "postgres_image": "postgres:17-alpine"
+}
