@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { guides, guideLink, guideSource } from './content'
-import { readMarkdown } from './markdown'
+import { headingSlug, readMarkdown } from './markdown'
 
 describe('bundled guides', () => {
   it('includes every reference without fetching remote documentation', () => {
@@ -23,6 +23,15 @@ describe('bundled guides', () => {
 })
 
 describe('guide reader', () => {
+  it.each(['<script', '<<script>alert(1)</script>', '<scr<script>ipt>', '\" onfocus=\"alert(1)'])('limits anchor characters for malformed markup: %s', value => {
+    expect(headingSlug(value)).toMatch(/^[\p{L}\p{N}_-]*$/u)
+  })
+
+  it('keeps existing Unicode, code and punctuation heading anchors', () => {
+    expect(headingSlug('JWT e regras de acesso')).toBe('jwt-e-regras-de-acesso')
+    expect(headingSlug('`getUser()` — configuração')).toBe('getuser--configuração')
+  })
+
   it('keeps code copyable and gives duplicate headings distinct anchors', () => {
     const blocks = readMarkdown('# Title\n\n## Results and errors\n\n```ts\nconst value = "<script>"\n```\n\n## Results and errors', 'docs/api.md')
     expect(blocks.filter(block => block.type === 'heading').map(block => block.id)).toEqual(['results-and-errors', 'results-and-errors-1'])

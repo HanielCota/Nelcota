@@ -5,7 +5,8 @@ import { translateTokens, type TranslationCatalog } from './prose'
 
 const assets = import.meta.glob<string>('../../../../../../../docs/assets/*.png', { query: '?url', import: 'default', eager: true })
 const escape = (value: string) => value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;')
-export const headingSlug = (text: string) => text.toLowerCase().replace(/<[^>]*>/g, '').replace(/[^\p{L}\p{N}_\-\s]/gu, '').replace(/\s/g, '-')
+// Anchor IDs have their own character allowlist; they are never parsed as HTML.
+export const headingSlug = (text: string) => text.toLowerCase().replace(/[^\p{L}\p{N}_\-\s]/gu, '').replace(/\s/g, '-')
 
 export type Block =
   | { type: 'html'; html: string }
