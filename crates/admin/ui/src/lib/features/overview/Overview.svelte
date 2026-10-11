@@ -131,7 +131,7 @@
     on ? 'bg-secondary font-medium text-foreground' : 'text-muted-foreground hover:text-foreground',
   ]
   const filter = (on: boolean) => [
-    'h-10 shrink-0 cursor-pointer rounded-full border px-4 text-sm whitespace-nowrap transition-colors',
+    'h-10 shrink-0 cursor-pointer rounded-xl border px-4 text-sm whitespace-nowrap transition-colors',
     on ? 'border-transparent bg-nav-active font-medium text-nav-active-foreground' : 'border-border-strong text-muted-foreground hover:text-foreground',
   ]
   const card = 'rounded-3xl bg-card p-5'
@@ -141,7 +141,7 @@
 {#snippet cardHeader(title: string, path: string)}
   <div class="flex items-center justify-between gap-3">
     <h2 class="text-sm font-medium text-muted-foreground">{title}</h2>
-    <a href={href(path)} class="grid size-10 place-items-center rounded-full bg-secondary text-muted-foreground transition-colors hover:text-foreground" aria-label={`${t('overview.open')}: ${title}`}>
+    <a href={href(path)} class="grid size-10 place-items-center rounded-xl bg-secondary text-muted-foreground transition-colors hover:text-foreground" aria-label={`${t('overview.open')}: ${title}`}>
       <Maximize2 class="size-4" aria-hidden="true" />
     </a>
   </div>
@@ -263,7 +263,7 @@
           {/if}
           <button
             type="button"
-            class="grid size-10 cursor-pointer place-items-center rounded-full border border-border-strong text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+            class="grid size-10 cursor-pointer place-items-center rounded-xl border border-border-strong text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
             onclick={download}
             disabled={!traffic}
             aria-label={t('overview.download')}

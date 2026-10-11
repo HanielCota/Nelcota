@@ -26,7 +26,7 @@
   } = $props()
 
   const item =
-    'group flex h-9 w-full min-w-0 cursor-pointer items-center gap-2 rounded-full px-3 text-left text-sm text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground'
+    'group flex h-9 w-full min-w-0 cursor-pointer items-center gap-2 rounded-xl px-3 text-left text-sm text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground'
   const heading = 'px-2.5 pb-1 text-xs font-medium text-muted-foreground'
   // With nothing saved yet, the templates are the most useful thing here.
   const templatesFirst = $derived(sqlStore.saved.length === 0)

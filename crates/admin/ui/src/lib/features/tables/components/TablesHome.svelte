@@ -82,7 +82,7 @@
       {#if resume}
         <a
           href={href(`/tables/${enc(resume)}`)}
-          class="group flex items-center gap-3 rounded-full bg-well py-2 pr-4 pl-2 text-sm transition-colors hover:bg-accent"
+          class="group flex items-center gap-3 rounded-2xl bg-well py-2 pr-4 pl-2 text-sm transition-colors hover:bg-accent"
         >
           <span class="grid size-9 shrink-0 place-items-center rounded-full bg-card text-muted-foreground"><History class="size-4" aria-hidden="true" /></span>
           <span class="min-w-0 flex-1 truncate">
@@ -108,7 +108,7 @@
               </span>
               <a
                 href={href(`/tables/${enc(table.name)}/structure`)}
-                class="relative z-[1] inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-medium text-muted-foreground hover:bg-card hover:text-foreground"
+                class="relative z-[1] inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-medium text-muted-foreground hover:bg-card hover:text-foreground"
                 aria-label={t('tables.home.structureOf', { table: table.name })}
               ><TableProperties class="size-3.5" aria-hidden="true" />{t('tables.toolbar.structure')}</a>
             </div>
