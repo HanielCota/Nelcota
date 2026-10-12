@@ -153,6 +153,92 @@ async fn wait_for_locks(app: &TestApp, count: i64, predicate: &str) {
     }
 }
 
+#[tokio::test]
+async fn concurrent_first_upserts_remove_the_displaced_bytes_without_a_quota() {
+    use futures_util::StreamExt;
+
+    let app = TestApp::spawn().await;
+    assert!(app.storage.settings.max_total_size.is_none());
+    app.admin_client
+        .batch_execute("INSERT INTO storage.buckets (id) VALUES ('docs')")
+        .await
+        .unwrap();
+    // Independent instances share the database and byte store, not a mutex.
+    let second = StorageState::new(
+        app.pool.clone(),
+        app.keys.clone(),
+        app.storage.store.clone(),
+        (*app.storage.settings).clone(),
+    );
+    let mut pending = Vec::new();
+    let mut gates = Vec::new();
+    for storage in [app.storage.clone(), second] {
+        let (ready, started) = tokio::sync::oneshot::channel();
+        let (release, gate) = tokio::sync::oneshot::channel();
+        pending.push(tokio::spawn(async move {
+            storage
+                .upload(
+                    service(),
+                    "docs",
+                    "same.txt",
+                    UploadOptions {
+                        content_length: Some(6),
+                        replace: true,
+                        ..Default::default()
+                    },
+                    Box::pin(stream::once(async move {
+                        ready.send(()).unwrap();
+                        gate.await.unwrap();
+                        Ok(Bytes::from_static(b"abcdef"))
+                    })),
+                )
+                .await
+        }));
+        // Both policy checks have rolled back before locking publication.
+        started.await.unwrap();
+        gates.push(release);
+    }
+    let (mut locker, connection) = app.admin.connect(tokio_postgres::NoTls).await.unwrap();
+    tokio::spawn(connection);
+    let lock = locker.transaction().await.unwrap();
+    lock.batch_execute("LOCK TABLE storage.objects IN SHARE MODE")
+        .await
+        .unwrap();
+    for gate in gates {
+        gate.send(()).unwrap();
+    }
+    wait_for_locks(
+        &app,
+        2,
+        "query LIKE 'INSERT INTO storage.objects%' OR query LIKE 'SELECT pg_advisory_xact_lock%'",
+    )
+    .await;
+    lock.commit().await.unwrap();
+    let mut replaced = 0;
+    for upload in pending {
+        replaced += usize::from(upload.await.unwrap().unwrap().replaced);
+    }
+    assert_eq!(
+        replaced, 1,
+        "the second publication must observe its predecessor"
+    );
+    let current = app
+        .storage
+        .object(&service(), "docs", "same.txt")
+        .await
+        .unwrap();
+    let files: Vec<_> = app.storage.store.list().collect().await;
+    assert_eq!(
+        files.len(),
+        1,
+        "superseded bytes must be removed immediately"
+    );
+    assert_eq!(
+        files[0].as_ref().unwrap().location,
+        nelcota_storage::Store::key("docs", current.version)
+    );
+}
+
 fn service() -> Claims {
     Claims::from_payload(json!({"role":"service_role"})).unwrap()
 }
