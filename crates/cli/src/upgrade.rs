@@ -121,7 +121,7 @@ fn direction(current: &str, target: &str) -> Direction {
         return Direction::Same;
     }
     match (parse_version(current), parse_version(target)) {
-        (Some(from), Some(to)) => match to.cmp(&from) {
+        (Some(from), Some(to)) => match to.cmp_precedence(&from) {
             std::cmp::Ordering::Greater => Direction::Upgrade,
             std::cmp::Ordering::Equal => Direction::Same,
             std::cmp::Ordering::Less => Direction::Downgrade,
@@ -130,27 +130,11 @@ fn direction(current: &str, target: &str) -> Direction {
     }
 }
 
-/// `x.y.z` or `x.y.z-pre` (an optional leading `v`). A pre-release sorts
-/// before its release: `(major, minor, patch, is_release, pre)`.
-fn parse_version(version: &str) -> Option<(u64, u64, u64, bool, String)> {
+/// SemVer precedence, with an optional leading `v` for image tags.
+fn parse_version(version: &str) -> Option<semver::Version> {
     let version = version.trim();
     let version = version.strip_prefix('v').unwrap_or(version);
-    let (core, pre) = match version.split_once('-') {
-        Some((core, pre)) => (core, Some(pre)),
-        None => (version, None),
-    };
-    let mut parts = core.split('.').map(|part| part.parse::<u64>().ok());
-    let (major, minor, patch) = (parts.next()??, parts.next()??, parts.next()??);
-    if parts.next().is_some() {
-        return None;
-    }
-    Some((
-        major,
-        minor,
-        patch,
-        pre.is_none(),
-        pre.unwrap_or_default().to_owned(),
-    ))
+    semver::Version::parse(version).ok()
 }
 
 // The workflow owns when traffic may resume; runtime and snapshot operations
@@ -370,6 +354,11 @@ mod tests {
         assert_eq!(direction("0.3.0-rc.1", "0.3.0"), Direction::Upgrade);
         assert_eq!(direction("0.3.0", "0.3.0-rc.1"), Direction::Downgrade);
         assert_eq!(direction("0.3.0-rc.1", "0.3.0-rc.2"), Direction::Upgrade);
+        assert_eq!(direction("0.3.0-rc.2", "0.3.0-rc.10"), Direction::Upgrade);
+        assert_eq!(direction("0.3.0-rc.10", "0.3.0-rc.2"), Direction::Downgrade);
+        assert_eq!(direction("1.0.0-2", "1.0.0-alpha"), Direction::Upgrade);
+        assert_eq!(direction("1.0.0+first", "1.0.0+second"), Direction::Same);
+        assert_eq!(direction("1.0.0-rc.02", "1.0.0"), Direction::Unknown);
         assert_eq!(direction("0.2.0", "edge"), Direction::Unknown);
         assert_eq!(direction("0.2", "0.3.0"), Direction::Unknown);
         assert_eq!(direction("0.2.0.1", "0.3.0"), Direction::Unknown);
