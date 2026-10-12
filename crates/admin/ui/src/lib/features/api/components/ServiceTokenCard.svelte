@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { dateText } from '$lib/date'
   import * as Select from '$lib/components/ui/select'
   import { Button } from '$lib/components/ui/button'
   import KeyRound from '@lucide/svelte/icons/key-round'
@@ -30,7 +31,7 @@
   }
 
   const expires = (epoch: number) =>
-    new Intl.DateTimeFormat(intlLocale(), { dateStyle: 'long' }).format(new Date(epoch * 1000))
+    dateText(epoch * 1000, new Intl.DateTimeFormat(intlLocale(), { dateStyle: 'long' }).format)
 </script>
 
 <!-- The token is not stored: it shows once, here, to be copied. -->

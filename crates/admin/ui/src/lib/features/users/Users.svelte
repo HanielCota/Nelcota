@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { dateText } from '$lib/date'
   import { untrack } from 'svelte'
   import * as Table from '$lib/components/ui/table'
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu'
@@ -30,11 +31,12 @@
   import type { UsersResponse, User } from '$lib/types'
   import { errorMessage, intlLocale, t } from '$lib/i18n/index.svelte'
   import { signInMethods } from '$lib/features/users/sign-in-methods'
+  import { parsePage } from '$lib/pagination'
 
   const resource = new RemoteResource<UsersResponse>()
   const users = $derived(resource.data?.users ?? null)
   const total = $derived(resource.data?.total ?? 0)
-  const page = $derived(Math.max(0, Number.parseInt(route.query.get('page') ?? '0') || 0))
+  const page = $derived(parsePage(route.query.get('page')))
   const appliedQuery = $derived(route.query.get('q') ?? '')
   const hasNext = $derived(resource.data?.has_next ?? false)
   let query = $state('')
@@ -121,7 +123,7 @@
   }
 
   const date = $derived(new Intl.DateTimeFormat(intlLocale(), { dateStyle: 'short', timeStyle: 'short' }))
-  const when = (value: string | null) => (value ? date.format(new Date(value)) : '—')
+  const when = (value: string | null) => dateText(value, date.format)
 </script>
 
 {#snippet unconfirmed(user: User)}

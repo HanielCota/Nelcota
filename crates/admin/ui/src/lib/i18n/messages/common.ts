@@ -4,6 +4,7 @@ import type { Messages } from '../index.svelte'
 const ptBR = {
   catalogPending: "Alteração aplicada. O catálogo está sendo atualizado; aguarde e atualize a tela. Não é preciso repetir a alteração.",
   invalidResponse: "A API retornou uma resposta incompatível. Atualize o painel e tente novamente.",
+  invalidNumber: 'Informe um número finito e tente novamente.',
 
   cancel: 'Cancelar',
   save: 'Salvar',
@@ -52,6 +53,7 @@ const ptBR = {
 const en: Messages<typeof ptBR> = {
   catalogPending: 'Change applied. The catalog is updating; wait and refresh the page. Do not repeat the change.',
   invalidResponse: 'The API returned an incompatible response. Refresh the panel and try again.',
+  invalidNumber: 'Enter a finite number and try again.',
   cancel: 'Cancel',
   save: 'Save',
   saving: 'Saving…',

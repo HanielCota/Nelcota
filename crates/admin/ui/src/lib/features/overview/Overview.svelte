@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { dateText } from '$lib/date'
   import { onMount } from 'svelte'
   import * as Table from '$lib/components/ui/table'
   import { Skeleton } from '$lib/components/ui/skeleton'
@@ -88,7 +89,7 @@
   const time = $derived(new Intl.DateTimeFormat(intlLocale(), { hour: '2-digit', minute: '2-digit' }))
   const stamp = $derived(new Intl.DateTimeFormat(intlLocale(), { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }))
   const periodText = $derived(range === '1h' ? t('overview.period.textHour') : t('overview.period.textDay'))
-  const since = $derived(traffic ? stamp.format(new Date(traffic.since)) : '')
+  const since = $derived(traffic ? dateText(traffic.since, stamp.format) : '')
 
   // The chart starts when counting started: a server up for ten minutes shows
   // ten minutes, not a flat day with a spike at the end.
@@ -106,7 +107,7 @@
   // Twelve bars across the period, the current one in the accent.
   const refusedBars = $derived(traffic ? groupSums(traffic.points.map((p) => p.refused), Math.ceil(traffic.points.length / 12)) : [])
   const refusedLabels = $derived(
-    traffic ? traffic.points.filter((_, i) => i % Math.ceil(traffic.points.length / 12) === 0).map((p) => time.format(new Date(p.at))) : [],
+    traffic ? traffic.points.filter((_, i) => i % Math.ceil(traffic.points.length / 12) === 0).map((p) => dateText(p.at, time.format)) : [],
   )
 
   const totalRows = $derived(data ? data.tables.reduce((sum, table) => sum + (table.rows ?? 0), 0) : 0)
@@ -303,7 +304,7 @@
               <Table.Body>
                 {#each [...traffic.points].reverse() as point (point.at)}
                   <Table.Row>
-                    <Table.Cell class="tabular-nums">{time.format(new Date(point.at))}</Table.Cell>
+                    <Table.Cell class="tabular-nums">{dateText(point.at, time.format)}</Table.Cell>
                     <Table.Cell class="text-right tabular-nums">{fmt.format(point.requests)}</Table.Cell>
                     <Table.Cell class="text-right tabular-nums">{fmt.format(point.refused)}</Table.Cell>
                     <Table.Cell class="text-right tabular-nums">{point.p95_ms === null ? '—' : fmt.format(point.p95_ms)}</Table.Cell>
@@ -370,7 +371,7 @@
               <tr class="border-t" title={t(`policies.blocked.reasons.${blockReason(block)}`)}>
                 <td class="max-w-28 truncate py-2.5 pr-3">{block.email ?? t(`policies.blocked.who.${block.role === 'anon' || block.role === 'invalid_token' || block.role === 'service_role' ? block.role : 'authenticated'}`)}</td>
                 <td class="max-w-32 truncate py-2.5 pr-3 text-muted-foreground">{target ? target.name : block.path}</td>
-                <td class="py-2.5 text-right text-muted-foreground tabular-nums">{time.format(new Date(block.at))}</td>
+                <td class="py-2.5 text-right text-muted-foreground tabular-nums">{dateText(block.at, time.format)}</td>
               </tr>
             {/each}
           </tbody>

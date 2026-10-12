@@ -21,13 +21,18 @@ export class ApiError extends Error {
 }
 
 async function request<T>(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
+  const encoded = body === undefined ? undefined : JSON.stringify(body, (_key, original: unknown) => {
+    const value = original instanceof Number ? original.valueOf() : original
+    if (typeof value === 'number' && !Number.isFinite(value)) throw new Error(t('common.invalidNumber'))
+    return value
+  })
   if (['/login', '/logout', '/sso'].includes(path)) clearQuerySession()
   const res = await fetch(`/admin/api${path}`, {
     method,
     signal,
     credentials: 'same-origin',
     headers: body === undefined ? {} : { 'content-type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: encoded,
   })
   const result = await parseResponse<T>(res, path, method)
   return result

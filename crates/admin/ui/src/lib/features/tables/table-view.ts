@@ -1,3 +1,5 @@
+import { parsePage } from '$lib/pagination'
+
 export interface TableView {
   page: number
   size: string
@@ -8,11 +10,10 @@ const SIZES = ['25', '50', '100', '500']
 
 /** UI parameters are distinct from REST-style column filters. */
 export function parseTableView(query: URLSearchParams): TableView {
-  const rawPage = Number(query.get('_page') ?? 0)
   const size = query.get('_size') ?? '50'
   const column = query.get('_sort')
   return {
-    page: Number.isSafeInteger(rawPage) && rawPage >= 0 ? rawPage : 0,
+    page: parsePage(query.get('_page')),
     size: SIZES.includes(size) ? size : '50',
     sort: column ? { column, desc: query.get('_desc') === 'true' } : null,
   }
@@ -20,7 +21,10 @@ export function parseTableView(query: URLSearchParams): TableView {
 
 export function tableViewSearch(query: URLSearchParams, patch: Partial<TableView>): string {
   const params = new URLSearchParams(query)
-  if (patch.page !== undefined) patch.page ? params.set('_page', String(patch.page)) : params.delete('_page')
+  if (patch.page !== undefined) {
+    params.delete('_page')
+    if (Number.isSafeInteger(patch.page) && patch.page > 0) params.set('_page', String(patch.page))
+  }
   if (patch.size !== undefined) patch.size === '50' ? params.delete('_size') : params.set('_size', patch.size)
   if (patch.sort !== undefined) {
     params.delete('_sort')

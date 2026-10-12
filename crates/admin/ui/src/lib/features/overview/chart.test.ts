@@ -43,4 +43,41 @@ describe('chart geometry', () => {
     expect(percent(1, 3)).toBe(33)
     expect(percent(1, 0)).toBe(0)
   })
+
+  it.each([NaN, Infinity, -Infinity])('keeps invalid numbers out of chart geometry (%s)', value => {
+    expect(niceTicks(value)).toEqual([0, 1])
+    expect(monotonePath([{ x: 0, y: value }])).toBe('')
+    expect(monotonePath([{ x: value, y: 1 }])).toBe('')
+    expect(areaPath([{ x: 0, y: 1 }], value)).toBe('')
+    expect(nearestIndex(value, 0, 100, 5)).toBe(0)
+    expect(nearestIndex(0, value, 100, 5)).toBe(0)
+    expect(nearestIndex(0, 0, value, 5)).toBe(0)
+    expect(nearestIndex(0, 0, 100, value)).toBe(0)
+    expect(groupSums([1, value, 3], 2)).toEqual([1, 3])
+    expect(percent(value, 10)).toBe(0)
+    expect(percent(1, value)).toBe(0)
+  })
+
+  it.each([0, -1, 0.5, NaN, Infinity, Number.MAX_SAFE_INTEGER])('bounds tick generation for invalid count %s', count => {
+    expect(niceTicks(87, count)).toEqual([0, 50, 100])
+  })
+
+  it.each([0, -1, 0.5, NaN, Infinity])('does not loop with invalid group size %s', size => {
+    expect(groupSums([1, 2], size)).toEqual([])
+  })
+
+  it('handles missing series and numeric overflow without invalid SVG paths', () => {
+    expect(monotonePath(null)).toBe('')
+    expect(areaPath(undefined, 0)).toBe('')
+    expect(groupSums(null, 2)).toEqual([])
+    expect(monotonePath([{ x: 0, y: 1 }, { x: -1, y: 2 }])).toBe('')
+    expect(monotonePath([{ x: -Number.MAX_VALUE, y: 1 }, { x: Number.MAX_VALUE, y: 2 }])).toBe('')
+    expect(groupSums([Number.MAX_VALUE, Number.MAX_VALUE], 2)).toEqual([0])
+    for (const max of [Number.MIN_VALUE, 1e-300, Number.MAX_VALUE]) {
+      const ticks = niceTicks(max)
+      expect(ticks.length).toBeLessThanOrEqual(101)
+      expect(ticks.every(Number.isFinite)).toBe(true)
+      expect(ticks.at(-1)).toBeGreaterThanOrEqual(max)
+    }
+  })
 })

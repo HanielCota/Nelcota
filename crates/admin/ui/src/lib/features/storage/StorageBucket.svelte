@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { dateText } from '$lib/date'
   import { untrack, onDestroy } from 'svelte'
   import * as Table from '$lib/components/ui/table'
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu'
@@ -282,7 +283,7 @@
                 <Table.Cell class="max-w-0 font-medium"><button type="button" class="flex w-full min-w-0 cursor-pointer items-center gap-2 text-left hover:text-brand" onclick={() => showPreview(file)} title={file.name}><Icon class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" /><span class="truncate">{baseName(file.name)}</span></button></Table.Cell>
                 <Table.Cell class="text-right tabular-nums text-muted-foreground">{size(file.size)}</Table.Cell>
                 <Table.Cell class="hidden font-mono text-xs text-muted-foreground 2xl:table-cell">{file.mime_type}</Table.Cell>
-                <Table.Cell class="hidden text-muted-foreground md:table-cell xl:hidden 2xl:table-cell">{date.format(new Date(file.updated_at))}</Table.Cell>
+                <Table.Cell class="hidden text-muted-foreground md:table-cell xl:hidden 2xl:table-cell">{dateText(file.updated_at, date.format)}</Table.Cell>
                 <Table.Cell class="text-right">
                   <div class="flex items-center justify-end gap-1">
                   <Button variant="ghost" size="icon-sm" href={fileHref(file.name)} download title={t('storage.browser.downloadFile', { name: baseName(file.name) })} aria-label={t('storage.browser.downloadFile', { name: baseName(file.name) })}><Download aria-hidden="true" /></Button>
