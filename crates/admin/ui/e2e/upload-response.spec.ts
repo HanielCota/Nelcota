@@ -63,3 +63,33 @@ test('an oversized unauthorized upload expires the panel session', async ({ page
   })
   expect(result).toEqual({ status: 401, email: null, expired: true })
 })
+
+for (const bytes of [32, 1024 * 1024]) {
+  test(`a late unauthorized upload of ${bytes} bytes cannot expire a newer login`, async ({ page }) => {
+    await fixture(page)
+    let finish!: () => Promise<void>
+    await page.route('**/admin/api/upload-test', route => new Promise<void>(resolve => {
+      finish = async () => { await route.fulfill({ status: 401, body: 'x'.repeat(bytes) }); resolve() }
+    }))
+    await page.goto('/admin/storage/documents')
+    await page.evaluate(async () => {
+      const { uploadFile } = await import(new URL('/admin/src/lib/api.ts', location.href).href)
+      Object.assign(window, { oldUpload: uploadFile('/upload-test', new File(['test'], 'test.txt')).catch(() => null) })
+    })
+    await expect.poll(() => typeof finish).toBe('function')
+    await page.evaluate(async () => {
+      const { api } = await import(new URL('/admin/src/lib/api.ts', location.href).href)
+      const { session } = await import(new URL('/admin/src/lib/features/auth/session.svelte.ts', location.href).href)
+      const me = await api.post('/login')
+      session.email = me.email
+      session.expired = false
+    })
+    await finish()
+    const result = await page.evaluate(async () => {
+      await Reflect.get(window, 'oldUpload')
+      const { session } = await import(new URL('/admin/src/lib/features/auth/session.svelte.ts', location.href).href)
+      return { email: session.email, expired: session.expired }
+    })
+    expect(result).toEqual({ email: 'admin@example.test', expired: false })
+  })
+}

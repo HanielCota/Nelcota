@@ -20,6 +20,37 @@ async function failure(): Promise<ApiError> {
 afterEach(() => { vi.unstubAllGlobals(); clearQuerySession() })
 
 describe('mutation reconciliation', () => {
+  it('does not deliver a previous session write result to a newly signed-in view', async () => {
+    let finish!: (response: Response) => void
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).endsWith('/login')) return new Response(JSON.stringify({ email: 'new@example.com' }))
+      return new Promise<Response>(resolve => { finish = resolve })
+    }))
+    const old = api.put('/anything', {}).catch(error => error)
+    const me = await api.post<{ email: string }>('/login')
+    session.email = me.email
+    finish(new Response(JSON.stringify({ saved: true })))
+    expect(await old).toMatchObject({ name: 'AbortError' })
+    expect(session.email).toBe('new@example.com')
+  })
+
+  it('ignores an old session rejection after a new login succeeds', async () => {
+    session.email = 'old@example.com'
+    session.expired = false
+    let finish!: (response: Response) => void
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).endsWith('/login')) return new Response(JSON.stringify({ email: 'new@example.com' }))
+      return new Promise<Response>(resolve => { finish = resolve })
+    }))
+    const old = api.put('/anything', {}).catch(error => error)
+    const me = await api.post<{ email: string }>('/login')
+    session.email = me.email
+    finish(new Response(JSON.stringify({ error: 'expired' }), { status: 401 }))
+    await old
+    expect(session.email).toBe('new@example.com')
+    expect(session.expired).toBe(false)
+  })
+
   it('invalidates old reads even when a committed write has an invalid response contract', async () => {
     await queryRead('/rows', 'admin', async () => 'before mutation')
     await expect(parseResponse(new Response('{}'), '/tables', 'POST')).rejects.toMatchObject({ code: 'invalid_response' })

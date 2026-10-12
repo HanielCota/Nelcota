@@ -1,24 +1,26 @@
 import { QueryClient } from '@tanstack/svelte-query'
+import { session } from './features/auth/session.svelte'
 
 // JSON reads share a short-lived cache. SQL execution and all writes always
 // reach the server; a session boundary cancels and discards private data.
 export const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false, staleTime: 2000, gcTime: 60_000, structuralSharing: false } },
 })
-let epoch = 0
 let revision = 0
 const readers = new Map<string, number>()
 
+export const querySession = () => session.epoch
+
 export function clearQuerySession() {
-  epoch++
+  session.epoch++
   revision = 0
   queryClient.clear()
 }
 
 export async function queryRead<T>(path: string, account: string | null | undefined, fetcher: (signal: AbortSignal) => Promise<T>, signal?: AbortSignal, freshForMs = 2000): Promise<T> {
   signal?.throwIfAborted()
-  const started = epoch
-  const queryKey = ['admin', epoch, revision, account, path]
+  const started = querySession()
+  const queryKey = ['admin', started, revision, account, path]
   const key = JSON.stringify(queryKey)
   readers.set(key, (readers.get(key) ?? 0) + 1)
   try {
@@ -31,7 +33,7 @@ export async function queryRead<T>(path: string, account: string | null | undefi
       // A synchronous adapter can abort while fetchQuery starts its request.
       if (signal.aborted) abort()
     }) : await pending
-    if (started !== epoch) throw new DOMException('Session changed', 'AbortError')
+    if (started !== querySession()) throw new DOMException('Session changed', 'AbortError')
     // Table cell editing mutates local rows; it must not mutate cached JSON.
     return structuredClone(result)
   } finally {
