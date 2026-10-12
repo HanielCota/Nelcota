@@ -36,6 +36,7 @@ fn main() {
             foreign_keys: vec![],
             rls_enabled: false,
             rls_forced: false,
+            security_invoker: false,
             comment: None,
             privileges: Default::default(),
         };

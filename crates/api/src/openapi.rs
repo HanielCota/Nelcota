@@ -244,6 +244,7 @@ mod tests {
             foreign_keys: vec![],
             rls_enabled: true,
             rls_forced: false,
+            security_invoker: false,
             comment: None,
             privileges,
         };

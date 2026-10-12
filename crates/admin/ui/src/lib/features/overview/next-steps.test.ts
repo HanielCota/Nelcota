@@ -30,6 +30,7 @@ describe('nextSteps', () => {
     expect(done(overview([table('a', 'ok'), table('b', 'none'), table('v', 'view', 'view')])).protect).toBe(true)
     expect(done(overview([table('a', 'ok'), table('b', 'danger')])).protect).toBe(false)
     expect(done(overview([table('a', 'warn')])).protect).toBe(false)
+    expect(done(overview([table('a', 'ok'), table('v', 'danger', 'view')])).protect).toBe(false)
   })
 
   it('counts users and an app sign-in', () => {
@@ -44,5 +45,8 @@ describe('attention', () => {
       exposed: ['a'],
       locked: ['b'],
     })
+  })
+  it('includes owner views in exposure warnings', () => {
+    expect(attention(overview([table('safe', 'view', 'view'), table('owner', 'danger', 'view')]))).toEqual({ exposed: ['owner'], locked: [] })
   })
 })

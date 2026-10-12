@@ -249,6 +249,7 @@ mod tests {
             foreign_keys,
             rls_enabled: true,
             rls_forced: false,
+            security_invoker: false,
             comment: None,
             privileges: [Privileges::default(); 3],
         }

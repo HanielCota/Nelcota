@@ -5,6 +5,93 @@ use axum::http::Method;
 use serde_json::json;
 
 #[tokio::test]
+async fn owner_views_warn_while_invoker_views_apply_the_callers_rls() {
+    let app = TestApp::spawn().await;
+    let cookie = login(&app).await;
+    app.admin_client.batch_execute(
+        "GRANT SELECT ON public.todos TO anon;
+         CREATE VIEW public.owner_todos AS SELECT * FROM public.todos;
+         CREATE VIEW public.caller_todos WITH (security_invoker = true) AS SELECT * FROM public.todos;
+         CREATE VIEW public.private_todos AS SELECT * FROM public.todos;
+         CREATE MATERIALIZED VIEW public.snapshot_todos AS SELECT * FROM public.todos;
+         GRANT SELECT ON public.owner_todos, public.caller_todos, public.snapshot_todos TO anon, authenticated;"
+    ).await.unwrap();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    let overview = loop {
+        let value = get(&app, "/admin/api/overview", &cookie).await.body;
+        if value["tables"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|t| t["name"] == "snapshot_todos")
+        {
+            break value;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "view metadata did not reload"
+        );
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    };
+    assert_eq!(
+        overview["exposed_without_rls"],
+        json!(["owner_todos", "products", "snapshot_todos"])
+    );
+    for (name, expected) in [
+        ("owner_todos", "danger"),
+        ("caller_todos", "view"),
+        ("private_todos", "view"),
+        ("snapshot_todos", "danger"),
+    ] {
+        let row = overview["tables"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|t| t["name"] == name)
+            .unwrap();
+        assert_eq!(row["rls"]["state"], expected, "{name}");
+    }
+    let policies = get(&app, "/admin/api/policies", &cookie).await.body;
+    assert_eq!(
+        policies["exposed_without_rls"],
+        overview["exposed_without_rls"]
+    );
+    // Policy editing stays on tables; views have their own remediation.
+    assert!(
+        !policies["tables"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|t| t["name"] == "owner_todos")
+    );
+    let (_, base) = app.get("/rest/v1/todos", None).await;
+    let (_, invoker) = app.get("/rest/v1/caller_todos", None).await;
+    let (_, owner) = app.get("/rest/v1/owner_todos", None).await;
+    assert_eq!(base, json!([]));
+    assert_eq!(invoker, base);
+    assert!(!owner.as_array().unwrap().is_empty());
+    app.admin_client
+        .batch_execute("ALTER VIEW public.owner_todos SET (security_invoker = true)")
+        .await
+        .unwrap();
+    loop {
+        let value = get(&app, "/admin/api/overview", &cookie).await.body;
+        if !value["exposed_without_rls"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("owner_todos"))
+        {
+            break;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "fixed view still warns"
+        );
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
+}
+
+#[tokio::test]
 async fn warning_for_a_table_without_rls() {
     let app = TestApp::spawn().await;
     let cookie = login(&app).await;

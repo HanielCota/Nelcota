@@ -217,6 +217,14 @@ Schema models: `nelcota types -o database.ts` (TypeScript, default), or
 [Rust SDK](../sdk/rust/README.md). The Rust models distinguish omitted write
 fields from explicit nulls and keep Postgres numeric precision.
 
+Views run with their owner's underlying privileges by default and can bypass
+the caller's row policies even when the source table enables RLS. For views
+that should apply the caller's policies, use `security_invoker = true` and grant
+the caller the required access to the underlying tables. The panel warns about
+exposed owner views; changing that option or revoking their GRANT clears the
+warning. Materialized views and foreign tables have no local row policies and
+also need explicit access controls.
+
 ## Catalog reload
 
 The API keeps the introspection in memory. An event trigger (migration V3)

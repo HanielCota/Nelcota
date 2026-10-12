@@ -27,7 +27,9 @@ impl Catalog {
             .query(
                 &format!(
                     "SELECT c.relname::text, c.relkind::text, c.relrowsecurity, c.relforcerowsecurity,
-                            obj_description(c.oid, 'pg_class'), {}
+                            obj_description(c.oid, 'pg_class'),
+                            coalesce((SELECT option_value::boolean FROM pg_options_to_table(c.reloptions)
+                                      WHERE option_name = 'security_invoker'), false), {}
                      FROM pg_class c
                      JOIN pg_namespace n ON n.oid = c.relnamespace
                      WHERE n.nspname = $1 AND c.relkind IN ('r', 'p', 'v', 'm', 'f')
@@ -47,7 +49,7 @@ impl Catalog {
             };
             let mut privileges = [Privileges::default(); 3];
             for (i, p) in privileges.iter_mut().enumerate() {
-                let base = 5 + i * 4;
+                let base = 6 + i * 4;
                 *p = Privileges {
                     select: row.get(base),
                     insert: row.get(base + 1),
@@ -66,6 +68,7 @@ impl Catalog {
                     rls_enabled: row.get(2),
                     rls_forced: row.get(3),
                     comment: row.get(4),
+                    security_invoker: row.get(5),
                     privileges,
                 },
             );

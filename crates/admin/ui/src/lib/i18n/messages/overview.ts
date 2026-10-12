@@ -73,8 +73,8 @@ const ptBR = {
     connect: { label: 'Conectar seu app', hint: 'Este passo conclui quando alguém fizer login pelo seu app.', action: 'Ver como' },
   },
   attention: {
-    exposed: '{table} está visível para qualquer pessoa',
-    exposedHint: 'Qualquer pessoa com o endereço da API pode ler e alterar todas as linhas.',
+    exposed: 'Acesso sem proteção por usuário em {table}',
+    exposedHint: 'Roles com GRANT podem acessar dados sem as políticas do usuário. Revise as permissões e os privilégios de views.',
     blocked: '{table} está bloqueada',
     blockedHint: 'A proteção está ativa, mas sem regras: ninguém acessa pela API.',
     protect: 'Proteger',
@@ -177,8 +177,8 @@ const en: Messages<typeof ptBR> = {
     connect: { label: 'Connect your app', hint: 'This step completes when someone signs in through your app.', action: 'See how' },
   },
   attention: {
-    exposed: '{table} is visible to anyone',
-    exposedHint: 'Anyone with the API address can read and change every row.',
+    exposed: 'Access without per-user protection on {table}',
+    exposedHint: 'Roles with a GRANT may access data without the caller’s row policies. Review permissions and view privileges.',
     blocked: '{table} is locked',
     blockedHint: 'Protection is on but has no rules: nobody gets in through the API.',
     protect: 'Protect',

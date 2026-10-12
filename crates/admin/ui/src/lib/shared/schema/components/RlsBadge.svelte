@@ -12,6 +12,7 @@
 
   type State = 'ok' | 'warn' | 'danger' | 'none' | 'view'
   const state = $derived((['ok', 'warn', 'danger', 'none', 'view'].includes(rls.state) ? rls.state : 'view') as State)
+  const ownerView = $derived(rls.label === 'view owner privileges')
 
   // The Postgres view of the same state (D93: technical on demand).
   const technicalLabel = $derived.by(() => {
@@ -28,8 +29,8 @@
         return t('policies.rls.view')
     }
   })
-  const label = $derived(technical.on ? technicalLabel : t(`policies.plain.state.${state}`))
-  const hint = $derived(`${t(`policies.plain.stateHint.${state}`)} (${technicalLabel})`)
+  const label = $derived(ownerView ? t('policies.ownerView') : technical.on ? technicalLabel : t(`policies.plain.state.${state}`))
+  const hint = $derived(ownerView ? t('policies.ownerViewHint') : `${t(`policies.plain.stateHint.${state}`)} (${technicalLabel})`)
 </script>
 
 <!-- Colour only for problems: unprotected (red) and locked (amber). -->
