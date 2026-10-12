@@ -19,30 +19,39 @@ export class SqlPreview {
 
   /** Schedules the preview; `request` gets the signal so it can be cancelled. */
   schedule(request: (signal: AbortSignal) => Promise<DdlResult>) {
-    clearTimeout(this.#timer)
+    this.clear()
+    this.loading = true
     this.#timer = setTimeout(() => this.#run(request), DELAY_MS)
   }
 
   async #run(request: (signal: AbortSignal) => Promise<DdlResult>) {
+    this.#timer = undefined
     this.#controller?.abort()
     const controller = (this.#controller = new AbortController())
     this.loading = true
     try {
-      this.sql = (await request(controller.signal)).sql
+      const result = await request(controller.signal)
+      if (this.#controller !== controller || controller.signal.aborted) return
+      this.sql = result.sql
       this.error = ''
     } catch (e) {
-      if (isAbort(e)) return
+      if (this.#controller !== controller || controller.signal.aborted || isAbort(e)) return
       this.sql = null
       this.error = errorMessage(e)
     } finally {
-      if (this.#controller === controller) this.loading = false
+      if (this.#controller === controller) {
+        this.loading = false
+        this.#controller = undefined
+      }
     }
   }
 
   /** Clears (e.g. an incomplete form) and cancels anything pending. */
   clear() {
     clearTimeout(this.#timer)
+    this.#timer = undefined
     this.#controller?.abort()
+    this.#controller = undefined
     this.sql = null
     this.error = ''
     this.loading = false
