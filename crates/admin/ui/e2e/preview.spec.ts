@@ -76,3 +76,31 @@ test('closing a preview cancels its pending read and allows a fresh preview', as
   await expect(page.getByText('Nova prévia segura', { exact: true })).toBeVisible()
   await expect(page.getByRole('alert')).toHaveCount(0)
 })
+
+test('a cancelled preview failure cannot replace a successful retry', async ({ page }) => {
+  await page.addInitScript(() => {
+    const state = { calls: 0, fail: () => {} }
+    Object.assign(window, { oldPreview: state })
+    const original = window.fetch
+    window.fetch = async (input, init) => {
+      const url = input instanceof Request ? input.url : String(input)
+      if (!url.includes('/storage/buckets/documents/file')) return original(input, init)
+      if (++state.calls > 1) return new Response('Current preview', { headers: { 'content-type': 'text/plain' } })
+      // A non-cooperative adapter reports a transport failure after cancellation.
+      return new Promise<Response>((_resolve, reject) => { state.fail = () => reject(new Error('obsolete failure')) })
+    }
+  })
+  await page.goto('/admin/storage/documents')
+  await page.getByRole('button', { name: 'readme.txt', exact: true }).click()
+  await expect.poll(() => page.evaluate(() => Reflect.get(window, 'oldPreview').calls)).toBe(1)
+  await page.getByRole('dialog').getByRole('button', { name: 'Fechar', exact: true }).first().click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await page.getByRole('button', { name: 'readme.txt', exact: true }).click()
+  await expect(page.getByText('Current preview', { exact: true })).toBeVisible()
+  await page.evaluate(async () => {
+    Reflect.get(window, 'oldPreview').fail()
+    await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
+  })
+  await expect(page.getByText('Current preview', { exact: true })).toBeVisible()
+  await expect(page.getByRole('alert')).toHaveCount(0)
+})
