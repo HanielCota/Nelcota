@@ -4,6 +4,19 @@ import { escapeLike } from '../../src/index.js';
 import { signedIn, skip, visitor } from './setup.js';
 
 describe.skipIf(skip)('REST against the server', () => {
+  it('returns precise and nullable scalar sets and rows from views', async () => {
+    const nelcota = visitor();
+    expect(await nelcota.rpc('precision_samples')).toMatchObject({
+      error: null, data: [1.25, '12345678901234567890.123456789', null],
+    });
+    expect(await nelcota.rpc('measurement_rows')).toMatchObject({
+      error: null,
+      data: [{
+        id: '9007199254740993', amount: '12345678901234567890.123456789',
+        tags: ['valid', null], states: ['open', null],
+      }],
+    });
+  });
   it('round-trips exact bigint and numeric values through reads, filters, writes and RPC', async () => {
     const nelcota = visitor();
     const row = { id: '9007199254740993', amount: '12345678901234567890.123456789', tags: ['valid', null], states: ['open' as const, null] };

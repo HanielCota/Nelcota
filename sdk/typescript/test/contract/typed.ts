@@ -22,6 +22,13 @@ export async function typed(): Promise<void> {
   void nelcota.from('orders').select().eq('status', 'lost');
   const sum: number | null = (await nelcota.rpc('add', { a: 1 })).data;
   void sum;
+  const samples = (await nelcota.rpc('precision_samples')).data;
+  const preciseValues: (number | string | null)[] | null = samples;
+  // @ts-expect-error scalar result sets can contain NULL elements
+  samples?.map(value => value.toString());
+  const viewRows: Database['public']['Views']['measurement_view']['Row'][] | null =
+    (await nelcota.rpc('measurement_rows')).data;
+  void [preciseValues, viewRows];
   const measurement = (await nelcota.from('measurements').select().single()).data;
   if (measurement) {
     const id: number | string = measurement.id;
