@@ -127,6 +127,45 @@ describe('password sign-in', () => {
 });
 
 describe('refresh', () => {
+  it('uses another tab\'s replacement when its broadcast reload overtakes an expired read', async () => {
+    vi.stubGlobal('window', {});
+    vi.stubGlobal('document', {});
+    let channel!: { onmessage?: (event: { data: string }) => void };
+    vi.stubGlobal('BroadcastChannel', class {
+      onmessage?: (event: { data: string }) => void;
+      constructor() { channel = this; }
+      close() {}
+      postMessage() {}
+    });
+    const storage = stored(session(5));
+    const replacement = session(900, 'refresh-2', 'access-2');
+    let queue = Promise.resolve(), requests = 0;
+    vi.stubGlobal('navigator', { locks: {
+      request: <T>(_name: string, task: () => Promise<T>) => {
+        const number = ++requests;
+        const run = queue.then(async () => {
+          const value = await task();
+          if (number === 1) {
+            // The first read captured the expiring session. Another tab
+            // publishes and broadcasts its replacement before that read settles.
+            await storage.setItem(KEY, JSON.stringify(replacement));
+            channel.onmessage?.({ data: 'changed' });
+          }
+          return value;
+        });
+        queue = run.then(() => {}, () => {});
+        return run;
+      },
+    } });
+    const { nelcota, calls } = setup(storage, json(session(900, 'refresh-3', 'access-3')));
+    try {
+      const result = await nelcota.auth.getSession();
+      expect(result.data?.refresh_token).toBe('refresh-2');
+      expect(calls).toHaveLength(0);
+      expect(JSON.parse((await storage.getItem(KEY))!).refresh_token).toBe('refresh-2');
+    } finally { nelcota.dispose(); }
+  });
+
   it('cancels each waiter independently and persists an accepted rotation', async () => {
     let started!: () => void, finish!: (response: Response) => void;
     const begun = new Promise<void>(resolve => { started = resolve; });

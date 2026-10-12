@@ -144,7 +144,7 @@ export class SessionManager {
     if (current.error) return fail(current.error);
     const session = current.data;
     if (!session || secondsLeft(session) > this.#marginFor(session)) return ok(session);
-    const refreshed = await this.refresh(options);
+    const refreshed = await this.refresh(options, session);
     if (refreshed.error?.code === 'invalid_grant' || refreshed.error?.code === 'session_missing') return ok(null);
     return refreshed;
   }
@@ -152,10 +152,12 @@ export class SessionManager {
     const result = await this.get();
     return result.data?.access_token ?? this.#session?.access_token ?? null;
   }
-  refresh(options: AuthRequestOptions = {}): Promise<Result<Session>> {
+  refresh(options: AuthRequestOptions = {}, snapshot?: Session): Promise<Result<Session>> {
     if (options.signal?.aborted) return Promise.resolve(fail(clientError('aborted', 'The request was aborted')));
     this.#refreshing ??= (async () => {
-      const known = await this.current();
+      // A broadcast can reload a replacement after get() observed expiry.
+      // Compare with that original session instead of rotating its replacement.
+      const known = snapshot ?? await this.current();
       if (!known) return fail(clientError('session_missing', 'Not signed in'));
       return this.#locked(async () => {
         const current = await this.#read(true);

@@ -62,3 +62,18 @@ Generated files, dist, node_modules and build output contributed zero findings a
 - Every configured rule name exists in the pinned native registry.
 - Native installation SHA-256 verified; all rule config JSON files accepted by Oxlint.
 - The application distribution and tracked original source files are unchanged.
+
+## PR review follow-up
+
+The baseline above records the original configuration scan against c9c70e2.
+Subsequent PR review reproduced a TypeScript SDK race: a broadcast could reload
+another tab's replacement after an expiring read, causing an unnecessary second
+rotation. Automatic refresh now compares against the session observed by that
+read. The browser smoke also disposes the first scenario's clients so their
+background listeners cannot interfere with its later two-client scenario.
+
+The new regression failed before the fix. Validation passed: 57 authentication
+tests, 15 type cases, 31 real-server contract tests, Chromium browser smoke,
+installed package consumers, TypeScript checks and all size budgets. The 13
+native preset tests also passed. No automated source fixes or rule tuning were
+applied; the SDK change is a separate, manually implemented concurrency fix.
