@@ -6,7 +6,7 @@ function current(): string {
   return path === '' ? '/' : path
 }
 
-export const route = $state({ path: current(), query: new URLSearchParams(location.search) })
+export const route = $state({ path: current(), query: new URLSearchParams(location.search), revision: 0 })
 
 export function navigate(to: string, replace = false) {
   const url = BASE + (to.startsWith('/') ? to : `/${to}`)
@@ -15,6 +15,8 @@ export function navigate(to: string, replace = false) {
 }
 
 function sync() {
+  // Returning to the same URL creates a new navigation context as well.
+  route.revision++
   route.path = current()
   route.query = new URLSearchParams(location.search)
 }

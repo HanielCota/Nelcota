@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onDestroy } from 'svelte'
   import * as AlertDialog from '$lib/components/ui/alert-dialog'
   import { buttonVariants } from '$lib/components/ui/button'
   import { Input } from '$lib/components/ui/input'
@@ -12,6 +13,8 @@
   let typed = $state('')
   let cascade = $state(false)
   let busy = $state(false)
+  let active = true
+  onDestroy(() => { active = false })
 
   $effect(() => {
     if (open) {
@@ -21,14 +24,17 @@
   })
 
   async function confirm() {
+    if (!active || busy || typed !== table) return
+    const target = table
     busy = true
     try {
-      const result = await ddl.dropTable(table, cascade)
+      const result = await ddl.dropTable(target, cascade)
+      if (!active || table !== target) return
       toast.success(t('tables.toast.tableDropped'))
       open = false
       ondropped()
     } catch (e) {
-      toast.error(errorMessage(e))
+      if (active && table === target) toast.error(errorMessage(e))
     } finally {
       busy = false
     }
