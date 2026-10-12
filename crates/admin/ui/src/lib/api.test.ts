@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { api, ApiError, parseResponse } from './api'
 import { errorMessage, i18n } from './i18n/index.svelte'
 import { session } from './features/auth/session.svelte'
+import { clearQuerySession, queryRead } from './query-client'
 
 function respond(body: string, status: number) {
   vi.stubGlobal('fetch', vi.fn(async () => new Response(body, { status })))
@@ -16,7 +17,32 @@ async function failure(): Promise<ApiError> {
   throw new Error('the request did not fail')
 }
 
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => { vi.unstubAllGlobals(); clearQuerySession() })
+
+describe('mutation reconciliation', () => {
+  it('invalidates old reads even when a committed write has an invalid response contract', async () => {
+    await queryRead('/rows', 'admin', async () => 'before mutation')
+    await expect(parseResponse(new Response('{}'), '/tables', 'POST')).rejects.toMatchObject({ code: 'invalid_response' })
+    expect(await queryRead('/rows', 'admin', async () => 'updated')).toBe('updated')
+  })
+
+  it('invalidates at the successful headers instead of waiting for the write body', async () => {
+    await queryRead('/rows', 'admin', async () => 'before mutation')
+    let finish!: () => void
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        finish = () => {
+          controller.enqueue(new TextEncoder().encode(JSON.stringify({ sql: [], applied: true, catalog_pending: false })))
+          controller.close()
+        }
+      },
+    })
+    const write = parseResponse(new Response(body), '/tables', 'POST')
+    try {
+      expect(await queryRead('/rows', 'admin', async () => 'updated')).toBe('updated')
+    } finally { finish(); await write }
+  })
+})
 
 describe('JSON request values', () => {
   it.each([NaN, Infinity, -Infinity, new Number(NaN)])('refuses non-finite input %s instead of clearing a nullable setting', async value => {
