@@ -1,7 +1,7 @@
 //! Serving a file (D79): inert headers, conditional requests and byte
 //! ranges on disk, and a redirect to a presigned URL on S3.
 
-use std::time::Duration;
+use std::{future::Future, time::Duration};
 
 use axum::{
     body::Body,
@@ -115,8 +115,44 @@ fn etag_matches(list: &str, etag: &str) -> bool {
     })
 }
 
-/// The response for a file the caller may read.
-pub async fn respond(
+/// A replacement can retire the bytes after metadata was read. Resolve the
+/// current version and its authorization again, and rebuild conditional/range
+/// headers together. Limit retries when another writer keeps replacing it.
+pub(crate) async fn respond_current<Fut>(
+    state: &StorageState,
+    bucket: &str,
+    name: &str,
+    request: &HeaderMap,
+    download: bool,
+    resolve: impl Fn() -> Fut + Send + Sync,
+) -> Result<Response, ApiError>
+where
+    Fut: Future<Output = Result<(Object, Access), ApiError>> + Send,
+{
+    let (mut object, mut access) = resolve().await?;
+    for _ in 0..3 {
+        match respond(state, bucket, name, &object, request, access, download).await {
+            Err(error) if error.code() == "object_not_found" => {
+                let (current, current_access) = resolve().await?;
+                if current.version == object.version {
+                    tracing::error!(bucket, version = %object.version, "a row points to missing bytes");
+                    return Err(error);
+                }
+                object = current;
+                access = current_access;
+            }
+            result => return result,
+        }
+    }
+    Err(ApiError::new(
+        StatusCode::SERVICE_UNAVAILABLE,
+        "unavailable",
+        "the file keeps changing; retry the download",
+    ))
+}
+
+/// The response for one already authorized version.
+async fn respond(
     state: &StorageState,
     bucket: &str,
     name: &str,
@@ -215,7 +251,6 @@ pub async fn respond(
     let result = match state.store.get(&key, range).await {
         Ok(result) => result,
         Err(crate::StoreError::Store(object_store::Error::NotFound { .. })) => {
-            tracing::error!(bucket, version = %object.version, "a row points to missing bytes");
             return Err(not_found());
         }
         Err(err) => {

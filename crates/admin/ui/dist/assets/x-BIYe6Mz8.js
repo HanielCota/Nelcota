@@ -1,1 +1,0 @@
-import{T as e,w as t}from"./api-BTgVBfwt.js";import{i as n}from"./router.svelte-MJOWSmS1.js";var r=new Set([`$$slots`,`$$events`,`$$legacy`]);function i(i,a){let o=t(a,r),s={name:`x`,size:24,node:[[`path`,{d:`M18 6 6 18`}],[`path`,{d:`m6 6 12 12`}]]};n(i,e(()=>o,{get icon(){return s}}))}export{i as t};

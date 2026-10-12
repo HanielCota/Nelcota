@@ -242,6 +242,10 @@ const { data, error } = await nelcota.auth.handleRedirect();
 ```
 
 `redirectTo` must be listed in the server's `NELCOTA_OAUTH_REDIRECT_URLS`.
+Each storage key holds one pending OAuth verifier: starting another sign-in
+replaces the previous attempt. Verifier publication, navigation and callback
+consumption use the same lock so asynchronous work cannot reorder them. Use
+separate storage keys for independent login flows.
 
 **Email links** arrive as `https://your.app/page#type=...&token=...`.
 `readEmailLink()` takes the token and removes it from the address bar and

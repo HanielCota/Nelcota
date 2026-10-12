@@ -38,6 +38,7 @@
   const tablesLoading = $derived(tablesResource.loading)
   const tablesError = $derived(tablesResource.error ? errorMessage(tablesResource.error) : '')
   const rows = new TableRows(tableRowsApi)
+  let active = true
   const data = $derived(rows.data)
   const loading = $derived(rows.loading)
   const savingCell = $derived(rows.saving)
@@ -110,6 +111,7 @@
   })
 
   async function loadTables() {
+    if (!active) return
     await tablesResource.load(signal => api.get<TablesResponse>('/tables', { signal }))
   }
 
@@ -119,21 +121,30 @@
       createOpen = true
       navigate('/tables', true)
     }
-    return () => tablesResource.cancel()
+    return () => { active = false; tablesResource.cancel() }
   })
 
   async function onCreated(table: string) {
+    const origin = route.revision
+    if (!active) return
     await loadTables()
+    if (!active || route.revision !== origin) return
     navigate(`/tables/${enc(table)}`)
   }
 
   async function onRenamed(table: string) {
+    const origin = route.revision
+    if (!active) return
     await loadTables()
+    if (!active || route.revision !== origin) return
     navigate(`/tables/${enc(table)}/structure`, true)
   }
 
   async function onDropped() {
+    const origin = route.revision
+    if (!active) return
     await loadTables()
+    if (!active || route.revision !== origin) return
     navigate('/tables')
   }
 
@@ -150,6 +161,7 @@
   }
 
   async function load() {
+    if (!active) return
     rows.setTable(name)
     if (!name || view !== 'data') return
     const params = rowsParams()

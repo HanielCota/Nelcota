@@ -273,20 +273,25 @@ pub(crate) async fn update_user(
 
     let mut client = state.pool.get().await.map_err(ApiError::from_pool)?;
     let tx = begin_auth(&mut client).await?;
-    // A JWT outlives its session (logout, password reset): only a live
-    // session may change the account.
+    // Lock the account before its session, as password recovery does. A join
+    // snapshot taken before waiting for this lock can still show a session
+    // that has since logged out, so validate it in a separate locked read.
     let current = tx
         .query_opt(
-            "SELECT u.encrypted_password
-             FROM auth.users u
-             JOIN auth.sessions s ON s.user_id = u.id
-             WHERE u.id = $1 AND s.id = $2 AND s.revoked_at IS NULL
-             FOR UPDATE OF u",
-            &[&user_id, &session_id],
+            "SELECT encrypted_password FROM auth.users WHERE id = $1 FOR UPDATE",
+            &[&user_id],
         )
         .await
         .map_err(db_error)?
         .ok_or_else(ApiError::invalid_token)?;
+    tx.query_opt(
+        "SELECT id FROM auth.sessions
+         WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL FOR UPDATE",
+        &[&session_id, &user_id],
+    )
+    .await
+    .map_err(db_error)?
+    .ok_or_else(ApiError::invalid_token)?;
     if let Some((expected, _)) = &new_hash
         && current.get::<_, Option<String>>(0) != *expected
     {

@@ -1,11 +1,14 @@
 // Session actions used in more than one place (sidebar, command palette).
 import { api } from '$lib/api'
 import { profile } from '$lib/features/profile/profile.svelte'
+import { querySession } from '$lib/query-client'
 import { session } from './session.svelte'
 
 export async function logout() {
   // Even if the request fails, the panel returns to the login screen.
-  await api.post('/logout').catch(() => {})
+  const pending = api.post('/logout'), started = querySession()
+  await pending.catch(() => {})
+  if (started !== querySession()) return
   session.email = null
   session.expired = false
   profile.avatar = null

@@ -591,6 +591,65 @@ describe('sign-out and user', () => {
 });
 
 describe('OAuth with PKCE', () => {
+  it('cannot erase a new OAuth verifier while consuming the previous callback', async () => {
+    const stored = memoryStorage();
+    await stored.setItem(`${KEY}.pkce`, 'v'.repeat(64));
+    let reading = false, release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const storage: SessionStorage = {
+      ...stored,
+      async getItem(key) {
+        const value = await stored.getItem(key);
+        if (key === `${KEY}.pkce` && !reading) { reading = true; await gate; }
+        return value;
+      },
+    };
+    const first = setup(storage, json(session())).nelcota, second = setup(storage).nelcota;
+    try {
+      const callback = first.auth.exchangeCode('old-code');
+      await vi.waitFor(() => expect(reading).toBe(true));
+      const login = second.auth.signInWithOAuth({ provider: 'github', redirectTo: 'https://app.example.com/back', redirect: false });
+      await new Promise<void>(resolve => setTimeout(resolve, 0));
+      release();
+      const [exchanged, started] = await Promise.all([callback, login]);
+      expect(exchanged.error).toBeNull();
+      const verifier = await stored.getItem(`${KEY}.pkce`);
+      expect(verifier).toMatch(/^[A-Za-z0-9_-]{64}$/);
+      expect(new URL(started.data!.url).searchParams.get('code_challenge')).toBe(await challengeFor(verifier!));
+    } finally { release(); first.dispose(); second.dispose(); }
+  });
+
+  it('keeps navigation ordered with verifier publication across clients', async () => {
+    const storage = memoryStorage();
+    const first = setup(storage).nelcota, second = setup(storage).nelcota;
+    const navigations: string[] = [];
+    vi.stubGlobal('window', {});
+    vi.stubGlobal('document', {});
+    vi.stubGlobal('location', { assign: (url: string) => navigations.push(url) });
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    let digests = 0;
+    const original = globalThis.crypto;
+    const digest = vi.fn(async () => {
+      const number = ++digests;
+      if (number === 1) await gate;
+      return new Uint8Array(32).fill(number).buffer;
+    });
+    vi.stubGlobal('crypto', { getRandomValues: original.getRandomValues.bind(original), subtle: { digest } });
+    try {
+      const a = first.auth.signInWithOAuth({ provider: 'github', redirectTo: 'https://app.example.com/back' });
+      await vi.waitFor(() => expect(digest).toHaveBeenCalledOnce());
+      const b = second.auth.signInWithOAuth({ provider: 'google', redirectTo: 'https://app.example.com/back' });
+      // Flush the second call's microtasks while the first digest is suspended.
+      await new Promise<void>(resolve => setTimeout(resolve, 0));
+      release();
+      await Promise.all([a, b]);
+      expect(navigations.map(url => new URL(url).searchParams.get('provider'))).toEqual(['github', 'google']);
+      expect(new URL(navigations.at(-1)!).searchParams.get('code_challenge'))
+        .toBe(Buffer.from(new Uint8Array(32).fill(2)).toString('base64url'));
+    } finally { release(); first.dispose(); second.dispose(); }
+  });
+
   it('builds the authorize URL with an S256 challenge of a stored verifier', async () => {
     const { nelcota, storage } = setup();
     const { data } = await nelcota.auth.signInWithOAuth({ provider: 'github', redirectTo: 'https://app.example.com/back' });

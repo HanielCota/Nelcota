@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { untrack } from 'svelte'
+  import { onDestroy, untrack } from 'svelte'
   import { Skeleton } from '$lib/components/ui/skeleton'
   import { toast } from 'svelte-sonner'
   import StructureColumns from './StructureColumns.svelte'
@@ -38,18 +38,23 @@
   let toDelete = $state<ColumnInfo | null>(null)
   let deleteOpen = $state(false)
   let dropOpen = $state(false)
+  let active = true
+  onDestroy(() => { active = false })
 
   async function load() {
+    if (!active) return
     inflight?.abort()
     const controller = (inflight = new AbortController())
     if (structure?.name !== name) structure = null
     loading = true
     error = ''
     try {
-      structure = await ddl.structure(name, { signal: controller.signal })
+      const result = await ddl.structure(name, { signal: controller.signal })
+      if (!active || inflight !== controller || controller.signal.aborted) return
+      structure = result
       error = ''
     } catch (e) {
-      if (!isAbort(e)) error = errorMessage(e)
+      if (active && inflight === controller && !controller.signal.aborted && !isAbort(e)) error = errorMessage(e)
     } finally {
       if (inflight === controller) loading = false
     }
@@ -63,16 +68,19 @@
 
   /** Single point of change: applies, notifies and reloads (or follows the rename). */
   async function alter(actions: AlterAction[]) {
-    if (actions.length === 0) return
+    if (!active || actions.length === 0) return
+    const target = name
     try {
-      await ddl.alterTable(name, actions)
+      await ddl.alterTable(target, actions)
+      if (!active || name !== target) return
       toast.success(t('tables.toast.tableAltered'))
       const renamed = actions.findLast((a) => a.action === 'rename_table')
       if (renamed) { onrenamed(renamed.name); return }
       await load()
+      if (!active || name !== target) return
       onaltered?.()
     } catch (e) {
-      toast.error(errorMessage(e))
+      if (active && name === target) toast.error(errorMessage(e))
       throw e
     }
   }

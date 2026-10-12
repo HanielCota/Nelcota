@@ -26,6 +26,7 @@
 
   function release() {
     controller?.abort()
+    controller = undefined
     if (objectUrl) URL.revokeObjectURL(objectUrl)
     objectUrl = ''
   }
@@ -62,7 +63,7 @@
       })
       if (!request.signal.aborted) media = result
     } catch (e) {
-      if (!isAbort(e)) error = errorMessage(e)
+      if (controller === request && !request.signal.aborted && !isAbort(e)) error = errorMessage(e)
     } finally {
       if (controller === request) loading = false
     }

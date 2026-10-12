@@ -219,6 +219,15 @@ async fn record(
 ) -> Result<(Uuid, Option<Uuid>), ApiError> {
     let db_err = |e| write_error(e, claims);
     quota::publish(state, claims, async |tx| {
+        // Row locks cannot protect a name that does not exist yet. Serialize
+        // every publisher of this name across instances before reading its
+        // predecessor, including when no project quota is configured.
+        tx.query_one(
+            "SELECT pg_advisory_xact_lock(hashtext('nelcota.storage.object:' || $1), hashtext($2))",
+            &[&bucket, &name],
+        )
+        .await
+        .map_err(db_err)?;
         let id = Uuid::now_v7();
         let size = i64::try_from(received.size).unwrap_or(i64::MAX);
         let values: [&(dyn tokio_postgres::types::ToSql + Sync); 7] = [

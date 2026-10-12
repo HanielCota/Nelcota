@@ -179,6 +179,41 @@ async fn replace_and_delete_drop_the_old_bytes() {
 }
 
 #[tokio::test]
+async fn missing_bytes_of_the_current_version_remain_a_not_found_response() {
+    let app = TestApp::spawn().await;
+    with_buckets(&app).await;
+    let path = "/storage/v1/object/site/missing.txt";
+    let (status, _) = app
+        .upload(
+            Method::POST,
+            path,
+            Some(&service_token()),
+            "text/plain",
+            b"original",
+        )
+        .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let version: Uuid = app
+        .admin_client
+        .query_one(
+            "SELECT version FROM storage.objects WHERE bucket_id='site' AND name='missing.txt'",
+            &[],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    app.storage
+        .store
+        .delete(&nelcota_storage::Store::key("site", version))
+        .await
+        .unwrap();
+    let (status, _) = app
+        .get("/storage/v1/object/public/site/missing.txt", None)
+        .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
 async fn size_and_type_limits() {
     let app = TestApp::spawn().await;
     with_buckets(&app).await;

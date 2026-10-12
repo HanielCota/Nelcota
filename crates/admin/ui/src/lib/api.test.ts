@@ -20,6 +20,79 @@ async function failure(): Promise<ApiError> {
 afterEach(() => { vi.unstubAllGlobals(); clearQuerySession() })
 
 describe('mutation reconciliation', () => {
+  it('discards superseded authentication while it is still waiting to send', async () => {
+    let finish!: (response: Response) => void
+    const fetch = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).endsWith('/logout')) return new Promise<Response>(resolve => { finish = resolve })
+      return new Response(JSON.stringify({ email: 'new@example.com' }))
+    })
+    vi.stubGlobal('fetch', fetch)
+    const old = api.post('/logout').catch(error => error)
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce())
+    const obsolete = api.post('/login', { email: 'obsolete@example.com' }).catch(error => error)
+    const current = api.post('/login', { email: 'new@example.com' })
+    finish(new Response(JSON.stringify({ ok: true })))
+    await old
+    expect(await obsolete).toMatchObject({ name: 'AbortError' })
+    expect(await current).toEqual({ email: 'new@example.com' })
+    expect(fetch).toHaveBeenCalledTimes(2)
+    expect(fetch.mock.calls[1]?.[0]).toBe('/admin/api/login')
+  })
+
+  it.each(['resolve', 'reject'])('waits for an earlier logout before starting login when it will %s', async outcome => {
+    let finish!: (response: Response) => void, reject!: (reason: unknown) => void
+    const fetch = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).endsWith('/login')) return new Response(JSON.stringify({ email: 'new@example.com' }))
+      return new Promise<Response>((yes, no) => { finish = yes; reject = no })
+    })
+    vi.stubGlobal('fetch', fetch)
+    const old = api.post('/logout').catch(error => error)
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce())
+    const current = api.post<{ email: string }>('/login')
+    await new Promise<void>(resolve => setTimeout(resolve, 0))
+    try {
+      // Set-Cookie is applied by the browser before the response promise resolves.
+      expect(fetch).toHaveBeenCalledOnce()
+    } finally {
+      if (outcome === 'resolve') finish(new Response(JSON.stringify({ ok: true })))
+      if (outcome === 'reject') reject(new Error('network failed'))
+      await old
+      await current
+    }
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not deliver a previous session write result to a newly signed-in view', async () => {
+    let finish!: (response: Response) => void
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).endsWith('/login')) return new Response(JSON.stringify({ email: 'new@example.com' }))
+      return new Promise<Response>(resolve => { finish = resolve })
+    }))
+    const old = api.put('/anything', {}).catch(error => error)
+    const me = await api.post<{ email: string }>('/login')
+    session.email = me.email
+    finish(new Response(JSON.stringify({ saved: true })))
+    expect(await old).toMatchObject({ name: 'AbortError' })
+    expect(session.email).toBe('new@example.com')
+  })
+
+  it('ignores an old session rejection after a new login succeeds', async () => {
+    session.email = 'old@example.com'
+    session.expired = false
+    let finish!: (response: Response) => void
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).endsWith('/login')) return new Response(JSON.stringify({ email: 'new@example.com' }))
+      return new Promise<Response>(resolve => { finish = resolve })
+    }))
+    const old = api.put('/anything', {}).catch(error => error)
+    const me = await api.post<{ email: string }>('/login')
+    session.email = me.email
+    finish(new Response(JSON.stringify({ error: 'expired' }), { status: 401 }))
+    await old
+    expect(session.email).toBe('new@example.com')
+    expect(session.expired).toBe(false)
+  })
+
   it('invalidates old reads even when a committed write has an invalid response contract', async () => {
     await queryRead('/rows', 'admin', async () => 'before mutation')
     await expect(parseResponse(new Response('{}'), '/tables', 'POST')).rejects.toMatchObject({ code: 'invalid_response' })

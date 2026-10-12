@@ -131,7 +131,7 @@ async fn concurrent_recovery_requests_issue_one_link_and_one_email() {
 
 async fn wait_for_locks(app: &TestApp, count: i64, predicate: &str) {
     let query = format!(
-        "SELECT count(*) FROM pg_stat_activity WHERE wait_event_type='Lock' AND ({predicate})"
+        "SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock' AND ({predicate})"
     );
     let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
     loop {
@@ -153,8 +153,279 @@ async fn wait_for_locks(app: &TestApp, count: i64, predicate: &str) {
     }
 }
 
+#[tokio::test]
+async fn concurrent_first_upserts_remove_the_displaced_bytes_without_a_quota() {
+    use futures_util::StreamExt;
+
+    let app = TestApp::spawn().await;
+    assert!(app.storage.settings.max_total_size.is_none());
+    app.admin_client
+        .batch_execute("INSERT INTO storage.buckets (id) VALUES ('docs')")
+        .await
+        .unwrap();
+    // Independent instances share the database and byte store, not a mutex.
+    let second = StorageState::new(
+        app.pool.clone(),
+        app.keys.clone(),
+        app.storage.store.clone(),
+        (*app.storage.settings).clone(),
+    );
+    let mut pending = Vec::new();
+    let mut gates = Vec::new();
+    for storage in [app.storage.clone(), second] {
+        let (ready, started) = tokio::sync::oneshot::channel();
+        let (release, gate) = tokio::sync::oneshot::channel();
+        pending.push(tokio::spawn(async move {
+            storage
+                .upload(
+                    service(),
+                    "docs",
+                    "same.txt",
+                    UploadOptions {
+                        content_length: Some(6),
+                        replace: true,
+                        ..Default::default()
+                    },
+                    Box::pin(stream::once(async move {
+                        ready.send(()).unwrap();
+                        gate.await.unwrap();
+                        Ok(Bytes::from_static(b"abcdef"))
+                    })),
+                )
+                .await
+        }));
+        // Both policy checks have rolled back before locking publication.
+        started.await.unwrap();
+        gates.push(release);
+    }
+    let (mut locker, connection) = app.admin.connect(tokio_postgres::NoTls).await.unwrap();
+    tokio::spawn(connection);
+    let lock = locker.transaction().await.unwrap();
+    lock.batch_execute("LOCK TABLE storage.objects IN SHARE MODE")
+        .await
+        .unwrap();
+    for gate in gates {
+        gate.send(()).unwrap();
+    }
+    wait_for_locks(
+        &app,
+        2,
+        "query LIKE 'INSERT INTO storage.objects%' OR query LIKE 'SELECT pg_advisory_xact_lock%'",
+    )
+    .await;
+    lock.commit().await.unwrap();
+    let mut replaced = 0;
+    for upload in pending {
+        replaced += usize::from(upload.await.unwrap().unwrap().replaced);
+    }
+    assert_eq!(
+        replaced, 1,
+        "the second publication must observe its predecessor"
+    );
+    let current = app
+        .storage
+        .object(&service(), "docs", "same.txt")
+        .await
+        .unwrap();
+    let files: Vec<_> = app.storage.store.list().collect().await;
+    assert_eq!(
+        files.len(),
+        1,
+        "superseded bytes must be removed immediately"
+    );
+    assert_eq!(
+        files[0].as_ref().unwrap().location,
+        nelcota_storage::Store::key("docs", current.version)
+    );
+}
+
 fn service() -> Claims {
     Claims::from_payload(json!({"role":"service_role"})).unwrap()
+}
+
+#[tokio::test]
+async fn logout_while_an_account_update_waits_cannot_authorize_the_old_session() {
+    update_after_logout_is_refused(json!({"data":{"should_not_be_written":true}})).await;
+}
+
+#[tokio::test]
+async fn logout_while_a_password_change_waits_cannot_change_the_account() {
+    update_after_logout_is_refused(json!({
+        "password":"new-password-456", "current_password":"strong-password-123"
+    }))
+    .await;
+}
+
+async fn update_after_logout_is_refused(body: serde_json::Value) {
+    let app = Arc::new(TestApp::spawn().await);
+    let signed_in = app
+        .post(
+            "/auth/v1/signup",
+            None,
+            json!({"email":"update-race@example.com", "password":"strong-password-123"}),
+        )
+        .await;
+    assert_eq!(signed_in.status, StatusCode::CREATED);
+    let id: Uuid = signed_in.body["user"]["id"]
+        .as_str()
+        .unwrap()
+        .parse()
+        .unwrap();
+    let access = signed_in.body["access_token"].as_str().unwrap().to_owned();
+    let (mut locker, connection) = app.admin.connect(tokio_postgres::NoTls).await.unwrap();
+    tokio::spawn(connection);
+    let lock = locker.transaction().await.unwrap();
+    lock.query_one("SELECT id FROM auth.users WHERE id=$1 FOR UPDATE", &[&id])
+        .await
+        .unwrap();
+    let updating = app.clone();
+    let token = access.clone();
+    let pending = tokio::spawn(async move {
+        updating
+            .request(
+                axum::http::Method::PUT,
+                "/auth/v1/user",
+                Some(&token),
+                Some(body),
+            )
+            .await
+    });
+    wait_for_locks(
+        &app,
+        1,
+        "query LIKE 'SELECT u.encrypted_password%' OR query LIKE 'SELECT encrypted_password%'",
+    )
+    .await;
+    assert_eq!(
+        app.post("/auth/v1/logout", Some(&access), json!({}))
+            .await
+            .status,
+        StatusCode::NO_CONTENT
+    );
+    lock.commit().await.unwrap();
+    let reply = pending.await.unwrap();
+    assert_eq!(reply.status, StatusCode::UNAUTHORIZED, "{}", reply.body);
+    let metadata: serde_json::Value = app
+        .admin_client
+        .query_one(
+            "SELECT raw_user_meta_data FROM auth.users WHERE id=$1",
+            &[&id],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    assert_eq!(metadata, json!({}));
+}
+
+#[tokio::test]
+async fn a_download_retries_a_version_replaced_after_its_metadata_snapshot() {
+    download_during_replacement(b"new complete bytes", true).await;
+}
+
+#[tokio::test]
+async fn a_download_cannot_bypass_changed_policies_when_retrying_a_replacement() {
+    download_during_replacement(
+        b"new bytes that the caller is no longer allowed to read",
+        false,
+    )
+    .await;
+}
+
+async fn download_during_replacement(bytes: &'static [u8], readable: bool) {
+    use axum::{
+        body::to_bytes,
+        http::{HeaderMap, HeaderValue, header},
+    };
+
+    let app = Arc::new(TestApp::spawn().await);
+    app.admin_client
+        .batch_execute("INSERT INTO storage.buckets (id) VALUES ('docs')")
+        .await
+        .unwrap();
+    let old = app
+        .storage
+        .upload(
+            service(),
+            "docs",
+            "same.txt",
+            UploadOptions::default(),
+            Box::pin(stream::iter([Ok(Bytes::from_static(b"old bytes"))])),
+        )
+        .await
+        .unwrap();
+    // Pause the SELECT policy after its statement snapshot sees the old row.
+    // Service-role replacement bypasses this policy and commits while it waits.
+    app.admin_client
+        .batch_execute(
+            "CREATE FUNCTION storage.pause_read() RETURNS boolean LANGUAGE plpgsql AS $$
+           BEGIN PERFORM pg_advisory_xact_lock(876120, 1); RETURN true; END $$;
+         CREATE POLICY paused_read ON storage.objects FOR SELECT TO authenticated
+           USING (bucket_id='docs' AND size<32 AND storage.pause_read());",
+        )
+        .await
+        .unwrap();
+    let (mut locker, connection) = app.admin.connect(tokio_postgres::NoTls).await.unwrap();
+    tokio::spawn(connection);
+    let lock = locker.transaction().await.unwrap();
+    lock.query_one("SELECT pg_advisory_xact_lock(876120, 1)", &[])
+        .await
+        .unwrap();
+    let downloading = app.clone();
+    let pending = tokio::spawn(async move {
+        let claims =
+            Claims::from_payload(json!({"role":"authenticated", "sub":downloading.user_a}))
+                .unwrap();
+        let mut headers = HeaderMap::new();
+        headers.insert(header::RANGE, HeaderValue::from_static("bytes=2-4"));
+        headers.insert(
+            header::IF_RANGE,
+            HeaderValue::from_str(&format!("\"{}\"", old.object.etag)).unwrap(),
+        );
+        nelcota_storage::http::download(
+            &downloading.storage,
+            &claims,
+            "docs",
+            "same.txt",
+            &headers,
+            false,
+        )
+        .await
+    });
+    wait_for_locks(&app, 1, "query LIKE 'SELECT %FROM storage.objects%'").await;
+    let new = app
+        .storage
+        .upload(
+            service(),
+            "docs",
+            "same.txt",
+            UploadOptions {
+                replace: true,
+                ..Default::default()
+            },
+            Box::pin(stream::iter([Ok(Bytes::from_static(bytes))])),
+        )
+        .await
+        .unwrap();
+    lock.commit().await.unwrap();
+    let result = pending.await.unwrap();
+    if !readable {
+        assert_eq!(result.unwrap_err().status(), StatusCode::NOT_FOUND);
+        return;
+    }
+    let response = result.unwrap();
+    assert_eq!(
+        response.status(),
+        StatusCode::OK,
+        "If-Range must be evaluated against the current version"
+    );
+    assert_eq!(
+        response.headers()[header::ETAG],
+        format!("\"{}\"", new.object.etag)
+    );
+    assert_eq!(
+        to_bytes(response.into_body(), 1024).await.unwrap(),
+        Bytes::from_static(bytes)
+    );
 }
 
 async fn quota_app() -> TestApp {

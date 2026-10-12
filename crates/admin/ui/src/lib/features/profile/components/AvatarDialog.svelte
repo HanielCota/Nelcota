@@ -6,6 +6,7 @@
   import { api } from '$lib/api'
   import { prepareAvatar } from '$lib/features/profile/avatar'
   import { profile } from '$lib/features/profile/profile.svelte'
+  import { querySession } from '$lib/query-client'
   import { errorMessage, t } from '$lib/i18n/index.svelte'
 
   let { open = $bindable(false) }: { open?: boolean } = $props()
@@ -16,26 +17,38 @@
   let reading = $state(false)
   let saving = $state(false)
   let dragging = $state(false)
+  let opening = 0
+  let read = 0
 
-  // Each opening starts with nothing picked.
+  // Closing, reopening or changing sessions retires all previous photo reads.
   $effect(() => {
-    if (open) picked = null
+    void [open, querySession()]
+    opening++; read++
+    picked = null
+    reading = false
+    dragging = false
+    return () => { opening++; read++ }
   })
 
   async function use(file: File | undefined) {
-    if (!file) return
+    if (!open || reading || saving || !file) return
     if (!file.type.startsWith('image/')) {
       toast.error(t('profile.notAnImage'))
       return
     }
+    const request = ++read, started = querySession()
+    const current = () => request === read && open && started === querySession()
     reading = true
     try {
-      picked = await prepareAvatar(file)
+      const photo = await prepareAvatar(file)
+      if (current()) picked = photo
     } catch {
-      toast.error(t('profile.unreadable'))
+      if (current()) toast.error(t('profile.unreadable'))
     } finally {
-      reading = false
-      if (input) input.value = ''
+      if (current()) {
+        reading = false
+        if (input) input.value = ''
+      }
     }
   }
 
@@ -46,28 +59,34 @@
   }
 
   async function save() {
-    if (!picked) return
+    if (!open || reading || saving || !picked) return
+    const dialog = opening, started = querySession(), image = picked.base64
     saving = true
     try {
-      profile.avatar = (await api.put<{ avatar: number }>('/profile/avatar', { image: picked.base64 })).avatar
+      const result = await api.put<{ avatar: number }>('/profile/avatar', { image })
+      if (started !== querySession()) return
+      profile.avatar = result.avatar
       toast.success(t('profile.saved'))
-      open = false
+      if (opening === dialog) open = false
     } catch (e) {
-      toast.error(errorMessage(e))
+      if (started === querySession()) toast.error(errorMessage(e))
     } finally {
       saving = false
     }
   }
 
   async function remove() {
+    if (!open || reading || saving) return
+    const dialog = opening, started = querySession()
     saving = true
     try {
       await api.delete('/profile/avatar')
+      if (started !== querySession()) return
       profile.avatar = null
       toast.success(t('profile.removed'))
-      open = false
+      if (opening === dialog) open = false
     } catch (e) {
-      toast.error(errorMessage(e))
+      if (started === querySession()) toast.error(errorMessage(e))
     } finally {
       saving = false
     }
@@ -112,7 +131,7 @@
 
     <Dialog.Footer class="sm:justify-between">
       {#if (profile.avatar !== null && !picked)}
-        <Button variant="ghost" class="text-destructive hover:text-destructive" disabled={saving} onclick={remove}>
+          <Button variant="ghost" class="text-destructive hover:text-destructive" disabled={reading || saving} onclick={remove}>
           {t('profile.remove')}
         </Button>
       {/if}
@@ -121,7 +140,7 @@
       {/if}
       <div class="flex flex-col-reverse gap-2 sm:flex-row">
         <Button variant="outline" onclick={() => (open = false)}>{t('common.cancel')}</Button>
-        <Button disabled={!picked || saving} onclick={save}>{saving ? t('common.saving') : t('common.save')}</Button>
+        <Button disabled={!picked || reading || saving} onclick={save}>{saving ? t('common.saving') : t('common.save')}</Button>
       </div>
     </Dialog.Footer>
   </Dialog.Content>
