@@ -1,1 +1,0 @@
-import{At as e,v as t,y as n}from"./api-D7t0fi2m.js";var r=`nelcota.technical`,i=e({on:t(r,`off`)===`on`});function a(){i.on=!i.on,n(r,i.on?`on`:`off`)}export{a as n,i as t};
