@@ -1,0 +1,15 @@
+{
+  "extends": [
+    "../../../.oxlintrc.json"
+  ],
+  "plugins": [
+    "typescript"
+  ],
+  "rules": {
+    "typescript/no-unnecessary-condition": "error",
+    "typescript/prefer-optional-chain": "error"
+  },
+  "options": {
+    "typeAware": true
+  }
+}

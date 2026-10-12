@@ -1,0 +1,11 @@
+{
+  "id": "seguranca/dependencias",
+  "group": "seguranca",
+  "engine": "npm-audit",
+  "enabled": true,
+  "description": "Dependency audits of both npm lockfiles; npm is optional for the native linter.",
+  "workspaces": [
+    "crates/admin/ui",
+    "sdk/typescript"
+  ]
+}

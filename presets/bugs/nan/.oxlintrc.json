@@ -1,0 +1,14 @@
+{
+  "extends": [
+    "../../../.oxlintrc.json"
+  ],
+  "plugins": [
+    "typescript",
+    "unicorn",
+    "oxc"
+  ],
+  "rules": {
+    "eslint/use-isnan": "error",
+    "unicorn/prefer-number-properties": "error"
+  }
+}

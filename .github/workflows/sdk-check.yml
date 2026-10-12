@@ -43,9 +43,27 @@ jobs:
       - run: cargo build -p nelcota-server
         working-directory: .
       - run: npx playwright-core install --with-deps chromium firefox webkit
-      - run: node scripts/contract.mjs --browser
+      - name: SDK server and browser contracts
+        id: sdk_contract
+        run: |
+          set -o pipefail
+          node scripts/contract.mjs --browser 2>&1 | tee "$RUNNER_TEMP/nelcota-sdk-contract.log"
         env:
           NELCOTA_SDK_BROWSERS: chromium,firefox,webkit
+      - name: Annotate contract failure diagnostics
+        if: failure() && steps.sdk_contract.conclusion == 'failure'
+        run: |
+          python3 - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+          path = Path(os.environ['RUNNER_TEMP']) / 'nelcota-sdk-contract.log'
+          if path.exists():
+              lines = path.read_text(errors='replace').splitlines()[-120:]
+              message = re.sub(r'\x1b\[[0-9;]*[A-Za-z]', '', '\n'.join(lines))
+              message = message.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+              print('::error title=SDK contract diagnostics::' + message)
+          PY
 
   sdk-node:
     runs-on: ubuntu-latest

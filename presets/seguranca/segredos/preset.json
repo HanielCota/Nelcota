@@ -1,0 +1,7 @@
+{
+  "id": "seguranca/segredos",
+  "group": "seguranca",
+  "engine": "gitleaks",
+  "enabled": true,
+  "description": "Redacted secret scanning with a locally supplied Gitleaks binary."
+}

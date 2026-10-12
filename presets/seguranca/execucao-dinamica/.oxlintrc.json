@@ -1,0 +1,15 @@
+{
+  "extends": [
+    "../../../.oxlintrc.json"
+  ],
+  "plugins": [
+    "typescript",
+    "unicorn",
+    "oxc"
+  ],
+  "rules": {
+    "eslint/no-eval": "error",
+    "eslint/no-implied-eval": "error",
+    "eslint/no-new-func": "error"
+  }
+}

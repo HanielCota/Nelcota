@@ -1,0 +1,13 @@
+{
+  "extends": [
+    "../../../.oxlintrc.json"
+  ],
+  "plugins": [
+    "import",
+    "oxc"
+  ],
+  "rules": {
+    "import/no-cycle": "error",
+    "oxc/no-barrel-file": "error"
+  }
+}

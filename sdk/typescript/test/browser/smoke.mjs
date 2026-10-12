@@ -103,6 +103,10 @@ try {
       const signOut = await nelcota.auth.signOut();
       out.signOut = signOut.error?.code ?? 'ok';
       out.storedAfter = Object.keys(localStorage).filter((k) => k.startsWith('nelcota.'));
+      // Retire the first scenario's listeners before the two-tab rotation.
+      // A still-live auto-refresh client would act as an unintended third client.
+      nelcota.dispose();
+      admin.dispose();
       return out;
     },
     { api, serviceToken },

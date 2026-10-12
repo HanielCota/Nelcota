@@ -1,0 +1,14 @@
+{
+  "extends": [
+    "../../../.oxlintrc.json"
+  ],
+  "plugins": [
+    "typescript",
+    "unicorn",
+    "oxc"
+  ],
+  "rules": {
+    "eslint/no-await-in-loop": "error",
+    "eslint/no-loop-func": "error"
+  }
+}

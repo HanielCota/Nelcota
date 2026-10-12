@@ -1,0 +1,15 @@
+{
+  "extends": [
+    "../../../.oxlintrc.json"
+  ],
+  "plugins": [
+    "typescript",
+    "unicorn",
+    "oxc"
+  ],
+  "rules": {
+    "eslint/no-unused-vars": "error",
+    "eslint/no-unreachable": "error",
+    "eslint/no-unused-expressions": "error"
+  }
+}

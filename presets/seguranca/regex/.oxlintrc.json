@@ -1,0 +1,14 @@
+{
+  "extends": [
+    "../../../.oxlintrc.json"
+  ],
+  "plugins": [
+    "typescript",
+    "unicorn",
+    "oxc"
+  ],
+  "rules": {
+    "eslint/no-control-regex": "error",
+    "eslint/no-invalid-regexp": "error"
+  }
+}

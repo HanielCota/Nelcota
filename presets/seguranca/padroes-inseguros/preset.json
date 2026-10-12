@@ -1,0 +1,8 @@
+{
+  "id": "seguranca/padroes-inseguros",
+  "group": "seguranca",
+  "engine": "semgrep",
+  "enabled": true,
+  "description": "Semgrep p/javascript rules; a locally supplied Semgrep installation is required.",
+  "ruleset": "p/javascript"
+}

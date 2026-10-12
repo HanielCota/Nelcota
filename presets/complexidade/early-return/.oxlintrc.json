@@ -1,0 +1,18 @@
+{
+  "extends": [
+    "../../../.oxlintrc.json"
+  ],
+  "plugins": [
+    "typescript",
+    "unicorn",
+    "oxc"
+  ],
+  "rules": {
+    "eslint/no-else-return": "error",
+    "eslint/no-lonely-if": "error",
+    "eslint/max-depth": [
+      "error",
+      3
+    ]
+  }
+}

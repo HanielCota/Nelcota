@@ -1,0 +1,222 @@
+{
+  "schemaVersion": 1,
+  "paths": [
+    "."
+  ],
+  "presets": [
+    {
+      "id": "bugs/correctness",
+      "group": "bugs",
+      "engine": "oxlint",
+      "config": "presets/bugs/correctness/.oxlintrc.json",
+      "enabled": true,
+      "description": "All native correctness rules from the enabled non-React plugins."
+    },
+    {
+      "id": "bugs/nan",
+      "group": "bugs",
+      "engine": "oxlint",
+      "config": "presets/bugs/nan/.oxlintrc.json",
+      "enabled": true,
+      "description": "NaN comparisons and explicit Number predicates."
+    },
+    {
+      "id": "bugs/nulls",
+      "group": "bugs",
+      "engine": "oxlint",
+      "config": "presets/bugs/nulls/.oxlintrc.json",
+      "enabled": true,
+      "description": "Strict equality except intentional value == null checks for null and undefined."
+    },
+    {
+      "id": "bugs/vazios",
+      "group": "bugs",
+      "engine": "oxlint",
+      "config": "presets/bugs/vazios/.oxlintrc.json",
+      "enabled": true,
+      "description": "Empty blocks and functions."
+    },
+    {
+      "id": "bugs/promises",
+      "group": "bugs",
+      "engine": "oxlint",
+      "config": "presets/bugs/promises/.oxlintrc.json",
+      "enabled": true,
+      "description": "Promise correctness and suspicious behavior; typed floating promises are a separate disabled preset."
+    },
+    {
+      "id": "bugs/nulls-tipados",
+      "group": "bugs",
+      "engine": "oxlint",
+      "config": "presets/bugs/nulls-tipados/.oxlintrc.json",
+      "enabled": false,
+      "description": "Type-aware nullable conditions and optional chains in the TypeScript SDK.",
+      "reason": "Disabled: oxlint-tsgolint is not installed. SDK tsconfig exists; enable only after installing and validating the native tsgolint companion. Svelte template typing is not covered.",
+      "typeAware": true,
+      "paths": [
+        "sdk/typescript/src"
+      ],
+      "tsconfig": "sdk/typescript/tsconfig.json"
+    },
+    {
+      "id": "bugs/promises-tipadas",
+      "group": "bugs",
+      "engine": "oxlint",
+      "config": "presets/bugs/promises-tipadas/.oxlintrc.json",
+      "enabled": false,
+      "description": "Type-aware floating promises in the TypeScript SDK.",
+      "reason": "Disabled: oxlint-tsgolint is not installed. SDK tsconfig exists; enable only after installing and validating the native tsgolint companion. Svelte template typing is not covered.",
+      "typeAware": true,
+      "paths": [
+        "sdk/typescript/src"
+      ],
+      "tsconfig": "sdk/typescript/tsconfig.json"
+    },
+    {
+      "id": "seguranca/execucao-dinamica",
+      "group": "seguranca",
+      "engine": "oxlint",
+      "config": "presets/seguranca/execucao-dinamica/.oxlintrc.json",
+      "enabled": true,
+      "description": "Dynamic code execution."
+    },
+    {
+      "id": "seguranca/regex",
+      "group": "seguranca",
+      "engine": "oxlint",
+      "config": "presets/seguranca/regex/.oxlintrc.json",
+      "enabled": true,
+      "description": "Invalid and control-character regular expressions."
+    },
+    {
+      "id": "seguranca/debug-esquecido",
+      "group": "seguranca",
+      "engine": "oxlint",
+      "config": "presets/seguranca/debug-esquecido/.oxlintrc.json",
+      "enabled": true,
+      "description": "Debugger statements and console warnings."
+    },
+    {
+      "id": "performance/async-em-loop",
+      "group": "performance",
+      "engine": "oxlint",
+      "config": "presets/performance/async-em-loop/.oxlintrc.json",
+      "enabled": true,
+      "description": "Await and closure allocation inside loops; intentional serialization may need manual review."
+    },
+    {
+      "id": "performance/imports",
+      "group": "performance",
+      "engine": "oxlint",
+      "config": "presets/performance/imports/.oxlintrc.json",
+      "enabled": true,
+      "description": "Import cycles and barrel files."
+    },
+    {
+      "id": "performance/eficiencia",
+      "group": "performance",
+      "engine": "oxlint",
+      "config": "presets/performance/eficiencia/.oxlintrc.json",
+      "enabled": true,
+      "description": "Set lookup opportunities and array reduction review."
+    },
+    {
+      "id": "limpeza/codigo-morto",
+      "group": "limpeza",
+      "engine": "oxlint",
+      "config": "presets/limpeza/codigo-morto/.oxlintrc.json",
+      "enabled": true,
+      "description": "Unused and unreachable code."
+    },
+    {
+      "id": "limpeza/consistencia",
+      "group": "limpeza",
+      "engine": "oxlint",
+      "config": "presets/limpeza/consistencia/.oxlintrc.json",
+      "enabled": true,
+      "description": "Declarations and explicit braces."
+    },
+    {
+      "id": "limpeza/typescript-limpo",
+      "group": "limpeza",
+      "engine": "oxlint",
+      "config": "presets/limpeza/typescript-limpo/.oxlintrc.json",
+      "enabled": true,
+      "description": "Explicit any, non-null assertions and consistent type imports."
+    },
+    {
+      "id": "limpeza/pendencias",
+      "group": "limpeza",
+      "engine": "oxlint",
+      "config": "presets/limpeza/pendencias/.oxlintrc.json",
+      "enabled": true,
+      "description": "TODO and FIXME review."
+    },
+    {
+      "id": "complexidade/early-return",
+      "group": "complexidade",
+      "engine": "oxlint",
+      "config": "presets/complexidade/early-return/.oxlintrc.json",
+      "enabled": true,
+      "description": "Guard clauses and a maximum nesting depth of three."
+    },
+    {
+      "id": "complexidade/tamanho",
+      "group": "complexidade",
+      "engine": "oxlint",
+      "config": "presets/complexidade/tamanho/.oxlintrc.json",
+      "enabled": true,
+      "description": "Complexity 10, function length 60 lines, and at most four parameters."
+    },
+    {
+      "id": "seguranca/segredos",
+      "group": "seguranca",
+      "engine": "gitleaks",
+      "enabled": true,
+      "description": "Redacted secret scanning with a locally supplied Gitleaks binary."
+    },
+    {
+      "id": "seguranca/dependencias",
+      "group": "seguranca",
+      "engine": "npm-audit",
+      "enabled": true,
+      "description": "Dependency audits of both npm lockfiles; npm is optional for the native linter.",
+      "workspaces": [
+        "crates/admin/ui",
+        "sdk/typescript"
+      ]
+    },
+    {
+      "id": "seguranca/padroes-inseguros",
+      "group": "seguranca",
+      "engine": "semgrep",
+      "enabled": true,
+      "description": "Semgrep p/javascript rules; a locally supplied Semgrep installation is required.",
+      "ruleset": "p/javascript"
+    },
+    {
+      "id": "seguranca/xss-react",
+      "group": "seguranca",
+      "engine": "oxlint",
+      "enabled": false,
+      "applicable": false,
+      "reason": "Not applicable: this project uses Svelte and has no React or JSX/TSX sources."
+    },
+    {
+      "id": "performance/react-perf",
+      "group": "performance",
+      "engine": "oxlint",
+      "enabled": false,
+      "applicable": false,
+      "reason": "Not applicable: this project uses Svelte and has no React or JSX/TSX sources."
+    },
+    {
+      "id": "acessibilidade/a11y",
+      "group": "acessibilidade",
+      "engine": "oxlint",
+      "enabled": false,
+      "applicable": false,
+      "reason": "Not applicable: this project uses Svelte and has no React or JSX/TSX sources."
+    }
+  ]
+}
