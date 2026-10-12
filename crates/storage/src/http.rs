@@ -149,16 +149,9 @@ pub async fn download(
 ) -> Result<Response, ApiError> {
     let bucket = path::bucket(bucket)?;
     let name = path::object(name)?;
-    let object = state.object(claims, bucket, &name).await?;
-    serve::respond(
-        state,
-        bucket,
-        &name,
-        &object,
-        headers,
-        Access::Private,
-        attachment,
-    )
+    serve::respond_current(state, bucket, &name, headers, attachment, || async {
+        Ok((state.object(claims, bucket, &name).await?, Access::Private))
+    })
     .await
 }
 pub(crate) async fn private_download(
@@ -186,15 +179,13 @@ pub(crate) async fn public(
 ) -> Result<Response, ApiError> {
     let bucket = path::bucket(&bucket)?;
     let name = path::object(&name)?;
-    let object = state.public_object(bucket, &name).await?;
-    serve::respond(
+    serve::respond_current(
         &state,
         bucket,
         &name,
-        &object,
         &headers,
-        Access::Public,
         query.download.is_some(),
+        || async { Ok((state.public_object(bucket, &name).await?, Access::Public)) },
     )
     .await
 }
@@ -218,15 +209,17 @@ pub(crate) async fn signed(
 ) -> Result<Response, ApiError> {
     let bucket = path::bucket(&bucket)?;
     let name = path::object(&name)?;
-    let (object, secs) = signing::resolve(&state, bucket, &name, query.token.as_deref()).await?;
-    serve::respond(
+    serve::respond_current(
         &state,
         bucket,
         &name,
-        &object,
         &headers,
-        Access::Signed { secs },
         query.download.is_some(),
+        || async {
+            let (object, secs) =
+                signing::resolve(&state, bucket, &name, query.token.as_deref()).await?;
+            Ok((object, Access::Signed { secs }))
+        },
     )
     .await
 }
