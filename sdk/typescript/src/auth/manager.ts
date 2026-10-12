@@ -15,7 +15,7 @@ export interface AuthOptions {
   storageKey?: string;
   /** Refresh in the background. Default: on in browsers. */
   autoRefresh?: boolean;
-  /** Refresh when fewer than this many seconds remain. Default 60. */
+  /** Refresh when fewer than this many seconds remain, capped at half the token lifetime. Default 60. */
   refreshMargin?: number;
   /** Unexpected storage/adapter failures in background auth. Automatic refresh pauses until a session is written successfully. */
   onBackgroundError?: (error: unknown) => void | Promise<void>;
@@ -87,6 +87,11 @@ export class SessionManager {
     return this.#session;
   }
   current(): Promise<Session | null> { return this.#locked(() => this.#read()); }
+  #marginFor(session: Session): number {
+    // A short-lived token or a large configured margin must not make every
+    // request (or every background tick) rotate a freshly issued token.
+    return Math.min(this.#margin, session.expires_in / 2);
+  }
   async #reload(): Promise<void> {
     await this.#locked(async () => {
       if (this.#dirty) return;
@@ -138,7 +143,7 @@ export class SessionManager {
     const current = await abortable(this.current(), options.signal);
     if (current.error) return fail(current.error);
     const session = current.data;
-    if (!session || secondsLeft(session) > this.#margin) return ok(session);
+    if (!session || secondsLeft(session) > this.#marginFor(session)) return ok(session);
     const refreshed = await this.refresh(options);
     if (refreshed.error?.code === 'invalid_grant' || refreshed.error?.code === 'session_missing') return ok(null);
     return refreshed;
@@ -155,7 +160,7 @@ export class SessionManager {
       return this.#locked(async () => {
         const current = await this.#read(true);
         if (!current) return fail(clientError('session_missing', 'Not signed in'));
-        if (current.refresh_token !== known.refresh_token && secondsLeft(current) > this.#margin) return ok(current);
+        if (current.refresh_token !== known.refresh_token && secondsLeft(current) > this.#marginFor(current)) return ok(current);
         // Once started, rotation owns its lifetime. A cancelled waiter must
         // not discard the replacement for a token already spent by the server.
         const result = await this.rotate(current.refresh_token, options.timeout === undefined ? {} : { timeout: options.timeout });
@@ -196,7 +201,10 @@ export class SessionManager {
     clearTimeout(this.#timer);
     this.#timer = undefined;
     if (this.#disposed || !this.#autoRefresh || !session) return;
-    const due = delayMs ?? Math.max(0, (secondsLeft(session) - this.#margin) * 1000 - Math.random() * 5000);
+    const remaining = secondsLeft(session);
+    const wait = Math.max(0, (remaining - this.#marginFor(session)) * 1000);
+    const jitter = Math.random() * Math.min(5000, wait / 2);
+    const due = delayMs ?? Math.max(remaining <= 0 ? RETRY_REFRESH_MS : 1000, wait - jitter);
     this.#timer = setTimeout(() => {
       this.#background(this.refresh().then(async ({ error }) => {
         if (error && error.code !== 'invalid_grant' && error.code !== 'session_missing') {

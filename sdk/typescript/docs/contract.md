@@ -78,6 +78,12 @@ fallback. Only Web Locks coordinate separate browser tabs. If a browser lacks
 Web Locks, use per-tab sessionStorage or an adapter with external coordination;
 the module-local queue does not guarantee cross-tab rotation safety.
 
+The refresh margin is capped at half the token lifetime, so short-lived tokens
+and large configured margins do not rotate fresh sessions repeatedly. Background
+jitter stays within the scheduled delay. An already expired token waits ten
+seconds before a background attempt; explicit session reads still refresh it
+immediately.
+
 Auth methods that perform HTTP accept `{signal,timeout}` as the last argument.
 Concurrent refresh callers share the first caller's timeout. Signals cancel
 each caller's wait independently; rotation continues and persists its result

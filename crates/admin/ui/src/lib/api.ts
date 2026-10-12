@@ -57,6 +57,9 @@ function expireSession(status: number, path: string) {
 }
 
 export async function parseResponse<T>(res: Response, path: string, method: string): Promise<T> {
+  // Successful headers can follow a committed write even when decoding its
+  // body fails. Refresh reads before parsing or validating that response.
+  if (res.ok && method !== 'GET' && method !== 'HEAD') invalidateReads()
   // Error pages are metadata; a proxy cannot force the panel to buffer its body.
   const body = res.ok ? null : await readBody(res, 64 * 1024)
   const text = res.ok ? await res.text() : (await body?.text() ?? '')
@@ -79,7 +82,6 @@ export async function parseResponse<T>(res: Response, path: string, method: stri
   }
   const validate = responseContract(method, path)
   if (validate && !validate(data)) throw new ApiError(t('common.invalidResponse'), 502, 'invalid_response')
-  if (method !== 'GET') invalidateReads()
   return data as T
 }
 

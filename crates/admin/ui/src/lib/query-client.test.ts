@@ -38,3 +38,39 @@ it('discards in-flight and cached private data at a session boundary', async () 
   await rejected
   expect(await queryRead('/private', 'admin', async () => 'new session')).toBe('new session')
 })
+
+it('starts a fresh read after a mutation while an older read is still pending', async () => {
+  let finish!: (value: string) => void
+  const older = queryRead('/rows', 'admin', () => new Promise<string>(resolve => { finish = resolve }))
+  invalidateReads()
+  const newer = queryRead('/rows', 'admin', async () => 'updated')
+  finish('before mutation')
+  await older
+  expect(await newer).toBe('updated')
+  expect(await queryRead('/rows', 'admin', async () => 'unexpected')).toBe('updated')
+})
+
+it('cancels an abandoned shared request so a retry can start a new one', async () => {
+  let finish!: (value: string) => void
+  let upstream!: AbortSignal
+  const controller = new AbortController()
+  const abandoned = queryRead('/retry', 'admin', signal => {
+    upstream = signal
+    return new Promise<string>(resolve => { finish = resolve })
+  }, controller.signal)
+  const rejected = expect(abandoned).rejects.toMatchObject({ name: 'AbortError' })
+  controller.abort()
+  await rejected
+  const retry = queryRead('/retry', 'admin', async () => 'new request')
+  finish('old request')
+  expect(await retry).toBe('new request')
+  expect(upstream.aborted).toBe(true)
+})
+
+it('observes cancellation triggered while the fetcher starts', async () => {
+  const controller = new AbortController()
+  await expect(queryRead('/immediate', 'admin', async () => {
+    controller.abort()
+    return 'cancelled data'
+  }, controller.signal)).rejects.toMatchObject({ name: 'AbortError' })
+})

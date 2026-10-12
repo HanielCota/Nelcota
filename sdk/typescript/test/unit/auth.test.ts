@@ -336,6 +336,44 @@ describe('refresh', () => {
       vi.useRealTimers();
     }
   });
+
+  it.each([30, 900])('bounds the refresh margin by the %s-second token lifetime', async lifetime => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-12T12:00:00Z'));
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const fresh = () => ({ ...session(lifetime), expires_in: lifetime });
+    const mock = mockFetch(() => json(fresh()));
+    const nelcota = createClient('https://api.example.com', {
+      fetch: mock.fetch,
+      auth: { autoRefresh: true, refreshMargin: 3600 },
+    });
+    try {
+      await nelcota.auth.setSession(fresh());
+      await nelcota.auth.getSession();
+      expect(mock.calls).toHaveLength(0);
+      await vi.advanceTimersByTimeAsync(lifetime * 500 - 1);
+      expect(mock.calls).toHaveLength(0);
+      await vi.advanceTimersByTimeAsync(2);
+      expect(mock.calls).toHaveLength(1);
+      await nelcota.auth.getSession();
+      expect(mock.calls).toHaveLength(1);
+    } finally { nelcota.dispose(); vi.restoreAllMocks(); vi.useRealTimers(); }
+  });
+
+  it('backs off when the server returns an already expired token', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-12T12:00:00Z'));
+    const expired = () => ({ ...session(0), expires_in: 0 });
+    const mock = mockFetch(() => json(expired()), json({ code: 'invalid_grant', message: 'stop unexpected rotation' }, 400));
+    const nelcota = createClient('https://api.example.com', { fetch: mock.fetch, auth: { autoRefresh: true } });
+    try {
+      await nelcota.auth.setSession(expired());
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(mock.calls.length).toBeLessThanOrEqual(1);
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(mock.calls).toHaveLength(1);
+    } finally { nelcota.dispose(); vi.useRealTimers(); }
+  });
 });
 
 describe('background adapter failures', () => {
