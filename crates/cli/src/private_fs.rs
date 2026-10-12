@@ -38,11 +38,35 @@ pub(crate) fn dir(path: &Path) -> io::Result<()> {
 
 pub(crate) fn write(path: &Path, contents: impl AsRef<[u8]>) -> io::Result<()> {
     use io::Write;
-    file(path)?.write_all(contents.as_ref())
+    replace(path, |file| file.write_all(contents.as_ref()))
+}
+
+/// Keep the previous configuration until its replacement is fully written.
+/// A same-directory temporary file makes the final rename atomic, including
+/// on Windows. Dropping it on any earlier error removes the partial contents.
+fn replace(path: &Path, write: impl FnOnce(&mut File) -> io::Result<()>) -> io::Result<()> {
+    let parent = path
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
+    let mut temporary = tempfile::Builder::new()
+        .prefix(".nelcota-")
+        .tempfile_in(parent)?;
+    restrict(temporary.path(), false)?;
+    write(temporary.as_file_mut())?;
+    temporary.as_file().sync_all()?;
+    temporary.persist(path).map_err(|error| error.error)?;
+    Ok(())
 }
 
 pub(crate) fn copy(source: impl AsRef<Path>, destination: impl AsRef<Path>) -> io::Result<u64> {
-    io::copy(&mut File::open(source)?, &mut file(destination.as_ref())?)
+    let mut source = File::open(source)?;
+    let mut copied = 0;
+    replace(destination.as_ref(), |destination| {
+        copied = io::copy(&mut source, destination)?;
+        Ok(())
+    })?;
+    Ok(copied)
 }
 
 fn restrict(path: &Path, directory: bool) -> io::Result<()> {
@@ -80,6 +104,20 @@ pub(crate) fn seal_tree(path: &Path) -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn failed_replacement_preserves_credentials_and_removes_partial_file() {
+        use io::Write;
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join(".env");
+        write(&path, b"ORIGINAL=secret\n").unwrap();
+        let result = replace(&path, |file| {
+            file.write_all(b"PARTIAL=")?;
+            Err(io::Error::other("simulated full disk"))
+        });
+        assert!(result.is_err());
+        assert_eq!(fs::read(&path).unwrap(), b"ORIGINAL=secret\n");
+        assert_eq!(fs::read_dir(temp.path()).unwrap().count(), 1);
+    }
     #[test]
     fn directories_are_private_when_created_and_reopened() {
         let temp = tempfile::tempdir().unwrap();

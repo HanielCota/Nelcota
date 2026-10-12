@@ -44,7 +44,7 @@ impl EnvFile {
         } else {
             format!("{key}={value}")
         };
-        let text = fs::read_to_string(&self.path).unwrap_or_default();
+        let text = self.read_or_missing()?;
         let mut found = false;
         let mut lines: Vec<String> = text
             .lines()
@@ -64,9 +64,19 @@ impl EnvFile {
     }
 
     pub fn remove(&self, key: &str) -> anyhow::Result<()> {
-        let text = fs::read_to_string(&self.path).unwrap_or_default();
+        let text = self.read_or_missing()?;
         let lines: Vec<&str> = text.lines().filter(|l| key_of(l) != Some(key)).collect();
         write_private(&self.path, &(lines.join("\n") + "\n"))
+    }
+
+    fn read_or_missing(&self) -> anyhow::Result<String> {
+        match fs::read_to_string(&self.path) {
+            Ok(text) => Ok(text),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(String::new()),
+            Err(error) => {
+                Err(error).with_context(|| format!("could not read {}", self.path.display()))
+            }
+        }
     }
 }
 
@@ -106,6 +116,16 @@ pub fn write_private(path: &Path, content: &str) -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn unreadable_contents_are_never_replaced_with_an_empty_configuration() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = EnvFile::new(dir.path().join(".env"));
+        fs::write(file.path(), [0xff, 0xfe]).unwrap();
+        assert!(file.set("A", "1").is_err());
+        assert!(file.remove("A").is_err());
+        assert_eq!(fs::read(file.path()).unwrap(), [0xff, 0xfe]);
+    }
 
     #[test]
     fn reads_env_with_quotes_and_comments() {
