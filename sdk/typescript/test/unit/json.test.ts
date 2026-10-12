@@ -1,0 +1,28 @@
+import { describe, expect, it } from 'vitest';
+import { parseJson } from '../../src/core/json.js';
+import fc from 'fast-check';
+
+describe('lossless numeric responses', () => {
+  it('preserves every sampled signed 64-bit integer', () => {
+    fc.assert(fc.property(fc.bigInt({ min: -(2n ** 63n), max: 2n ** 63n - 1n }), value => {
+      const expected = value >= -9007199254740991n && value <= 9007199254740991n ? Number(value) : value.toString();
+      expect(parseJson(`[${value}]`)).toEqual([expected]);
+    }));
+  });
+  it('preserves unsafe integers and decimal digits inside nested values', () => {
+    expect(parseJson('{"id":9007199254740993,"amount":12345678901234567890.123456789,"nested":[-9007199254740993,0.1234567890123456789,1e400,1e-400]}')).toEqual({
+      id: '9007199254740993', amount: '12345678901234567890.123456789',
+      nested: ['-9007199254740993', '0.1234567890123456789', '1e400', '1e-400'],
+    });
+  });
+  it('keeps ordinary numbers and equivalent decimal notation numeric', () => {
+    expect(parseJson('[0,-0,0.1,1.2500,1e3,1.25e-3,9007199254740991]')).toEqual([0, -0, 0.1, 1.25, 1000, 0.00125, Number.MAX_SAFE_INTEGER]);
+  });
+  it('leaves strings, escapes and property names untouched', () => {
+    const original = { '9007199254740993': 'value " 9007199254740993', slash: '\\', line: '\n', unicode: 'ação' };
+    expect(parseJson(JSON.stringify(original))).toEqual(original);
+  });
+  it.each(['{9007199254740993:1}', '[01]', '[NaN]', '[1e]', '[1e400,]', '"unterminated', '[1.2.3]'])('rejects malformed input %s', input => {
+    expect(() => parseJson(input)).toThrow(SyntaxError);
+  });
+});

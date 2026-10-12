@@ -22,4 +22,14 @@ export async function typed(): Promise<void> {
   void nelcota.from('orders').select().eq('status', 'lost');
   const sum: number | null = (await nelcota.rpc('add', { a: 1 })).data;
   void sum;
+  const measurement = (await nelcota.from('measurements').select().single()).data;
+  if (measurement) {
+    const id: number | string = measurement.id;
+    const amount: number | string = measurement.amount;
+    const tags: (string | null)[] = measurement.tags;
+    const states: ('open' | 'paid' | 'shipped' | null)[] = measurement.states;
+    // @ts-expect-error PostgreSQL arrays can contain null even in NOT NULL columns
+    measurement.tags.map(tag => tag.toUpperCase());
+    void [id, amount, tags, states];
+  }
 }

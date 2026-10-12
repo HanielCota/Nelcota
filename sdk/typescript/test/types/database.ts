@@ -13,35 +13,35 @@ export interface Database {
     Tables: {
       customers: {
         Row: {
-          id: number;
+          id: number | string;
           name: string;
         };
         Insert: {
-          id?: number;
+          id?: number | string;
           name: string;
         };
         Update: {
-          id?: number;
+          id?: number | string;
           name?: string;
         };
         Relationships: [];
       };
       items: {
         Row: {
-          id: number;
-          order_id: number;
+          id: number | string;
+          order_id: number | string;
           product: string;
           qty: number;
         };
         Insert: {
-          id?: number;
-          order_id: number;
+          id?: number | string;
+          order_id: number | string;
           product: string;
           qty?: number;
         };
         Update: {
-          id?: number;
-          order_id?: number;
+          id?: number | string;
+          order_id?: number | string;
           product?: string;
           qty?: number;
         };
@@ -51,27 +51,27 @@ export interface Database {
       };
       orders: {
         Row: {
-          id: number;
-          customer_id: number | null;
-          seller_id: number | null;
+          id: number | string;
+          customer_id: number | string | null;
+          seller_id: number | string | null;
           status: "open" | "paid" | "shipped";
-          total: number;
+          total: number | string;
           meta: Json | null;
         };
         Insert: {
-          id?: number;
-          customer_id?: number | null;
-          seller_id?: number | null;
+          id?: number | string;
+          customer_id?: number | string | null;
+          seller_id?: number | string | null;
           status?: "open" | "paid" | "shipped";
-          total: number;
+          total: number | string;
           meta?: Json | null;
         };
         Update: {
-          id?: number;
-          customer_id?: number | null;
-          seller_id?: number | null;
+          id?: number | string;
+          customer_id?: number | string | null;
+          seller_id?: number | string | null;
           status?: "open" | "paid" | "shipped";
-          total?: number;
+          total?: number | string;
           meta?: Json | null;
         };
         Relationships: [
@@ -83,8 +83,8 @@ export interface Database {
     Views: {
       order_totals: {
         Row: {
-          customer_id: number | null;
-          total: number | null;
+          customer_id: number | string | null;
+          total: number | string | null;
         };
         Relationships: [];
       };

@@ -39,6 +39,15 @@ function client(mock: ReturnType<typeof mockFetch>, options: Parameters<typeof c
   return createClient('https://api.example.com', { fetch: mock.fetch, auth: { autoRefresh: false }, ...options });
 }
 
+it('keeps an unsafe identifier intact when it is reused in a filter', async () => {
+  const mock = mockFetch(new Response('[{"id":9007199254740993}]'), json([]));
+  const nelcota = client(mock);
+  const first = await nelcota.from('todos').select('id');
+  expect(first.data).toEqual([{ id: '9007199254740993' }]);
+  await nelcota.from('todos').select('id').eq('id', first.data![0]!.id);
+  expect(mock.calls[1]!.url.searchParams.get('id')).toBe('eq.9007199254740993');
+});
+
 describe('retries', () => {
   it('returns long Retry-After delays instead of retrying too early', async () => {
     const mock = mockFetch(json({ code: 'rate_limited', message: 'wait' }, 429, { 'retry-after': '90' }));

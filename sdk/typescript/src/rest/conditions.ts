@@ -11,15 +11,13 @@ export type FilterValue<T> = 0 extends 1 & T
   ? FilterScalar
   : [NonNullable<T>] extends [never]
     ? FilterScalar
-    : NonNullable<T> extends number
-      ? number | bigint | string
+    : NonNullable<T> extends number | string
+      ? [Extract<NonNullable<T>, number>] extends [never]
+        ? string extends NonNullable<T> ? string | Date : NonNullable<T>
+        : number | bigint | string
       : NonNullable<T> extends boolean
         ? boolean
-        : NonNullable<T> extends string
-          ? string extends NonNullable<T>
-            ? string | Date
-            : NonNullable<T>
-          : string;
+        : string;
 
 
 const encoded: unique symbol = Symbol('nelcota.condition');

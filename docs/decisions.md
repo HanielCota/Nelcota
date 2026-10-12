@@ -895,6 +895,17 @@ bounded reqwest transport, without adding a second HTTP stack. Nelcota retains
 its one-time state, account linking and session policies. These dependencies
 do not add a JavaScript server: Rust serves the compiled panel and backend.
 
+**D99. Client conversions preserve Postgres value identity.** JSON numbers
+remain numeric when conversion preserves their decimal value. The TypeScript
+SDK keeps unsafe integers and decimals that would lose digits as strings,
+including nested JSON values and RPC results. Generated numeric types that
+can exceed JavaScript precision use `number | string`, so callers must handle
+both forms and can reuse exact values in filters and writes. This preserves
+the existing HTTP protocol and needs no runtime dependency or JSON reviver
+source support. PostgreSQL array elements can be null even in NOT NULL columns;
+generated scalar and enum arrays therefore use `(T | null)[]`. Column
+nullability remains separate. Regenerate schema types after updating the SDK.
+
 ### Known pending items
 
 - Filtering parent rows by their embeds (`!inner`) and self-referencing embeds.

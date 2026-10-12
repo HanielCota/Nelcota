@@ -13,12 +13,11 @@ use crate::catalog::{Catalog, Column, Table, TableKind};
 
 fn ts_scalar(type_name: &str) -> String {
     if let Some(element) = type_name.strip_suffix("[]") {
-        return format!("{}[]", ts_scalar(element));
+        return format!("({} | null)[]", ts_scalar(element));
     }
     match type_name {
-        "smallint" | "integer" | "bigint" | "real" | "double precision" | "numeric" | "oid" => {
-            "number".into()
-        }
+        "smallint" | "integer" | "oid" => "number".into(),
+        "bigint" | "real" | "double precision" | "numeric" => "number | string".into(),
         "boolean" => "boolean".into(),
         "json" | "jsonb" => "Json".into(),
         "void" => "undefined".into(),
@@ -35,7 +34,7 @@ fn ts_column(column: &Column) -> String {
             .collect::<Vec<_>>()
             .join(" | ");
         return if column.category == 'A' {
-            format!("({union})[]")
+            format!("({union} | null)[]")
         } else {
             union
         };
@@ -224,6 +223,59 @@ pub fn generate(catalog: &Catalog) -> String {
 mod tests {
     use super::*;
     use crate::catalog::{Argument, ForeignKey, Function, Privileges};
+
+    #[test]
+    fn precise_numbers_and_nullable_array_elements_in_every_write_shape() {
+        assert_eq!(ts_scalar("bigint"), "number | string");
+        assert_eq!(ts_scalar("numeric"), "number | string");
+        assert_eq!(ts_scalar("numeric[]"), "(number | string | null)[]");
+        assert_eq!(ts_scalar("text[]"), "(string | null)[]");
+        let mut moods = column("moods", "public.mood[]");
+        moods.category = 'A';
+        moods.enum_values = vec!["happy".into(), "sad".into()];
+        let mut catalog = Catalog {
+            schema: "public".into(),
+            ..Catalog::default()
+        };
+        catalog.tables.insert(
+            "arrays".into(),
+            table("arrays", vec![column("tags", "text[]"), moods], Vec::new()),
+        );
+        catalog.functions.insert(
+            "echo_tags".into(),
+            vec![Function {
+                name: "echo_tags".into(),
+                args: vec![Argument {
+                    name: "tags".into(),
+                    type_name: "text[]".into(),
+                    has_default: false,
+                }],
+                return_type: "text[]".into(),
+                returns_set: false,
+                returns_void: false,
+                volatility: 'i',
+                comment: None,
+                executable: [true; 3],
+            }],
+        );
+        let out = generate(&catalog);
+        // Row and Insert require the non-null array; Update makes it optional.
+        assert_eq!(out.matches("tags: (string | null)[];").count(), 2);
+        assert!(out.contains("tags?: (string | null)[];"), "{out}");
+        assert_eq!(
+            out.matches("moods: (\"happy\" | \"sad\" | null)[];")
+                .count(),
+            2
+        );
+        assert!(
+            out.contains("moods?: (\"happy\" | \"sad\" | null)[];"),
+            "{out}"
+        );
+        assert!(
+            out.contains("Args: { tags: (string | null)[] }; Returns: (string | null)[]"),
+            "{out}"
+        );
+    }
 
     fn column(name: &str, type_name: &str) -> Column {
         Column {

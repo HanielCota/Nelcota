@@ -81,7 +81,8 @@ impl Catalog {
                         t.typcategory::text,
                         CASE WHEN t.typcategory = 'A' THEN format_type(t.typelem, NULL) END,
                         ARRAY(SELECT e.enumlabel::text FROM pg_enum e
-                              WHERE e.enumtypid = a.atttypid ORDER BY e.enumsortorder),
+                              WHERE e.enumtypid = CASE WHEN t.typcategory = 'A' THEN t.typelem ELSE a.atttypid END
+                              ORDER BY e.enumsortorder),
                         NOT a.attnotnull,
                         a.atthasdef OR a.attidentity <> '' OR a.attgenerated <> '',
                         a.attgenerated <> '' OR a.attidentity = 'a',

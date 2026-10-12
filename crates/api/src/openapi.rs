@@ -8,11 +8,13 @@ use crate::catalog::{Catalog, Column, Table, TableKind};
 
 /// JSON Schema of a Postgres type, by its formatted name.
 pub fn json_schema(type_name: &str, enum_values: &[String]) -> Value {
+    if let Some(element) = type_name.strip_suffix("[]") {
+        let mut items = json_schema(element, enum_values);
+        items["nullable"] = json!(true);
+        return json!({ "type": "array", "items": items });
+    }
     if !enum_values.is_empty() {
         return json!({ "type": "string", "enum": enum_values });
-    }
-    if let Some(element) = type_name.strip_suffix("[]") {
-        return json!({ "type": "array", "items": json_schema(element, &[]) });
     }
     match type_name {
         "smallint" | "integer" | "bigint" | "oid" => json!({ "type": "integer" }),
@@ -234,6 +236,18 @@ pub fn document(catalog: &Catalog, role: Role) -> Value {
 mod tests {
     use super::*;
     use crate::catalog::Privileges;
+
+    #[test]
+    fn array_items_keep_enum_values_and_allow_null() {
+        assert_eq!(
+            json_schema("text[]", &[]),
+            json!({"type":"array","items":{"type":"string","nullable":true}})
+        );
+        assert_eq!(
+            json_schema("public.mood[]", &["happy".into()]),
+            json!({"type":"array","items":{"type":"string","enum":["happy"],"nullable":true}})
+        );
+    }
 
     fn catalog() -> Catalog {
         let table = |name: &str, privileges| Table {
