@@ -67,7 +67,8 @@
       </Select.Content>
     </Select.Root>
     <Button variant="outline" disabled={busy} onclick={issue}>
-      {#if busy}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{:else}<KeyRound data-icon="inline-start" aria-hidden="true" />{/if}
+      {#if (busy)}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{/if}
+      {#if !(busy)}<KeyRound data-icon="inline-start" aria-hidden="true" />{/if}
       {busy ? t('connect.token.generating') : issued ? t('connect.token.generateAnother') : t('connect.token.generate')}
     </Button>
     <span class="text-sm text-muted-foreground">

@@ -87,9 +87,9 @@ fn configure_firewall(enable: bool) {
     });
     if all_ok {
         ok("ufw: SSH, 80 and 443 allowed; everything else blocked");
-    } else {
-        warn("could not configure ufw; check with `ufw status`");
+        return;
     }
+    warn("could not configure ufw; check with `ufw status`");
 }
 
 #[cfg(test)]

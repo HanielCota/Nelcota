@@ -60,9 +60,10 @@
   </p>
   <nav class="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 pb-3" aria-label={t('tables.sidebar.heading')}>
     {#if error}<LoadError message={error} onretry={onretry} busy={loading} />{/if}
-    {#if loading && !tables.length}
+    {#if (loading && !tables.length)}
       {#each Array(4) as _}<Skeleton class="mb-1 h-9 w-full" />{/each}
-    {:else}
+    {/if}
+    {#if !(loading && !tables.length)}
     {#each visible as table (table.name)}
       <a
         href={href(`/tables/${encodeURIComponent(table.name)}`)}
@@ -78,16 +79,16 @@
         <span class="ml-auto flex"><RlsDot state={table.rls.state} /></span>
         {#if table.kind !== 'table'}<span class="text-2xs text-muted-foreground">{t('tables.sidebar.view')}</span>{/if}
       </a>
-    {:else}
-      {#if !error}
+    {/each}
+      {#if !visible.length && !error}
         <EmptyState icon={search.trim() ? Search : Rows3} title={search.trim() ? t('common.noMatches') : t('tables.sidebar.empty')} class="px-3 py-6">
           {#snippet actions()}
-            {#if search.trim()}<Button variant="outline" size="sm" onclick={() => (search = '')}>{t('common.clearSearch')}</Button>
-            {:else if !tables.length}<Button variant="outline" size="sm" onclick={oncreate}><Plus data-icon="inline-start" aria-hidden="true" />{t('tables.sidebar.newTable')}</Button>{/if}
+            {#if (search.trim())}<Button variant="outline" size="sm" onclick={() => (search = '')}>{t('common.clearSearch')}</Button>
+            {/if}
+            {#if !(search.trim()) && (!tables.length)}<Button variant="outline" size="sm" onclick={oncreate}><Plus data-icon="inline-start" aria-hidden="true" />{t('tables.sidebar.newTable')}</Button>{/if}
           {/snippet}
         </EmptyState>
       {/if}
-    {/each}
     {/if}
   </nav>
 </aside>

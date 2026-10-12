@@ -48,7 +48,10 @@ pub fn project_name_from_domain(domain: &str) -> String {
     let name: String = label
         .to_lowercase()
         .chars()
-        .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+        .map(|c| match c.is_ascii_alphanumeric() {
+            true => c,
+            false => '-',
+        })
         .take(32)
         .collect();
     name.trim_matches('-').to_owned()

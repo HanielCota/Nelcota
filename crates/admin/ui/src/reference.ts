@@ -18,7 +18,10 @@ window.addEventListener('message', event => {
     setPageTitle: () => 'Nelcota API',
     customCss: 'body { margin: 0; } .scalar-app { font-family: system-ui, sans-serif; }',
   }
-  if (instance) instance.updateConfiguration(config)
-  else instance = createApiReference('#reference', config)
+  if (instance) {
+    instance.updateConfiguration(config)
+    return
+  }
+  instance = createApiReference('#reference', config)
 })
 window.addEventListener('pagehide', () => instance?.destroy(), { once: true })

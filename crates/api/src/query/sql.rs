@@ -27,10 +27,11 @@ pub(super) fn select_list(
             .map(|c| format!("{alias}.{}", ident(c))),
     );
     for (n, embed) in select.embeds.iter().enumerate() {
-        let path = if path.is_empty() {
-            n.to_string()
-        } else {
-            format!("{path}_{n}")
+        let path = match path.is_empty() {
+            true => n.to_string(),
+            false => {
+                format!("{path}_{n}")
+            }
         };
         parts.push(embed_sql(sql, schema, embed, alias, &path));
     }
@@ -68,21 +69,23 @@ pub(super) fn embed_sql(
         conditions.join(" AND "),
         order_clause(&row, &embed.order),
     );
-    let limit = if embed.many {
-        match (embed.limit, sql.embed_limit) {
+    let limit = match embed.many {
+        true => match (embed.limit, sql.embed_limit) {
             (Some(l), Some(m)) => Some(l.min(m)),
             (l, m) => l.or(m),
-        }
-    } else {
-        embed.limit
+        },
+        false => embed.limit,
     };
     rows.push_str(&paging(sql, limit, embed.offset));
     let checked = sql.json(&json);
-    let value = if embed.many {
-        format!("(SELECT coalesce(json_agg({checked}), '[]') FROM ({rows}) AS {json})")
-    } else {
-        // The foreign key references a unique key: at most one row.
-        format!("(SELECT {checked} FROM ({rows}) AS {json})")
+    let value = match embed.many {
+        true => {
+            format!("(SELECT coalesce(json_agg({checked}), '[]') FROM ({rows}) AS {json})")
+        }
+        false => {
+            // The foreign key references a unique key: at most one row.
+            format!("(SELECT {checked} FROM ({rows}) AS {json})")
+        }
     };
     format!("{value} AS {}", ident(&embed.alias))
 }
@@ -119,11 +122,18 @@ pub(super) fn condition_sql(sql: &mut Sql, alias: &str, condition: &Condition) -
                 .iter()
                 .map(|item| condition_sql(sql, alias, item))
                 .collect();
-            let joined = format!("({})", parts.join(if *any { " OR " } else { " AND " }));
-            if *negate {
-                format!("NOT {joined}")
-            } else {
-                joined
+            let joined = format!(
+                "({})",
+                parts.join(match *any {
+                    true => " OR ",
+                    false => " AND ",
+                })
+            );
+            match *negate {
+                true => {
+                    format!("NOT {joined}")
+                }
+                false => joined,
             }
         }
     }
@@ -142,7 +152,10 @@ pub(super) fn filter_sql(sql: &mut Sql, alias: &str, filter: &Filter) -> String 
             pattern,
         } => {
             let p = sql.param(Param::Text(pattern.clone()));
-            let op = if *insensitive { "ILIKE" } else { "LIKE" };
+            let op = match *insensitive {
+                true => "ILIKE",
+                false => "LIKE",
+            };
             format!("{target}::text {op} {p}::text")
         }
         Op::In(items) if items.is_empty() => "false".to_owned(),
@@ -161,10 +174,9 @@ pub(super) fn filter_sql(sql: &mut Sql, alias: &str, filter: &Filter) -> String 
         }
     };
     if filter.negate {
-        format!("NOT ({condition})")
-    } else {
-        condition
+        return format!("NOT ({condition})");
     }
+    condition
 }
 
 pub(super) fn order_clause(alias: &str, order: &[OrderTerm]) -> String {
@@ -177,7 +189,10 @@ pub(super) fn order_clause(alias: &str, order: &[OrderTerm]) -> String {
             let mut term = format!(
                 "{alias}.{} {}",
                 ident(&o.column),
-                if o.desc { "DESC" } else { "ASC" }
+                match o.desc {
+                    true => "DESC",
+                    false => "ASC",
+                }
             );
             match o.nulls_first {
                 Some(true) => term.push_str(" NULLS FIRST"),
@@ -284,10 +299,13 @@ pub(super) fn with_representation(
 pub(super) fn body_columns(table: &Table, rows: &[Value]) -> Result<Vec<String>, QueryError> {
     let mut columns: Vec<String> = Vec::new();
     for row in rows {
-        let Value::Object(map) = row else {
-            return Err(invalid(
-                "the body must be a JSON object or an array of objects",
-            ));
+        let map = match row {
+            Value::Object(map) => map,
+            _ => {
+                return Err(invalid(
+                    "the body must be a JSON object or an array of objects",
+                ));
+            }
         };
         for key in map.keys() {
             if !columns.iter().any(|c| c == key) {
@@ -339,10 +357,13 @@ pub fn insert(
     let mut groups: Vec<(Vec<String>, Vec<Value>)> = Vec::new();
     let mut group_index: HashMap<Vec<usize>, usize> = HashMap::new();
     for row in rows {
-        let Value::Object(map) = &row else {
-            return Err(invalid(
-                "the body must be a JSON object or an array of objects",
-            ));
+        let map = match &row {
+            Value::Object(map) => map,
+            _ => {
+                return Err(invalid(
+                    "the body must be a JSON object or an array of objects",
+                ));
+            }
         };
         let mut columns = map
             .keys()
@@ -353,20 +374,23 @@ pub fn insert(
             })
             .collect::<Result<Vec<_>, _>>()?;
         columns.sort_unstable();
-        if let Some(&index) = group_index.get(&columns) {
-            groups[index].1.push(row);
-        } else {
-            if groups.len() >= MAX_INSERT_GROUPS {
-                return Err(invalid(format!(
-                    "insert accepts at most {MAX_INSERT_GROUPS} distinct column sets"
-                )));
+        match group_index.get(&columns) {
+            Some(&index) => {
+                groups[index].1.push(row);
             }
-            let ordered = columns
-                .iter()
-                .map(|&index| table.columns[index].name.clone())
-                .collect();
-            group_index.insert(columns, groups.len());
-            groups.push((ordered, vec![row]));
+            _ => {
+                if groups.len() >= MAX_INSERT_GROUPS {
+                    return Err(invalid(format!(
+                        "insert accepts at most {MAX_INSERT_GROUPS} distinct column sets"
+                    )));
+                }
+                let ordered = columns
+                    .iter()
+                    .map(|&index| table.columns[index].name.clone())
+                    .collect();
+                group_index.insert(columns, groups.len());
+                groups.push((ordered, vec![row]));
+            }
         }
     }
 
@@ -436,8 +460,11 @@ pub fn update(
     filters: &[Condition],
     representation: Option<&Select>,
 ) -> Result<Sql, QueryError> {
-    let Value::Object(map) = body else {
-        return Err(invalid("the PATCH body must be a JSON object"));
+    let map = match body {
+        Value::Object(map) => map,
+        _ => {
+            return Err(invalid("the PATCH body must be a JSON object"));
+        }
     };
     let columns = body_columns(table, &[Value::Object(map.clone())])?;
     if columns.is_empty() {
@@ -515,16 +542,17 @@ pub fn rpc(
         .collect::<Vec<_>>()
         .join(", ");
     let call = format!("{}.{}({call_args})", ident(schema), ident(&function.name));
-    let source = if used.is_empty() {
-        None
-    } else {
-        let definition = used
-            .iter()
-            .map(|a| format!("{} {}", ident(&a.name), a.type_name))
-            .collect::<Vec<_>>()
-            .join(", ");
-        let p = sql.param(Param::Json(Value::Object(args)));
-        Some(format!("json_to_record({p}::json) AS _a({definition})"))
+    let source = match used.is_empty() {
+        true => None,
+        false => {
+            let definition = used
+                .iter()
+                .map(|a| format!("{} {}", ident(&a.name), a.type_name))
+                .collect::<Vec<_>>()
+                .join(", ");
+            let p = sql.param(Param::Json(Value::Object(args)));
+            Some(format!("json_to_record({p}::json) AS _a({definition})"))
+        }
     };
     sql.text = match (function.returns_set, function.returns_void, source) {
         (true, _, source) => {

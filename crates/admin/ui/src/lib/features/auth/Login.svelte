@@ -128,7 +128,8 @@
         aria-label={mode.current === 'dark' ? t('shell.account.lightTheme') : t('shell.account.darkTheme')}
         title={mode.current === 'dark' ? t('shell.account.lightTheme') : t('shell.account.darkTheme')}
       >
-        {#if mode.current === 'dark'}<Sun class="size-[18px]" aria-hidden="true" />{:else}<Moon class="size-[18px]" aria-hidden="true" />{/if}
+        {#if (mode.current === 'dark')}<Sun class="size-[18px]" aria-hidden="true" />{/if}
+        {#if !(mode.current === 'dark')}<Moon class="size-[18px]" aria-hidden="true" />{/if}
       </button>
     </div>
   </header>
@@ -208,7 +209,8 @@
                   aria-pressed={showPassword}
                   onclick={() => { showPassword = !showPassword; document.getElementById('password')?.focus() }}
                 >
-                  {#if showPassword}<EyeOff aria-hidden="true" />{:else}<Eye aria-hidden="true" />{/if}
+                  {#if (showPassword)}<EyeOff aria-hidden="true" />{/if}
+                  {#if !(showPassword)}<Eye aria-hidden="true" />{/if}
                 </Button>
               </InputGroup.Addon>
             </InputGroup.Root>

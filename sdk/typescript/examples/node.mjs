@@ -4,11 +4,14 @@ import { createClient, unwrap } from '@nelcota/client';
 export async function runExample({ url, email, password, signUp = false }) {
   if (!url || !email || !password) throw new Error('Set NELCOTA_URL, NELCOTA_EMAIL and NELCOTA_PASSWORD');
   const client = createClient(url);
+  async function authenticate() {
+    if (!signUp) return unwrap(await client.auth.signInWithPassword({ email, password }));
+    const account = unwrap(await client.auth.signUp({ email, password }));
+    if (!account.session) throw new Error('Confirm the signup email, then run again with NELCOTA_SIGN_UP unset');
+    return account.session;
+  }
   try {
-    if (signUp) {
-      const account = unwrap(await client.auth.signUp({ email, password }));
-      if (!account.session) throw new Error('Confirm the signup email, then run again with NELCOTA_SIGN_UP unset');
-    } else unwrap(await client.auth.signInWithPassword({ email, password }));
+    await authenticate();
     const session = unwrap(await client.auth.getSession());
     const note = unwrap(await client.from('notes').insert({ body: 'Hello from Node' }).select('id,body').single());
     const { data: notes } = await client.from('notes').select('id,body').order('id', { ascending: false }).limit(20).throwOnError();

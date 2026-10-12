@@ -35,8 +35,11 @@ struct DevState {
 }
 
 fn load_state(root: &Path) -> anyhow::Result<Option<DevState>> {
-    let Ok(text) = fs::read_to_string(root.join(STATE_FILE)) else {
-        return Ok(None);
+    let text = match fs::read_to_string(root.join(STATE_FILE)) {
+        Ok(text) => text,
+        _ => {
+            return Ok(None);
+        }
     };
     let env = parse(&text);
     let get = |key: &str| {
@@ -152,28 +155,33 @@ pub fn run(root: &Path, args: DevArgs) -> anyhow::Result<Outcome> {
         .args(["inspect", "-f", "{{.State.Running}}", &container])
         .output()
         .context("Docker not found")?;
-    if !running.status.success() {
-        let status = Command::new("docker")
-            .args(["run", "-d", "--name", &container, "-e"])
-            .arg(format!("POSTGRES_PASSWORD={}", state.postgres_password))
-            .arg("-p")
-            .arg(format!("127.0.0.1:{}:5432", state.db_port))
-            .arg("-v")
-            .arg(format!("{container}-data:/var/lib/postgresql/data"))
-            .args([
-                "postgres:17-alpine",
-                "postgres",
-                "-c",
-                "shared_preload_libraries=pg_stat_statements",
-            ])
-            .status()?;
-        if !status.success() {
-            bail!("could not create the {container} container");
+    match !running.status.success() {
+        true => {
+            let status = Command::new("docker")
+                .args(["run", "-d", "--name", &container, "-e"])
+                .arg(format!("POSTGRES_PASSWORD={}", state.postgres_password))
+                .arg("-p")
+                .arg(format!("127.0.0.1:{}:5432", state.db_port))
+                .arg("-v")
+                .arg(format!("{container}-data:/var/lib/postgresql/data"))
+                .args([
+                    "postgres:17-alpine",
+                    "postgres",
+                    "-c",
+                    "shared_preload_libraries=pg_stat_statements",
+                ])
+                .status()?;
+            if !status.success() {
+                bail!("could not create the {container} container");
+            }
         }
-    } else if String::from_utf8_lossy(&running.stdout).trim() != "true" {
-        Command::new("docker")
-            .args(["start", &container])
-            .status()?;
+        false => {
+            if String::from_utf8_lossy(&running.stdout).trim() != "true" {
+                Command::new("docker")
+                    .args(["start", &container])
+                    .status()?;
+            }
+        }
     }
 
     let config = config_for(root, &state, args.listen);

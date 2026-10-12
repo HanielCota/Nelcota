@@ -20,10 +20,9 @@ pub async fn history(pool: &Pool, query: HistoryQuery) -> Result<DeliveryPage, E
     }
     let client = pool.get().await?;
     let rows = client.query(&format!("{DELIVERIES} WHERE ($1::uuid IS NULL OR d.endpoint_id=$1) AND ($2::text IS NULL OR d.status=$2) AND ($3::bigint IS NULL OR d.id<$3) ORDER BY d.id DESC LIMIT $4"), &[&endpoint, &query.status, &before, &(PAGE_SIZE+1)]).await?;
-    let next_cursor = if rows.len() > PAGE_SIZE as usize {
-        Some(rows[(PAGE_SIZE - 1) as usize].get("id"))
-    } else {
-        None
+    let next_cursor = match rows.len() > PAGE_SIZE as usize {
+        true => Some(rows[(PAGE_SIZE - 1) as usize].get("id")),
+        false => None,
     };
     Ok(DeliveryPage {
         deliveries: rows.iter().take(PAGE_SIZE as usize).map(delivery).collect(),

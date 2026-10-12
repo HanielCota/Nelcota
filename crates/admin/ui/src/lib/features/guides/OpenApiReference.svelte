@@ -47,11 +47,13 @@
     {#if resource.data}<Button variant="outline" size="sm" onclick={() => downloadText('openapi.json', JSON.stringify(resource.data, null, 2), 'application/json')}><Download />{t('guides.openapi.download')}</Button><Badge variant="secondary">OpenAPI {resource.data.openapi}</Badge>{/if}
   </div>
   {#if resource.error}<LoadError message={errorMessage(resource.error)} onretry={load} busy={resource.loading} />{/if}
-  {#if resource.loading}<Skeleton class="h-48 rounded-2xl" />
-  {:else if resource.data}
-    {#if operations(resource.data).length}
+  {#if (resource.loading)}<Skeleton class="h-48 rounded-2xl" />
+  {/if}
+  {#if !(resource.loading) && (resource.data)}
+    {#if (operations(resource.data).length)}
       <iframe bind:this={frame} src="/admin/assets/reference.html" title={t('guides.entries.openapi.title')} onload={sendDocument} class="h-[75dvh] min-h-96 w-full rounded-xl border"></iframe>
-    {:else}
+    {/if}
+    {#if !(operations(resource.data).length)}
       <EmptyState icon={Rows3} title={t('guides.openapi.empty')} description={t('guides.openapi.emptyHint')} />
     {/if}
   {/if}

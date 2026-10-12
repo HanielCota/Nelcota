@@ -49,21 +49,27 @@ pub(crate) async fn security_headers(request: Request, next: Next) -> Response {
     // Svelte transitions, CodeMirror and menu positioning (floating-ui)
     // inject styles at runtime.
     // A file downloaded through the panel keeps its own (sandboxed) policy.
-    let policy = if reference {
-        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; \
+    let policy = match reference {
+        true => {
+            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; \
          img-src 'self' data:; font-src 'self'; connect-src 'self'; \
          frame-ancestors 'self'; form-action 'self'; base-uri 'none'"
-    } else {
-        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; \
+        }
+        false => {
+            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; \
          img-src 'self' data:; font-src 'self'; connect-src 'self'; \
          frame-ancestors 'none'; form-action 'self'; base-uri 'none'"
+        }
     };
     headers
         .entry(header::CONTENT_SECURITY_POLICY)
         .or_insert(HeaderValue::from_static(policy));
     headers.insert(
         header::X_FRAME_OPTIONS,
-        HeaderValue::from_static(if reference { "SAMEORIGIN" } else { "DENY" }),
+        HeaderValue::from_static(match reference {
+            true => "SAMEORIGIN",
+            false => "DENY",
+        }),
     );
     headers.insert(
         header::X_CONTENT_TYPE_OPTIONS,

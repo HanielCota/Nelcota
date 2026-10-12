@@ -159,7 +159,7 @@
         <Button variant="outline" size="sm" href={href('/connect')}><Plug data-icon="inline-start" aria-hidden="true" />{t('connect.start')}</Button>
       </nav>
     </div>
-    {#if traffic}
+    {#if (traffic)}
       <!-- Labels share the top line and figures share the bottom line; on
            phones the total takes a row and the two meters share the next. -->
       <div class="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-[auto_minmax(0,16rem)_minmax(0,16rem)] sm:items-end sm:gap-x-12">
@@ -170,7 +170,8 @@
         <p class="col-start-2 row-start-3 text-sm text-muted-foreground sm:col-start-3 sm:row-start-1">{t('overview.hero.errors')}</p>
         <div class="col-start-2 row-start-4 sm:col-start-3 sm:row-start-2"><Meter label={t('overview.hero.errors')} part={traffic.totals.errors} whole={traffic.totals.requests} {format} /></div>
       </div>
-    {:else if metrics.loading}
+    {/if}
+    {#if !(traffic) && (metrics.loading)}
       <Skeleton class="h-16 w-[40rem] max-w-full rounded-2xl" />
     {/if}
   </section>
@@ -192,7 +193,7 @@
   <!-- Stat cards beside the traffic chart. -->
   <section class="grid gap-4 lg:grid-cols-[18.75rem_minmax(0,1fr)]">
     <div class="grid content-start gap-4 sm:grid-cols-3 lg:grid-cols-1">
-      {#if data}
+      {#if (data)}
         <article class={card}>
           <div class="flex items-center justify-between text-xs text-muted-foreground">
             <span>{t('overview.cards.database')}</span>
@@ -221,11 +222,12 @@
             <Ring value={signedInShare} label={t('overview.cards.usersRing', { percent: signedInShare })} />
           </div>
         </article>
-      {:else}
+      {/if}
+      {#if !(data)}
         <Skeleton class="h-36 rounded-3xl" />
         <Skeleton class="h-36 rounded-3xl" />
       {/if}
-      {#if traffic}
+      {#if (traffic)}
         <article class={card}>
           <div class="flex items-center justify-between text-xs text-muted-foreground">
             <span>{periodText}</span>
@@ -239,7 +241,8 @@
             <MiniBars values={refusedBars} labels={refusedLabels} describe={t('overview.cards.refusedBars')} />
           </div>
         </article>
-      {:else}
+      {/if}
+      {#if !(traffic)}
         <Skeleton class="h-36 rounded-3xl" />
       {/if}
     </div>
@@ -272,9 +275,10 @@
         </div>
       </div>
 
-      {#if metrics.error}
+      {#if (metrics.error)}
         <LoadError message={errorMessage(metrics.error)} onretry={loadMetrics} busy={metrics.loading} />
-      {:else if traffic}
+      {/if}
+      {#if !(metrics.error) && (traffic)}
         <!-- A refetch keeps the previous frame, dimmed. -->
         <div class={['transition-opacity', metrics.loading && 'opacity-60']}>
           <TrafficChart points={chartPoints} hourly={range === '1h'} {show} />
@@ -309,7 +313,8 @@
             </Table.Root>
           </div>
         {/if}
-      {:else}
+      {/if}
+      {#if !(metrics.error) && !(traffic)}
         <Skeleton class="h-[22rem] rounded-2xl" />
       {/if}
     </article>
@@ -319,11 +324,13 @@
   <section class="grid gap-4 lg:grid-cols-3">
     <article class={['grid content-start gap-5', card]}>
       {@render cardHeader(t('overview.rows.title'), '/tables')}
-      {#if !data}
+      {#if (!data)}
         <Skeleton class="h-40 rounded-2xl" />
-      {:else if byRows.length === 0}
+      {/if}
+      {#if !(!data) && (byRows.length === 0)}
         <p class="text-sm text-muted-foreground">{t('overview.rows.empty')}</p>
-      {:else}
+      {/if}
+      {#if !(!data) && !(byRows.length === 0)}
         <ul class="grid gap-5">
           {#each byRows as table (table.name)}
             {@const share = percent(table.rows ?? 0, totalRows)}
@@ -342,11 +349,13 @@
 
     <article class={['grid content-start gap-4', card]}>
       {@render cardHeader(t('overview.blocked.title'), '/policies')}
-      {#if !denied.data}
+      {#if (!denied.data)}
         <Skeleton class="h-40 rounded-2xl" />
-      {:else if recentBlocks.length === 0}
+      {/if}
+      {#if !(!denied.data) && (recentBlocks.length === 0)}
         <p class="text-sm text-muted-foreground">{t('overview.blocked.none')}</p>
-      {:else}
+      {/if}
+      {#if !(!denied.data) && !(recentBlocks.length === 0)}
         <table class="w-full text-sm">
           <thead>
             <tr class="text-xs text-muted-foreground">
@@ -371,10 +380,11 @@
 
     <article class={['grid content-start gap-4', card]}>
       <h2 class="text-sm font-medium text-muted-foreground">{t('overview.needs.title')}</h2>
-      {#if !data}
+      {#if (!data)}
         <Skeleton class="h-40 rounded-2xl" />
-      {:else}
-        {#if needs.length}
+      {/if}
+      {#if !(!data)}
+        {#if (needs.length)}
           <ul class="grid gap-3">
             {#each needs.slice(0, 3) as item (item.key)}
               <li>
@@ -388,7 +398,8 @@
               </li>
             {/each}
           </ul>
-        {:else}
+        {/if}
+        {#if !(needs.length)}
           <p class="flex items-center gap-2 text-sm font-medium"><CircleCheck class="size-5 shrink-0 text-brand" aria-hidden="true" />{t('overview.needs.allGood')}</p>
         {/if}
         <!-- The first steps, always in view: each is ticked by what the project
@@ -401,9 +412,10 @@
             {#each allSteps as step (step.id)}
               <li>
                 <a href={href(step.path)} class="group flex items-center gap-3 rounded-2xl px-2 py-2 transition-colors hover:bg-well">
-                  {#if step.done}
+                  {#if (step.done)}
                     <span class="grid size-6 shrink-0 place-items-center rounded-full bg-brand/15 text-brand"><Check class="size-3.5" aria-hidden="true" /></span>
-                  {:else}
+                  {/if}
+                  {#if !(step.done)}
                     <span class="size-6 shrink-0 rounded-full border-2 border-dashed border-muted-foreground/40" aria-hidden="true"></span>
                   {/if}
                   <span class={['min-w-0 flex-1 text-sm', step.done ? 'text-muted-foreground line-through decoration-muted-foreground/40' : 'font-medium']}>{t(`overview.steps.${step.id}.label`)}</span>

@@ -287,16 +287,22 @@ async fn timed_out_and_canceled_uploads_leave_no_multipart_parts() {
             );
             tokio::time::sleep(Duration::from_millis(20)).await;
         }
-        if canceled {
-            task.abort();
-            let Err(error) = task.await else {
-                panic!("canceled upload completed");
-            };
-            assert!(error.is_cancelled());
-        } else {
-            let error = task.await.unwrap().err().unwrap();
-            assert_eq!(error.status(), StatusCode::REQUEST_TIMEOUT);
-            assert_eq!(error.code(), "upload_timeout");
+        match canceled {
+            true => {
+                task.abort();
+                let error = match task.await {
+                    Err(error) => error,
+                    _ => {
+                        panic!("canceled upload completed");
+                    }
+                };
+                assert!(error.is_cancelled());
+            }
+            false => {
+                let error = task.await.unwrap().err().unwrap();
+                assert_eq!(error.status(), StatusCode::REQUEST_TIMEOUT);
+                assert_eq!(error.code(), "upload_timeout");
+            }
         }
         let deadline = tokio::time::Instant::now() + Duration::from_secs(11);
         while listing().await {

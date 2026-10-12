@@ -144,15 +144,16 @@ async fn read_write_headers_cardinality_and_rpc() {
             "prefer":parts.headers.get("prefer").map(|v| v.to_str().unwrap()),
             "body":serde_json::from_slice::<Value>(&body).ok()}),
                 );
-                let body = if parts.method == "HEAD" || parts.method == "DELETE" {
-                    ""
-                } else if parts.uri.path().ends_with("/rpc/add") {
-                    "12"
-                } else {
-                    r#"[{"id":1,"body":"hello"}]"#
+                let body = match () {
+                    _ if parts.method == "HEAD" || parts.method == "DELETE" => "",
+                    _ if parts.uri.path().ends_with("/rpc/add") => "12",
+                    _ => r#"[{"id":1,"body":"hello"}]"#,
                 };
                 Response::builder()
-                    .status(if parts.method == "DELETE" { 204 } else { 200 })
+                    .status(match parts.method == "DELETE" {
+                        true => 204,
+                        false => 200,
+                    })
                     .header("content-range", "0-0/17")
                     .body(Body::from(body))
                     .unwrap()
@@ -264,16 +265,15 @@ async fn retries_are_bounded_and_mutations_are_never_replayed() {
         .fallback(any(
             |State(count): State<Arc<AtomicUsize>>, request: Request| async move {
                 let n = count.fetch_add(1, Ordering::SeqCst);
-                if request.method() == "GET" && n == 2 {
-                    Response::builder().body(Body::from("[]")).unwrap()
-                } else {
-                    Response::builder()
+                match request.method() == "GET" && n == 2 {
+                    true => Response::builder().body(Body::from("[]")).unwrap(),
+                    false => Response::builder()
                         .status(503)
                         .header("retry-after", "0")
                         .body(Body::from(
                             r#"{"code":"unavailable","message":"try later"}"#,
                         ))
-                        .unwrap()
+                        .unwrap(),
                 }
             },
         ))

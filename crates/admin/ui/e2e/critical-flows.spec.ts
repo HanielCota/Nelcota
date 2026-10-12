@@ -105,8 +105,8 @@ test('upload conflicts keep their original destination and SQL cells show full c
 test('an incompatible API response can be retried without losing the page', async ({ page }) => {
   let failed = true
   await page.route('**/admin/api/users?*', async route => {
-    if (failed) await route.fulfill({ json: { users: 'incompatible' } })
-    else await route.fulfill({ json: { page: 0, users: [], total: 0, has_next: false } })
+    if (failed) return route.fulfill({ json: { users: 'incompatible' } })
+    return route.fulfill({ json: { page: 0, users: [], total: 0, has_next: false } })
   })
   await page.goto('/admin/users')
   await expect(page.getByRole('alert')).toContainText('resposta incompatível')

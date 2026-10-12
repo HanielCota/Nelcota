@@ -37,9 +37,10 @@
       >
     {/if}
   </header>
-  {#if preview.error}
+  {#if (preview.error)}
     <p class="border-t border-destructive/20 bg-destructive/5 px-4 py-2.5 text-sm text-destructive">{preview.error}</p>
-  {:else if open}
+  {/if}
+  {#if !(preview.error) && (open)}
     <pre class="max-h-72 overflow-auto border-t bg-card/60 px-4 py-3 font-mono text-xs leading-relaxed whitespace-pre-wrap">{text ||
         placeholder ||
         t('policies.sqlPreview.placeholder')}</pre>

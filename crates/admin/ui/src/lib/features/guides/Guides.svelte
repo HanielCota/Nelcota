@@ -40,7 +40,8 @@
   })
 </script>
 
-{#if missing}<NotFound />{:else}
+{#if (missing)}<NotFound />{/if}
+{#if !(missing)}
 <div class="mx-auto grid w-full max-w-page gap-6 px-4 pt-2 pb-12 sm:px-6 lg:px-8 [&>:first-child]:mb-0">
   <PageHeader title={t('guides.title')} description={t('guides.description')} />
   <div class="grid items-start gap-6 md:grid-cols-[14rem_minmax(0,1fr)] xl:grid-cols-[15rem_minmax(0,1fr)_12rem]">
@@ -88,11 +89,13 @@
         <p class="text-sm text-muted-foreground">{t(`guides.entries.${selected.id}.description`)}</p>
         <Button variant="outline" size="sm" class="w-fit" href={href(selected.action)}>{t('guides.openPanel')}<ArrowRight data-icon="inline-end" aria-hidden="true" /></Button>
       </header>
-      {#if selected.id === 'openapi'}
+      {#if (selected.id === 'openapi')}
         <OpenApiReference />
-      {:else if 'code' in selected}
+      {/if}
+      {#if !(selected.id === 'openapi') && ('code' in selected)}
         <CodeBlock code={source} lang={selected.code} />
-      {:else}
+      {/if}
+      {#if !(selected.id === 'openapi') && !('code' in selected)}
         {#if headings.length}
           <details class="rounded-2xl bg-well p-4 xl:hidden">
             <summary class="cursor-pointer text-sm font-medium">{t('guides.contents')}</summary>
@@ -103,11 +106,13 @@
         {/if}
         <div class="grid min-w-0 gap-4" lang={'language' in selected ? selected.language : i18n.locale}>
           {#each blocks as block, index (`${selected.id}:${index}`)}
-            {#if block.type === 'code'}
+            {#if (block.type === 'code')}
               <CodeBlock code={block.code} lang={block.lang} />
-            {:else if block.type === 'heading'}
+            {/if}
+            {#if !(block.type === 'code') && (block.type === 'heading')}
               <svelte:element this={`h${Math.min(block.level + 1, 6)}`} id={block.id} class={['scroll-mt-6 pt-5 font-semibold', block.level === 2 ? 'text-lg' : 'text-base']}>{@html block.html}</svelte:element>
-            {:else}<div class="guide-prose min-w-0">{@html block.html}</div>{/if}
+            {/if}
+            {#if !(block.type === 'code') && !(block.type === 'heading')}<div class="guide-prose min-w-0">{@html block.html}</div>{/if}
           {/each}
         </div>
       {/if}

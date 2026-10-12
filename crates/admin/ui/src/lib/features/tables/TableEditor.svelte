@@ -235,9 +235,10 @@
   <TableSidebar {tables} current={name} loading={tablesLoading} error={tablesError} onretry={loadTables} oncreate={() => (createOpen = true)} />
 
   <section class={cn('min-w-0 flex-1 flex-col overflow-hidden rounded-3xl bg-card', name ? 'flex' : 'hidden lg:flex')}>
-    {#if !name}
+    {#if (!name)}
       <TablesHome {tables} loading={tablesLoading} last={lastTable} oncreate={() => (createOpen = true)} />
-    {:else}
+    {/if}
+    {#if !(!name)}
       <TableToolbar
         {name}
         {view}
@@ -257,12 +258,13 @@
         listedRls={tables.find((entry) => entry.name === name)?.rls}
       />
 
-      {#if view === 'structure'}
+      {#if (view === 'structure')}
         <div class="min-h-0 flex-1 overflow-auto">
           <StructureView {name} policies={tables.find((entry) => entry.name === name)?.rls.policies} onrenamed={onRenamed} ondropped={onDropped} onaltered={loadTables} />
         </div>
-      {:else}
-        {#if filterOpen && data}
+      {/if}
+      {#if !(view === 'structure')}
+        {#if (filterOpen && data)}
           {#key filterPreset}
             <FilterBar
               columns={data.table.columns}
@@ -275,7 +277,8 @@
               }}
             />
           {/key}
-        {:else if filters.length || sort}
+        {/if}
+        {#if !(filterOpen && data) && (filters.length || sort)}
           <FilterChips {filters} {sort} onchange={setFilters} onclearsort={() => setSort('', null)} />
         {/if}
 
@@ -290,17 +293,19 @@
           />
         {/if}
 
-        {#if viewing}
+        {#if (viewing)}
           <p class="flex flex-wrap items-center gap-x-3 gap-y-1 border-b bg-muted/40 px-4 py-2 text-sm text-muted-foreground">
             <Eye class="size-4 shrink-0" aria-hidden="true" />
             <span>{viewer.mode === 'anon' ? t('tables.viewAs.bannerVisitor') : t('tables.viewAs.bannerUser', { email: viewer.user?.email ?? '' })}</span>
             <button type="button" class="cursor-pointer text-foreground underline underline-offset-4" onclick={() => setViewer({ mode: 'owner', user: null })}>{t('tables.viewAs.back')}</button>
           </p>
-        {:else if data?.table.exposed_without_rls}
+        {/if}
+        {#if !(viewing) && (data?.table.exposed_without_rls)}
           <p class="flex items-center gap-2 border-b border-destructive/30 bg-destructive/5 px-4 py-2 text-sm text-destructive">
             <ShieldAlert class="size-4 shrink-0" />{t(data.table.kind === 'table' ? 'tables.editor.noRls' : 'tables.editor.noRowProtection')}
           </p>
-        {:else if data && !data.table.editable && data.table.kind === 'table'}
+        {/if}
+        {#if !(viewing) && !(data?.table.exposed_without_rls) && (data && !data.table.editable && data.table.kind === 'table')}
           <p class="flex items-center gap-2 border-b bg-muted/40 px-4 py-2 text-sm text-muted-foreground">
             <KeyRound class="size-4 shrink-0" />{t('tables.editor.noPrimaryKey')}
           </p>
@@ -314,13 +319,16 @@
               <div class="animate-progress h-full w-2/5 bg-brand"></div>
             </div>
           {/if}
-          {#if denied}
+          {#if (denied)}
             <p class="mx-auto max-w-xl p-8 text-center text-sm text-muted-foreground">{denied}</p>
-          {:else if error && !data}
+          {/if}
+          {#if !(denied) && (error && !data)}
             <GridState state="error" message={error} onretry={load} />
-          {:else if !data}
+          {/if}
+          {#if !(denied) && !(error && !data) && (!data)}
             <GridState state="loading" />
-          {:else}
+          {/if}
+          {#if !(denied) && !(error && !data) && !(!data)}
             {#if error}<GridState state="error" message={error} onretry={load} />{/if}
             <div class={['transition-opacity', loading && 'opacity-60']}>
               <DataGrid
@@ -339,11 +347,13 @@
               />
             </div>
             {#if data.rows.length === 0}
-              {#if filters.length}
+              {#if (filters.length)}
                 <GridState state="no-match" onclearfilters={() => setFilters([])} />
-              {:else if viewing}
+              {/if}
+              {#if !(filters.length) && (viewing)}
                 <p class="p-8 text-center text-sm text-muted-foreground">{t('tables.viewAs.hidden')}</p>
-              {:else}
+              {/if}
+              {#if !(filters.length) && !(viewing)}
                 <GridState state="empty" table={name} insertable={data.table.insertable} oninsert={() => openSheet(null)} />
               {/if}
             {/if}

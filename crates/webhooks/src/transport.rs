@@ -26,8 +26,11 @@ impl Transport {
             .duration_since(UNIX_EPOCH)
             .map_or(0, |d| d.as_secs());
         let event_id = job.event_id.to_string();
-        let Ok(url) = self.policy.validate(&job.url) else {
-            return outcome(None, Some("invalid_destination"), false, None, started);
+        let url = match self.policy.validate(&job.url) {
+            Ok(url) => url,
+            _ => {
+                return outcome(None, Some("invalid_destination"), false, None, started);
+            }
         };
         let request = self
             .http
@@ -58,7 +61,10 @@ impl Transport {
                 let success = (200..300).contains(&status);
                 outcome(
                     Some(i32::from(status)),
-                    if success { None } else { Some("http_error") },
+                    match success {
+                        true => None,
+                        false => Some("http_error"),
+                    },
                     retryable(status),
                     retry_after,
                     started,
@@ -66,10 +72,9 @@ impl Transport {
             }
             Ok(Err(error)) => {
                 // Sanitized categories only: reqwest errors can contain the URL.
-                let code = if error.is_timeout() {
-                    "timeout"
-                } else {
-                    "network_error"
+                let code = match error.is_timeout() {
+                    true => "timeout",
+                    false => "network_error",
                 };
                 outcome(None, Some(code), true, None, started)
             }

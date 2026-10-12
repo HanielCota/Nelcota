@@ -28,7 +28,7 @@
   } = $props()
 </script>
 
-{#if state === 'loading'}
+{#if (state === 'loading')}
   <div class="grid gap-px p-0" aria-busy="true" aria-label={t('tables.state.loading')}>
     <div class="flex gap-3 border-b px-4 py-3.5">
       {#each [1, 2, 3, 4, 5] as i (i)}<Skeleton class="h-6 w-32" />{/each}
@@ -39,18 +39,21 @@
       </div>
     {/each}
   </div>
-{:else if state === 'error'}
+{/if}
+{#if !(state === 'loading') && (state === 'error')}
   <div class="grid justify-items-start gap-3 p-6 text-sm">
     <p class="break-words text-destructive">{t('tables.state.loadError', { message })}</p>
     {#if onretry}<Button variant="outline" size="sm" onclick={onretry}><RotateCw />{t('common.retry')}</Button>{/if}
   </div>
-{:else if state === 'no-match'}
+{/if}
+{#if !(state === 'loading') && !(state === 'error') && (state === 'no-match')}
   <EmptyState class="py-20" title={t('tables.state.noMatch')}>
     {#snippet actions()}
       {#if onclearfilters}<Button variant="outline" onclick={onclearfilters}>{t('tables.state.clearFilters')}</Button>{/if}
     {/snippet}
   </EmptyState>
-{:else}
+{/if}
+{#if !(state === 'loading') && !(state === 'error') && !(state === 'no-match')}
   <EmptyState class="py-20" icon={Rows3} title={t('tables.state.empty')} description={t(insertable ? 'tables.state.emptyHint' : 'tables.state.emptyReadOnly', { table })}>
     {#snippet actions()}
       {#if insertable && oninsert}<Button onclick={oninsert}><Plus />{t('tables.state.insertFirst')}</Button>{/if}

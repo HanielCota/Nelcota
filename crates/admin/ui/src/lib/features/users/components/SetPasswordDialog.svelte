@@ -65,7 +65,8 @@
         <Dialog.Footer>
           <Button variant="outline" disabled={saving} onclick={guard.request}>{t('common.cancel')}</Button>
           <Button type="submit" disabled={saving || !!passwordProblem(password)}>
-            {#if saving}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{:else}<KeyRound data-icon="inline-start" aria-hidden="true" />{/if}
+            {#if (saving)}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{/if}
+            {#if !(saving)}<KeyRound data-icon="inline-start" aria-hidden="true" />{/if}
             {saving ? t('common.saving') : t('users.setPassword.submit')}
           </Button>
         </Dialog.Footer>

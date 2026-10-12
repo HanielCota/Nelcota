@@ -27,16 +27,15 @@ async fn server(fail: bool) -> (String, Arc<AtomicUsize>, tokio::task::JoinHandl
                     assert_eq!(body["refresh_token"], "r0");
                     count.fetch_add(1, Ordering::SeqCst);
                     tokio::time::sleep(Duration::from_millis(100)).await;
-                    if fail {
-                        (
+                    match fail {
+                        true => (
                             StatusCode::BAD_REQUEST,
                             Json(json!({"code":"invalid_grant","message":"spent"})),
-                        )
-                    } else {
-                        (
+                        ),
+                        false => (
                             StatusCode::OK,
                             Json(serde_json::to_value(session("a1", "r1")).unwrap()),
-                        )
+                        ),
                     }
                 },
             ),

@@ -111,11 +111,12 @@
     />
 
     <Dialog.Footer class="sm:justify-between">
-      {#if profile.avatar !== null && !picked}
+      {#if (profile.avatar !== null && !picked)}
         <Button variant="ghost" class="text-destructive hover:text-destructive" disabled={saving} onclick={remove}>
           {t('profile.remove')}
         </Button>
-      {:else}
+      {/if}
+      {#if !(profile.avatar !== null && !picked)}
         <span class="hidden sm:block"></span>
       {/if}
       <div class="flex flex-col-reverse gap-2 sm:flex-row">

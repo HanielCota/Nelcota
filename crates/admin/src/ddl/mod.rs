@@ -35,10 +35,9 @@ impl From<DdlError> for crate::ApiError {
     fn from(err: DdlError) -> Self {
         let error = crate::ApiError::bad_request(err.code, err.message);
         if err.params.is_null() {
-            error
-        } else {
-            error.params(err.params)
+            return error;
         }
+        error.params(err.params)
     }
 }
 
@@ -173,16 +172,18 @@ impl DataType {
         };
         let lower = base.to_lowercase();
         let is_enum = enums.iter().any(|e| e == base);
-        let base = if is_enum {
-            base.to_owned()
-        } else if let Some(known) = BASE_TYPES.iter().find(|t| **t == lower) {
-            (*known).to_owned()
-        } else {
-            return invalid(
-                "unknown_type",
-                format!("unknown type: '{base}'"),
-                json!({ "type": base }),
-            );
+        let base = match is_enum {
+            true => base.to_owned(),
+            false => match BASE_TYPES.iter().find(|t| **t == lower) {
+                Some(known) => (*known).to_owned(),
+                _ => {
+                    return invalid(
+                        "unknown_type",
+                        format!("unknown type: '{base}'"),
+                        json!({ "type": base }),
+                    );
+                }
+            },
         };
         if let Some(args) = &modifier {
             let ok = WITH_MODIFIER.contains(&base.as_str())
@@ -213,13 +214,13 @@ impl DataType {
 
     /// The type's SQL; enums are qualified with the schema.
     pub fn to_sql(&self, schema: &str) -> String {
-        let mut sql = if self.is_enum {
-            qualified(schema, &self.base)
-        } else if self.base == "timestamptz" && self.modifier.is_some() {
-            // timestamptz(3) is not in the grammar: it is timestamp(3) with time zone.
-            "timestamp".to_owned()
-        } else {
-            self.base.clone()
+        let mut sql = match () {
+            _ if self.is_enum => qualified(schema, &self.base),
+            _ if self.base == "timestamptz" && self.modifier.is_some() => {
+                // timestamptz(3) is not in the grammar: it is timestamp(3) with time zone.
+                "timestamp".to_owned()
+            }
+            _ => self.base.clone(),
         };
         if let Some(args) = &self.modifier {
             sql.push_str(&format!("({args})"));

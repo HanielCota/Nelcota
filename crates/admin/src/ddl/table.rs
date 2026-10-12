@@ -109,10 +109,15 @@ fn column_sql(ctx: &Context, col: &ColumnDef, inline_pk: bool) -> Result<String>
         }
         sql.push_str(" GENERATED ALWAYS AS IDENTITY");
     }
-    if inline_pk {
-        sql.push_str(" PRIMARY KEY");
-    } else if !col.nullable || col.identity || col.primary_key {
-        sql.push_str(" NOT NULL");
+    match inline_pk {
+        true => {
+            sql.push_str(" PRIMARY KEY");
+        }
+        false => {
+            if !col.nullable || col.identity || col.primary_key {
+                sql.push_str(" NOT NULL");
+            }
+        }
     }
     if let Some(default) = &col.default {
         sql.push_str(&format!(" DEFAULT {}", expression("DEFAULT", default)?));
@@ -311,10 +316,9 @@ pub fn alter(ctx: &Context, initial: &Structure, actions: &[AlterAction]) -> Res
                     .map_or("NULL".to_owned(), literal)
             )),
             AlterAction::SetRls { enabled } => statements.push(alter(
-                if *enabled {
-                    "ENABLE ROW LEVEL SECURITY"
-                } else {
-                    "DISABLE ROW LEVEL SECURITY"
+                match *enabled {
+                    true => "ENABLE ROW LEVEL SECURITY",
+                    false => "DISABLE ROW LEVEL SECURITY",
                 }
                 .to_owned(),
             )),
@@ -377,10 +381,9 @@ pub fn alter(ctx: &Context, initial: &Structure, actions: &[AlterAction]) -> Res
             }
             AlterAction::SetNullable { column, nullable } => {
                 column_exists(&current, column)?;
-                let change = if *nullable {
-                    "DROP NOT NULL"
-                } else {
-                    "SET NOT NULL"
+                let change = match *nullable {
+                    true => "DROP NOT NULL",
+                    false => "SET NOT NULL",
                 };
                 statements.push(alter(format!("ALTER COLUMN {} {change}", ident(column))));
             }

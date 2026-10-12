@@ -45,18 +45,20 @@ pub fn remove(
 ) -> anyhow::Result<()> {
     naming::validate_project_name(name)?;
     let mut manifest = host.require()?;
-    let Some(entry) = manifest.projects.iter().find(|p| p.name == name).cloned() else {
-        bail!("project '{name}' does not exist");
+    let entry = match manifest.projects.iter().find(|p| p.name == name).cloned() {
+        Some(entry) => entry,
+        _ => {
+            bail!("project '{name}' does not exist");
+        }
     };
     if !yes
         && !(util::interactive()
             && util::confirm(&format!(
                 "Remove the project {name} ({})? {} and the data is deleted.",
                 entry.domain,
-                if no_backup {
-                    "There is NO final backup (--no-backup)"
-                } else {
-                    "A final backup goes to archive/"
+                match no_backup {
+                    true => "There is NO final backup (--no-backup)",
+                    false => "A final backup goes to archive/",
                 }
             )))
     {
@@ -64,28 +66,33 @@ pub fn remove(
     }
 
     let project = host.project(&manifest, &entry);
-    if no_backup {
-        warn("--no-backup: removing without a final backup");
-    } else {
-        if project.health(Service::Postgres).as_deref() != Some("healthy") {
-            step(&format!(
-                "Starting the {name} Postgres for the final backup"
-            ));
-            project
-                .start(&[Service::Postgres])
-                .and_then(|()| project.wait_healthy(Service::Postgres, lifecycle::HEALTH_TIMEOUT))
-                .context(
-                    "could not start Postgres for the final backup; nothing was removed \
-                     (fix it, or pass --no-backup to remove without one)",
-                )?;
+    match no_backup {
+        true => {
+            warn("--no-backup: removing without a final backup");
         }
-        let dump = backup::run(host, &project, false, None)?;
-        fs::create_dir_all(host.archive_dir())?;
-        let archived = host
-            .archive_dir()
-            .join(dump.file_name().unwrap_or_default());
-        crate::backup::archive(&dump, &archived)?;
-        ok(&format!("final backup at {}", archived.display()));
+        false => {
+            if project.health(Service::Postgres).as_deref() != Some("healthy") {
+                step(&format!(
+                    "Starting the {name} Postgres for the final backup"
+                ));
+                project
+                    .start(&[Service::Postgres])
+                    .and_then(|()| {
+                        project.wait_healthy(Service::Postgres, lifecycle::HEALTH_TIMEOUT)
+                    })
+                    .context(
+                        "could not start Postgres for the final backup; nothing was removed \
+                     (fix it, or pass --no-backup to remove without one)",
+                    )?;
+            }
+            let dump = backup::run(host, &project, false, None)?;
+            fs::create_dir_all(host.archive_dir())?;
+            let archived = host
+                .archive_dir()
+                .join(dump.file_name().unwrap_or_default());
+            crate::backup::archive(&dump, &archived)?;
+            ok(&format!("final backup at {}", archived.display()));
+        }
     }
     match manifest.runtime {
         Runtime::Docker if project.exists() => lifecycle::down(&project, true)?,
@@ -99,11 +106,14 @@ pub fn remove(
     caddy::write(host, &manifest)?;
     caddy::reload(host, manifest.runtime)?;
 
-    if keep_files {
-        ok(&format!("files kept at {}", project.dir.display()));
-    } else {
-        fs::remove_dir_all(&project.dir)?;
-        ok(&format!("folder {} removed", project.dir.display()));
+    match keep_files {
+        true => {
+            ok(&format!("files kept at {}", project.dir.display()));
+        }
+        false => {
+            fs::remove_dir_all(&project.dir)?;
+            ok(&format!("folder {} removed", project.dir.display()));
+        }
     }
     ok(&format!("project {name} removed"));
     Ok(())

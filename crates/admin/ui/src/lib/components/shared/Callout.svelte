@@ -28,7 +28,8 @@
     className,
   ]}
 >
-  {#if variant === 'danger'}<ShieldAlert aria-hidden="true" />{:else}<CircleAlert aria-hidden="true" />{/if}
+  {#if (variant === 'danger')}<ShieldAlert aria-hidden="true" />{/if}
+  {#if !(variant === 'danger')}<CircleAlert aria-hidden="true" />{/if}
   {#if title}
     <Alert.Title class={['font-medium', variant === 'danger' ? 'text-destructive' : 'text-warning']}>{title}</Alert.Title>
   {/if}

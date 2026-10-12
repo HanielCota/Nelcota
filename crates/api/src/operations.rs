@@ -304,12 +304,15 @@ pub(crate) async fn rpc(
         .functions
         .get(name)
         .ok_or_else(|| not_found("function", name))?;
-    let Value::Object(args) = parse_body(bytes)? else {
-        return Err(ApiError::new(
-            StatusCode::BAD_REQUEST,
-            "invalid_body",
-            "the arguments must be a JSON object",
-        ));
+    let args = match parse_body(bytes)? {
+        Value::Object(args) => args,
+        _ => {
+            return Err(ApiError::new(
+                StatusCode::BAD_REQUEST,
+                "invalid_body",
+                "the arguments must be a JSON object",
+            ));
+        }
     };
     let function = query::resolve_function(candidates, &args).map_err(bad_query)?;
     let sql = query::rpc(&catalog.schema, function, args, max_rows);

@@ -143,49 +143,54 @@ pub fn capture(project: &Project, path: &Path) -> anyhow::Result<()> {
     let partial = path.with_extension("dump.partial");
     let bundle = bundle_path(path)?;
     let result = (|| {
-        if project.stores_files_on_disk()? {
-            let mut snapshot = Snapshot::open(project)?;
-            let id = snapshot.line()?;
-            if !id.bytes().all(|c| c.is_ascii_hexdigit() || c == b'-') || id.is_empty() {
-                bail!("invalid exported snapshot");
-            }
-            let objects: Vec<Object> = serde_json::from_str(&snapshot.line()?)?;
-            let root = bundle.join("objects");
-            crate::private_fs::dir(&bundle)?;
-            crate::private_fs::dir(&root)?;
-            let mut records = Vec::with_capacity(objects.len());
-            for object in objects {
-                let source = object_path(&project.storage_dir(), &object.key)?;
-                let destination = object_path(&root, &object.key)?;
-                crate::private_fs::dir(destination.parent().context("invalid object directory")?)?;
-                crate::private_fs::copy(&source, &destination)
-                    .with_context(|| format!("could not snapshot {}", object.key))?;
-                let (size, sha256) = checksum(&destination)?;
-                if size != object.size {
-                    bail!("file size changed during backup: {}", object.key);
+        match project.stores_files_on_disk()? {
+            true => {
+                let mut snapshot = Snapshot::open(project)?;
+                let id = snapshot.line()?;
+                if !id.bytes().all(|c| c.is_ascii_hexdigit() || c == b'-') || id.is_empty() {
+                    bail!("invalid exported snapshot");
                 }
-                records.push(FileRecord {
-                    key: object.key,
-                    size,
-                    sha256,
-                });
+                let objects: Vec<Object> = serde_json::from_str(&snapshot.line()?)?;
+                let root = bundle.join("objects");
+                crate::private_fs::dir(&bundle)?;
+                crate::private_fs::dir(&root)?;
+                let mut records = Vec::with_capacity(objects.len());
+                for object in objects {
+                    let source = object_path(&project.storage_dir(), &object.key)?;
+                    let destination = object_path(&root, &object.key)?;
+                    crate::private_fs::dir(
+                        destination.parent().context("invalid object directory")?,
+                    )?;
+                    crate::private_fs::copy(&source, &destination)
+                        .with_context(|| format!("could not snapshot {}", object.key))?;
+                    let (size, sha256) = checksum(&destination)?;
+                    if size != object.size {
+                        bail!("file size changed during backup: {}", object.key);
+                    }
+                    records.push(FileRecord {
+                        key: object.key,
+                        size,
+                        sha256,
+                    });
+                }
+                dump(project, &partial, Some(&id))?;
+                let manifest = Manifest {
+                    format: 1,
+                    dump: path
+                        .file_name()
+                        .context("invalid dump name")?
+                        .to_string_lossy()
+                        .into_owned(),
+                    objects: records,
+                };
+                crate::private_fs::write(
+                    &bundle.join("manifest.json"),
+                    serde_json::to_vec_pretty(&manifest)?,
+                )?;
             }
-            dump(project, &partial, Some(&id))?;
-            let manifest = Manifest {
-                format: 1,
-                dump: path
-                    .file_name()
-                    .context("invalid dump name")?
-                    .to_string_lossy()
-                    .into_owned(),
-                objects: records,
-            };
-            crate::private_fs::write(
-                &bundle.join("manifest.json"),
-                serde_json::to_vec_pretty(&manifest)?,
-            )?;
-        } else {
-            dump(project, &partial, None)?;
+            false => {
+                dump(project, &partial, None)?;
+            }
         }
         fs::rename(&partial, path)?;
         Ok(())

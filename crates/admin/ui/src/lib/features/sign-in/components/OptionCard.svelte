@@ -23,7 +23,8 @@
 <article class="flex flex-col gap-4 rounded-3xl bg-card p-5">
   <div class="flex items-center justify-between gap-3">
     <span class="grid size-10 place-items-center rounded-full bg-well text-muted-foreground">
-      {#if Icon}<Icon class="size-[18px]" aria-hidden="true" />{:else if option.id === 'google' || option.id === 'github'}<BrandMark brand={option.id} />{/if}
+      {#if (Icon)}<Icon class="size-[18px]" aria-hidden="true" />{/if}
+      {#if !(Icon) && (option.id === 'google' || option.id === 'github')}<BrandMark brand={option.id} />{/if}
     </span>
     <span class={['flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium', option.on ? 'bg-brand/15 text-brand' : 'bg-well text-muted-foreground']}>
       <span class={['size-1.5 rounded-full', option.on ? 'bg-brand' : 'bg-muted-foreground/60']} aria-hidden="true"></span>

@@ -15,8 +15,9 @@
   const raw = $derived(grants.length ? grants.map((g) => g.toLowerCase()).join(', ') : '—')
 </script>
 
-{#if technical.on}
+{#if (technical.on)}
   <span class="font-mono text-xs text-muted-foreground">{raw}</span>
-{:else}
+{/if}
+{#if !(technical.on)}
   <span class={['text-sm', grants.length ? 'text-foreground' : 'text-muted-foreground']} title={raw}>{plain}</span>
 {/if}

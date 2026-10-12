@@ -82,8 +82,11 @@ pub(crate) async fn send(state: &AuthState, kind: LinkKind, email: &str) -> Resu
 /// requester's error (it goes to the log).
 pub(crate) fn deliver(state: &AuthState, kind: LinkKind, to: &str, token: &str, slot: MailSlot) {
     // Links are only issued while their flow is enabled.
-    let Ok((mailer, page_url)) = ensure_enabled(state, kind) else {
-        return;
+    let (mailer, page_url) = match ensure_enabled(state, kind) {
+        Ok((mailer, page_url)) => (mailer, page_url),
+        _ => {
+            return;
+        }
     };
     let message = compose(kind, to, page_url, token);
     slot.send(mailer.clone(), message, kind.as_str());

@@ -117,7 +117,15 @@ async fn wide_batches_preserve_values_defaults_and_reject_invalid_rows_atomicall
     let app = TestApp::spawn().await;
     let columns = (0..1600)
         .rev()
-        .map(|n| format!("c{n:04} integer{}", if n == 0 { " DEFAULT 42" } else { "" }))
+        .map(|n| {
+            format!(
+                "c{n:04} integer{}",
+                match n {
+                    0 => " DEFAULT 42",
+                    _ => "",
+                }
+            )
+        })
         .collect::<Vec<_>>()
         .join(",");
     app.admin_client

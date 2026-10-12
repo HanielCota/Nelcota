@@ -45,6 +45,9 @@
     (state === 'none' || state === 'view') && 'border-border-strong bg-muted text-muted-foreground',
   ]}
 >
-  {#if state === 'ok'}<ShieldCheck aria-hidden="true" />{:else if state === 'warn' || state === 'danger'}<ShieldAlert aria-hidden="true" />{:else if state === 'view'}<Rows3 aria-hidden="true" />{:else}<ShieldOff aria-hidden="true" />{/if}
+  {#if (state === 'ok')}<ShieldCheck aria-hidden="true" />{/if}
+  {#if !(state === 'ok') && (state === 'warn' || state === 'danger')}<ShieldAlert aria-hidden="true" />{/if}
+  {#if !(state === 'ok') && !(state === 'warn' || state === 'danger') && (state === 'view')}<Rows3 aria-hidden="true" />{/if}
+  {#if !(state === 'ok') && !(state === 'warn' || state === 'danger') && !(state === 'view')}<ShieldOff aria-hidden="true" />{/if}
   {label}
 </Badge>

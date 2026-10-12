@@ -227,8 +227,11 @@ async fn finish(
 
 /// `redirect_to` plus `code` or `error`, keeping the page's own query.
 fn back_to_app(redirect_to: &str, result: Result<String, &str>) -> String {
-    let Ok(mut url) = Url::parse(redirect_to) else {
-        return redirect_to.to_owned();
+    let mut url = match Url::parse(redirect_to) {
+        Ok(url) => url,
+        _ => {
+            return redirect_to.to_owned();
+        }
     };
     match result {
         Ok(code) => url.query_pairs_mut().append_pair("code", &code),
@@ -245,18 +248,24 @@ pub(crate) async fn redeem(
     ip: Option<IpAddr>,
     user_agent: Option<&str>,
 ) -> Result<Value, ApiError> {
-    let (Some(code), Some(verifier)) = (auth_code, code_verifier) else {
-        return Err(crate::error::validation(
-            "auth_code and code_verifier are required",
-        ));
+    let (code, verifier) = match (auth_code, code_verifier) {
+        (Some(code), Some(verifier)) => (code, verifier),
+        _ => {
+            return Err(crate::error::validation(
+                "auth_code and code_verifier are required",
+            ));
+        }
     };
     let mut client = state.pool.get().await.map_err(ApiError::from_pool)?;
     let tx = begin_auth(&mut client).await?;
     let user_id = flow::redeem(&tx, &code, &verifier).await?;
-    let Some(user_id) = user_id else {
-        // The code is spent even when the verifier was wrong: commit that.
-        tx.commit().await.map_err(db_error)?;
-        return Err(invalid_grant("invalid or expired code"));
+    let user_id = match user_id {
+        Some(user_id) => user_id,
+        _ => {
+            // The code is spent even when the verifier was wrong: commit that.
+            tx.commit().await.map_err(db_error)?;
+            return Err(invalid_grant("invalid or expired code"));
+        }
     };
     let session = start_session(state, &tx, user_id, ip, user_agent).await?;
     tx.commit().await.map_err(db_error)?;

@@ -17,19 +17,25 @@ export function parseInList(value: string): string[] {
   const chars = [...inner];
   for (let i = 0; i < chars.length; i++) {
     const c = chars[i]!;
-    if (c === '"' && quoted) quoted = false;
-    else if (c === '"' && current.trim() === '') {
+    if (c === '"' && quoted) { quoted = false; continue; }
+    if (c === '"' && current.trim() === '') {
       quoted = true;
       wasQuoted = true;
       current = '';
-    } else if (c === '\\' && quoted) {
+      continue;
+    }
+    if (c === '\\' && quoted) {
       const next = chars[++i];
       if (next !== undefined) current += next;
-    } else if (c === ',' && !quoted) {
+      continue;
+    }
+    if (c === ',' && !quoted) {
       items.push(wasQuoted ? current : current.trim());
       current = '';
       wasQuoted = false;
-    } else current += c;
+      continue;
+    }
+    current += c;
   }
   if (quoted) throw new Error('unclosed quotes');
   items.push(wasQuoted ? current : current.trim());
@@ -45,17 +51,19 @@ export function splitTopLevel(input: string): string[] {
   for (let i = 0; i < input.length; i++) {
     const c = input[i]!;
     if (quoted) {
-      if (escaped) escaped = false;
-      else if (c === '\\') escaped = true;
-      else if (c === '"') quoted = false;
+      if (escaped) { escaped = false; continue; }
+      if (c === '\\') { escaped = true; continue; }
+      if (c === '"') quoted = false;
       continue;
     }
-    if (c === '"') quoted = true;
-    else if (c === '(') depth++;
-    else if (c === ')') {
+    if (c === '"') { quoted = true; continue; }
+    if (c === '(') { depth++; continue; }
+    if (c === ')') {
       if (depth === 0) throw new Error('unbalanced');
       depth--;
-    } else if (c === ',' && depth === 0) {
+      continue;
+    }
+    if (c === ',' && depth === 0) {
       parts.push(input.slice(start, i));
       start = i + 1;
     }
@@ -81,7 +89,9 @@ export function readFilter(item: string): [string, string, string] {
     if (chars[i] === '\\') {
       const next = chars[++i];
       if (next !== undefined) value += next;
-    } else value += chars[i];
+      continue;
+    }
+    value += chars[i];
   }
   return [column, op, value];
 }

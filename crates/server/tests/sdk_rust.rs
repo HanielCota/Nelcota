@@ -308,10 +308,13 @@ async fn login_rotation_recovery_magic_links_and_scoped_tokens() {
     let mut rotated = String::new();
     for task in tasks {
         let session = task.await.unwrap();
-        if rotated.is_empty() {
-            rotated = session.refresh_token;
-        } else {
-            assert_eq!(rotated, session.refresh_token);
+        match rotated.is_empty() {
+            true => {
+                rotated = session.refresh_token;
+            }
+            false => {
+                assert_eq!(rotated, session.refresh_token);
+            }
         }
     }
     assert_ne!(rotated, old.refresh_token);
@@ -710,13 +713,18 @@ async fn rust_types_cli_reads_the_real_catalog_and_keeps_the_typescript_default(
             String::from_utf8_lossy(&result.stderr)
         );
         let code = String::from_utf8(result.stdout).unwrap();
-        if language.is_some() {
-            assert!(code.contains("pub mod todos"));
-            assert!(code.contains("pub id: i64"));
-            assert!(code.contains("pub price: serde_json::Number"));
-            assert!(code.contains("skip_serializing_if = \"nelcota_client::Field::is_omitted\""));
-        } else {
-            assert!(code.contains("export interface Database"));
+        match language.is_some() {
+            true => {
+                assert!(code.contains("pub mod todos"));
+                assert!(code.contains("pub id: i64"));
+                assert!(code.contains("pub price: serde_json::Number"));
+                assert!(
+                    code.contains("skip_serializing_if = \"nelcota_client::Field::is_omitted\"")
+                );
+            }
+            false => {
+                assert!(code.contains("export interface Database"));
+            }
         }
     }
 }

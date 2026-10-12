@@ -150,13 +150,16 @@ pub struct RedeemRequest {
 
 /// `POST /admin/api/sso {token}` (public): trades the token for a session.
 pub async fn redeem(State(state): State<AdminState>, Json(body): Json<RedeemRequest>) -> Response {
-    let Some(sso) = state.host.sso.as_ref() else {
-        return ApiError::new(
-            StatusCode::NOT_FOUND,
-            "sso_disabled",
-            "single sign-on is off",
-        )
-        .into_response();
+    let sso = match state.host.sso.as_ref() {
+        Some(sso) => sso,
+        _ => {
+            return ApiError::new(
+                StatusCode::NOT_FOUND,
+                "sso_disabled",
+                "single sign-on is off",
+            )
+            .into_response();
+        }
     };
     match sso.redeem(&body.token, &state.host.project, &state.credentials.email) {
         Ok(()) => {

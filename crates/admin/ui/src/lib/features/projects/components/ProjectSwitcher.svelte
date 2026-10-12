@@ -96,7 +96,7 @@
   </Button>
 {/snippet}
 
-{#if data}
+{#if (data)}
   <DropdownMenu.Root bind:open={menuOpen}>
     <DropdownMenu.Trigger>
       {#snippet child({ props })}{@render trigger(props)}{/snippet}
@@ -122,6 +122,7 @@
       </DropdownMenu.Group>
     </DropdownMenu.Content>
   </DropdownMenu.Root>
-{:else}
+{/if}
+{#if !(data)}
   {@render trigger()}
 {/if}

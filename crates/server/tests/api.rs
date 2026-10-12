@@ -183,10 +183,9 @@ async fn rls_holds_on_every_verb() {
         (Method::PATCH, Some(json!({ "title": "x" }))),
         (Method::DELETE, None),
     ] {
-        let path = if method == Method::POST {
-            "/rest/v1/todos"
-        } else {
-            "/rest/v1/todos?id=gt.0"
+        let path = match method == Method::POST {
+            true => "/rest/v1/todos",
+            false => "/rest/v1/todos?id=gt.0",
         };
         let reply = app.request(method.clone(), path, None, body).await;
         assert_eq!(reply.status, StatusCode::UNAUTHORIZED, "{method}");

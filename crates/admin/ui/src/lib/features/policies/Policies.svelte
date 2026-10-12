@@ -163,11 +163,12 @@
   </PageHeader>
 
   {#if error}<LoadError message={error} onretry={load} busy={loading} />{/if}
-  {#if !data && loading}
+  {#if (!data && loading)}
     <div class="grid gap-4">
       {#each [0, 1, 2] as i (i)}<Skeleton class="h-36 rounded-3xl" />{/each}
     </div>
-  {:else if data}
+  {/if}
+  {#if !(!data && loading) && (data)}
     {#if data.exposed_without_rls.length}
       <Callout variant="danger" title={t('policies.exposed', { tables: data.exposed_without_rls.join(', ') })}>
         {t('policies.exposedHint')}
@@ -201,9 +202,10 @@
 
     <div class="grid gap-6 *:min-w-0 xl:grid-cols-[minmax(0,1fr)_24rem] xl:items-start">
     <div class="grid min-w-0 gap-4">
-    {#if data.tables.length === 0}
+    {#if (data.tables.length === 0)}
       <EmptyState class="rounded-3xl bg-card" icon={ShieldCheck} title={t('policies.noTables')} description={t('policies.noTablesHint')}>{#snippet actions()}<Button href={href('/tables?create=true')}><Plus data-icon="inline-start" aria-hidden="true" />{t('tables.editor.newTable')}</Button>{/snippet}</EmptyState>
-    {:else}
+    {/if}
+    {#if !(data.tables.length === 0)}
       <div class="flex flex-wrap items-center justify-between gap-3">
         <!-- Wraps on a phone instead of hiding the last filters behind a scroll. -->
         <div class="flex max-w-full flex-wrap items-center gap-1 rounded-3xl bg-card p-1 sm:rounded-full" role="group" aria-label={t('policies.filterLabel')}>
@@ -215,12 +217,14 @@
         <div class="w-full sm:w-72"><SearchField bind:value={search} oninput={onSearch} label={t('policies.search')} /></div>
       </div>
       {#if !visible.length}
-        {#if (rlsFilter === 'all' || rlsFilter === 'attention') && exposedRelations.some(name => name.toLowerCase().includes(search.trim().toLowerCase()))}
+        {#if ((rlsFilter === 'all' || rlsFilter === 'attention') && exposedRelations.some(name => name.toLowerCase().includes(search.trim().toLowerCase())))}
           <EmptyState class="rounded-3xl bg-card" icon={ShieldCheck} title={t('policies.relationsAttention')} description={t('policies.exposedRelations', { relations: exposedRelations.join(', ') })} />
-        {:else if !search.trim() && rlsFilter !== 'all'}
+        {/if}
+        {#if !((rlsFilter === 'all' || rlsFilter === 'attention') && exposedRelations.some(name => name.toLowerCase().includes(search.trim().toLowerCase()))) && (!search.trim() && rlsFilter !== 'all')}
           <!-- A filter with nothing in it is usually good news: say so instead of "no matches". -->
           <EmptyState class="rounded-3xl bg-card" icon={ShieldCheck} title={t(`policies.filterEmpty.${rlsFilter}.title`)} description={t(`policies.filterEmpty.${rlsFilter}.text`)}>{#snippet actions()}<Button variant="outline" onclick={() => setFilters('all', '')}>{t('policies.showAll')}</Button>{/snippet}</EmptyState>
-        {:else}
+        {/if}
+        {#if !((rlsFilter === 'all' || rlsFilter === 'attention') && exposedRelations.some(name => name.toLowerCase().includes(search.trim().toLowerCase()))) && !(!search.trim() && rlsFilter !== 'all')}
           <EmptyState class="rounded-3xl bg-card" icon={Search} title={t('common.noMatches')}>{#snippet actions()}<Button variant="outline" onclick={() => setFilters('all', '')}>{t('common.clearFilters')}</Button>{/snippet}</EmptyState>
         {/if}
       {/if}
@@ -240,20 +244,22 @@
             </div>
             <div class="ml-auto flex items-center gap-2">
               {#if !table.rls.enabled}
-                <Button variant="outline" size="sm" disabled={enabling !== null} onclick={() => requestEnableRls(table.name, table.policies.length)}>{#if enabling === table.name}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{:else}<ShieldCheck data-icon="inline-start" aria-hidden="true" />{/if}{t('policies.enableRls')}</Button>
+                <Button variant="outline" size="sm" disabled={enabling !== null} onclick={() => requestEnableRls(table.name, table.policies.length)}>{#if (enabling === table.name)}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{/if}{#if !(enabling === table.name)}<ShieldCheck data-icon="inline-start" aria-hidden="true" />{/if}{t('policies.enableRls')}</Button>
               {/if}
               <Button variant="outline" size="sm" onclick={() => openSheet(table.name, null)}><Plus />{t('policies.newPolicy')}</Button>
             </div>
           </header>
-          {#if table.policies.length === 0}
+          {#if (table.policies.length === 0)}
             <p class="rounded-2xl bg-well px-4 py-3.5 text-sm text-muted-foreground">
-              {#if table.rls.enabled}
+              {#if (table.rls.enabled)}
                 {t('policies.noPoliciesRlsBefore')} <code class="text-xs text-foreground">service_role</code> {t('policies.noPoliciesRlsAfter')}
-              {:else}
+              {/if}
+              {#if !(table.rls.enabled)}
                 {t('policies.noPolicies')}
               {/if}
             </p>
-          {:else}
+          {/if}
+          {#if !(table.policies.length === 0)}
             <div class="grid gap-2">
               {#each table.policies as policy (policy.name)}
                 {@const meaning = describePolicy(policy)}
@@ -275,10 +281,12 @@
                   </p>
                   <div class="col-start-1 grid min-w-0 gap-1 font-mono text-xs @4xl:col-start-auto">
                     {#if policy.using}
-                      {#if policy.using.length > 160}<details><summary class="cursor-pointer text-muted-foreground">USING · {t('common.details')}</summary><CodeBlock code={policy.using} lang="sql" wrap /></details>{:else}<p class="break-words"><span class="text-muted-foreground">using</span> {policy.using}</p>{/if}
+                      {#if (policy.using.length > 160)}<details><summary class="cursor-pointer text-muted-foreground">USING · {t('common.details')}</summary><CodeBlock code={policy.using} lang="sql" wrap /></details>{/if}
+                      {#if !(policy.using.length > 160)}<p class="break-words"><span class="text-muted-foreground">using</span> {policy.using}</p>{/if}
                     {/if}
                     {#if policy.check}
-                      {#if policy.check.length > 160}<details><summary class="cursor-pointer text-muted-foreground">WITH CHECK · {t('common.details')}</summary><CodeBlock code={policy.check} lang="sql" wrap /></details>{:else}<p class="break-words"><span class="text-muted-foreground">with check</span> {policy.check}</p>{/if}
+                      {#if (policy.check.length > 160)}<details><summary class="cursor-pointer text-muted-foreground">WITH CHECK · {t('common.details')}</summary><CodeBlock code={policy.check} lang="sql" wrap /></details>{/if}
+                      {#if !(policy.check.length > 160)}<p class="break-words"><span class="text-muted-foreground">with check</span> {policy.check}</p>{/if}
                     {/if}
                   </div>
                   {/if}

@@ -61,32 +61,35 @@ pub(super) async fn resolve(
         .await
         .map_err(db_error)?
         .map(|row| row.get(0));
-    let linked = if let Some(user_id) = linked_account {
-        tx.query_opt(
-            "UPDATE auth.identities
+    let linked = match linked_account {
+        Some(user_id) => tx
+            .query_opt(
+                "UPDATE auth.identities
                 SET email = $3, identity_data = $4, updated_at = now(), last_sign_in_at = now()
               WHERE provider = $1 AND provider_id = $2 AND user_id = $5
               RETURNING user_id",
-            &[
-                &provider.as_str(),
-                &identity.subject,
-                &email,
-                &identity.data,
-                &user_id,
-            ],
-        )
-        .await
-        .map_err(db_error)?
-        .map(|row| row.get::<_, Uuid>(0))
-    } else {
-        None
+                &[
+                    &provider.as_str(),
+                    &identity.subject,
+                    &email,
+                    &identity.data,
+                    &user_id,
+                ],
+            )
+            .await
+            .map_err(db_error)?
+            .map(|row| row.get::<_, Uuid>(0)),
+        _ => None,
     };
     if let Some(user_id) = linked {
         return Ok(Ok(user_id));
     }
 
-    let Some(email) = email else {
-        return Ok(Err(Refusal::EmailRequired));
+    let email = match email {
+        Some(email) => email,
+        _ => {
+            return Ok(Err(Refusal::EmailRequired));
+        }
     };
     let existing: Option<(Uuid, bool)> = tx
         .query_opt(

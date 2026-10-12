@@ -337,11 +337,14 @@ async fn interrupted_paused_and_exhausted_leases_recover_and_retention_keeps_pen
     for row in rows {
         assert_eq!(row.get::<_, i32>(2), 1);
         let status: &str = row.get(1);
-        if row.get::<_, String>(0) == resumable.endpoint.id {
-            assert_eq!(status, "pending");
-        } else {
-            assert_eq!(row.get::<_, String>(0), exhausted.endpoint.id);
-            assert_eq!(status, "failed");
+        match row.get::<_, String>(0) == resumable.endpoint.id {
+            true => {
+                assert_eq!(status, "pending");
+            }
+            false => {
+                assert_eq!(row.get::<_, String>(0), exhausted.endpoint.id);
+                assert_eq!(status, "failed");
+            }
         }
     }
     app.admin_client.batch_execute("UPDATE nelcota.webhook_deliveries SET created_at=clock_timestamp()-interval '8 days',finished_at=CASE WHEN status='failed' THEN clock_timestamp()-interval '8 days' END").await.unwrap();

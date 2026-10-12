@@ -96,7 +96,10 @@ pub fn status(project: &Project) -> anyhow::Result<()> {
 /// A base backup: full on Sundays, differential (changes since the last
 /// full) on the other days. Shorter WAL replays on restore.
 pub fn backup(project: &Project) -> anyhow::Result<()> {
-    let kind = if weekday_utc() == 0 { "full" } else { "diff" };
+    let kind = match weekday_utc() == 0 {
+        true => "full",
+        false => "diff",
+    };
     step(&format!("PITR base backup of {} ({kind})", project.name));
     pgbackrest(project, &[&format!("--type={kind}"), "backup"])?;
     ok("base backup stored in S3");

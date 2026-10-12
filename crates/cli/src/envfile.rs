@@ -39,22 +39,24 @@ impl EnvFile {
     /// Replaces (or appends) a key, preserving the rest of the file.
     /// Values with `$` go in single quotes (Compose does not interpolate them).
     pub fn set(&self, key: &str, value: &str) -> anyhow::Result<()> {
-        let line = if value.contains('$') {
-            format!("{key}='{value}'")
-        } else {
-            format!("{key}={value}")
+        let line = match value.contains('$') {
+            true => {
+                format!("{key}='{value}'")
+            }
+            false => {
+                format!("{key}={value}")
+            }
         };
         let text = self.read_or_missing()?;
         let mut found = false;
         let mut lines: Vec<String> = text
             .lines()
-            .map(|l| {
-                if key_of(l) == Some(key) {
+            .map(|l| match key_of(l) == Some(key) {
+                true => {
                     found = true;
                     line.clone()
-                } else {
-                    l.to_owned()
                 }
+                false => l.to_owned(),
             })
             .collect();
         if !found {

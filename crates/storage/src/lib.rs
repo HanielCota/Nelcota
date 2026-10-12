@@ -68,7 +68,10 @@ impl StorageState {
 impl StorageState {
     /// `disk` or `s3`.
     pub fn backend(&self) -> &'static str {
-        if self.store.is_s3() { "s3" } else { "disk" }
+        if self.store.is_s3() {
+            return "s3";
+        }
+        "disk"
     }
 }
 

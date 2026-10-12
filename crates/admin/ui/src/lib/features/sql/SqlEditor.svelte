@@ -285,7 +285,8 @@
           </Button>
         {/if}
         <Button onclick={run} disabled={running} title={t('sql.editor.runTitle', { shortcut: `${mod}+Enter` })} class="sm:min-w-28">
-          {#if running}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{:else}<Play data-icon="inline-start" aria-hidden="true" />{/if}{running ? t('sql.editor.running') : runsSelection ? t('sql.editor.runSelection') : t('sql.editor.run')}
+          {#if (running)}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{/if}
+          {#if !(running)}<Play data-icon="inline-start" aria-hidden="true" />{/if}{running ? t('sql.editor.running') : runsSelection ? t('sql.editor.runSelection') : t('sql.editor.run')}
         </Button>
       </div>
     </div>
@@ -319,25 +320,28 @@
           <div class="animate-progress h-full w-2/5 bg-brand"></div>
         </div>
       {/if}
-      {#if !response}
+      {#if (!response)}
         <EmptyState
           title={t('sql.results.emptyTitle')}
           icon={FileCode}
           description={t('sql.results.emptyDescription')}
         />
-      {:else if 'error' in response}
+      {/if}
+      {#if !(!response) && ('error' in response)}
         <div class="p-4" role="alert">
           <div class="rounded-2xl bg-destructive/10 px-4 py-3 text-sm">
             <p class="mb-1 font-medium text-destructive">{t('sql.results.failed')}</p>
             <p class="font-mono text-xs leading-relaxed text-destructive">
               {#if response.error.code}{response.error.code}:{' '}{/if}{response.error.message}
             </p>
-            {#if errorLine !== null}<p class="mt-2 text-muted-foreground">{t('sql.editor.errorHere', { line: errorLine })}</p>{:else if response.error.position}<p class="mt-2 text-muted-foreground">{t('sql.results.position', { position: response.error.position })}</p>{/if}
+            {#if (errorLine !== null)}<p class="mt-2 text-muted-foreground">{t('sql.editor.errorHere', { line: errorLine })}</p>{/if}
+            {#if !(errorLine !== null) && (response.error.position)}<p class="mt-2 text-muted-foreground">{t('sql.results.position', { position: response.error.position })}</p>{/if}
             {#if response.error.detail}<p class="mt-2 text-muted-foreground">{response.error.detail}</p>{/if}
             {#if response.error.hint}<p class="mt-2 text-muted-foreground">{t('sql.results.hint', { hint: response.error.hint })}</p>{/if}
           </div>
         </div>
-      {:else if 'results' in response}
+      {/if}
+      {#if !(!response) && !('error' in response) && ('results' in response)}
         {#if response.results_truncated}
           <p class="border-b px-4 py-2.5 text-sm text-warning" role="status">{t('sql.results.batchTruncated')}</p>
         {/if}
@@ -382,7 +386,7 @@
                   <tr class="hover:bg-muted/40">
                     {#each row as cell, c (c)}
                       <td class="max-w-96 truncate border-r border-b px-3 py-2 font-mono text-xs" title={cell ?? 'NULL'}>
-                        <div class="flex items-center gap-2"><span class="min-w-0 flex-1 truncate">{#if cell === null}<span class="text-3xs text-muted-foreground/80">NULL</span>{:else}{cell}{/if}</span>{#if cell && (cell.length > 80 || cell.includes('\n'))}<Button variant="ghost" size="icon-xs" aria-label={t('common.details')} onclick={() => { detail = { title: result.columns[c], value: cell }; detailOpen = true }}><Maximize2 aria-hidden="true" /></Button>{/if}</div>
+                        <div class="flex items-center gap-2"><span class="min-w-0 flex-1 truncate">{#if (cell === null)}<span class="text-3xs text-muted-foreground/80">NULL</span>{/if}{#if !(cell === null)}{cell}{/if}</span>{#if cell && (cell.length > 80 || cell.includes('\n'))}<Button variant="ghost" size="icon-xs" aria-label={t('common.details')} onclick={() => { detail = { title: result.columns[c], value: cell }; detailOpen = true }}><Maximize2 aria-hidden="true" /></Button>{/if}</div>
                       </td>
                     {/each}
                   </tr>

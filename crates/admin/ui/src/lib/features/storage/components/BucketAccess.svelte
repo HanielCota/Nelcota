@@ -91,14 +91,17 @@
     </DropdownMenu.Root>
   </div>
 
-  {#if resource.error}
+  {#if (resource.error)}
     <LoadError message={errorMessage(resource.error)} onretry={load} busy={resource.loading} />
-  {:else if !access}
+  {/if}
+  {#if !(resource.error) && (!access)}
     <Skeleton class="h-12" />
-  {:else}
-    {#if locked(access.policies, access.public)}
+  {/if}
+  {#if !(resource.error) && !(!access)}
+    {#if (locked(access.policies, access.public))}
       <Callout>{t('storage.access.locked')}</Callout>
-    {:else if access.public}
+    {/if}
+    {#if !(locked(access.policies, access.public)) && (access.public)}
       <p class="rounded-2xl bg-well px-3 py-2.5 text-sm text-muted-foreground">{t('storage.access.publicNote')}</p>
     {/if}
     {#if access.policies.length}

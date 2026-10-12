@@ -98,8 +98,11 @@ impl Catalog {
             )
             .await?;
         for row in rows {
-            let Some(table) = tables.get_mut(&row.get::<_, String>(0)) else {
-                continue;
+            let table = match tables.get_mut(&row.get::<_, String>(0)) {
+                Some(table) => table,
+                _ => {
+                    continue;
+                }
             };
             table.columns.push(Column {
                 name: row.get(1),
@@ -136,20 +139,26 @@ impl Catalog {
             )
             .await?;
         for row in rows {
-            let Some(table) = tables.get_mut(&row.get::<_, String>(0)) else {
-                continue;
+            let table = match tables.get_mut(&row.get::<_, String>(0)) {
+                Some(table) => table,
+                _ => {
+                    continue;
+                }
             };
             let columns: Vec<String> = row.get(3);
-            if row.get::<_, String>(1) == "p" {
-                table.primary_key = columns;
-            } else {
-                table.foreign_keys.push(ForeignKey {
-                    name: row.get(2),
-                    columns,
-                    foreign_schema: row.get(4),
-                    foreign_table: row.get(5),
-                    foreign_columns: row.get(6),
-                });
+            match row.get::<_, String>(1) == "p" {
+                true => {
+                    table.primary_key = columns;
+                }
+                false => {
+                    table.foreign_keys.push(ForeignKey {
+                        name: row.get(2),
+                        columns,
+                        foreign_schema: row.get(4),
+                        foreign_table: row.get(5),
+                        foreign_columns: row.get(6),
+                    });
+                }
             }
         }
 
@@ -184,22 +193,24 @@ impl Catalog {
             let types: Vec<String> = row.get(3);
             let defaults = usize::try_from(row.get::<_, i32>(4)).unwrap_or(0);
             // Names of the input arguments (modes i, b, v; no modes = all IN).
-            let in_names: Vec<&String> = if modes.is_empty() {
-                names.iter().collect()
-            } else {
-                names
+            let in_names: Vec<&String> = match modes.is_empty() {
+                true => names.iter().collect(),
+                false => names
                     .iter()
                     .zip(&modes)
                     .filter(|(_, m)| matches!(m.as_str(), "i" | "b" | "v"))
                     .map(|(n, _)| n)
-                    .collect()
+                    .collect(),
             };
             let mut args = Vec::with_capacity(types.len());
             let first_default = types.len().saturating_sub(defaults);
             for (i, type_name) in types.into_iter().enumerate() {
                 // Only functions with named arguments are callable through JSON.
-                let Some(name) = in_names.get(i).filter(|n| !n.is_empty()) else {
-                    continue 'functions;
+                let name = match in_names.get(i).filter(|n| !n.is_empty()) {
+                    Some(name) => name,
+                    _ => {
+                        continue 'functions;
+                    }
                 };
                 args.push(Argument {
                     name: (*name).clone(),

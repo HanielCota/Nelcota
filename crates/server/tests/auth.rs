@@ -733,10 +733,9 @@ async fn concurrent_recovery_submissions_consume_the_link_once() {
         verify(&app, &token, "first-password-123"),
         verify(&app, &token, "second-password-123")
     );
-    let (winner, loser, password) = if first.status == StatusCode::OK {
-        (first, second, "first-password-123")
-    } else {
-        (second, first, "second-password-123")
+    let (winner, loser, password) = match first.status == StatusCode::OK {
+        true => (first, second, "first-password-123"),
+        false => (second, first, "second-password-123"),
     };
     assert_eq!(winner.status, StatusCode::OK);
     assert_eq!(loser.status, StatusCode::BAD_REQUEST);

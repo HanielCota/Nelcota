@@ -81,7 +81,9 @@ def main():
                 raise RuntimeError(f"Expected {expected}, got {actual}")
         scenario = UpgradeScenario(root, old, target, version, migrations)
         report = scenario.report
-        report["target_kind"] = "published" if args.published_target else "checkout"
+        report["target_kind"] = "checkout"
+        if args.published_target:
+            report["target_kind"] = "published"
         scenario.prepare(config["postgres_image"])
         scenario.run()
         status = 0

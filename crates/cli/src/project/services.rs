@@ -29,10 +29,9 @@ impl Services for Docker<'_> {
         self.0.compose_ok(&["up", "-d"])
     }
     fn down(&self, volumes: bool) -> anyhow::Result<()> {
-        self.0.compose_ok(if volumes {
-            &["down", "--volumes"]
-        } else {
-            &["down"]
+        self.0.compose_ok(match volumes {
+            true => &["down", "--volumes"],
+            false => &["down"],
         })
     }
     fn start(&self, services: &[Service]) -> anyhow::Result<()> {
@@ -74,8 +73,11 @@ impl Services for Docker<'_> {
         Some(String::from_utf8_lossy(&output.stdout).trim().to_owned())
     }
     fn postgres_crashed(&self) -> bool {
-        let Ok(id) = self.0.compose_output_quiet(&["ps", "-a", "-q", "postgres"]) else {
-            return false;
+        let id = match self.0.compose_output_quiet(&["ps", "-a", "-q", "postgres"]) {
+            Ok(id) => id,
+            _ => {
+                return false;
+            }
         };
         Command::new("docker")
             .args(["inspect", "--format", "{{.RestartCount}}", id.trim()])
@@ -193,7 +195,13 @@ impl Services for Systemd<'_> {
                 .status()
                 .is_ok_and(|status| status.success()),
         };
-        Some(if healthy { "healthy" } else { "starting" }.into())
+        Some(
+            match healthy {
+                true => "healthy",
+                false => "starting",
+            }
+            .into(),
+        )
     }
     fn postgres_crashed(&self) -> bool {
         native::unit_state(native::POSTGRES_UNIT).as_deref() == Some("failed")

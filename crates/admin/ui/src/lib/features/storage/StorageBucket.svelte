@@ -97,8 +97,10 @@
 
   function toggleFile(name: string, on: boolean) {
     const next = new Set(selected)
-    if (on) next.add(name)
-    else next.delete(name)
+    switch (on) {
+      case true: next.add(name); break
+      case false: next.delete(name); break
+    }
     selected = next
   }
 
@@ -162,12 +164,14 @@
   <nav class="mb-4 flex flex-wrap items-center gap-2 text-sm [overflow-wrap:anywhere]" aria-label={t('storage.browser.path')}>
     <a class="text-muted-foreground hover:text-foreground hover:underline" href={href('/storage')}>{t('storage.title')}</a>
     <ChevronRight class="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-    {#if prefix}<a class="font-mono text-muted-foreground hover:text-foreground hover:underline" href={folderHref('')}>{bucket}</a>
-    {:else}<span class="font-mono" aria-current="page">{bucket}</span>{/if}
+    {#if (prefix)}<a class="font-mono text-muted-foreground hover:text-foreground hover:underline" href={folderHref('')}>{bucket}</a>
+    {/if}
+    {#if !(prefix)}<span class="font-mono" aria-current="page">{bucket}</span>{/if}
     {#each trail as folder, index (folder.prefix)}
       <ChevronRight class="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-      {#if index === trail.length - 1}<span class="font-mono" aria-current="page">{folder.name}</span>
-      {:else}<a class="font-mono text-muted-foreground hover:text-foreground hover:underline" href={folderHref(folder.prefix)}>{folder.name}</a>{/if}
+      {#if (index === trail.length - 1)}<span class="font-mono" aria-current="page">{folder.name}</span>
+      {/if}
+      {#if !(index === trail.length - 1)}<a class="font-mono text-muted-foreground hover:text-foreground hover:underline" href={folderHref(folder.prefix)}>{folder.name}</a>{/if}
     {/each}
   </nav>
   <PageHeader
@@ -178,7 +182,8 @@
       {#if info}
         <input bind:this={picker} type="file" multiple accept={info.bucket.allowed_mime_types?.join(',')} class="hidden" onchange={picked} />
         <Button disabled={uploading !== null} onclick={() => picker?.click()}>
-          {#if uploading}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{:else}<Upload data-icon="inline-start" aria-hidden="true" />{/if}
+          {#if (uploading)}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{/if}
+          {#if !(uploading)}<Upload data-icon="inline-start" aria-hidden="true" />{/if}
           {uploading ? t('storage.browser.uploading', uploading) : t('storage.browser.upload')}
         </Button>
         <Button variant="outline" href="#bucket-access" aria-label={t('storage.browser.access')}><ShieldCheck data-icon="inline-start" aria-hidden="true" /><span class="sm:hidden">{t('storage.browser.accessShort')}</span><span class="hidden sm:inline">{t('storage.browser.access')}</span></Button>
@@ -202,28 +207,31 @@
     <section class="mb-4 grid gap-3 rounded-3xl bg-card p-4" aria-label={t('storage.browser.uploadProgress')}>
       <div class="flex items-center justify-between"><h2 class="text-sm font-medium">{t('storage.browser.uploadProgress')}</h2>{#if !uploading}<Button variant="ghost" size="sm" onclick={() => uploads.clear()}>{t('common.close')}</Button>{/if}</div>
       {#each queue as item, index (index)}
-        <div class="grid gap-1"><div class="flex min-w-0 items-center gap-2 text-xs">{#if item.status === 'done'}<CircleCheck class="size-4 shrink-0 text-brand" aria-hidden="true" />{:else if item.status === 'error' || item.status === 'conflict'}<CircleAlert class="size-4 shrink-0 text-warning" aria-hidden="true" />{:else}<Upload class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />{/if}<span class="min-w-0 flex-1 truncate">{item.name}</span><span class="shrink-0 text-muted-foreground" aria-live="polite">{t(`storage.browser.uploadStatus.${item.status}`)}</span></div>{#if item.status === 'sending' || item.status === 'queued'}<progress class="h-1.5 w-full accent-brand" value={item.loaded} max={item.total || 1} aria-label={item.name}></progress>{/if}</div>
+        <div class="grid gap-1"><div class="flex min-w-0 items-center gap-2 text-xs">{#if (item.status === 'done')}<CircleCheck class="size-4 shrink-0 text-brand" aria-hidden="true" />{/if}{#if !(item.status === 'done') && (item.status === 'error' || item.status === 'conflict')}<CircleAlert class="size-4 shrink-0 text-warning" aria-hidden="true" />{/if}{#if !(item.status === 'done') && !(item.status === 'error' || item.status === 'conflict')}<Upload class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />{/if}<span class="min-w-0 flex-1 truncate">{item.name}</span><span class="shrink-0 text-muted-foreground" aria-live="polite">{t(`storage.browser.uploadStatus.${item.status}`)}</span></div>{#if item.status === 'sending' || item.status === 'queued'}<progress class="h-1.5 w-full accent-brand" value={item.loaded} max={item.total || 1} aria-label={item.name}></progress>{/if}</div>
       {/each}
     </section>
   {/if}
 
-  {#if info === null}
+  {#if (info === null)}
     <EmptyState class="rounded-3xl bg-card" title={t('storage.browser.notFound', { bucket })}>
       {#snippet actions()}
         <Button variant="outline" href={href('/storage')}>{t('storage.browser.back')}</Button>
       {/snippet}
     </EmptyState>
-  {:else}
-    {#if files === null}
+  {/if}
+  {#if !(info === null)}
+    {#if (files === null)}
       {#if loading}<Skeleton class="h-48 rounded-3xl" />{/if}
-    {:else if files.length === 0 && folders.length === 0}
+    {/if}
+    {#if !(files === null) && (files.length === 0 && folders.length === 0)}
       <EmptyState
         class="rounded-3xl bg-card"
         icon={Folder}
         title={prefix ? t('storage.browser.emptyFolder') : t('storage.browser.emptyBucket')}
         description={t('storage.browser.emptyFolderDescription')}
       >{#snippet actions()}<Button variant="outline" disabled={!info || uploading !== null} onclick={() => picker?.click()}><Upload data-icon="inline-start" aria-hidden="true" />{t('storage.browser.upload')}</Button>{/snippet}</EmptyState>
-    {:else}
+    {/if}
+    {#if !(files === null) && !(files.length === 0 && folders.length === 0)}
       <div class="overflow-hidden rounded-3xl bg-card">
         {#if selectedNames.length}
           <div class="flex min-h-12 items-center gap-2 border-b border-brand/20 bg-brand/5 px-4 py-2 text-sm" role="region" aria-label={t('storage.browser.selection.selected', { count: selectedNames.length })}>

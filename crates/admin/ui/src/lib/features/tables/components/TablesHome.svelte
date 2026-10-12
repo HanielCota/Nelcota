@@ -51,14 +51,15 @@
 </script>
 
 <div class="min-h-0 flex-1 overflow-y-auto">
-  {#if loading && !tables.length}
+  {#if (loading && !tables.length)}
     <div class="grid gap-4 p-6 lg:p-8" aria-busy="true">
       <Skeleton class="h-12 w-48" />
       <div class="grid gap-3 xl:grid-cols-2 2xl:grid-cols-3">
         {#each [1, 2, 3, 4] as i (i)}<Skeleton class="h-32 rounded-3xl" />{/each}
       </div>
     </div>
-  {:else if !tables.length}
+  {/if}
+  {#if !(loading && !tables.length) && (!tables.length)}
     <div class="grid h-full place-items-center p-8">
       <EmptyState icon={Rows3} title={t('tables.home.emptyTitle')} description={t('tables.home.emptyHint')}>
         {#snippet actions()}
@@ -66,7 +67,8 @@
         {/snippet}
       </EmptyState>
     </div>
-  {:else}
+  {/if}
+  {#if !(loading && !tables.length) && !(!tables.length)}
     <div class="grid gap-6 p-6 lg:p-8">
       <header class="flex flex-wrap items-end justify-between gap-4">
         <div class="min-w-0">
@@ -104,7 +106,9 @@
             </div>
             <div class="mt-auto flex items-center justify-between gap-3 text-sm text-muted-foreground">
               <span class="tabular-nums">
-                {#if rows}{rows}{:else if overview.loading}<Skeleton class="h-4 w-20" />{:else if table.kind !== 'table'}{t('tables.home.view')}{/if}
+                {#if (rows)}{rows}{/if}
+                {#if !(rows) && (overview.loading)}<Skeleton class="h-4 w-20" />{/if}
+                {#if !(rows) && !(overview.loading) && (table.kind !== 'table')}{t('tables.home.view')}{/if}
               </span>
               <a
                 href={href(`/tables/${enc(table.name)}/structure`)}

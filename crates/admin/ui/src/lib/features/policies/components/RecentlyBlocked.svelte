@@ -54,13 +54,16 @@
     </Button>
   </div>
 
-  {#if resource.error}
+  {#if (resource.error)}
     <LoadError message={errorMessage(resource.error)} onretry={load} busy={resource.loading} />
-  {:else if !data}
+  {/if}
+  {#if !(resource.error) && (!data)}
     <Skeleton class="h-12" />
-  {:else if data.requests.length === 0}
+  {/if}
+  {#if !(resource.error) && !(!data) && (data.requests.length === 0)}
     <p class="rounded-2xl bg-well px-4 py-3.5 text-sm text-muted-foreground">{t('policies.blocked.none')}</p>
-  {:else}
+  {/if}
+  {#if !(resource.error) && !(!data) && !(data.requests.length === 0)}
     <ul class="divide-y overflow-hidden rounded-2xl bg-well">
       {#each shown as request, index (`${request.at}-${index}`)}
         <li class="grid gap-1 px-4 py-3">

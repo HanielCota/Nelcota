@@ -68,11 +68,14 @@ fn check_public_https(
             || std::time::Instant::now() < deadline,
             HTTPS_INTERVAL,
         );
-        if answered {
-            ok(&format!("{url} answers"));
-        } else {
-            warn(&format!("{url} did not answer"));
-            failed.push(entry.domain.as_str());
+        match answered {
+            true => {
+                ok(&format!("{url} answers"));
+            }
+            false => {
+                warn(&format!("{url} did not answer"));
+                failed.push(entry.domain.as_str());
+            }
         }
     }
     if failed.is_empty() {
@@ -129,10 +132,11 @@ pub fn down(project: &Project, volumes: bool) -> anyhow::Result<()> {
 /// without a terminal unless `--yes` was given.
 pub fn confirm_volume_deletion(projects: &[Project], all: bool, yes: bool) -> anyhow::Result<()> {
     let names: Vec<&str> = projects.iter().map(|p| p.name.as_str()).collect();
-    let what = if all {
-        format!("{} and Caddy's certificates", names.join(", "))
-    } else {
-        names.join(", ")
+    let what = match all {
+        true => {
+            format!("{} and Caddy's certificates", names.join(", "))
+        }
+        false => names.join(", "),
     };
     warn(&format!("--volumes: the data of {what} will be DELETED"));
     if yes {

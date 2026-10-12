@@ -19,24 +19,27 @@ async function setup(page: Page, empty = false) {
   await page.route('**/admin/api/webhooks**', async route => {
     const request = route.request(), url = new URL(request.url()), path = url.pathname.slice('/admin/api'.length)
     if (request.method() !== 'GET') writes.push({ method: request.method(), path, body: request.postDataJSON() })
-    let data: unknown
-    if (path === '/webhooks' && request.method() === 'GET') data = { endpoints: hooks, tables: ['notes', 'orders'], allow_loopback: false, outstanding: resent ? 1 : 0, retained: resent ? 2 : 1 }
-    else if (path === '/webhooks' && request.method() === 'POST') {
+    const reply = (json: unknown) => route.fulfill({ status: 200, json });
+    if (path === '/webhooks' && request.method() === 'GET') return reply({ endpoints: hooks, tables: ['notes', 'orders'], allow_loopback: false, outstanding: resent ? 1 : 0, retained: resent ? 2 : 1 });
+    if (path === '/webhooks' && request.method() === 'POST') {
       const input = request.postDataJSON() as Omit<Hook, 'id' | 'schema' | 'table_available' | 'created_at'>
-      const endpoint = { ...initial, ...input }; hooks = [endpoint]; data = { endpoint, secret }
-    } else if (path === `/webhooks/${endpointId}` && request.method() === 'PUT') {
-      hooks = [{ ...hooks[0], ...request.postDataJSON() }]; data = hooks[0]
-    } else if (path === `/webhooks/${endpointId}` && request.method() === 'DELETE') {
+      const endpoint = { ...initial, ...input }; hooks = [endpoint]; return reply({ endpoint, secret });
+    }
+    if (path === `/webhooks/${endpointId}` && request.method() === 'PUT') {
+      hooks = [{ ...hooks[0], ...request.postDataJSON() }]; return reply(hooks[0]);
+    }
+    if (path === `/webhooks/${endpointId}` && request.method() === 'DELETE') {
       hooks = []; return route.fulfill({ status: 204 })
-    } else if (path === `/webhooks/${endpointId}/rotate`) data = { endpoint: hooks[0], secret }
-    else if (path === '/webhooks/deliveries' && request.method() === 'DELETE') data = { deleted: 1 }
-    else if (path === '/webhooks/deliveries') { historyQueries.push(url.search); data = { deliveries: [delivery()], next_cursor: url.searchParams.has('before') ? null : '50' } }
-    else if (path === `/webhooks/deliveries/${deliveryId}/replay`) { resent = true; data = { id: '9223372036854775801' } }
-    else if (path.startsWith('/webhooks/deliveries/')) {
+    }
+    if (path === `/webhooks/${endpointId}/rotate`) return reply({ endpoint: hooks[0], secret });
+    if (path === '/webhooks/deliveries' && request.method() === 'DELETE') return reply({ deleted: 1 });
+    if (path === '/webhooks/deliveries') { historyQueries.push(url.search); return reply({ deliveries: [delivery()], next_cursor: url.searchParams.has('before') ? null : '50' }); }
+    if (path === `/webhooks/deliveries/${deliveryId}/replay`) { resent = true; return reply({ id: '9223372036854775801' }); }
+    if (path.startsWith('/webhooks/deliveries/')) {
       const replay = path.endsWith('5801')
-      data = { delivery: replay ? { ...delivery(), id: '9223372036854775801', status: 'pending', attempts: 0, last_status: null, last_error: null, finished_at: null, next_attempt_at: stamp, replay_of: deliveryId } : delivery(), payload: JSON.stringify({ id: eventId, type: 'UPDATE', record: { title: '<script>window.webhookXss = true</script>' } }), attempts: replay ? [] : [{ number: 2, started_at: stamp, finished_at: stamp, status_code: 503, duration_ms: 25, error: 'http_error' }, { number: 1, started_at: stamp, finished_at: stamp, status_code: null, duration_ms: null, error: 'worker_interrupted' }] }
-    } else return route.fulfill({ status: 404, json: { code: 'webhook_not_found', error: 'Not found' } })
-    return route.fulfill({ json: data })
+      return reply({ delivery: replay ? { ...delivery(), id: '9223372036854775801', status: 'pending', attempts: 0, last_status: null, last_error: null, finished_at: null, next_attempt_at: stamp, replay_of: deliveryId } : delivery(), payload: JSON.stringify({ id: eventId, type: 'UPDATE', record: { title: '<script>window.webhookXss = true</script>' } }), attempts: replay ? [] : [{ number: 2, started_at: stamp, finished_at: stamp, status_code: 503, duration_ms: 25, error: 'http_error' }, { number: 1, started_at: stamp, finished_at: stamp, status_code: null, duration_ms: null, error: 'worker_interrupted' }] });
+    }
+    return route.fulfill({ status: 404, json: { code: 'webhook_not_found', error: 'Not found' } })
   })
   await page.goto('/admin/webhooks')
   return { writes, historyQueries }

@@ -33,10 +33,11 @@ fn ts_column(column: &Column) -> String {
             .map(|v| serde_json::to_string(v).unwrap_or_default())
             .collect::<Vec<_>>()
             .join(" | ");
-        return if column.category == 'A' {
-            format!("({union} | null)[]")
-        } else {
-            union
+        return match column.category == 'A' {
+            true => {
+                format!("({union} | null)[]")
+            }
+            false => union,
         };
     }
     ts_scalar(&column.type_name)
@@ -118,7 +119,10 @@ pub fn generate(catalog: &Catalog) -> String {
             let _ = writeln!(out, "      {}: {{", key(&table.name));
             out.push_str("        Row: {\n");
             for c in &table.columns {
-                let null = if c.nullable { " | null" } else { "" };
+                let null = match c.nullable {
+                    true => " | null",
+                    false => "",
+                };
                 let _ = writeln!(out, "          {}: {}{null};", key(&c.name), ts_column(c));
             }
             out.push_str("        };\n");
@@ -127,12 +131,18 @@ pub fn generate(catalog: &Catalog) -> String {
                     let _ = writeln!(out, "        {variant}: {{");
                     for c in table.columns.iter().filter(|c| !c.generated) {
                         let optional = all_optional || c.nullable || c.has_default;
-                        let null = if c.nullable { " | null" } else { "" };
+                        let null = match c.nullable {
+                            true => " | null",
+                            false => "",
+                        };
                         let _ = writeln!(
                             out,
                             "          {}{}: {}{null};",
                             key(&c.name),
-                            if optional { "?" } else { "" },
+                            match optional {
+                                true => "?",
+                                false => "",
+                            },
                             ts_column(c)
                         );
                     }
@@ -158,7 +168,10 @@ pub fn generate(catalog: &Catalog) -> String {
                         format!(
                             "{}{}: {}",
                             key(&a.name),
-                            if a.has_default { "?" } else { "" },
+                            match a.has_default {
+                                true => "?",
+                                false => "",
+                            },
                             ts_scalar(&a.type_name)
                         )
                     })
@@ -170,10 +183,9 @@ pub fn generate(catalog: &Catalog) -> String {
                 );
                 let base = relation
                     .map(|t| {
-                        let section = if t.kind == TableKind::Table {
-                            "Tables"
-                        } else {
-                            "Views"
+                        let section = match t.kind == TableKind::Table {
+                            true => "Tables",
+                            false => "Views",
                         };
                         format!(
                             "Database[{}][{}][{}][\"Row\"]",

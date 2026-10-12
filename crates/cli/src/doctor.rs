@@ -51,11 +51,14 @@ pub fn run(host: &Host) -> anyhow::Result<()> {
         Runtime::Docker => caddy::running(host),
         Runtime::Systemd => native::unit_state("caddy").as_deref() == Some("active"),
     };
-    if caddy_running {
-        ok("Caddy running (holds ports 80 and 443)");
-    } else {
-        warn("Caddy is not running (`nelcota up` starts it)");
-        report.check(checks::ports());
+    match caddy_running {
+        true => {
+            ok("Caddy running (holds ports 80 and 443)");
+        }
+        false => {
+            warn("Caddy is not running (`nelcota up` starts it)");
+            report.check(checks::ports());
+        }
     }
     match checks::free_disk_mb(host.root()) {
         Some(mb) => disk(&mut report, mb),
@@ -73,20 +76,26 @@ pub fn run(host: &Host) -> anyhow::Result<()> {
 
     step("Backups");
     if cfg!(target_os = "linux") && !manifest.local {
-        if std::path::Path::new(machine::BACKUP_CRON).is_file() {
-            ok(&format!("daily backup job: {}", machine::BACKUP_CRON));
-        } else {
-            report.problem(format!(
-                "no daily backup job ({} missing; run `nelcota init` as root on a new host, \
+        match std::path::Path::new(machine::BACKUP_CRON).is_file() {
+            true => {
+                ok(&format!("daily backup job: {}", machine::BACKUP_CRON));
+            }
+            false => {
+                report.problem(format!(
+                    "no daily backup job ({} missing; run `nelcota init` as root on a new host, \
                  or add the cron line from docs/backup.md)",
-                machine::BACKUP_CRON
-            ));
+                    machine::BACKUP_CRON
+                ));
+            }
         }
     }
-    if backup::s3_configured(host) {
-        ok("remote backup: S3 configured in host.env");
-    } else {
-        warn("remote backup not configured: dumps stay on this machine (see docs/backup.md)");
+    match backup::s3_configured(host) {
+        true => {
+            ok("remote backup: S3 configured in host.env");
+        }
+        false => {
+            warn("remote backup not configured: dumps stay on this machine (see docs/backup.md)");
+        }
     }
     for project in &projects {
         match backup::latest(project) {

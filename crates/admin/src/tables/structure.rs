@@ -127,7 +127,7 @@ pub async fn load(
     schema: &str,
     table: &str,
 ) -> Result<Option<Structure>, ApiError> {
-    let Some(head) = client
+    let head = match client
         .query_opt(
             "SELECT c.oid, obj_description(c.oid, 'pg_class'), c.relrowsecurity
              FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -135,8 +135,11 @@ pub async fn load(
             &[&schema, &table],
         )
         .await?
-    else {
-        return Ok(None);
+    {
+        Some(head) => head,
+        _ => {
+            return Ok(None);
+        }
     };
     let oid: u32 = head.get(0);
     let roles: Vec<&str> = API_ROLES.to_vec();

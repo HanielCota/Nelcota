@@ -54,13 +54,14 @@
     class={[
       'px-4 py-3.5 pr-14 font-mono text-xs leading-relaxed sm:text-[0.8125rem]',
       wrap ? 'break-words whitespace-pre-wrap' : 'overflow-x-auto',
-    ]}>{#if tokens}{#each tokens as token, i (i)}{#if token.kind}<span class={COLOURS[token.kind]}>{token.text}</span>{:else}{token.text}{/if}{/each}{:else}{code}{/if}</pre>
+    ]}>{#if (tokens)}{#each tokens as token, i (i)}{#if (token.kind)}<span class={COLOURS[token.kind]}>{token.text}</span>{/if}{#if !(token.kind)}{token.text}{/if}{/each}{/if}{#if !(tokens)}{code}{/if}</pre>
   <button
     type="button"
     class="absolute top-1.5 right-1.5 grid size-8 cursor-pointer place-items-center rounded-md bg-well text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
     aria-label={label ?? t('common.copy')}
     onclick={copy}
   >
-    {#if copied}<Check class="size-4 text-brand" />{:else}<Copy class="size-4" />{/if}
+    {#if (copied)}<Check class="size-4 text-brand" />{/if}
+    {#if !(copied)}<Copy class="size-4" />{/if}
   </button>
 </div>

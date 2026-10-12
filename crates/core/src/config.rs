@@ -370,10 +370,13 @@ impl Config {
                 ));
             }
         };
-        let Some(recovery_url) = recovery else {
-            return Err(ConfigError::Invalid(
-                "with SMTP configured, set NELCOTA_PASSWORD_RECOVERY_URL (the app page that receives the link)",
-            ));
+        let recovery_url = match recovery {
+            Some(recovery_url) => recovery_url,
+            _ => {
+                return Err(ConfigError::Invalid(
+                    "with SMTP configured, set NELCOTA_PASSWORD_RECOVERY_URL (the app page that receives the link)",
+                ));
+            }
         };
         Ok(Some(MailConfig {
             smtp_url: url,

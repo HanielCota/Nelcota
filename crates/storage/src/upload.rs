@@ -78,10 +78,9 @@ async fn write(
     body: UploadStream,
 ) -> Result<UploadOutcome, ApiError> {
     let deadline = tokio::time::Instant::now() + state.settings.upload_timeout;
-    let mode = if options.replace {
-        Mode::Upsert
-    } else {
-        Mode::Create
+    let mode = match options.replace {
+        true => Mode::Upsert,
+        false => Mode::Create,
     };
     let bucket = path::bucket(bucket)?;
     let name = path::object(name)?;
@@ -114,18 +113,21 @@ async fn write(
             let tx = begin_request(&mut client, &claims)
                 .await
                 .map_err(|e| ApiError::from_db(e, claims.role()))?;
-            let old_size = if mode == Mode::Upsert {
-                tx.query_opt(
-                    "SELECT size FROM storage.objects WHERE bucket_id = $1 AND name = $2",
-                    &[&bucket, &name],
-                )
-                .await
-                .map_err(|e| write_error(e, &claims))?
-                .map_or(0, |row| row.get::<_, i64>(0).max(0) as u64)
-            } else {
-                0
+            let old_size = match mode == Mode::Upsert {
+                true => tx
+                    .query_opt(
+                        "SELECT size FROM storage.objects WHERE bucket_id = $1 AND name = $2",
+                        &[&bucket, &name],
+                    )
+                    .await
+                    .map_err(|e| write_error(e, &claims))?
+                    .map_or(0, |row| row.get::<_, i64>(0).max(0) as u64),
+                false => 0,
             };
-            let sql = if mode == Mode::Create { INSERT } else { UPSERT };
+            let sql = match mode == Mode::Create {
+                true => INSERT,
+                false => UPSERT,
+            };
             let placeholder: [&(dyn tokio_postgres::types::ToSql + Sync); 7] = [
                 &Uuid::now_v7(),
                 &bucket,
@@ -310,39 +312,42 @@ async fn receive(
         ));
     }
 
-    if ended {
-        store
-            .put(key, Bytes::from(head))
-            .await
-            .map_err(store_failed)?;
-    } else {
-        let mut writer = store.writer(key).await.map_err(store_failed)?;
-        writer.write(&head);
-        let mut result = Ok(());
-        while let Some(chunk) = stream.next().await {
-            let chunk = match chunk
-                .map_err(interrupted)
-                .and_then(|c| take(&c).map(|()| c))
-            {
-                Ok(chunk) => chunk,
-                Err(err) => {
-                    result = Err(err);
+    match ended {
+        true => {
+            store
+                .put(key, Bytes::from(head))
+                .await
+                .map_err(store_failed)?;
+        }
+        false => {
+            let mut writer = store.writer(key).await.map_err(store_failed)?;
+            writer.write(&head);
+            let mut result = Ok(());
+            while let Some(chunk) = stream.next().await {
+                let chunk = match chunk
+                    .map_err(interrupted)
+                    .and_then(|c| take(&c).map(|()| c))
+                {
+                    Ok(chunk) => chunk,
+                    Err(err) => {
+                        result = Err(err);
+                        break;
+                    }
+                };
+                if let Err(err) = writer.wait_for_capacity(PARTS_IN_FLIGHT).await {
+                    result = Err(store_failed(err));
                     break;
                 }
-            };
-            if let Err(err) = writer.wait_for_capacity(PARTS_IN_FLIGHT).await {
-                result = Err(store_failed(err));
-                break;
+                writer.put(chunk);
             }
-            writer.put(chunk);
-        }
-        match result {
-            Ok(()) => {
-                writer.finish().await.map_err(store_failed)?;
-            }
-            Err(err) => {
-                let _ = writer.abort().await;
-                return Err(err);
+            match result {
+                Ok(()) => {
+                    writer.finish().await.map_err(store_failed)?;
+                }
+                Err(err) => {
+                    let _ = writer.abort().await;
+                    return Err(err);
+                }
             }
         }
     }

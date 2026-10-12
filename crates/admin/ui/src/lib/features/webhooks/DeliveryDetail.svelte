@@ -55,9 +55,10 @@
       {#if delivery.replay_of}<a href={href(`/webhooks/deliveries/${delivery.replay_of}`)} class="text-sm text-primary underline">{t('webhooks.replayOf', { id: delivery.replay_of })}</a>{/if}
     </section>
     <section class="grid gap-4 rounded-3xl bg-card p-5"><h2 class="font-semibold">{t('webhooks.attemptHistory')}</h2>
-      {#if resource.data.attempts.length}<div class="overflow-x-auto"><table class="w-full text-left text-sm"><thead><tr class="text-muted-foreground"><th class="py-3 pr-4 font-medium">{t('webhooks.attempt')}</th><th class="py-3 pr-4 font-medium">{t('webhooks.started')}</th><th class="py-3 pr-4 font-medium">{t('webhooks.duration')}</th><th class="py-3 font-medium">{t('webhooks.result')}</th></tr></thead><tbody>
+      {#if (resource.data.attempts.length)}<div class="overflow-x-auto"><table class="w-full text-left text-sm"><thead><tr class="text-muted-foreground"><th class="py-3 pr-4 font-medium">{t('webhooks.attempt')}</th><th class="py-3 pr-4 font-medium">{t('webhooks.started')}</th><th class="py-3 pr-4 font-medium">{t('webhooks.duration')}</th><th class="py-3 font-medium">{t('webhooks.result')}</th></tr></thead><tbody>
         {#each resource.data.attempts as attempt (attempt.number)}<tr class="border-t border-border"><td class="py-3 pr-4 tabular-nums">{attempt.number}</td><td class="py-3 pr-4 whitespace-nowrap">{dateLabel(attempt.started_at)}</td><td class="py-3 pr-4 whitespace-nowrap tabular-nums">{attempt.duration_ms === null ? '—' : `${attempt.duration_ms} ms`}</td><td class="py-3">{attempt.status_code ? `HTTP ${attempt.status_code}` : attempt.finished_at ? '—' : statusLabel('processing')}{#if attempt.error}<p class="mt-1 text-xs text-muted-foreground">{failureLabel(attempt.error)}</p>{/if}</td></tr>{/each}
-      </tbody></table></div>{:else}<p class="text-sm text-muted-foreground">{t('webhooks.noAttempts')}</p>{/if}
+      </tbody></table></div>{/if}
+      {#if !(resource.data.attempts.length)}<p class="text-sm text-muted-foreground">{t('webhooks.noAttempts')}</p>{/if}
     </section>
     <section class="grid gap-4 rounded-3xl bg-card p-5"><h2 class="font-semibold">{t('webhooks.payload')}</h2><CodeBlock code={resource.data.payload} wrap /></section>
   {/if}

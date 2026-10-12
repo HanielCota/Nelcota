@@ -53,9 +53,10 @@ the current checkout so a published-release check cannot hide a PR regression.
   (`feat(storage): ...`, `fix(cli): ...`), imperative, with a body saying why.
 - Code, comments, docs and commit messages are in English. Only the panel's
   interface is translated (pt-BR and en, through the i18n catalogs).
-- Prefer guard clauses and early returns to nested `if`/`else` control flow;
-  use `match` or `switch` for distinct cases. Rust `let ... else`, conditional
-  value expressions and Svelte rendering branches remain appropriate.
+- Use guard clauses and early returns. Avoid `else` in executable source,
+  including Rust value expressions and `let ... else`; use `match` or `switch`
+  for alternatives. Svelte rendering uses explicit, mutually exclusive guards.
+  Check nullable input and reject non-finite numbers at input boundaries.
 - Security-sensitive code (auth, RLS, SQL building, storage) needs a test that
   proves the boundary holds, e.g. that one user cannot reach another's data.
 - Migrations in `migrations/` are never edited once released: add a new one.

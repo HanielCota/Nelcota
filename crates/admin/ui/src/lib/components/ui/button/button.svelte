@@ -55,7 +55,7 @@
 	}: ButtonProps = $props();
 </script>
 
-{#if href}
+{#if (href)}
 	<a
 		bind:this={ref}
 		data-slot="button"
@@ -68,7 +68,8 @@
 	>
 		{@render children?.()}
 	</a>
-{:else}
+{/if}
+{#if !(href)}
 	<button
 		bind:this={ref}
 		data-slot="button"

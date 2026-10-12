@@ -13,10 +13,13 @@ fn literal(value: &str) -> String {
 fn ident(value: &str) -> String {
     let mut out = String::new();
     for c in value.chars() {
-        if c.is_ascii_alphanumeric() || c == '_' {
-            out.push(c.to_ascii_lowercase());
-        } else {
-            let _ = write!(out, "_u{:x}_", c as u32);
+        match c.is_ascii_alphanumeric() || c == '_' {
+            true => {
+                out.push(c.to_ascii_lowercase());
+            }
+            false => {
+                let _ = write!(out, "_u{:x}_", c as u32);
+            }
         }
     }
     if out.is_empty() || out == "_" {
@@ -56,12 +59,16 @@ fn variant(value: &str) -> String {
     let mut out = String::new();
     let mut upper = true;
     for c in value.chars() {
-        if c.is_ascii_alphanumeric() {
-            out.push(if upper { c.to_ascii_uppercase() } else { c });
-            upper = false;
-        } else {
+        if !c.is_ascii_alphanumeric() {
             upper = true;
+            continue;
         }
+        if upper {
+            out.push(c.to_ascii_uppercase());
+            upper = false;
+            continue;
+        }
+        out.push(c);
     }
     if out.is_empty() || out == "Self" || out.as_bytes()[0].is_ascii_digit() {
         out.insert_str(0, "Value");
@@ -171,17 +178,21 @@ pub fn generate(catalog: &Catalog) -> String {
                 .collect();
             let all_optional = mode == "Update"
                 || (mode == "Insert" && columns.iter().all(|c| c.nullable || c.has_default));
-            let default = if all_optional { ", Default" } else { "" };
+            let default = match all_optional {
+                true => ", Default",
+                false => "",
+            };
             let _ = writeln!(
                 out,
                 "        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize{default})]\n        pub struct {mode} {{"
             );
             for column in columns {
                 let base = column_type(column, &enum_names);
-                let base = if column.nullable {
-                    format!("Option<{base}>")
-                } else {
-                    base
+                let base = match column.nullable {
+                    true => {
+                        format!("Option<{base}>")
+                    }
+                    false => base,
                 };
                 let optional = mode == "Update"
                     || (mode == "Insert" && (column.nullable || column.has_default));
@@ -193,10 +204,11 @@ pub fn generate(catalog: &Catalog) -> String {
                 if optional {
                     out.push_str("            #[serde(default, skip_serializing_if = \"nelcota_client::Field::is_omitted\")]\n");
                 }
-                let ty = if optional {
-                    format!("nelcota_client::Field<{base}>")
-                } else {
-                    base
+                let ty = match optional {
+                    true => {
+                        format!("nelcota_client::Field<{base}>")
+                    }
+                    false => base,
                 };
                 let _ = writeln!(out, "            pub {}: {ty},", fields[&column.name]);
             }
@@ -208,10 +220,11 @@ pub fn generate(catalog: &Catalog) -> String {
     let mut used = BTreeSet::new();
     for (name, overloads) in &catalog.functions {
         for (index, function) in overloads.iter().enumerate() {
-            let base = if overloads.len() > 1 {
-                format!("{}_{}", ident(name), index + 1)
-            } else {
-                ident(name)
+            let base = match overloads.len() > 1 {
+                true => {
+                    format!("{}_{}", ident(name), index + 1)
+                }
+                false => ident(name),
             };
             let module = unique(base, &mut used);
             let _ = writeln!(
@@ -219,10 +232,9 @@ pub fn generate(catalog: &Catalog) -> String {
                 "        pub mod {module} {{\n            pub const NAME: &str = {};",
                 literal(name)
             );
-            let default = if function.args.iter().all(|a| a.has_default) {
-                ", Default"
-            } else {
-                ""
+            let default = match function.args.iter().all(|a| a.has_default) {
+                true => ", Default",
+                false => "",
             };
             let _ = writeln!(
                 out,
@@ -237,11 +249,12 @@ pub fn generate(catalog: &Catalog) -> String {
                     literal(&arg.name)
                 );
                 let ty = format!("Option<{}>", scalar(&arg.type_name));
-                let ty = if arg.has_default {
-                    out.push_str("                #[serde(default, skip_serializing_if = \"nelcota_client::Field::is_omitted\")]\n");
-                    format!("nelcota_client::Field<{ty}>")
-                } else {
-                    ty
+                let ty = match arg.has_default {
+                    true => {
+                        out.push_str("                #[serde(default, skip_serializing_if = \"nelcota_client::Field::is_omitted\")]\n");
+                        format!("nelcota_client::Field<{ty}>")
+                    }
+                    false => ty,
                 };
                 let _ = writeln!(out, "                pub {name}: {ty},");
             }
@@ -254,12 +267,14 @@ pub fn generate(catalog: &Catalog) -> String {
                 .get(table_name)
                 .map(|m| format!("super::super::{m}::Row"))
                 .unwrap_or_else(|| scalar(&function.return_type));
-            let returns = if function.returns_void {
-                "()".into()
-            } else if function.returns_set {
-                format!("Vec<Option<{base}>>")
-            } else {
-                format!("Option<{base}>")
+            let returns = match () {
+                _ if function.returns_void => "()".into(),
+                _ if function.returns_set => {
+                    format!("Vec<Option<{base}>>")
+                }
+                _ => {
+                    format!("Option<{base}>")
+                }
             };
             let _ = writeln!(out, "            pub type Returns = {returns};\n        }}");
         }

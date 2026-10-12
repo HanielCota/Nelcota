@@ -48,9 +48,13 @@ impl BackupS3 {
         // `docker -v` reads as extra colons.
         let dir = dir.strip_prefix(r"\\?\").unwrap_or(&dir);
         let mut command = Command::new("docker");
-        command
-            .args(["run", "--rm", "-v"])
-            .arg(format!("{dir}:/data{}", if read_only { ":ro" } else { "" }));
+        command.args(["run", "--rm", "-v"]).arg(format!(
+            "{dir}:/data{}",
+            match read_only {
+                true => ":ro",
+                false => "",
+            }
+        ));
         if let Some(user) = user {
             command.args(["--user", user]);
         }

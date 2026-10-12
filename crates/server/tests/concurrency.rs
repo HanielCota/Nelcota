@@ -213,7 +213,10 @@ async fn concurrent_uploads_reserve_capacity_with_and_without_a_length() {
             .unwrap()
             .get(0);
         assert_eq!(used, 6);
-        let name = if first.is_ok() { "a.txt" } else { "b.txt" };
+        let name = match first.is_ok() {
+            true => "a.txt",
+            false => "b.txt",
+        };
         app.storage.delete(&service(), "docs", name).await.unwrap();
     }
 }

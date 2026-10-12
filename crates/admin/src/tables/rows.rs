@@ -101,7 +101,10 @@ impl FilterSpec {
     /// Pair in the REST API format (`column=not.op.value`), then validated by
     /// the same parser against the catalog.
     fn to_pair(&self) -> (String, String) {
-        let not = if self.not { "not." } else { "" };
+        let not = match self.not {
+            true => "not.",
+            false => "",
+        };
         (
             self.column.clone(),
             format!("{not}{}.{}", self.op.as_str(), self.value),
@@ -143,7 +146,10 @@ pub(crate) fn build_request(
     let order = match &params.sort {
         Some(col) => Some(format!(
             "{col}.{}",
-            if params.desc { "desc" } else { "asc" }
+            match params.desc {
+                true => "desc",
+                false => "asc",
+            }
         )),
         None if !table.primary_key.is_empty() => Some(table.primary_key.join(",")),
         None => None,
@@ -341,14 +347,16 @@ pub async fn table(
         .collect();
 
     let estimate = estimates.get(&table.name).copied().unwrap_or(-1);
-    let (total, exact) = if let Some(total) = viewed_total {
-        (total, total.is_some())
-    } else if filtered {
-        let count = query::count(&catalog.schema, &table, &request);
-        let total = bounded_count(&mut client, &count).await;
-        (total, total.is_some())
-    } else {
-        row_count(&client, &catalog.schema, &table, estimate).await
+    let (total, exact) = match viewed_total {
+        Some(total) => (total, total.is_some()),
+        _ => match filtered {
+            true => {
+                let count = query::count(&catalog.schema, &table, &request);
+                let total = bounded_count(&mut client, &count).await;
+                (total, total.is_some())
+            }
+            false => row_count(&client, &catalog.schema, &table, estimate).await,
+        },
     };
     let columns: Vec<Value> = table
         .columns
@@ -397,12 +405,15 @@ pub async fn table(
 fn to_values(table: &Table, values: Map<String, Value>) -> Result<Map<String, Value>, ApiError> {
     let mut out = Map::new();
     for (key, value) in values {
-        let Some(col) = table.column(&key).filter(|c| !c.generated) else {
-            return Err(ApiError::bad_request(
-                "unknown_or_generated_column",
-                format!("unknown or generated column: {key}"),
-            )
-            .params(json!({ "column": key })));
+        let col = match table.column(&key).filter(|c| !c.generated) {
+            Some(col) => col,
+            _ => {
+                return Err(ApiError::bad_request(
+                    "unknown_or_generated_column",
+                    format!("unknown or generated column: {key}"),
+                )
+                .params(json!({ "column": key })));
+            }
         };
         let json = match value {
             Value::Null => Value::Null,

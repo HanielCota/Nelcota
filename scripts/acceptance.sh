@@ -38,7 +38,10 @@ VERSION="${NELCOTA_TEST_VERSION:-dev}"
 WORK="$(mktemp -d)"
 ROOT="$WORK"
 command -v cygpath >/dev/null 2>&1 && ROOT="$(cygpath -w "$WORK")"
-native() { if command -v cygpath >/dev/null 2>&1; then cygpath -w "$1"; else printf '%s' "$1"; fi; }
+native() {
+  if command -v cygpath >/dev/null 2>&1; then cygpath -w "$1"; return; fi
+  printf '%s' "$1"
+}
 nelcota() { "$BIN" -C "$ROOT" "$@"; }
 cleanup() { nelcota down --all --volumes --yes >/dev/null 2>&1 || true; rm -rf "$WORK"; }
 trap cleanup EXIT
@@ -171,7 +174,8 @@ docker run -d --rm --name nelcota-accept-s3 -p 9101:9000 \
 cleanup_s3() { docker rm -f nelcota-accept-s3 >/dev/null 2>&1 || true; }
 trap 'cleanup_s3; cleanup' EXIT
 # The aws-cli container reaches the host's port 9101.
-if command -v cygpath >/dev/null 2>&1; then s3_host=host.docker.internal; else s3_host=172.17.0.1; fi
+s3_host=172.17.0.1
+if command -v cygpath >/dev/null 2>&1; then s3_host=host.docker.internal; fi
 cat >> "$WORK/host.env" <<ENV
 NELCOTA_BACKUP_S3_ENDPOINT=http://$s3_host:9101
 NELCOTA_BACKUP_S3_BUCKET=accept-backups

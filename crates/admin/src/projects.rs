@@ -111,8 +111,11 @@ async fn probe(name: &str) -> Value {
 /// app answers at all, so an unhealthy app still shows which version it runs.
 async fn probe_url(url: &str) -> Value {
     let down = json!({ "healthy": false, "version": null, "latency_ms": null });
-    let Ok(uri) = url.parse::<Uri>() else {
-        return down;
+    let uri = match url.parse::<Uri>() {
+        Ok(uri) => uri,
+        _ => {
+            return down;
+        }
     };
     let started = std::time::Instant::now();
     let client = Client::builder(TokioExecutor::new()).build_http::<Empty<Bytes>>();
@@ -127,8 +130,11 @@ async fn probe_url(url: &str) -> Value {
         Some((status, body))
     })
     .await;
-    let Ok(Some((status, body))) = response else {
-        return down;
+    let (status, body) = match response {
+        Ok(Some((status, body))) => (status, body),
+        _ => {
+            return down;
+        }
     };
     let version = serde_json::from_slice::<Value>(&body)
         .ok()

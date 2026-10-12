@@ -116,10 +116,10 @@
       <div class="rounded-3xl bg-card p-4 sm:p-5"><p class="text-sm text-muted-foreground">{t('webhooks.retained')}</p><p class="mt-1 flex flex-wrap items-baseline gap-x-2 text-2xl font-semibold tabular-nums">{config.data.retained}<span class="text-xs font-normal whitespace-nowrap text-muted-foreground">/ 100 000</span></p></div>
     </div>
     {#if config.data.outstanding >= 8000 || config.data.retained >= 80000}<Callout variant="warning" title={t('webhooks.capacity')} />{/if}
-    {#if tab === 'configuration'}
+    {#if (tab === 'configuration')}
       {#if !config.data.endpoints.length}
         <EmptyState class="rounded-3xl bg-card" icon={Webhook} title={t(config.data.tables.length ? 'webhooks.emptyTitle' : 'webhooks.noTables')} description={t(config.data.tables.length ? 'webhooks.emptyHint' : 'webhooks.noTablesHint')}>
-          {#snippet actions()}{#if config.data?.tables.length}<Button onclick={() => edit(null)}>{t('webhooks.create')}</Button>{:else}<Button href={href('/tables?create=true')}>{t('tables.editor.newTable')}</Button>{/if}{/snippet}
+          {#snippet actions()}{#if (config.data?.tables.length)}<Button onclick={() => edit(null)}>{t('webhooks.create')}</Button>{/if}{#if !(config.data?.tables.length)}<Button href={href('/tables?create=true')}>{t('tables.editor.newTable')}</Button>{/if}{/snippet}
         </EmptyState>
       {/if}
       <div class="grid gap-4 lg:grid-cols-2">
@@ -141,7 +141,8 @@
         {/each}
       </div>
       <p class="text-sm text-muted-foreground">{t('webhooks.retryGuide')} <a href={href('/guides/webhooks')} class="text-primary underline">{t('webhooks.guide')}</a></p>
-    {:else}
+    {/if}
+    {#if !(tab === 'configuration')}
       {#if history.error}<LoadError message={errorMessage(history.error)} onretry={loadHistory} busy={history.loading} />{/if}
       {#if !history.data && history.loading}<Skeleton class="h-48 rounded-3xl" />{/if}
       <DeliveryHistory data={history.data} endpoints={config.data.endpoints} endpoint={endpointFilter} status={statusFilter} hasCursor={!!before} onfilter={filters} onnext={() => filters(endpointFilter, statusFilter, history.data?.next_cursor ?? '')} onfirst={() => filters(endpointFilter, statusFilter)} />

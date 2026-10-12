@@ -107,8 +107,11 @@ async fn issue_tokens(
 }
 
 pub(crate) async fn refresh(state: &AuthState, token: Option<String>) -> Result<Value, ApiError> {
-    let Some(token) = token.filter(|t| !t.is_empty() && t.len() <= 128) else {
-        return Err(validation("refresh_token is required"));
+    let token = match token.filter(|t| !t.is_empty() && t.len() <= 128) {
+        Some(token) => token,
+        _ => {
+            return Err(validation("refresh_token is required"));
+        }
     };
     let hash = Sha256::digest(token.as_bytes()).to_vec();
 
@@ -130,8 +133,11 @@ pub(crate) async fn refresh(state: &AuthState, token: Option<String>) -> Result<
         )
         .await
         .map_err(db_error)?;
-    let Some(row) = row else {
-        return Err(invalid_grant("invalid refresh token"));
+    let row = match row {
+        Some(row) => row,
+        _ => {
+            return Err(invalid_grant("invalid refresh token"));
+        }
     };
     let (token_id, revoked, expired, session_id, session_revoked): (i64, bool, bool, Uuid, bool) =
         (row.get(0), row.get(1), row.get(2), row.get(3), row.get(4));

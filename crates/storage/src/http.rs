@@ -83,10 +83,9 @@ pub fn upload_stream(body: Body) -> UploadStream {
     )
 }
 pub fn upload_response(state: &StorageState, outcome: UploadOutcome) -> Response {
-    let status = if outcome.replaced {
-        StatusCode::OK
-    } else {
-        StatusCode::CREATED
+    let status = match outcome.replaced {
+        true => StatusCode::OK,
+        false => StatusCode::CREATED,
     };
     let public_url = outcome.public.then(|| {
         format!(
