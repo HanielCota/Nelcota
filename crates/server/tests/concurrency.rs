@@ -131,7 +131,7 @@ async fn concurrent_recovery_requests_issue_one_link_and_one_email() {
 
 async fn wait_for_locks(app: &TestApp, count: i64, predicate: &str) {
     let query = format!(
-        "SELECT count(*) FROM pg_stat_activity WHERE wait_event_type='Lock' AND ({predicate})"
+        "SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock' AND ({predicate})"
     );
     let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
     loop {
@@ -155,6 +155,80 @@ async fn wait_for_locks(app: &TestApp, count: i64, predicate: &str) {
 
 fn service() -> Claims {
     Claims::from_payload(json!({"role":"service_role"})).unwrap()
+}
+
+#[tokio::test]
+async fn logout_while_an_account_update_waits_cannot_authorize_the_old_session() {
+    update_after_logout_is_refused(json!({"data":{"should_not_be_written":true}})).await;
+}
+
+#[tokio::test]
+async fn logout_while_a_password_change_waits_cannot_change_the_account() {
+    update_after_logout_is_refused(json!({
+        "password":"new-password-456", "current_password":"strong-password-123"
+    }))
+    .await;
+}
+
+async fn update_after_logout_is_refused(body: serde_json::Value) {
+    let app = Arc::new(TestApp::spawn().await);
+    let signed_in = app
+        .post(
+            "/auth/v1/signup",
+            None,
+            json!({"email":"update-race@example.com", "password":"strong-password-123"}),
+        )
+        .await;
+    assert_eq!(signed_in.status, StatusCode::CREATED);
+    let id: Uuid = signed_in.body["user"]["id"]
+        .as_str()
+        .unwrap()
+        .parse()
+        .unwrap();
+    let access = signed_in.body["access_token"].as_str().unwrap().to_owned();
+    let (mut locker, connection) = app.admin.connect(tokio_postgres::NoTls).await.unwrap();
+    tokio::spawn(connection);
+    let lock = locker.transaction().await.unwrap();
+    lock.query_one("SELECT id FROM auth.users WHERE id=$1 FOR UPDATE", &[&id])
+        .await
+        .unwrap();
+    let updating = app.clone();
+    let token = access.clone();
+    let pending = tokio::spawn(async move {
+        updating
+            .request(
+                axum::http::Method::PUT,
+                "/auth/v1/user",
+                Some(&token),
+                Some(body),
+            )
+            .await
+    });
+    wait_for_locks(
+        &app,
+        1,
+        "query LIKE 'SELECT u.encrypted_password%' OR query LIKE 'SELECT encrypted_password%'",
+    )
+    .await;
+    assert_eq!(
+        app.post("/auth/v1/logout", Some(&access), json!({}))
+            .await
+            .status,
+        StatusCode::NO_CONTENT
+    );
+    lock.commit().await.unwrap();
+    let reply = pending.await.unwrap();
+    assert_eq!(reply.status, StatusCode::UNAUTHORIZED, "{}", reply.body);
+    let metadata: serde_json::Value = app
+        .admin_client
+        .query_one(
+            "SELECT raw_user_meta_data FROM auth.users WHERE id=$1",
+            &[&id],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    assert_eq!(metadata, json!({}));
 }
 
 async fn quota_app() -> TestApp {
