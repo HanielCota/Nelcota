@@ -1,0 +1,12 @@
+{
+  "extends": [
+    "../../../.oxlintrc.json"
+  ],
+  "plugins": [
+    "unicorn"
+  ],
+  "rules": {
+    "unicorn/prefer-set-has": "error",
+    "unicorn/no-array-reduce": "error"
+  }
+}

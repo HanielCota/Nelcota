@@ -16,3 +16,6 @@ sdk/typescript/test/contract/generated/
 /output/
 /.playwright-cli/
 /.claude/worktrees/
+
+# Project-local review tools and disposable reports
+/.tools/

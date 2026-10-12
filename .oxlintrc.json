@@ -1,0 +1,50 @@
+{
+  "$schema": "https://raw.githubusercontent.com/oxc-project/oxc/oxlint_v1.87.0/npm/oxlint/configuration_schema.json",
+  "plugins": [
+    "typescript",
+    "unicorn",
+    "oxc"
+  ],
+  "categories": {
+    "correctness": "off",
+    "suspicious": "off",
+    "pedantic": "off",
+    "perf": "off",
+    "style": "off",
+    "restriction": "off",
+    "nursery": "off"
+  },
+  "rules": {},
+  "env": {
+    "browser": true,
+    "node": true
+  },
+  "globals": {
+    "$state": "readonly",
+    "$derived": "readonly",
+    "$effect": "readonly",
+    "$props": "readonly",
+    "$bindable": "readonly",
+    "$inspect": "readonly",
+    "$host": "readonly",
+    "Bun": "readonly",
+    "Deno": "readonly"
+  },
+  "ignorePatterns": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/coverage/**",
+    "**/.git/**",
+    "target/**",
+    ".tools/**",
+    "output/**",
+    ".nelcota/**",
+    "backups/**",
+    "crates/admin/ui/src/lib/generated/**",
+    "sdk/typescript/test/contract/generated/**"
+  ],
+  "options": {
+    "typeAware": false
+  }
+}

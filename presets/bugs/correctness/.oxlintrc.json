@@ -1,0 +1,16 @@
+{
+  "extends": [
+    "../../../.oxlintrc.json"
+  ],
+  "plugins": [
+    "typescript",
+    "unicorn",
+    "oxc",
+    "promise",
+    "import"
+  ],
+  "rules": {},
+  "categories": {
+    "correctness": "error"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "extends": [
+    "../../../.oxlintrc.json"
+  ],
+  "plugins": [
+    "typescript",
+    "unicorn",
+    "oxc"
+  ],
+  "rules": {
+    "eslint/no-warning-comments": [
+      "error",
+      {
+        "terms": [
+          "todo",
+          "fixme"
+        ],
+        "location": "anywhere"
+      }
+    ]
+  }
+}

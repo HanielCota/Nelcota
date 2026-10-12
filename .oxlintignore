@@ -1,0 +1,12 @@
+**/node_modules/**
+**/dist/**
+**/build/**
+**/coverage/**
+**/.git/**
+target/**
+.tools/**
+output/**
+.nelcota/**
+backups/**
+crates/admin/ui/src/lib/generated/**
+sdk/typescript/test/contract/generated/**

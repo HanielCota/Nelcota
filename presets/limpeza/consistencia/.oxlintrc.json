@@ -1,0 +1,15 @@
+{
+  "extends": [
+    "../../../.oxlintrc.json"
+  ],
+  "plugins": [
+    "typescript",
+    "unicorn",
+    "oxc"
+  ],
+  "rules": {
+    "eslint/prefer-const": "error",
+    "eslint/no-var": "error",
+    "eslint/curly": "error"
+  }
+}
