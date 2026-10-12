@@ -47,6 +47,7 @@ const ptBR = {
   editor: {
     newTable: 'Nova tabela',
     noRls: 'Sem RLS: quem tem GRANT nesta tabela lê e altera todas as linhas.',
+    noRowProtection: 'Este objeto pode expor dados sem as políticas do usuário. Revise os privilégios da view e security_invoker, ou remova o GRANT. Views materializadas e tabelas externas exigem controle de acesso próprio.',
     noPrimaryKey: 'Sem chave primária: dá para ver as linhas, mas não editar por aqui.',
     deleteTitle: { one: 'Apagar 1 linha?', other: 'Apagar {count} linhas?' },
     deleteDescription: 'Esta ação não pode ser desfeita. As linhas são apagadas numa transação só.',
@@ -357,6 +358,7 @@ const en: Messages<typeof ptBR> = {
   editor: {
     newTable: 'New table',
     noRls: 'No RLS: anyone with a GRANT on this table reads and changes every row.',
+    noRowProtection: 'This object may expose data without the caller’s row policies. Review view privileges and security_invoker, or revoke the GRANT. Materialized views and foreign tables require their own access controls.',
     noPrimaryKey: 'No primary key: rows can be viewed but not edited here.',
     deleteTitle: { one: 'Delete 1 row?', other: 'Delete {count} rows?' },
     deleteDescription: 'This cannot be undone. The rows are deleted in a single transaction.',

@@ -16,17 +16,17 @@ describe('select', () => {
 
   it('picks columns', () => {
     const query = nelcota.from('orders').select('id, status');
-    expectTypeOf<Result<typeof query>>().toEqualTypeOf<{ id: number; status: 'open' | 'paid' | 'shipped' }[]>();
+    expectTypeOf<Result<typeof query>>().toEqualTypeOf<{ id: number | string; status: 'open' | 'paid' | 'shipped' }[]>();
   });
 
   it('types many-to-one embeds as an object or null, one-to-many as arrays', () => {
     const query = nelcota.from('orders').select('id,buyer:customers!customer_id(name),items(product,qty)');
     expectTypeOf<Result<typeof query>>().toEqualTypeOf<
-      { id: number; buyer: { name: string } | null; items: { product: string; qty: number }[] }[]
+      { id: number | string; buyer: { name: string } | null; items: { product: string; qty: number }[] }[]
     >();
     const back = nelcota.from('customers').select('name,orders!customer_id(id,items(*))');
     expectTypeOf<Result<typeof back>>().toEqualTypeOf<
-      { name: string; orders: { id: number; items: Database['public']['Tables']['items']['Row'][] }[] }[]
+      { name: string; orders: { id: number | string; items: Database['public']['Tables']['items']['Row'][] }[] }[]
     >();
   });
 
@@ -39,9 +39,9 @@ describe('select', () => {
 
   it('single and maybeSingle change the result to one row', () => {
     const one = nelcota.from('orders').select('id').eq('id', 1).single();
-    expectTypeOf<Result<typeof one>>().toEqualTypeOf<{ id: number }>();
+    expectTypeOf<Result<typeof one>>().toEqualTypeOf<{ id: number | string }>();
     const maybe = nelcota.from('orders').select('id').maybeSingle();
-    expectTypeOf<Result<typeof maybe>>().toEqualTypeOf<{ id: number } | null>();
+    expectTypeOf<Result<typeof maybe>>().toEqualTypeOf<{ id: number | string } | null>();
   });
 
   it('types HEAD as null and preserves that through another select', () => {
@@ -54,25 +54,25 @@ describe('select', () => {
     // @ts-expect-error HEAD never returns a row
     reselected.maybeSingle();
     const withOptions = (options: SelectOptions) => nelcota.from('orders').select('id', options);
-    expectTypeOf<Result<ReturnType<typeof withOptions>>>().toEqualTypeOf<{ id: number }[] | null>();
+    expectTypeOf<Result<ReturnType<typeof withOptions>>>().toEqualTypeOf<{ id: number | string }[] | null>();
     const get = nelcota.from('orders').select('id', { head: false });
-    expectTypeOf<Result<typeof get>>().toEqualTypeOf<{ id: number }[]>();
+    expectTypeOf<Result<typeof get>>().toEqualTypeOf<{ id: number | string }[]>();
   });
 
   it('throwOnError drops the error branch and survives later calls', () => {
     const query = nelcota.from('orders').select('id').throwOnError().eq('id', 1).single();
-    expectTypeOf<Awaited<typeof query>['data']>().toEqualTypeOf<{ id: number }>();
+    expectTypeOf<Awaited<typeof query>['data']>().toEqualTypeOf<{ id: number | string }>();
     expectTypeOf<Awaited<typeof query>['error']>().toEqualTypeOf<null>();
-    expectTypeOf<Awaited<ReturnType<typeof query.execute>>['data']>().toEqualTypeOf<{ id: number }>();
+    expectTypeOf<Awaited<ReturnType<typeof query.execute>>['data']>().toEqualTypeOf<{ id: number | string }>();
     const plain = nelcota.from('orders').select('id');
-    expectTypeOf<Awaited<typeof plain>['data']>().toEqualTypeOf<{ id: number }[] | null>();
-    expectTypeOf(unwrap<{ id: number }[]>).returns.toEqualTypeOf<{ id: number }[]>();
+    expectTypeOf<Awaited<typeof plain>['data']>().toEqualTypeOf<{ id: number | string }[] | null>();
+    expectTypeOf(unwrap<{ id: number | string }[]>).returns.toEqualTypeOf<{ id: number | string }[]>();
     void nelcota.from('orders').select('id').throwOnError().pages(10);
   });
 
   it('pages yield arrays of the selected row, only on row reads', () => {
     const pages = nelcota.from('orders').select('id').order('id').offset(10).pages(100);
-    expectTypeOf(pages).toEqualTypeOf<AsyncGenerator<{ id: number }[], void, undefined>>();
+    expectTypeOf(pages).toEqualTypeOf<AsyncGenerator<{ id: number | string }[], void, undefined>>();
     // @ts-expect-error a HEAD read has no rows to page
     nelcota.from('orders').select('id', { head: true }).pages(100);
     // @ts-expect-error a single row has no pages
@@ -86,12 +86,16 @@ describe('filters', () => {
     orders.eq('status', 'paid');
     orders.in('status', ['open', 'paid']);
     orders.gte('total', 10);
+    orders.eq('id', '9007199254740993');
+    orders.eq('id', 9007199254740993n);
+    orders.match({ id: '9007199254740993', total: '0.1234567890123456789' });
+    orders.or(c => [c.eq('id', '9007199254740993'), c.gt('total', 10)]);
     orders.eq('items.qty', 3);
     // @ts-expect-error not a status
     orders.eq('status', 'lost');
     // @ts-expect-error not a column
     orders.eq('nope', 1);
-    // @ts-expect-error total is a number
+    // @ts-expect-error total is a numeric value
     orders.gt('total', true);
     orders.or((c) => [c.eq('status', 'paid'), c.gt('total', 100)]);
     // Columns that are not selected can still filter and order.
@@ -126,7 +130,7 @@ describe('writes', () => {
     // @ts-expect-error select is required before maybeSingle on a minimal write
     minimal.maybeSingle();
     const back = nelcota.from('orders').insert({ total: 1 }).select('id').single();
-    expectTypeOf<Result<typeof back>>().toEqualTypeOf<{ id: number }>();
+    expectTypeOf<Result<typeof back>>().toEqualTypeOf<{ id: number | string }>();
   });
 
   it('views without Insert refuse writes', () => {

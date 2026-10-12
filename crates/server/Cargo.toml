@@ -30,6 +30,7 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 
 [dev-dependencies]
+object_store = { version = "0.14.2", default-features = false, features = ["aws-base", "reqwest", "ring"] }
 nelcota-client = { path = "../../sdk/rust" }
 reqwest.workspace = true
 rustls.workspace = true

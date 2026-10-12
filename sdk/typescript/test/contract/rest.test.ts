@@ -4,6 +4,32 @@ import { escapeLike } from '../../src/index.js';
 import { signedIn, skip, visitor } from './setup.js';
 
 describe.skipIf(skip)('REST against the server', () => {
+  it('returns precise and nullable scalar sets and rows from views', async () => {
+    const nelcota = visitor();
+    expect(await nelcota.rpc('precision_samples')).toMatchObject({
+      error: null, data: [1.25, '12345678901234567890.123456789', null],
+    });
+    expect(await nelcota.rpc('measurement_rows')).toMatchObject({
+      error: null,
+      data: [{
+        id: '9007199254740993', amount: '12345678901234567890.123456789',
+        tags: ['valid', null], states: ['open', null],
+      }],
+    });
+  });
+  it('round-trips exact bigint and numeric values through reads, filters, writes and RPC', async () => {
+    const nelcota = visitor();
+    const row = { id: '9007199254740993', amount: '12345678901234567890.123456789', tags: ['valid', null], states: ['open' as const, null] };
+    const first = await nelcota.from('measurements').select().eq('id', row.id).single();
+    expect(first).toMatchObject({ error: null, data: row });
+    expect((await nelcota.from('measurements').select().eq('id', first.data!.id).single()).data).toEqual(row);
+    expect((await nelcota.rpc('echo_numeric', { value: row.amount })).data).toBe(row.amount);
+    const { client } = await signedIn();
+    const inserted = { ...row, id: '9007199254740995' };
+    expect(await client.from('measurements').insert(inserted).select().single()).toMatchObject({ error: null, data: inserted });
+    expect(await client.from('measurements').update({ amount: row.amount }).eq('id', inserted.id).select().single()).toMatchObject({ error: null, data: inserted });
+    expect((await client.from('measurements').delete().eq('id', inserted.id)).error).toBeNull();
+  });
   it('reads as a visitor with order, paging and an exact count', async () => {
     const nelcota = visitor();
     const { data, error, count } = await nelcota

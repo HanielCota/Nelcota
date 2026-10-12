@@ -37,6 +37,16 @@ at runtime. RLS and GRANTs always remain server/Postgres decisions.
 - HTTP error bodies larger than 64 KiB are discarded; status, a generic code
   and Retry-After remain available.
 - Invalid JSON returns `invalid_response` with the response's HTTP status.
+- JSON numbers stay numeric when their decimal digits survive JavaScript
+  conversion. Unsafe integers and decimals that would lose digits become
+  strings, including nested JSON values and RPC results. Generated `bigint`,
+  `numeric`, `real` and `double precision` fields use `number | string`; regenerate
+  schema types after upgrading. Pass exact values as strings in filters and
+  writes. PostgreSQL array elements may be null independently of column
+  nullability; generated arrays therefore use `(T | null)[]`.
+- Scalar RPC result sets also allow null elements and group numeric unions as
+  `(number | string | null)[]`. Functions returning view rows reference the
+  generated `Views` section, while table rows reference `Tables`.
 - Invalid developer configuration and unsafe identifiers/paths throw
   `NelcotaUsageError`. Errors thrown by user-supplied token/storage/fetch
   configuration outside the HTTP operation remain the caller's responsibility.

@@ -57,6 +57,8 @@ pub struct Table {
     pub foreign_keys: Vec<ForeignKey>,
     pub rls_enabled: bool,
     pub rls_forced: bool,
+    /// Views with this option use the caller's underlying privileges and RLS.
+    pub security_invoker: bool,
     pub comment: Option<String>,
     /// Privileges of anon, authenticated and service_role (in that order).
     pub privileges: [Privileges; 3],
@@ -71,14 +73,17 @@ impl Table {
         self.privileges[role_index(role)]
     }
 
-    /// Plain table (not a view) exposed without RLS: any role with a GRANT sees
-    /// every row. The panel warns about it.
+    /// Relations that may expose rows without the caller's RLS. Ordinary
+    /// views run under their owner's privileges; materialized and foreign
+    /// tables have no local row policies. Invoker views use underlying RLS.
     pub fn exposed_without_rls(&self) -> bool {
-        self.kind == TableKind::Table
-            && !self.rls_enabled
-            && self.privileges[..2]
-                .iter()
-                .any(|p| p.select || p.insert || p.update || p.delete)
+        (match self.kind {
+            TableKind::Table => !self.rls_enabled,
+            TableKind::View => !self.security_invoker,
+            TableKind::MaterializedView | TableKind::ForeignTable => true,
+        }) && self.privileges[..2]
+            .iter()
+            .any(|p| p.select || p.insert || p.update || p.delete)
     }
 }
 

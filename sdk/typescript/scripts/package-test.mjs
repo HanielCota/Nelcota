@@ -48,12 +48,15 @@ import { createStorageClient } from '@nelcota/client/storage';
 const session = { access_token: 'access', token_type: 'bearer', expires_in: 900,
   expires_at: Math.floor(Date.now()/1000)+900, refresh_token: 'refresh',
   user: {id:'u1',email:'a@example.com',email_confirmed_at:null,user_metadata:{},created_at:'',last_sign_in_at:null} };
-const fetch = async (url, init) => new Response(JSON.stringify(
+const fetch = async (url, init) => new Response(String(url).includes('/precise') ? '[{"id":9007199254740993}]' : JSON.stringify(
   String(url).includes('/auth/') ? session : String(url).includes('/storage/') ? {folders:[],objects:[]} : [{id:1}]
 ), {headers:{'content-type':'application/json'}});
 const options = {fetch, accessToken:()=> 'access'};
 assert.deepEqual((await createClient('https://api.example.com', options).from('notes').select()).data, [{id:1}]);
 assert.deepEqual((await createRestClient('https://api.example.com', options).from('notes').select()).data, [{id:1}]);
+for (const factory of [createClient, createRestClient]) {
+  assert.deepEqual((await factory('https://api.example.com', options).from('precise').select()).data, [{id:'9007199254740993'}]);
+}
 const auth = createAuthClient('https://api.example.com', {fetch});
 assert.equal((await auth.signInWithPassword({email:'a@example.com',password:'pw'})).data.access_token, 'access');
 assert.deepEqual((await createStorageClient('https://api.example.com', options).from('files').list()).data, {folders:[],objects:[]});
@@ -71,7 +74,13 @@ import { createStorageClient } from '@nelcota/client/storage';
 import type { Database } from './database.js';
 const client = createClient<Database>('https://api.example.com');
 const result = await client.from('customers').select('id,name');
-if (!result.error) { const id: number = result.data[0]!.id; void id; }
+if (!result.error) {
+  const id: number | string = result.data[0]!.id;
+  await client.from('customers').select().eq('id', id);
+  // @ts-expect-error: a bigint response can exceed JavaScript's numeric precision
+  const rounded: number = id;
+  void rounded;
+}
 const rest = createRestClient<Database>('https://api.example.com');
 // @ts-expect-error: unknown table
 rest.from('missing_table');

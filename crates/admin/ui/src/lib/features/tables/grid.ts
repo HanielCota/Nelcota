@@ -41,6 +41,8 @@ export function canonicalType(type: string): string {
 
 export function columnKind(column: Pick<Column, 'type' | 'enum_values'>): ColumnKind {
   const type = canonicalType(column.type)
+  // Enum metadata describes the elements; the editor needs the whole array literal.
+  if (type.endsWith('[]')) return 'text'
   if (column.enum_values.length) return 'enum'
   if (NUMBER.includes(type)) return 'number'
   if (type === 'boolean') return 'boolean'

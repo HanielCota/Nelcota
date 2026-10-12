@@ -9,6 +9,7 @@ mod error;
 mod gc;
 pub mod http;
 mod mime;
+mod multipart;
 mod operations;
 mod path;
 mod private_dir;

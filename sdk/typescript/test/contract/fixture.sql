@@ -32,6 +32,40 @@ CREATE TABLE public.echo (
     slug  text UNIQUE
 );
 
+-- Exact numeric and nullable array-element regression fixtures.
+CREATE TABLE public.measurements (
+    id bigint PRIMARY KEY,
+    amount numeric NOT NULL,
+    tags text[] NOT NULL,
+    states public.order_status[] NOT NULL
+);
+INSERT INTO public.measurements VALUES
+    (9007199254740993, 12345678901234567890.123456789, ARRAY['valid', NULL], ARRAY['open'::public.order_status, NULL]);
+ALTER TABLE public.measurements ENABLE ROW LEVEL SECURITY;
+GRANT SELECT ON public.measurements TO anon, authenticated;
+GRANT INSERT, UPDATE, DELETE ON public.measurements TO authenticated;
+CREATE POLICY measurements_read ON public.measurements FOR SELECT TO anon, authenticated USING (true);
+CREATE POLICY measurements_write ON public.measurements FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE FUNCTION public.echo_numeric(value numeric) RETURNS numeric LANGUAGE sql IMMUTABLE AS $$ SELECT value $$;
+GRANT EXECUTE ON FUNCTION public.echo_numeric(numeric) TO anon, authenticated;
+
+CREATE FUNCTION public.precision_samples() RETURNS SETOF numeric LANGUAGE sql IMMUTABLE AS $$
+    SELECT value FROM (VALUES
+        (1, 1.25::numeric),
+        (2, 12345678901234567890.123456789::numeric),
+        (3, NULL::numeric)
+    ) AS samples(position, value) ORDER BY position
+$$;
+GRANT EXECUTE ON FUNCTION public.precision_samples() TO anon, authenticated;
+
+CREATE VIEW public.measurement_view WITH (security_invoker = true) AS
+    SELECT id, amount, tags, states FROM public.measurements;
+GRANT SELECT ON public.measurement_view TO anon, authenticated;
+CREATE FUNCTION public.measurement_rows() RETURNS SETOF public.measurement_view LANGUAGE sql STABLE AS $$
+    SELECT * FROM public.measurement_view WHERE id = 9007199254740993
+$$;
+GRANT EXECUTE ON FUNCTION public.measurement_rows() TO anon, authenticated;
+
 ALTER TABLE public.customers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.items ENABLE ROW LEVEL SECURITY;

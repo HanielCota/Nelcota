@@ -13,12 +13,11 @@ use crate::catalog::{Catalog, Column, Table, TableKind};
 
 fn ts_scalar(type_name: &str) -> String {
     if let Some(element) = type_name.strip_suffix("[]") {
-        return format!("{}[]", ts_scalar(element));
+        return format!("({} | null)[]", ts_scalar(element));
     }
     match type_name {
-        "smallint" | "integer" | "bigint" | "real" | "double precision" | "numeric" | "oid" => {
-            "number".into()
-        }
+        "smallint" | "integer" | "oid" => "number".into(),
+        "bigint" | "real" | "double precision" | "numeric" => "number | string".into(),
         "boolean" => "boolean".into(),
         "json" | "jsonb" => "Json".into(),
         "void" => "undefined".into(),
@@ -35,7 +34,7 @@ fn ts_column(column: &Column) -> String {
             .collect::<Vec<_>>()
             .join(" | ");
         return if column.category == 'A' {
-            format!("({union})[]")
+            format!("({union} | null)[]")
         } else {
             union
         };
@@ -165,24 +164,30 @@ pub fn generate(catalog: &Catalog) -> String {
                     })
                     .collect::<Vec<_>>()
                     .join("; ");
-                let base = catalog
-                    .tables
-                    .get(
-                        f.return_type
-                            .trim_start_matches(&format!("{}.", catalog.schema)),
-                    )
+                let relation = catalog.tables.get(
+                    f.return_type
+                        .trim_start_matches(&format!("{}.", catalog.schema)),
+                );
+                let base = relation
                     .map(|t| {
+                        let section = if t.kind == TableKind::Table {
+                            "Tables"
+                        } else {
+                            "Views"
+                        };
                         format!(
-                            "Database[{}][\"Tables\"][{}][\"Row\"]",
+                            "Database[{}][{}][{}][\"Row\"]",
                             string(&catalog.schema),
+                            string(section),
                             string(&t.name)
                         )
                     })
                     .unwrap_or_else(|| ts_scalar(&f.return_type));
-                let returns = if f.returns_set {
-                    format!("{base}[]")
-                } else {
-                    base
+                let returns = match (f.returns_set, relation.is_some()) {
+                    (false, _) => base,
+                    (true, true) => format!("{base}[]"),
+                    // Scalar sets can include NULL rows; group unions before `[]`.
+                    (true, false) => format!("({base} | null)[]"),
                 };
                 format!("{{ Args: {{ {args} }}; Returns: {returns} }}")
             })
@@ -225,6 +230,59 @@ mod tests {
     use super::*;
     use crate::catalog::{Argument, ForeignKey, Function, Privileges};
 
+    #[test]
+    fn precise_numbers_and_nullable_array_elements_in_every_write_shape() {
+        assert_eq!(ts_scalar("bigint"), "number | string");
+        assert_eq!(ts_scalar("numeric"), "number | string");
+        assert_eq!(ts_scalar("numeric[]"), "(number | string | null)[]");
+        assert_eq!(ts_scalar("text[]"), "(string | null)[]");
+        let mut moods = column("moods", "public.mood[]");
+        moods.category = 'A';
+        moods.enum_values = vec!["happy".into(), "sad".into()];
+        let mut catalog = Catalog {
+            schema: "public".into(),
+            ..Catalog::default()
+        };
+        catalog.tables.insert(
+            "arrays".into(),
+            table("arrays", vec![column("tags", "text[]"), moods], Vec::new()),
+        );
+        catalog.functions.insert(
+            "echo_tags".into(),
+            vec![Function {
+                name: "echo_tags".into(),
+                args: vec![Argument {
+                    name: "tags".into(),
+                    type_name: "text[]".into(),
+                    has_default: false,
+                }],
+                return_type: "text[]".into(),
+                returns_set: false,
+                returns_void: false,
+                volatility: 'i',
+                comment: None,
+                executable: [true; 3],
+            }],
+        );
+        let out = generate(&catalog);
+        // Row and Insert require the non-null array; Update makes it optional.
+        assert_eq!(out.matches("tags: (string | null)[];").count(), 2);
+        assert!(out.contains("tags?: (string | null)[];"), "{out}");
+        assert_eq!(
+            out.matches("moods: (\"happy\" | \"sad\" | null)[];")
+                .count(),
+            2
+        );
+        assert!(
+            out.contains("moods?: (\"happy\" | \"sad\" | null)[];"),
+            "{out}"
+        );
+        assert!(
+            out.contains("Args: { tags: (string | null)[] }; Returns: (string | null)[]"),
+            "{out}"
+        );
+    }
+
     fn column(name: &str, type_name: &str) -> Column {
         Column {
             name: name.into(),
@@ -249,6 +307,7 @@ mod tests {
             foreign_keys,
             rls_enabled: true,
             rls_forced: false,
+            security_invoker: false,
             comment: None,
             privileges: [Privileges::default(); 3],
         }
@@ -336,5 +395,77 @@ mod tests {
             out.contains(r#"Returns: Database["my-app"]["Tables"]["orders"]["Row"][]"#),
             "{out}"
         );
+    }
+
+    #[test]
+    fn scalar_sets_group_unions_and_allow_null_elements() {
+        let mut catalog = shop("public");
+        let prototype = catalog.functions["recent_orders"][0].clone();
+        for (name, return_type) in [
+            ("numeric_samples", "numeric"),
+            ("bigint_samples", "bigint"),
+            ("array_samples", "text[]"),
+        ] {
+            catalog.functions.insert(
+                name.into(),
+                vec![Function {
+                    name: name.into(),
+                    args: Vec::new(),
+                    return_type: return_type.into(),
+                    ..prototype.clone()
+                }],
+            );
+        }
+        let out = generate(&catalog);
+        for name in ["numeric_samples", "bigint_samples"] {
+            assert!(
+                out.contains(&format!(
+                    "{name}: {{ Args: {{  }}; Returns: (number | string | null)[] }}"
+                )),
+                "{out}"
+            );
+        }
+        assert!(
+            out.contains("array_samples: { Args: {  }; Returns: ((string | null)[] | null)[] }"),
+            "{out}"
+        );
+    }
+
+    #[test]
+    fn function_rows_refer_to_views_in_the_views_section() {
+        let mut catalog = shop("my-app");
+        let prototype = catalog.functions["recent_orders"][0].clone();
+        for (name, kind, returns_set) in [
+            ("order_view", TableKind::View, true),
+            ("materialized_orders", TableKind::MaterializedView, true),
+            ("foreign_orders", TableKind::ForeignTable, false),
+        ] {
+            let mut relation = table(name, vec![column("id", "bigint")], Vec::new());
+            relation.kind = kind;
+            catalog.tables.insert(name.into(), relation);
+            catalog.functions.insert(
+                format!("read_{name}"),
+                vec![Function {
+                    name: format!("read_{name}"),
+                    args: Vec::new(),
+                    return_type: format!("my-app.{name}"),
+                    returns_set,
+                    ..prototype.clone()
+                }],
+            );
+        }
+        let out = generate(&catalog);
+        for (name, suffix) in [
+            ("order_view", "[]"),
+            ("materialized_orders", "[]"),
+            ("foreign_orders", ""),
+        ] {
+            assert!(
+                out.contains(&format!(
+                    "read_{name}: {{ Args: {{  }}; Returns: Database[\"my-app\"][\"Views\"][\"{name}\"][\"Row\"]{suffix} }}"
+                )),
+                "{out}"
+            );
+        }
     }
 }

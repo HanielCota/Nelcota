@@ -113,7 +113,7 @@ const { data, count } = await nelcota
   .order('created_at', { ascending: false })
   .order('qty', { referencedTable: 'items' })
   .range(0, 19);
-// data: { id: number; total: number; customer: { name: string } | null;
+// data: { id: number | string; total: number | string; customer: { name: string } | null;
 //         items: { product: string; qty: number }[] }[]
 
 // One row: an error (not_single) unless exactly one matches.

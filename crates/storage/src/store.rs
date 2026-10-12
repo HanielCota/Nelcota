@@ -26,6 +26,8 @@ pub const PARTS_IN_FLIGHT: usize = 2;
 pub struct Store {
     inner: Arc<dyn ObjectStore>,
     backend: Backend,
+    /// Includes pending creation and canceled uploads awaiting abort.
+    multipart_slots: Arc<tokio::sync::Semaphore>,
 }
 
 #[cfg(all(test, unix))]
@@ -141,6 +143,9 @@ impl Store {
                 Ok(Some(Store {
                     inner: s3.clone(),
                     backend: Backend::S3 { s3 },
+                    multipart_slots: Arc::new(tokio::sync::Semaphore::new(
+                        crate::CONCURRENT_UPLOADS,
+                    )),
                 }))
             }
         }
@@ -153,6 +158,7 @@ impl Store {
         Ok(Store {
             inner: Arc::new(fs),
             backend: Backend::Disk { root },
+            multipart_slots: Arc::new(tokio::sync::Semaphore::new(crate::CONCURRENT_UPLOADS)),
         })
     }
 
@@ -181,8 +187,13 @@ impl Store {
     /// Starts writing a new object, in parts.
     pub async fn writer(&self, key: &Key) -> Result<WriteMultipart, StoreError> {
         let part = if self.is_s3() { S3_PART } else { DISK_PART };
-        let upload = self.inner.put_multipart(key).await?;
-        Ok(WriteMultipart::new_with_chunk_size(upload, part))
+        Ok(crate::multipart::writer(
+            self.inner.clone(),
+            key.clone(),
+            part,
+            self.multipart_slots.clone(),
+        )
+        .await?)
     }
 
     /// Writes a small object in one request.

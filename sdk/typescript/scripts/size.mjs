@@ -25,12 +25,13 @@ const BUDGETS = {
   // Includes shared cancellation, explicit row/bucket contract validation and
   // the optional Postgres error fields, pages() and throwOnError()/unwrap().
   // Bounded streaming error reads add about 200 B gzip to the HTTP closure.
-  'index.js': 14_100,
+  // Lossless JSON decoding adds about 380 B gzip to each HTTP closure.
+  'index.js': 14_500,
   // Standalone factories include HTTP and keep the other feature modules out.
-  'rest/index.js': 8_750,
+  'rest/index.js': 9_150,
   // Failed persistence must retain rotated tokens; background failures are observed.
-  'auth/index.js': 8_350,
-  'storage/index.js': 6_600,
+  'auth/index.js': 8_750,
+  'storage/index.js': 7_000,
 };
 
 function closure(entry, seen = new Set()) {

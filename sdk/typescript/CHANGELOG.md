@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Preserve unsafe integers and decimal digits in JSON responses as strings,
+  including nested values and RPC results. Ordinary numbers remain numeric.
+  Regenerate schema types: Postgres numeric types that may exceed JavaScript
+  precision now use `number | string`. Use strings for exact filters and writes.
+- Generated arrays allow null elements independently of column nullability,
+  including enum arrays and RPC arguments and results.
+
 ## 0.1.2 — 2026-10-11
 
 - Bound HTTP error bodies to 64 KiB while preserving status and `Retry-After`.

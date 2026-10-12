@@ -34,6 +34,7 @@
   const data = $derived(resource.data)
   const error = $derived(resource.error ? errorMessage(resource.error) : '')
   const loading = $derived(resource.loading)
+  const exposedRelations = $derived(data?.exposed_without_rls.filter(name => !data.tables.some(table => table.name === name)) ?? [])
   // Keep filters in the URL, including links from overview warnings (`?table=`).
   const appliedSearch = $derived(route.query.get('q') ?? route.query.get('table') ?? '')
   let search = $state('')
@@ -72,7 +73,7 @@
       tables: tables.length,
       protected: tables.filter((table) => table.rls.enabled).length,
       policies: tables.reduce((sum, table) => sum + table.policies.length, 0),
-      attention: tables.filter((table) => ['danger', 'warn'].includes(table.rls.state)).length,
+      attention: tables.filter((table) => ['danger', 'warn'].includes(table.rls.state)).length + exposedRelations.length,
     }
   })
   const segment = (on: boolean) => [
@@ -170,7 +171,13 @@
     {#if data.exposed_without_rls.length}
       <Callout variant="danger" title={t('policies.exposed', { tables: data.exposed_without_rls.join(', ') })}>
         {t('policies.exposedHint')}
-        {#snippet actions()}<Button variant="outline" size="sm" onclick={() => setFilters('attention')}><ShieldCheck data-icon="inline-start" aria-hidden="true" />{t('common.reviewAccess')}</Button>{/snippet}
+        {#if exposedRelations.length}
+          <p class="mt-2">{t('policies.exposedRelations', { relations: exposedRelations.join(', ') })}</p>
+        {/if}
+        {#snippet actions()}
+          <Button variant="outline" size="sm" onclick={() => setFilters('attention')}><ShieldCheck data-icon="inline-start" aria-hidden="true" />{t('common.reviewAccess')}</Button>
+          {#if exposedRelations.length}<Button variant="outline" size="sm" href={href('/sql')}>{t('policies.reviewSql')}</Button>{/if}
+        {/snippet}
       </Callout>
     {/if}
 
@@ -208,7 +215,9 @@
         <div class="w-full sm:w-72"><SearchField bind:value={search} oninput={onSearch} label={t('policies.search')} /></div>
       </div>
       {#if !visible.length}
-        {#if !search.trim() && rlsFilter !== 'all'}
+        {#if (rlsFilter === 'all' || rlsFilter === 'attention') && exposedRelations.some(name => name.toLowerCase().includes(search.trim().toLowerCase()))}
+          <EmptyState class="rounded-3xl bg-card" icon={ShieldCheck} title={t('policies.relationsAttention')} description={t('policies.exposedRelations', { relations: exposedRelations.join(', ') })} />
+        {:else if !search.trim() && rlsFilter !== 'all'}
           <!-- A filter with nothing in it is usually good news: say so instead of "no matches". -->
           <EmptyState class="rounded-3xl bg-card" icon={ShieldCheck} title={t(`policies.filterEmpty.${rlsFilter}.title`)} description={t(`policies.filterEmpty.${rlsFilter}.text`)}>{#snippet actions()}<Button variant="outline" onclick={() => setFilters('all', '')}>{t('policies.showAll')}</Button>{/snippet}</EmptyState>
         {:else}

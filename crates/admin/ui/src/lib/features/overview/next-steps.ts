@@ -13,7 +13,7 @@ export interface Step {
 
 export function nextSteps(overview: Overview): Step[] {
   const tables = overview.tables.filter((table) => table.kind === 'table')
-  const unprotected = tables.some((table) => table.rls.state === 'danger' || table.rls.state === 'warn')
+  const unprotected = overview.tables.some((table) => table.rls.state === 'danger' || table.rls.state === 'warn')
   return [
     { id: 'table', done: tables.length > 0, path: '/tables?create=true' },
     { id: 'protect', done: tables.length > 0 && !unprotected, path: '/policies' },

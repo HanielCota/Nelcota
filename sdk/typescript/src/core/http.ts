@@ -6,6 +6,7 @@
 import { NelcotaError, NelcotaUsageError, clientError } from './errors.js';
 import { abortable } from './cancellation.js';
 import { assertTokenAllowed } from './jwt.js';
+import { parseJson } from './json.js';
 
 export type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
@@ -277,7 +278,7 @@ export class HttpClient {
       const text = spec.method === 'HEAD' ? '' : await response.text();
       if (text === '') return null as T;
       try {
-        return JSON.parse(text) as T;
+        return parseJson(text) as T;
       } catch (cause) {
         throw new NelcotaError({
           status: response.status,

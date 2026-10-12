@@ -971,6 +971,33 @@ async fn wait_for_table(app: &TestApp, table: &str, token: Option<&str>) {
     }
 }
 
+#[tokio::test]
+async fn generated_arrays_allow_null_elements_and_introspect_enum_elements() {
+    let app = TestApp::spawn().await;
+    app.admin_client.batch_execute(
+        "CREATE TABLE public.nullable_elements (tags text[] NOT NULL, moods public.priority[] NOT NULL);
+         INSERT INTO public.nullable_elements VALUES (ARRAY['valid', NULL], ARRAY['low'::public.priority, NULL]);
+         GRANT SELECT ON public.nullable_elements TO anon;"
+    ).await.unwrap();
+    wait_for_table(&app, "nullable_elements", None).await;
+    let (_, rows) = app.get("/rest/v1/nullable_elements", None).await;
+    assert_eq!(rows[0]["tags"], json!(["valid", null]));
+    assert_eq!(rows[0]["moods"], json!(["low", null]));
+    let catalog = app.catalog.get();
+    let column = catalog
+        .table("nullable_elements")
+        .unwrap()
+        .column("moods")
+        .unwrap();
+    assert_eq!(column.enum_values, ["low", "medium", "high"]);
+    let types = nelcota_api::typescript::generate(&catalog);
+    assert!(types.contains("tags: (string | null)[];"), "{types}");
+    assert!(
+        types.contains("moods: (\"low\" | \"medium\" | \"high\" | null)[];"),
+        "{types}"
+    );
+}
+
 /// Sorts an embedded array so assertions do not depend on json_agg's order.
 fn sorted_by(mut rows: Value, key: &str) -> Value {
     rows.as_array_mut()
