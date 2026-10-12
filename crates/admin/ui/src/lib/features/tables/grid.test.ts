@@ -43,6 +43,15 @@ describe('column kind', () => {
   it('enum wins over the type', () => {
     expect(columnKind(col('a', 'order_status', { enum_values: ['open', 'paid'] }))).toBe('enum')
   })
+
+  it('arrays stay text even when their elements are enums', () => {
+    for (const type of ['order_status[]', 'public.order_status[]']) {
+      expect(columnKind(col('a', type, { enum_values: ['open', 'paid'] }))).toBe('text')
+    }
+    for (const type of ['numeric[]', 'boolean[]', 'jsonb[]', 'text[]']) {
+      expect(columnKind(col('a', type))).toBe('text')
+    }
+  })
 })
 
 describe('width and alignment', () => {

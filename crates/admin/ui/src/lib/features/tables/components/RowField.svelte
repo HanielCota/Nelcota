@@ -39,7 +39,7 @@
   const preview = $derived(
     kind === 'temporal' && field.value && !field.isNull ? formatCell(field.value, column.type) : null,
   )
-  const options = $derived(kind === 'boolean' ? ['true', 'false'] : column.enum_values)
+  const options = $derived(kind === 'boolean' ? ['true', 'false'] : kind === 'enum' ? column.enum_values : [])
 
   function formatJson() {
     try {
