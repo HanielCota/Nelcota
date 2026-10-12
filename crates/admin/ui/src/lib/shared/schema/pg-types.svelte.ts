@@ -3,24 +3,35 @@
 
 import { api } from '$lib/api'
 import { ddl } from './ddl'
+import { querySession } from '$lib/query-client'
 
-export const pgTypes = $state({ base: [] as string[], enums: [] as string[], loaded: false })
+const catalog = $state({ base: [] as string[], enums: [] as string[], loaded: false, epoch: -1 })
+export const pgTypes = {
+  get base() { return catalog.epoch === querySession() ? catalog.base : [] },
+  get enums() { return catalog.epoch === querySession() ? catalog.enums : [] },
+  get loaded() { return catalog.epoch === querySession() && catalog.loaded },
+}
 
-let pending: Promise<void> | undefined
+let pending: { epoch: number; promise: Promise<void> } | undefined
 
 export function loadTypes(): Promise<void> {
-  pending ??= ddl
+  const epoch = querySession()
+  if (pending?.epoch === epoch) return pending.promise
+  const promise = ddl
     .types()
     .then((types) => {
-      pgTypes.base = types.base
-      pgTypes.enums = types.enums
-      pgTypes.loaded = true
+      if (epoch !== querySession() || pending?.promise !== promise) return
+      catalog.base = types.base
+      catalog.enums = types.enums
+      catalog.epoch = epoch
+      catalog.loaded = true
     })
     .catch(() => {
       // Without the list the field still accepts free text (the server validates).
-      pending = undefined
+      if (pending?.promise === promise) pending = undefined
     })
-  return pending
+  pending = { epoch, promise }
+  return promise
 }
 
 /** Tables and columns of the exposed schema, to pick a foreign key. */
