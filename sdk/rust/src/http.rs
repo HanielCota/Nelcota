@@ -108,10 +108,9 @@ impl Client {
 
     pub(crate) async fn json<T: DeserializeOwned>(&self, spec: Spec) -> Result<Response<T>> {
         let response = self.bytes(spec).await?;
-        let body = if response.data.is_empty() {
-            b"null".as_slice()
-        } else {
-            response.data.as_ref()
+        let body = match response.data.is_empty() {
+            true => b"null".as_slice(),
+            false => response.data.as_ref(),
         };
         let data = serde_json::from_slice(body).map_err(|e| Error::InvalidResponse {
             status: response.status,
@@ -158,7 +157,10 @@ impl Client {
             .or(spec.timeout)
             .unwrap_or(self.inner.timeout);
         let retryable = spec.method == Method::GET || spec.method == Method::HEAD;
-        let tries = if retryable { self.inner.retries } else { 0 };
+        let tries = match retryable {
+            true => self.inner.retries,
+            false => 0,
+        };
         for attempt in 0..=tries {
             let mut request = self
                 .inner
@@ -202,14 +204,15 @@ impl Client {
                         db: crate::error::DbErrorInfo::from_body(&value),
                     });
                 }
-                let data = if buffered {
-                    let mut bytes = bytes::BytesMut::new();
-                    while let Some(chunk) = response.chunk().await.map_err(Error::network)? {
-                        bytes.extend_from_slice(&chunk);
+                let data = match buffered {
+                    true => {
+                        let mut bytes = bytes::BytesMut::new();
+                        while let Some(chunk) = response.chunk().await.map_err(Error::network)? {
+                            bytes.extend_from_slice(&chunk);
+                        }
+                        Some(bytes.freeze())
                     }
-                    Some(bytes.freeze())
-                } else {
-                    None
+                    false => None,
                 };
                 Ok((response, data))
             };
@@ -248,10 +251,9 @@ fn backoff(attempt: usize) -> Duration {
         .saturating_mul(2_u64.saturating_pow(attempt.min(16) as u32))
         .min(30_000);
     let mut bytes = [0; 8];
-    let random = if getrandom::fill(&mut bytes).is_ok() {
-        u64::from_le_bytes(bytes)
-    } else {
-        cap / 2
+    let random = match getrandom::fill(&mut bytes).is_ok() {
+        true => u64::from_le_bytes(bytes),
+        false => cap / 2,
     };
     Duration::from_millis(random % (cap + 1))
 }

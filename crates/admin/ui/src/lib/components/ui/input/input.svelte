@@ -20,7 +20,7 @@
 	}: Props = $props();
 </script>
 
-{#if type === "file"}
+{#if (type === "file")}
 	<input
 		bind:this={ref}
 		data-slot={dataSlot}
@@ -33,7 +33,8 @@
 		bind:value
 		{...restProps}
 	/>
-{:else}
+{/if}
+{#if !(type === "file")}
 	<input
 		bind:this={ref}
 		data-slot={dataSlot}

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { dateText } from '$lib/date'
   import { untrack } from 'svelte'
   import * as Table from '$lib/components/ui/table'
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu'
@@ -30,11 +31,12 @@
   import type { UsersResponse, User } from '$lib/types'
   import { errorMessage, intlLocale, t } from '$lib/i18n/index.svelte'
   import { signInMethods } from '$lib/features/users/sign-in-methods'
+  import { parsePage } from '$lib/pagination'
 
   const resource = new RemoteResource<UsersResponse>()
   const users = $derived(resource.data?.users ?? null)
   const total = $derived(resource.data?.total ?? 0)
-  const page = $derived(Math.max(0, Number.parseInt(route.query.get('page') ?? '0') || 0))
+  const page = $derived(parsePage(route.query.get('page')))
   const appliedQuery = $derived(route.query.get('q') ?? '')
   const hasNext = $derived(resource.data?.has_next ?? false)
   let query = $state('')
@@ -108,10 +110,11 @@
       if (action === 'revoke') {
         await api.post(`/users/${enc(user.id)}/revoke`)
         toast.success(t('users.revoked', { email: user.email }))
-      } else {
-        await api.delete(`/users/${enc(user.id)}`)
-        toast.success(t('users.deleted', { email: user.email }))
+        await load()
+        return
       }
+      await api.delete(`/users/${enc(user.id)}`)
+      toast.success(t('users.deleted', { email: user.email }))
       await load()
     } catch (e) {
       toast.error(errorMessage(e))
@@ -120,7 +123,7 @@
   }
 
   const date = $derived(new Intl.DateTimeFormat(intlLocale(), { dateStyle: 'short', timeStyle: 'short' }))
-  const when = (value: string | null) => (value ? date.format(new Date(value)) : '—')
+  const when = (value: string | null) => dateText(value, date.format)
 </script>
 
 {#snippet unconfirmed(user: User)}
@@ -140,7 +143,7 @@
 {#snippet methods(user: User)}
   {@const list = signInMethods(user)}
   <span class="inline-flex flex-wrap gap-1" title={list[0].kind === 'linkOnly' ? t('users.methods.linkOnlyHint') : undefined}>
-    {#each list as method, i (i)}<span class={['rounded-md bg-well px-2 py-0.5 text-xs font-medium', method.kind === 'linkOnly' ? 'text-muted-foreground' : '']}>{#if method.kind === 'password'}{t('users.methods.password')}{:else if method.kind === 'provider'}{method.name}{:else}{t('users.methods.linkOnly')}{/if}</span>{/each}
+    {#each list as method, i (i)}<span class={['rounded-md bg-well px-2 py-0.5 text-xs font-medium', method.kind === 'linkOnly' ? 'text-muted-foreground' : '']}>{#if (method.kind === 'password')}{t('users.methods.password')}{/if}{#if !(method.kind === 'password') && (method.kind === 'provider')}{method.name}{/if}{#if !(method.kind === 'password') && !(method.kind === 'provider')}{t('users.methods.linkOnly')}{/if}</span>{/each}
   </span>
 {/snippet}
 
@@ -179,9 +182,10 @@
   <div class="-mt-2 mb-6"><PillTabs label={t('shell.pages.users')} current={'/users'} tabs={[{ path: '/users', label: t('shell.pages.users') }, { path: '/sign-in', label: t('shell.pages.userSignIn') }]} /></div>
 
   {#if error}<LoadError message={error} onretry={load} busy={loading} />{/if}
-  {#if users === null}
+  {#if (users === null)}
     {#if loading}<Skeleton class="h-64 rounded-3xl" />{/if}
-  {:else if users.length === 0}
+  {/if}
+  {#if !(users === null) && (users.length === 0)}
     <EmptyState
       class="rounded-3xl bg-card"
       icon={appliedQuery ? Search : UsersIcon}
@@ -191,19 +195,21 @@
         : t('users.emptyDescription')}
     >
       {#snippet actions()}
-        {#if appliedQuery}
+        {#if (appliedQuery)}
           <Button
             variant="outline"
             onclick={() => {
               go(0, '')
             }}>{t('users.clearSearch')}</Button
           >
-        {:else}
+        {/if}
+        {#if !(appliedQuery)}
           <Button variant="outline" onclick={() => (createOpen = true)}><UserPlus data-icon="inline-start" aria-hidden="true" />{t('users.new')}</Button>
         {/if}
       {/snippet}
     </EmptyState>
-  {:else}
+  {/if}
+  {#if !(users === null) && !(users.length === 0)}
     <div class="grid gap-3 md:hidden" aria-busy={loading}>
       {#each users as user (user.id)}
         <article class="min-w-0 rounded-3xl bg-card p-4">

@@ -155,8 +155,11 @@ pub(super) async fn redeem(
         )
         .await
         .map_err(db_error)?;
-    let Some(row) = row else {
-        return Ok(None);
+    let row = match row {
+        Some(row) => row,
+        _ => {
+            return Ok(None);
+        }
     };
     let (user_id, challenge, live): (Option<Uuid>, String, bool) =
         (row.get(0), row.get(1), row.get(2));

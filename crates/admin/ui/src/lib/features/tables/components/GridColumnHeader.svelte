@@ -78,9 +78,11 @@
     </span>
     <!-- Sort indicator: subtle until hover; highlighted when active. -->
     <span class="mt-0.5 shrink-0" aria-hidden="true">
-      {#if sort === 'asc'}<ArrowUp class="size-3.5 text-brand" />
-      {:else if sort === 'desc'}<ArrowDown class="size-3.5 text-brand" />
-      {:else}<ArrowUpDown class="size-3.5 text-muted-foreground opacity-0 transition-opacity group-hover/head:opacity-100" />{/if}
+      {#if (sort === 'asc')}<ArrowUp class="size-3.5 text-brand" />
+      {/if}
+      {#if !(sort === 'asc') && (sort === 'desc')}<ArrowDown class="size-3.5 text-brand" />
+      {/if}
+      {#if !(sort === 'asc') && !(sort === 'desc')}<ArrowUpDown class="size-3.5 text-muted-foreground opacity-0 transition-opacity group-hover/head:opacity-100" />{/if}
     </span>
   </button>
   <DropdownMenu.Root {onOpenChangeComplete}>

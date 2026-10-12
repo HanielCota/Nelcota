@@ -21,9 +21,10 @@
     className,
   )}
 >
-  {#if url && failed !== url}
+  {#if (url && failed !== url)}
     <img src={url} alt="" class="size-full object-cover" draggable="false" onerror={() => (failed = url)} />
-  {:else}
+  {/if}
+  {#if !(url && failed !== url)}
     {initial}
   {/if}
 </span>

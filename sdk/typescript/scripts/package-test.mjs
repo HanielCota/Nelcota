@@ -36,8 +36,8 @@ try {
   const metadata = JSON.parse(readFileSync(join(installed, 'package.json'), 'utf8'));
   assert.equal(Object.keys(metadata.dependencies ?? {}).length, 0, 'Runtime dependencies were added');
   for (const entry of Object.values(metadata.exports)) {
-    if (typeof entry === 'string') assert(existsSync(join(installed, entry)));
-    else for (const target of Object.values(entry)) assert(existsSync(join(installed, target)), `Missing export: ${target}`);
+    if (typeof entry === 'string') { assert(existsSync(join(installed, entry))); continue; }
+    for (const target of Object.values(entry)) assert(existsSync(join(installed, target)), `Missing export: ${target}`);
   }
   writeFileSync(join(consumer, 'consumer.mjs'), `
 import assert from 'node:assert/strict';

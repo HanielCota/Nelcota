@@ -104,7 +104,8 @@
       {#each steps as step, index (step.id)}
         <li class="grid grid-cols-[1.75rem_minmax(0,1fr)] gap-x-3 gap-y-1">
           <span class={['grid size-7 place-items-center rounded-full text-xs font-semibold tabular-nums', step.done ? 'bg-brand/15 text-brand' : 'bg-well']}>
-            {#if step.done}<CircleCheck class="size-4" aria-hidden="true" />{:else}{index + 1}{/if}
+            {#if (step.done)}<CircleCheck class="size-4" aria-hidden="true" />{/if}
+            {#if !(step.done)}{index + 1}{/if}
           </span>
           <p class="self-center text-sm font-medium">{step.title}</p>
           <p class={['col-start-2 text-sm text-muted-foreground', step.id === 'generate' && generated && 'break-all font-mono text-xs']}>{step.hint}</p>
@@ -136,7 +137,7 @@
       </div>
     </div>
     <div class="grid min-h-0 flex-1 content-start gap-5 overflow-y-auto p-5">
-      {#if data}
+      {#if (data)}
         <dl class="grid grid-cols-3 gap-3 lg:grid-cols-1">
           <div class="grid content-start gap-1 lg:flex lg:items-baseline lg:justify-between">
             <dt class="text-xs text-muted-foreground lg:text-sm">{t('migrations.stats.pending')}</dt>
@@ -152,7 +153,8 @@
           </div>
         </dl>
         <div class="hidden border-t pt-5 lg:block">{@render howTo(data)}</div>
-      {:else if loading}
+      {/if}
+      {#if !(data) && (loading)}
         {#each [0, 1, 2] as i (i)}<Skeleton class="h-7 w-full" />{/each}
       {/if}
     </div>
@@ -160,10 +162,11 @@
 
   <div class="grid min-w-0 flex-1 content-start gap-3 lg:overflow-y-auto lg:rounded-3xl">
     {#if error}<LoadError message={error} onretry={load} busy={loading} />{/if}
-    {#if !data && loading}
+    {#if (!data && loading)}
       <Skeleton class="h-40 rounded-3xl" />
       <Skeleton class="h-72 rounded-3xl" />
-    {:else if data}
+    {/if}
+    {#if !(!data && loading) && (data)}
     <section class="grid gap-4 rounded-3xl bg-card p-5" aria-labelledby="migrations-pending">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div class="grid gap-1">
@@ -175,7 +178,7 @@
         {/if}
       </div>
 
-      {#if data.pending.length === 0}
+      {#if (data.pending.length === 0)}
         <div class="flex items-center gap-3 rounded-2xl bg-well px-4 py-3.5">
           <CircleCheck class="size-5 shrink-0 text-brand" aria-hidden="true" />
           <div class="grid gap-0.5">
@@ -183,7 +186,8 @@
             <p class="text-sm text-muted-foreground">{t('migrations.nothingPendingHint')}</p>
           </div>
         </div>
-      {:else}
+      {/if}
+      {#if !(data.pending.length === 0)}
         <ol class="grid gap-2">
           {#each data.pending as change (change.id)}
             <li class="rounded-2xl bg-well px-4 py-3">
@@ -207,7 +211,7 @@
 
     <section class="grid gap-4 rounded-3xl bg-card p-5" aria-labelledby="migrations-list">
       <h2 id="migrations-list" class="text-lg font-semibold">{t('migrations.listTitle')}</h2>
-      {#if data.migrations.length === 0}
+      {#if (data.migrations.length === 0)}
         <div class="flex items-center gap-3 rounded-2xl bg-well px-4 py-3.5">
           <FilePlus class="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
           <div class="grid gap-0.5">
@@ -215,13 +219,14 @@
             <p class="text-sm text-muted-foreground">{t('migrations.noMigrationsHint')}</p>
           </div>
         </div>
-      {:else}
+      {/if}
+      {#if !(data.migrations.length === 0)}
         <div class="grid gap-2 md:hidden">
           {#each data.migrations as migration (migration.version)}
             {@const situation = status(migration)}
             <article class="grid min-w-0 gap-3 rounded-2xl bg-well p-4">
               <p class="break-words font-mono text-xs"><span class="text-muted-foreground">V{migration.version}</span> · {migration.name}</p>
-              <div class="flex flex-wrap items-center gap-2"><Badge variant="outline" class={situation.warn ? 'border-warning/30 text-warning' : 'text-muted-foreground'}>{#if situation.warn}<CircleAlert aria-hidden="true" />{:else}<CircleCheck aria-hidden="true" />{/if}{situation.label}</Badge>{#if migration.from_panel}<span class="text-xs text-muted-foreground">{t('migrations.fromPanel')}</span>{/if}</div>
+              <div class="flex flex-wrap items-center gap-2"><Badge variant="outline" class={situation.warn ? 'border-warning/30 text-warning' : 'text-muted-foreground'}>{#if (situation.warn)}<CircleAlert aria-hidden="true" />{/if}{#if !(situation.warn)}<CircleCheck aria-hidden="true" />{/if}{situation.label}</Badge>{#if migration.from_panel}<span class="text-xs text-muted-foreground">{t('migrations.fromPanel')}</span>{/if}</div>
               <p class="text-xs text-muted-foreground">{t('migrations.columns.appliedOn')}: {date(migration.applied_on)}</p>
               {#if migration.from_panel}<Button variant="outline" size="sm" class="justify-self-start" href={`/admin/api/migrations/${migration.version}/file`} download><Download data-icon="inline-start" aria-hidden="true" />{t('common.download')}</Button>{/if}
             </article>
@@ -247,7 +252,7 @@
                     <span class="font-mono text-xs">{migration.name}</span>
                     {#if migration.from_panel}<span class="ml-2 text-xs text-muted-foreground">{t('migrations.fromPanel')}</span>{/if}
                   </Table.Cell>
-                  <Table.Cell><Badge variant="outline" class={situation.warn ? 'border-warning/30 text-warning' : 'text-muted-foreground'}>{#if situation.warn}<CircleAlert aria-hidden="true" />{:else}<CircleCheck aria-hidden="true" />{/if}{situation.label}</Badge></Table.Cell>
+                  <Table.Cell><Badge variant="outline" class={situation.warn ? 'border-warning/30 text-warning' : 'text-muted-foreground'}>{#if (situation.warn)}<CircleAlert aria-hidden="true" />{/if}{#if !(situation.warn)}<CircleCheck aria-hidden="true" />{/if}{situation.label}</Badge></Table.Cell>
                   <Table.Cell class="text-muted-foreground">{date(migration.applied_on)}</Table.Cell>
                   <Table.Cell class="text-right">
                     {#if migration.from_panel}
@@ -268,9 +273,10 @@
       <p class="flex items-start gap-2 text-xs text-muted-foreground">
         <FolderOpen class="mt-px size-3.5 shrink-0" aria-hidden="true" />
         <span>
-          {#if data.folder}
+          {#if (data.folder)}
             {t('migrations.folderRead')} <span class="font-mono">{data.folder}</span>.
-          {:else}
+          {/if}
+          {#if !(data.folder)}
             {t('migrations.folderMissing')}
           {/if}
         </span>
@@ -296,16 +302,17 @@
       <Field.Field data-invalid={!validName}>
         <Field.Label for="migration-name">{t('common.name')}</Field.Label>
         <Input id="migration-name" name="migration-name" bind:value={name} maxlength={60} autocomplete="off" spellcheck={false} aria-invalid={!validName} aria-describedby="migration-name-hint" />
-          {#if validName}<Field.Description id="migration-name-hint">
+          {#if (validName)}<Field.Description id="migration-name-hint">
             {t('migrations.dialog.file')} <span class="font-mono">V{data?.next_version}__{name}.sql</span>
-          </Field.Description>{:else}<Field.Error id="migration-name-hint">
+          </Field.Description>{/if}
+          {#if !(validName)}<Field.Error id="migration-name-hint">
             {t('migrations.dialog.nameRule')}
           </Field.Error>{/if}
       </Field.Field>
       </Field.Group>
       <Dialog.Footer>
         <Button variant="outline" disabled={saving} onclick={guard.request}>{t('common.cancel')}</Button>
-        <Button type="submit" disabled={!validName || saving}>{#if saving}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{:else}<FilePlus data-icon="inline-start" aria-hidden="true" />{/if}{saving ? t('migrations.dialog.generating') : t('migrations.dialog.submit')}</Button>
+        <Button type="submit" disabled={!validName || saving}>{#if (saving)}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{/if}{#if !(saving)}<FilePlus data-icon="inline-start" aria-hidden="true" />{/if}{saving ? t('migrations.dialog.generating') : t('migrations.dialog.submit')}</Button>
       </Dialog.Footer>
     </fieldset>
     </form>

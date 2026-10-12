@@ -14,8 +14,11 @@ pub fn parse_filename(filename: &str) -> Option<(i32, String)> {
 
 /// Migration files in the project folder (empty if it does not exist).
 pub(super) fn folder_migrations(dir: Option<&FsPath>) -> BTreeMap<i32, String> {
-    let Some(Ok(entries)) = dir.map(std::fs::read_dir) else {
-        return BTreeMap::new();
+    let entries = match dir.map(std::fs::read_dir) {
+        Some(Ok(entries)) => entries,
+        _ => {
+            return BTreeMap::new();
+        }
     };
     entries
         .filter_map(|e| e.ok()?.file_name().into_string().ok())

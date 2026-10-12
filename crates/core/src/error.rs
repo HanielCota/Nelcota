@@ -179,9 +179,12 @@ impl ApiError {
     /// detail, hint and constraint; transient ones become a retryable 503;
     /// anything else is logged and hidden behind a 500.
     pub fn from_db(err: tokio_postgres::Error, role: Role) -> Self {
-        let Some(db) = err.as_db_error() else {
-            tracing::error!(error = %err, "failed to communicate with Postgres");
-            return Self::unavailable();
+        let db = match err.as_db_error() {
+            Some(db) => db,
+            _ => {
+                tracing::error!(error = %err, "failed to communicate with Postgres");
+                return Self::unavailable();
+            }
         };
         let code = db.code().code();
         if code == "54000" && db.message() == "NELCOTA_RESPONSE_TOO_LARGE" {
@@ -236,10 +239,9 @@ impl IntoResponse for ApiError {
         if self.status == StatusCode::UNAUTHORIZED {
             // RFC 6750 §3.1: `invalid_token` only when a token was presented
             // and rejected; `anon` lacking a privilege just needs to sign in.
-            let challenge = if self.code == "invalid_token" {
-                r#"Bearer error="invalid_token""#
-            } else {
-                "Bearer"
+            let challenge = match self.code == "invalid_token" {
+                true => r#"Bearer error="invalid_token""#,
+                false => "Bearer",
             };
             response.headers_mut().insert(
                 header::WWW_AUTHENTICATE,

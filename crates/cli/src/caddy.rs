@@ -33,10 +33,9 @@ fn render_paused(manifest: &Manifest, paused: &BTreeSet<String>) -> String {
             Runtime::Docker => format!("app-{}:8000", project.name),
             Runtime::Systemd => native::APP_LISTEN.to_owned(),
         };
-        let tls = if manifest.local {
-            "\ttls internal\n"
-        } else {
-            ""
+        let tls = match manifest.local {
+            true => "\ttls internal\n",
+            false => "",
         };
         if paused.contains(&project.name) {
             out.push_str(&format!(

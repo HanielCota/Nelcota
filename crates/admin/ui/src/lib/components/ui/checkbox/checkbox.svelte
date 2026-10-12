@@ -29,9 +29,10 @@
 			data-slot="checkbox-indicator"
 			class="[&>svg]:size-3.5 grid place-content-center text-current transition-none"
 		>
-			{#if checked}
+			{#if (checked)}
 				<CheckIcon  />
-			{:else if indeterminate}
+			{/if}
+			{#if !(checked) && (indeterminate)}
 				<MinusIcon  />
 			{/if}
 		</div>

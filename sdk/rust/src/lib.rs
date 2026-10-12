@@ -16,6 +16,7 @@ pub mod auth;
 mod encoding;
 mod error;
 mod http;
+mod json;
 pub mod rest;
 pub mod storage;
 

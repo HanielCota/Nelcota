@@ -17,6 +17,13 @@ describe('table context', () => {
     expect(parseTableView(query)).toEqual({ page: 0, size: '50', sort: null })
     expect(parseFilters(query)).toHaveLength(1)
   })
+
+  it.each([NaN, Infinity, -1, 0.5])('keeps invalid page %s out of the URL while preserving filters', page => {
+    const params = new URLSearchParams(tableViewSearch(new URLSearchParams('title=eq.test&_page=2'), { page, size: '100' }))
+    expect(params.has('_page')).toBe(false)
+    expect(parseTableView(params).size).toBe('100')
+    expect(params.get('title')).toBe('eq.test')
+  })
 })
 
 describe('row identity', () => {

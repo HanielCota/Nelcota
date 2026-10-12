@@ -284,13 +284,13 @@
             onkeydown={(e) => onCellKey(e, i, c)}
             ondblclick={() => startEdit(i, column)}
           >
-            {#if editing?.key === rowKey(row, data.table.primary_key, i) && editing.column === column.name}
+            {#if (editing?.key === rowKey(row, data.table.primary_key, i) && editing.column === column.name)}
               <div class="flex items-center gap-1 bg-card p-0.5 ring-2 ring-brand ring-inset" onfocusout={(event) => {
                 // Focus left the editor (click elsewhere, Tab): save like Enter
                 // does. Escape and Enter clear `editing` first, so this is a no-op.
                 if (!event.currentTarget.contains(event.relatedTarget as Node | null)) commitEdit(false, false)
               }}>
-                {#if editing.original?.includes('\n')}
+                {#if (editing.original?.includes('\n'))}
                   <!-- Multi-line text: an <input> would flatten the line breaks.
                        Enter saves, Shift+Enter adds a line. -->
                   <textarea
@@ -301,7 +301,8 @@
                     onkeydown={onEditorKey}
                     aria-label={t('tables.grid.edit', { column: column.name })}
                   ></textarea>
-                {:else}
+                {/if}
+                {#if !(editing.original?.includes('\n'))}
                   <input
                     id="inline-editor"
                     class={[
@@ -324,7 +325,8 @@
                   >
                 {/if}
               </div>
-            {:else}
+            {/if}
+            {#if !(editing?.key === rowKey(row, data.table.primary_key, i) && editing.column === column.name)}
               <div class="flex min-h-10 items-center gap-1 px-3.5 py-2" title={value ?? 'NULL'}>
                 <span class="min-w-0 flex-1"><GridCell {value} type={column.type} {kind} /></span>
                 {#if value && (value.length > 80 || value.includes('\n'))}

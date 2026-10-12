@@ -24,18 +24,23 @@
     kind === 'temporal' && 'tabular-nums',
   ]}
 >
-  {#if value === null}
+  {#if (value === null)}
     <span class="font-mono text-3xs text-muted-foreground/80">NULL</span>
-  {:else if kind === 'boolean'}
+  {/if}
+  {#if !(value === null) && (kind === 'boolean')}
     <span class={['font-mono', value === 'true' ? 'text-foreground' : 'text-muted-foreground']}>{value}</span>
-  {:else if kind === 'enum'}
+  {/if}
+  {#if !(value === null) && !(kind === 'boolean') && (kind === 'enum')}
     <span class="rounded-full bg-well px-2 py-0.5 text-2xs">{value}</span>
-  {:else if kind === 'uuid' && shortUuid(value) !== value}
+  {/if}
+  {#if !(value === null) && !(kind === 'boolean') && !(kind === 'enum') && (kind === 'uuid' && shortUuid(value) !== value)}
     <!-- Shortened on screen; assistive tech and the tooltip get the whole id. -->
     <span aria-hidden="true">{shortUuid(value)}</span><span class="sr-only">{value}</span>
-  {:else if kind === 'json'}
+  {/if}
+  {#if !(value === null) && !(kind === 'boolean') && !(kind === 'enum') && !(kind === 'uuid' && shortUuid(value) !== value) && (kind === 'json')}
     <span class="text-muted-foreground">{compactJson(value)}</span>
-  {:else}
+  {/if}
+  {#if !(value === null) && !(kind === 'boolean') && !(kind === 'enum') && !(kind === 'uuid' && shortUuid(value) !== value) && !(kind === 'json')}
     {display?.text}
   {/if}
 </span>

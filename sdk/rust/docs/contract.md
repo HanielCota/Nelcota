@@ -39,6 +39,11 @@ Generated models provide serde shapes, not compile-time verification of string
 queries. Missing required selected columns fail decoding. Numeric precision is
 preserved by arbitrary_precision; write null and omitted fields differ.
 
+REST writes and RPC reject non-finite floating-point input, including nested
+fields, before HTTP. Serde must not silently turn NaN or infinity into JSON
+null. Explicit null and omitted fields retain their existing semantics, and
+serialization runs once without adding dependencies.
+
 Acceptance checks: SDK tests/doctests/examples, server HTTP contract tests,
 Rust generator snapshot and generated model compile/serialization tests,
 Clippy/rustfmt, docs, package verification and an external consumer smoke test.

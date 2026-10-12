@@ -6,7 +6,7 @@
 import { NelcotaError, NelcotaUsageError, clientError } from './errors.js';
 import { abortable } from './cancellation.js';
 import { assertTokenAllowed } from './jwt.js';
-import { parseJson } from './json.js';
+import { encodeJson, parseJson } from './json.js';
 
 export type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
@@ -192,6 +192,8 @@ export class HttpClient {
     if (spec.signal?.aborted) {
       return { data: null, response: null, error: clientError('aborted', 'The request was aborted') };
     }
+    if (spec.json !== undefined && spec.body !== undefined) throw new NelcotaUsageError('A request has either json or body, not both');
+    const encodedBody = spec.json === undefined ? spec.body : encodeJson(spec.json);
     const headers = new Headers(this.#options.headers);
     for (const [name, value] of Object.entries(spec.headers ?? {})) headers.set(name, value);
     if (spec.auth === false) headers.delete('authorization');
@@ -212,10 +214,8 @@ export class HttpClient {
     const bearer = headers.get('authorization');
     if (bearer?.toLowerCase().startsWith('bearer ')) assertTokenAllowed(bearer.slice(7));
 
-    let body: BodyInit | null | undefined = spec.body;
+    const body = encodedBody;
     if (spec.json !== undefined) {
-      if (body !== undefined) throw new NelcotaUsageError('A request has either json or body, not both');
-      body = JSON.stringify(spec.json);
       headers.set('content-type', 'application/json');
     }
 

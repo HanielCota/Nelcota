@@ -33,19 +33,22 @@ pub(crate) async fn sign_in(
     let user_id = tokens::consume(&tx, kind, &hash)
         .await?
         .ok_or_else(expired_link)?;
-    if kind == LinkKind::MagicLink {
-        // A magic link is independent of the pending signup: the inbox owner
-        // must not inherit a password chosen by whoever registered the address.
-        confirm_inbox_owner(&tx, user_id).await?;
-    } else {
-        // A signup confirmation approves the password from that signup.
-        tx.execute(
-            "UPDATE auth.users SET email_confirmed_at = coalesce(email_confirmed_at, now())
+    match kind == LinkKind::MagicLink {
+        true => {
+            // A magic link is independent of the pending signup: the inbox owner
+            // must not inherit a password chosen by whoever registered the address.
+            confirm_inbox_owner(&tx, user_id).await?;
+        }
+        false => {
+            // A signup confirmation approves the password from that signup.
+            tx.execute(
+                "UPDATE auth.users SET email_confirmed_at = coalesce(email_confirmed_at, now())
              WHERE id = $1",
-            &[&user_id],
-        )
-        .await
-        .map_err(db_error)?;
+                &[&user_id],
+            )
+            .await
+            .map_err(db_error)?;
+        }
     }
     let session = start_session(state, &tx, user_id, ip, user_agent).await?;
     tx.commit().await.map_err(db_error)?;

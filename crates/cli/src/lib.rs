@@ -393,10 +393,11 @@ pub fn run(cli: Cli) -> anyhow::Result<Outcome> {
         }
         Command::Down { volumes, all, yes } => {
             let manifest = host.require()?;
-            let targets = if all {
-                host.projects(&manifest)
-            } else {
-                vec![host.select(&manifest, selection)?]
+            let targets = match all {
+                true => host.projects(&manifest),
+                false => {
+                    vec![host.select(&manifest, selection)?]
+                }
             };
             if volumes && manifest.runtime == Runtime::Docker {
                 lifecycle::confirm_volume_deletion(&targets, all, yes)?;
@@ -439,8 +440,11 @@ pub fn run(cli: Cli) -> anyhow::Result<Outcome> {
             keep_files,
             no_backup,
         } => {
-            let Some(name) = selection else {
-                bail!("name the project to remove: nelcota -p <name> remove");
+            let name = match selection {
+                Some(name) => name,
+                _ => {
+                    bail!("name the project to remove: nelcota -p <name> remove");
+                }
             };
             done(projects::remove(&host, name, yes, keep_files, no_backup))
         }
@@ -460,10 +464,11 @@ pub fn run(cli: Cli) -> anyhow::Result<Outcome> {
                 dry_run,
                 reinstall,
             };
-            let targets = if all {
-                host.projects(&manifest)
-            } else {
-                vec![host.select(&manifest, selection)?]
+            let targets = match all {
+                true => host.projects(&manifest),
+                false => {
+                    vec![host.select(&manifest, selection)?]
+                }
             };
             let mut failed = Vec::new();
             for project in &targets {
@@ -480,10 +485,11 @@ pub fn run(cli: Cli) -> anyhow::Result<Outcome> {
         }
         Command::Backup { upload, keep, all } => {
             let manifest = host.require()?;
-            let targets = if all {
-                host.projects(&manifest)
-            } else {
-                vec![host.select(&manifest, selection)?]
+            let targets = match all {
+                true => host.projects(&manifest),
+                false => {
+                    vec![host.select(&manifest, selection)?]
+                }
             };
             // S3 added to host.env after `init` is picked up without editing the cron.
             let upload = upload || backup::s3_configured(&host);
@@ -553,13 +559,10 @@ pub fn run(cli: Cli) -> anyhow::Result<Outcome> {
             lifecycle::recreate_apps(&affected)?;
             Ok(Outcome::Done)
         }
-        Command::Healthcheck { addr } => {
-            if util::healthcheck(&addr) {
-                Ok(Outcome::Done)
-            } else {
-                std::process::exit(1)
-            }
-        }
+        Command::Healthcheck { addr } => match util::healthcheck(&addr) {
+            true => Ok(Outcome::Done),
+            false => std::process::exit(1),
+        },
     }
 }
 

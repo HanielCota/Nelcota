@@ -118,7 +118,7 @@
           <h3 bind:this={heading} tabindex="-1" class="text-lg font-semibold outline-none">{step === 0 ? t('guided.table.startTitle') : step === 1 ? t('guided.table.fieldsTitle') : step === 2 ? t('guided.table.accessTitle') : t('guided.review')}</h3>
           <p class="text-sm text-muted-foreground">{step === 0 ? t('guided.table.startHint') : step === 1 ? t('guided.table.fieldsHint') : step === 2 ? t('guided.table.accessHint') : t('guided.table.reviewHint')}</p>
         </div>
-        {#if step === 0}
+        {#if (step === 0)}
           <Field.Group>
             <Field.Field data-invalid={attempted && !!nameError}>
               <Field.Label for="table-name">{t('guided.table.name')}</Field.Label>
@@ -136,17 +136,19 @@
             </Field.Field>
             <Field.Field><Field.Label for="table-comment">{t('tables.create.comment')} <span class="font-normal text-muted-foreground">({t('tables.create.optional')})</span></Field.Label><Input id="table-comment" bind:value={() => spec.comment ?? '', value => spec.comment = value || null} /></Field.Field>
           </Field.Group>
-        {:else if step === 1}
+        {/if}
+        {#if !(step === 0) && (step === 1)}
           <Field.Group><Field.Field orientation="horizontal"><Checkbox id="table-advanced" bind:checked={advanced} /><Field.Label for="table-advanced">{t('guided.technical')}</Field.Label></Field.Field></Field.Group>
           {#if !advanced}<p class="text-sm text-muted-foreground">{t('guided.table.automatic')}</p>{/if}
           <Field.Group class="gap-4">
             {#each spec.columns as column, index (keys[index])}
               {@const problem = columnProblem(spec.columns, index)}
               {@const fieldNumber = spec.columns.slice(0, index + 1).filter(column => !automaticColumn(column)).length}
-              {#if advanced}
+              {#if (advanced)}
                 <ColumnFields bind:column={spec.columns[index]} {tables} mode="create" onremove={spec.columns.length > 1 ? () => { spec.columns.splice(index, 1); keys.splice(index, 1) } : undefined} />
                 {#if attempted && problem}<Field.Error>{column.name || index + 1}: {t(`guided.problems.${problem}`)}</Field.Error>{/if}
-              {:else if !automaticColumn(column)}
+              {/if}
+              {#if !(advanced) && (!automaticColumn(column))}
                 <Field.Set class="rounded-xl border p-4">
                   <div class="flex items-center justify-between gap-2"><Field.Legend class="mb-0">{t('guided.table.fieldTitle', { number: fieldNumber })}</Field.Legend><Button variant="ghost" size="icon-sm" aria-label={t('guided.table.remove', { number: fieldNumber })} onclick={() => { spec.columns.splice(index, 1); keys.splice(index, 1) }}><X aria-hidden="true" /></Button></div>
                   <Field.Group class="gap-4">
@@ -166,17 +168,20 @@
             {/each}
           </Field.Group>
           <Button variant="outline" class="self-start" onclick={() => { spec.columns.push(blankColumn()); keys.push(nextKey++) }}><Plus data-icon="inline-start" aria-hidden="true" />{t('guided.table.add')}</Button>
-        {:else if step === 2}
-          {#if advanced}
+        {/if}
+        {#if !(step === 0) && !(step === 1) && (step === 2)}
+          {#if (advanced)}
             <p class="text-sm text-muted-foreground">{t('guided.table.advancedHint')}</p>
             <Field.Group><Field.Field orientation="horizontal"><Checkbox id="table-rls" bind:checked={spec.rls} /><Field.Label for="table-rls">{t('tables.create.rls')}</Field.Label></Field.Field></Field.Group>
             {#if !spec.rls}<Alert.Root variant="destructive"><Alert.Description>{t('tables.create.noRlsWarning')}</Alert.Description></Alert.Root>{/if}
             <GrantsEditor bind:grants={spec.grants} />
-          {:else}
-            <AccessChoices bind:audience bind:level allowPrivate />
-            {#if audience === 'owner'}{#if ownerConflict}<Alert.Root variant="destructive"><Alert.Description>{t('guided.access.ownerConflict')}</Alert.Description></Alert.Root>{:else}<p class="text-sm text-muted-foreground">{t('guided.access.ownerAdded')}</p>{/if}{/if}
           {/if}
-        {:else if payload}
+          {#if !(advanced)}
+            <AccessChoices bind:audience bind:level allowPrivate />
+            {#if audience === 'owner'}{#if (ownerConflict)}<Alert.Root variant="destructive"><Alert.Description>{t('guided.access.ownerConflict')}</Alert.Description></Alert.Root>{/if}{#if !(ownerConflict)}<p class="text-sm text-muted-foreground">{t('guided.access.ownerAdded')}</p>{/if}{/if}
+          {/if}
+        {/if}
+        {#if !(step === 0) && !(step === 1) && !(step === 2) && (payload)}
           <div class="flex flex-col gap-4 rounded-xl border p-4">
             <div class="flex flex-col gap-1"><h4 class="font-semibold [overflow-wrap:anywhere]">{payload.table.name}</h4>{#if spec.comment}<p class="text-sm text-muted-foreground [overflow-wrap:anywhere]">{spec.comment}</p>{/if}</div>
             <p class="text-xs text-muted-foreground">{t('guided.table.fieldsCount', { count: payload.table.columns.length })}</p>
@@ -194,7 +199,8 @@
       <div class="contents sm:flex sm:gap-2">
         {#if step > 0}<Button variant="outline" disabled={saving} onclick={() => changeStep(step - 1)}>{t('guided.back')}</Button>{/if}
         <Button class={step > 0 ? 'max-sm:col-span-2' : undefined} type="submit" form="create-table" disabled={saving || step === 3 && !ready}>
-          {#if saving}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{:else if step === 3}<Save data-icon="inline-start" aria-hidden="true" />{/if}
+          {#if (saving)}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{/if}
+          {#if !(saving) && (step === 3)}<Save data-icon="inline-start" aria-hidden="true" />{/if}
           {saving ? t('common.creating') : step === 3 ? t('tables.create.submit') : t('guided.next')}
         </Button>
       </div>

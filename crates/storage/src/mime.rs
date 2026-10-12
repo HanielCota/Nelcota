@@ -36,8 +36,11 @@ fn clean(value: &str) -> Option<String> {
 /// Whether the bucket accepts `mime`: no list accepts anything; entries are
 /// exact (`image/png`) or a family (`image/*`).
 pub fn allowed(mime: &str, list: Option<&[String]>) -> bool {
-    let Some(list) = list else {
-        return true;
+    let list = match list {
+        Some(list) => list,
+        _ => {
+            return true;
+        }
     };
     list.iter().any(|entry| match entry.strip_suffix("/*") {
         Some(family) => mime

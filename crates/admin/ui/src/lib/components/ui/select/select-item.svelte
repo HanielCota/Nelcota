@@ -32,9 +32,10 @@
 			{/if}
 		</span>
 		<span class="flex flex-1 gap-2 shrink-0 whitespace-nowrap">
-			{#if childrenProp}
+			{#if (childrenProp)}
 				{@render childrenProp({ selected, highlighted })}
-			{:else}
+			{/if}
+			{#if !(childrenProp)}
 				{label || value}
 			{/if}
 		</span>

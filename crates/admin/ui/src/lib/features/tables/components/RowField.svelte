@@ -65,16 +65,18 @@
     {/if}
   </div>
 
-  {#if field.isNull}
+  {#if (field.isNull)}
     <div class="flex h-9 items-center rounded-xl border border-dashed border-border-strong bg-well px-3 font-mono text-xs text-muted-foreground">NULL</div>
-  {:else if options.length}
+  {/if}
+  {#if !(field.isNull) && (options.length)}
     <Select.Root type="single" bind:value={field.value}>
       <Select.Trigger {id} class="w-full" aria-invalid={problem ? true : undefined} aria-describedby={descriptionId}>{field.value || placeholder || t('tables.row.select')}</Select.Trigger>
       <Select.Content>
         {#each options as option (option)}<Select.Item value={option}>{option}</Select.Item>{/each}
       </Select.Content>
     </Select.Root>
-  {:else if multiline}
+  {/if}
+  {#if !(field.isNull) && !(options.length) && (multiline)}
     <Textarea
       {id}
       class={['field-sizing-content min-h-20 text-sm', kind === 'json' && 'min-h-28 font-mono text-xs']}
@@ -83,7 +85,8 @@
       aria-invalid={problem ? true : undefined}
       aria-describedby={descriptionId}
     />
-  {:else}
+  {/if}
+  {#if !(field.isNull) && !(options.length) && !(multiline)}
     <Input
       {id}
       class={['text-sm', (kind === 'number' || kind === 'uuid' || kind === 'temporal') && 'font-mono text-xs']}
@@ -95,9 +98,10 @@
     />
   {/if}
 
-  {#if problem}
+  {#if (problem)}
     <p id={`${id}-error`} class="text-xs text-destructive">{t(`tables.row.problems.${problem}`)}</p>
-  {:else if preview && preview.text !== field.value}
+  {/if}
+  {#if !(problem) && (preview && preview.text !== field.value)}
     <p class="text-xs text-muted-foreground">= {preview.text}{canonicalType(column.type) === 'timestamp with time zone' ? ` ${t('tables.row.inYourTimeZone')}` : ''}</p>
   {/if}
   {#if kind === 'json' && !field.isNull && field.value.trim()}

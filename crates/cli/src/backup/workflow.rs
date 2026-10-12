@@ -103,16 +103,17 @@ pub fn restore(
     {
         bail!("restore cancelled (use --yes to skip the question)");
     }
-    let manifest = if files {
-        if !crate::backup::bundle_path(file)?
-            .join("manifest.json")
-            .is_file()
-        {
-            sync_files_down(host, project, file)?;
+    let manifest = match files {
+        true => {
+            if !crate::backup::bundle_path(file)?
+                .join("manifest.json")
+                .is_file()
+            {
+                sync_files_down(host, project, file)?;
+            }
+            Some(crate::backup::validate(file)?)
         }
-        Some(crate::backup::validate(file)?)
-    } else {
-        None
+        false => None,
     };
     // Public traffic gets a 503 until the restored app is healthy, and the
     // current state is kept first so a wrong dump can be undone.
@@ -132,11 +133,10 @@ pub fn restore(
     step(&format!("Restoring {}", file.display()));
     // Prepare immutable bytes first. A copy failure cannot leave restored
     // metadata pointing to missing files; extra versions are harmless on rollback.
-    let result = if let Some(manifest) = manifest.as_ref() {
-        crate::backup::restore_files(project, file, manifest)
-            .and_then(|()| restore_dump(project, file))
-    } else {
-        restore_dump(project, file)
+    let result = match manifest.as_ref() {
+        Some(manifest) => crate::backup::restore_files(project, file, manifest)
+            .and_then(|()| restore_dump(project, file)),
+        _ => restore_dump(project, file),
     };
     step("Starting the app");
     let healthy = project

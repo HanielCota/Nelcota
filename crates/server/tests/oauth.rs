@@ -105,16 +105,15 @@ async fn token(
     }
     tokio::time::sleep(delay).await;
     if good {
-        (
+        return (
             StatusCode::OK,
             Json(json!({ "access_token": "provider-token", "token_type": "bearer" })),
-        )
-    } else {
-        (
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": "bad_verification_code" })),
-        )
+        );
     }
+    (
+        StatusCode::BAD_REQUEST,
+        Json(json!({ "error": "bad_verification_code" })),
+    )
 }
 
 fn authorized(headers: &HeaderMap) -> bool {
@@ -584,10 +583,9 @@ async fn claim_serializes_with_pending_pkce(kind: &str) {
     let pending = h.sign_in().await;
     let code = pending["code"].clone();
     let id: uuid::Uuid = old["user"]["id"].as_str().unwrap().parse().unwrap();
-    let (path, page) = if kind == "recovery" {
-        ("/auth/v1/recover", RECOVERY_URL)
-    } else {
-        ("/auth/v1/magiclink", MAGIC_LINK_URL)
+    let (path, page) = match kind == "recovery" {
+        true => ("/auth/v1/recover", RECOVERY_URL),
+        false => ("/auth/v1/magiclink", MAGIC_LINK_URL),
     };
     h.app
         .post(path, None, json!({"email":"pkce-race@example.com"}))

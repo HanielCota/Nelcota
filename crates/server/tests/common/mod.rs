@@ -192,12 +192,14 @@ impl TestApp {
     }
 
     pub async fn spawn_with(options: Options) -> Self {
-        let (container, external_database, admin) =
-            if let Ok(url) = std::env::var("NELCOTA_TEST_DATABASE_URL") {
+        let (container, external_database, admin) = match std::env::var("NELCOTA_TEST_DATABASE_URL")
+        {
+            Ok(url) => {
                 let database = postgres::ExternalDatabase::create(&url).await;
                 let config = database.config();
                 (None, Some(database), config)
-            } else {
+            }
+            _ => {
                 let container = Postgres::default()
                     .with_tag("17-alpine")
                     .with_cmd([
@@ -217,7 +219,8 @@ impl TestApp {
                         .parse()
                         .unwrap();
                 (Some(container), None, admin)
-            };
+            }
+        };
 
         if external_database.is_none() {
             db::bootstrap(&admin, AUTHENTICATOR_PASSWORD, 10)

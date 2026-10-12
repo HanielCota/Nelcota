@@ -99,7 +99,8 @@
     <Sheet.Footer class="flex-row justify-end gap-2 border-t bg-muted/40 px-6 py-4">
       <Button variant="outline" disabled={saving} onclick={guard.request}>{t('common.cancel')}</Button>
       <Button type="submit" form="column-form" disabled={saving || actions.length === 0}>
-        {#if saving}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{:else}<Save data-icon="inline-start" aria-hidden="true" />{/if}
+        {#if (saving)}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{/if}
+        {#if !(saving)}<Save data-icon="inline-start" aria-hidden="true" />{/if}
         {saving ? t('common.saving') : original ? t('tables.columnSheet.saveChanges') : t('tables.columnSheet.addColumn')}
       </Button>
     </Sheet.Footer>

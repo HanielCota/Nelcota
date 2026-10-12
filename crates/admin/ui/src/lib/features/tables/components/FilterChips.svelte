@@ -26,7 +26,8 @@
 <div class="flex shrink-0 flex-wrap items-center gap-2 border-b px-4 py-2.5">
   {#if sort}
     <span class={chip}>
-      {#if sort.desc}<ArrowDown class="size-3 text-muted-foreground" />{:else}<ArrowUp class="size-3 text-muted-foreground" />{/if}
+      {#if (sort.desc)}<ArrowDown class="size-3 text-muted-foreground" />{/if}
+      {#if !(sort.desc)}<ArrowUp class="size-3 text-muted-foreground" />{/if}
       {t('tables.filters.sortedBy')} <span class="font-mono">{sort.column}</span>
       <button class={remove} aria-label={t('tables.filters.clearSort')} onclick={onclearsort}><X class="size-3" /></button>
     </span>

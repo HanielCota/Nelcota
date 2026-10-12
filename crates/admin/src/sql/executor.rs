@@ -46,27 +46,31 @@ impl Results {
                 let bytes = (0..row.len())
                     .map(|i| row.get(i).map_or(4, |v| v.len() + 8))
                     .sum::<usize>();
-                if self.current.rows.len() < MAX_ROWS
+                match self.current.rows.len() < MAX_ROWS
                     && self.bytes.saturating_add(bytes) <= MAX_BYTES
                 {
-                    self.bytes += bytes;
-                    self.current.rows.push(
-                        (0..row.len())
-                            .map(|i| row.get(i).map(str::to_owned))
-                            .collect(),
-                    );
-                } else {
-                    self.current.truncated = true;
+                    true => {
+                        self.bytes += bytes;
+                        self.current.rows.push(
+                            (0..row.len())
+                                .map(|i| row.get(i).map(str::to_owned))
+                                .collect(),
+                        );
+                    }
+                    false => {
+                        self.current.truncated = true;
+                    }
                 }
             }
-            SimpleQueryMessage::CommandComplete(count) => {
-                if retain {
+            SimpleQueryMessage::CommandComplete(count) => match retain {
+                true => {
                     self.current.count = count;
                     self.results.push(std::mem::take(&mut self.current));
-                } else {
+                }
+                false => {
                     self.results_truncated = true;
                 }
-            }
+            },
             _ => {}
         }
     }

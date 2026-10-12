@@ -33,13 +33,12 @@ pub enum Area {
 impl Area {
     pub fn of(path: &str) -> Self {
         if path.starts_with("/rest/") {
-            Area::Rest
-        } else if path.starts_with("/auth/") {
-            Area::Auth
-        } else if path.starts_with("/storage/") {
-            Area::Storage
-        } else {
-            Area::Other
+            return Area::Rest;
+        }
+        match () {
+            _ if path.starts_with("/auth/") => Area::Auth,
+            _ if path.starts_with("/storage/") => Area::Storage,
+            _ => Area::Other,
         }
     }
 }

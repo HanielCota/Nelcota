@@ -29,12 +29,18 @@ async fn with_buckets(app: &TestApp) {
 
 /// Files in the disk store.
 fn stored_files(dir: &Path) -> usize {
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return 0;
+    let entries = match std::fs::read_dir(dir) {
+        Ok(entries) => entries,
+        _ => {
+            return 0;
+        }
     };
     entries
         .map(|e| e.unwrap().path())
-        .map(|p| if p.is_dir() { stored_files(&p) } else { 1 })
+        .map(|p| match p.is_dir() {
+            true => stored_files(&p),
+            false => 1,
+        })
         .sum()
 }
 

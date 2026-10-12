@@ -43,7 +43,8 @@
         aria-pressed={visible}
         onclick={() => (visible = !visible)}
       >
-        {#if visible}<EyeOff class="size-4" />{:else}<Eye class="size-4" />{/if}
+        {#if (visible)}<EyeOff class="size-4" />{/if}
+        {#if !(visible)}<Eye class="size-4" />{/if}
       </button>
     </div>
     <Button variant="outline" class="h-10" onclick={generate}>{t('users.password.generate')}</Button>

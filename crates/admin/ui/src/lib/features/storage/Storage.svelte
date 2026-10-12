@@ -88,7 +88,7 @@
 {/snippet}
 
 {#snippet accessBadge(bucket: Bucket)}
-  <Badge variant={bucket.public ? 'outline' : 'secondary'}>{#if bucket.public}<Globe aria-hidden="true" />{:else}<Lock aria-hidden="true" />{/if}{bucket.public ? t('storage.public') : t('storage.private')}</Badge>
+  <Badge variant={bucket.public ? 'outline' : 'secondary'}>{#if (bucket.public)}<Globe aria-hidden="true" />{/if}{#if !(bucket.public)}<Lock aria-hidden="true" />{/if}{bucket.public ? t('storage.public') : t('storage.private')}</Badge>
 {/snippet}
 
 <div class="mx-auto w-full max-w-page px-4 pt-2 pb-12 sm:px-6 lg:px-8">
@@ -109,27 +109,31 @@
   </PageHeader>
 
   {#if error}<LoadError message={error} onretry={load} busy={loading} />{/if}
-  {#if data === null}
+  {#if (data === null)}
     {#if loading}<Skeleton class="h-48 rounded-3xl" />{/if}
-  {:else if !data.enabled}
+  {/if}
+  {#if !(data === null) && (!data.enabled)}
     <EmptyState icon={HardDrive} class="rounded-3xl bg-card" title={t('storage.disabled')} description={t('storage.disabledDescription')} />
-  {:else}
-    {#if data.buckets.length === 0}
+  {/if}
+  {#if !(data === null) && !(!data.enabled)}
+    {#if (data.buckets.length === 0)}
       <EmptyState icon={HardDrive} class="rounded-3xl bg-card" title={t('storage.empty')} description={t('storage.emptyDescription')}>
         {#snippet actions()}
           <Button variant="outline" onclick={() => edit(null)}><Plus data-icon="inline-start" aria-hidden="true" />{t('storage.newBucket')}</Button>
         {/snippet}
       </EmptyState>
-    {:else}
+    {/if}
+    {#if !(data.buckets.length === 0)}
       <div class="mb-4 grid gap-3 sm:flex sm:items-center sm:justify-between">
         <p class="text-sm text-muted-foreground">{t('storage.bucketHint')}</p>
         <div class="w-full shrink-0 sm:w-72"><SearchField bind:value={search} label={t('storage.search')} /></div>
       </div>
-      {#if !visible.length}
+      {#if (!visible.length)}
         <EmptyState icon={Search} class="rounded-3xl bg-card" title={t('common.noMatches')}>
           {#snippet actions()}<Button variant="outline" onclick={() => (search = '')}>{t('common.clearSearch')}</Button>{/snippet}
         </EmptyState>
-      {:else}
+      {/if}
+      {#if !(!visible.length)}
       <div class="grid gap-3 md:hidden">
         {#each visible as bucket (bucket.id)}
           <article class="min-w-0 rounded-3xl bg-card p-4">
@@ -176,9 +180,10 @@
                     : t('storage.serverLimit', { size: size(data.max_file_size) })}
                 </Table.Cell>
                 <Table.Cell class="hidden text-muted-foreground md:table-cell">
-                  {#if bucket.allowed_mime_types}
+                  {#if (bucket.allowed_mime_types)}
                     <span class="font-mono text-xs">{bucket.allowed_mime_types.join(', ')}</span>
-                  {:else}
+                  {/if}
+                  {#if !(bucket.allowed_mime_types)}
                     {t('storage.anyType')}
                   {/if}
                 </Table.Cell>
@@ -200,9 +205,10 @@
           <div class="grid min-w-0 gap-1">
             <h2 id="storage-access-note" class="text-sm font-semibold">{t('storage.notes.access.title')}</h2>
             <p class="text-sm text-muted-foreground">{t('storage.notes.access.text')}</p>
-            {#if data.buckets.length === 1}
+            {#if (data.buckets.length === 1)}
               <Button variant="outline" size="sm" class="mt-2 w-fit" href={href(`/storage/${enc(data.buckets[0].id)}`)}><ShieldCheck data-icon="inline-start" aria-hidden="true" />{t('storage.notes.access.action', { bucket: data.buckets[0].id })}</Button>
-            {:else}
+            {/if}
+            {#if !(data.buckets.length === 1)}
               <p class="text-sm text-muted-foreground">{t('storage.notes.access.openBucket')}</p>
             {/if}
           </div>

@@ -167,10 +167,13 @@ async fn access_log(request: Request, next: Next) -> Response {
     let response = next.run(request).await;
     let status = response.status().as_u16();
     let latency_ms = started.elapsed().as_secs_f64() * 1000.0;
-    if path == "/health" {
-        tracing::debug!(%method, path, status, latency_ms, "response");
-    } else {
-        tracing::info!(%method, path, status, latency_ms, "response");
+    match path == "/health" {
+        true => {
+            tracing::debug!(%method, path, status, latency_ms, "response");
+        }
+        false => {
+            tracing::info!(%method, path, status, latency_ms, "response");
+        }
     }
     response
 }
@@ -265,15 +268,14 @@ async fn json_errors(request: Request, next: Next) -> Response {
     let (parts, body) = response.into_parts();
     let status = parts.status;
     // axum's rejections explain themselves in a short plain-text body.
-    let text = if parts.headers.contains_key(header::CONTENT_ENCODING) {
-        None
-    } else {
-        axum::body::to_bytes(body, 4096)
+    let text = match parts.headers.contains_key(header::CONTENT_ENCODING) {
+        true => None,
+        false => axum::body::to_bytes(body, 4096)
             .await
             .ok()
             .and_then(|bytes| String::from_utf8(bytes.to_vec()).ok())
             .map(|text| text.trim().to_owned())
-            .filter(|text| !text.is_empty())
+            .filter(|text| !text.is_empty()),
     };
     let (code, default) = match status {
         StatusCode::BAD_REQUEST => ("bad_request", "bad request"),
@@ -330,16 +332,15 @@ async fn health(State(pool): State<Pool>) -> impl IntoResponse {
     };
     let version = env!("CARGO_PKG_VERSION");
     if ok {
-        (
+        return (
             StatusCode::OK,
             Json(json!({ "status": "ok", "version": version })),
-        )
-    } else {
-        (
-            StatusCode::SERVICE_UNAVAILABLE,
-            Json(json!({ "status": "unavailable", "version": version })),
-        )
+        );
     }
+    (
+        StatusCode::SERVICE_UNAVAILABLE,
+        Json(json!({ "status": "unavailable", "version": version })),
+    )
 }
 
 #[cfg(test)]

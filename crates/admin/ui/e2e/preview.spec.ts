@@ -36,8 +36,8 @@ for (const length of [null, '1']) {
         const body = new ReadableStream<Uint8Array>({
           pull(controller) {
             stats.bytes += 65536
-            if (stats.bytes > 8 * 1024 * 1024) controller.close()
-            else controller.enqueue(new Uint8Array(65536))
+            if (stats.bytes > 8 * 1024 * 1024) return controller.close()
+            controller.enqueue(new Uint8Array(65536))
           },
           cancel() { stats.cancelled = true },
         }, { highWaterMark: 0 })

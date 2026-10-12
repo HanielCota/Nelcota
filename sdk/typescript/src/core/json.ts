@@ -1,3 +1,5 @@
+import { NelcotaUsageError } from './errors.js';
+
 /** Decimal identity, independent of exponent notation or insignificant zeros. */
 function decimal(source: string): string {
   const [mantissa = '', power = '0'] = source.toLowerCase().split('e');
@@ -9,7 +11,6 @@ function decimal(source: string): string {
   const exponent = BigInt(power) - BigInt(fraction.length) + BigInt(digits.length - significant.length);
   return `${negative ? '-' : ''}${significant}e${exponent}`;
 }
-
 /**
  * Keep ordinary numbers numeric; preserve unsafe integers and decimals whose
  * digits would change as strings. This also works without JSON reviver source
@@ -27,4 +28,15 @@ export function parseJson(text: string): unknown {
     return JSON.stringify(token);
   });
   return changed ? JSON.parse(preserved) as unknown : parsed;
+}
+
+/** Explicit null is valid; a non-finite number must never silently become null. */
+export function encodeJson(input: unknown): string {
+  const text = JSON.stringify(input, (_key, original: unknown) => {
+    const value = original instanceof Number ? original.valueOf() : original;
+    if (typeof value === 'number' && !Number.isFinite(value)) throw new NelcotaUsageError('JSON numbers must be finite');
+    return value;
+  });
+  if (text === undefined) throw new NelcotaUsageError('Request body must be JSON serializable');
+  return text;
 }

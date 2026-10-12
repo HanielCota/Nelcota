@@ -272,10 +272,12 @@
 
         {#if topic === 'tables' && tableError}<LoadError message={tableError} onretry={loadTables} busy={tablesLoading} />{/if}
         {#if snippetsError}<LoadError message={snippetsError} onretry={loadSnippets} busy={snippetsLoading} />{/if}
-        {#if topic === 'tables' && (tablesLoading || snippetsLoading)}<Skeleton class="h-48 rounded-2xl" />
-        {:else if topic === 'tables' && !tables.length && !tableError}
+        {#if (topic === 'tables' && (tablesLoading || snippetsLoading))}<Skeleton class="h-48 rounded-2xl" />
+        {/if}
+        {#if !(topic === 'tables' && (tablesLoading || snippetsLoading)) && (topic === 'tables' && !tables.length && !tableError)}
           <EmptyState icon={Rows3} title={t('connect.noTables')}>{#snippet actions()}<Button href={href('/tables?create=true')}><Plus data-icon="inline-start" aria-hidden="true" />{t('tables.editor.newTable')}</Button>{/snippet}</EmptyState>
-        {:else}
+        {/if}
+        {#if !(topic === 'tables' && (tablesLoading || snippetsLoading)) && !(topic === 'tables' && !tables.length && !tableError)}
           <div class="grid gap-6 *:min-w-0">
             {#each snippets as snippet (snippet.id)}
               <article class="grid gap-2 *:min-w-0">

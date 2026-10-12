@@ -95,7 +95,7 @@
 {/snippet}
 
 <div class="rounded-2xl bg-well">
-  {#if !compact}
+  {#if (!compact)}
     <!-- One column at a time (Structure tab): visible labels instead of
          placeholders that vanish as soon as you type. -->
     <div class="grid gap-3 p-4 sm:grid-cols-3">
@@ -119,7 +119,8 @@
         />{t('tables.columns.requiredLong')}
       </label>
     </div>
-  {:else}
+  {/if}
+  {#if !(!compact)}
   <div class="flex flex-wrap items-center gap-2 p-3">
     {@render nameInput('w-32 font-mono text-xs')}
     {@render typeInput('w-32 font-mono text-xs')}

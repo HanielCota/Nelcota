@@ -87,7 +87,13 @@ impl Encoder {
                 Ok(csv_line(values.iter().map(Option::as_deref)))
             }
             // Postgres' text goes through untouched: numeric keeps every digit.
-            Format::Json => Ok(format!("{}\n  {json}", if index == 0 { "" } else { "," })),
+            Format::Json => Ok(format!(
+                "{}\n  {json}",
+                match index {
+                    0 => "",
+                    _ => ",",
+                }
+            )),
         }
     }
 
@@ -143,18 +149,16 @@ fn spreadsheet_formula(value: &str) -> bool {
 fn file_name(table: &str, format: Format) -> String {
     let base: String = table
         .chars()
-        .map(|c| {
-            if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
-                c
-            } else {
-                '_'
-            }
-        })
+        .map(
+            |c| match c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                true => c,
+                false => '_',
+            },
+        )
         .collect();
-    let base = if base.trim_matches('_').is_empty() {
-        "table".to_owned()
-    } else {
-        base
+    let base = match base.trim_matches('_').is_empty() {
+        true => "table".to_owned(),
+        false => base,
     };
     format!("{base}.{}", format.extension())
 }

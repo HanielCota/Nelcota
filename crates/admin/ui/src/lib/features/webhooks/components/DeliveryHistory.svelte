@@ -22,7 +22,7 @@
       <option value="">{t('webhooks.allStatuses')}</option>{#each statuses as value}<option value={value}>{statusLabel(value)}</option>{/each}
     </select>
   </div>
-  {#if data?.deliveries.length}
+  {#if (data?.deliveries.length)}
     <div class="overflow-x-auto rounded-3xl bg-card">
       <table class="w-full text-left text-sm"><thead><tr class="border-b border-border text-muted-foreground"><th class="p-4 font-medium">{t('webhooks.sent')}</th><th class="p-4 font-medium">{t('webhooks.configuration')}</th><th class="p-4 font-medium">{t('webhooks.event')}</th><th class="p-4 font-medium">{t('webhooks.result')}</th><th class="p-4"><span class="sr-only">{t('webhooks.view')}</span></th></tr></thead>
         <tbody>{#each data.deliveries as delivery (delivery.id)}<tr class="border-b border-border/60 last:border-0">
@@ -34,7 +34,8 @@
         </tr>{/each}</tbody>
       </table>
     </div>
-  {:else if data}<EmptyState class="rounded-3xl bg-card" icon={History} title={t('webhooks.noDeliveries')} description={t('webhooks.noDeliveriesHint')} />{/if}
+  {/if}
+  {#if !(data?.deliveries.length) && (data)}<EmptyState class="rounded-3xl bg-card" icon={History} title={t('webhooks.noDeliveries')} description={t('webhooks.noDeliveriesHint')} />{/if}
   <div class="flex flex-wrap justify-end gap-2">
     {#if hasCursor}<Button variant="outline" onclick={onfirst}>{t('webhooks.firstPage')}</Button>{/if}
     <Button variant="outline" disabled={!data?.next_cursor} onclick={onnext}>{t('webhooks.nextPage')}</Button>

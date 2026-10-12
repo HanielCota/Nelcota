@@ -9,8 +9,8 @@ function streamed(sizes: number[], headers?: HeadersInit) {
   const body = new ReadableStream<Uint8Array>({
     pull(controller) {
       const size = sizes[reads++]
-      if (size === undefined) controller.close()
-      else controller.enqueue(new Uint8Array(size))
+      if (size === undefined) return controller.close()
+      controller.enqueue(new Uint8Array(size))
     },
     cancel,
   }, { highWaterMark: 0 })

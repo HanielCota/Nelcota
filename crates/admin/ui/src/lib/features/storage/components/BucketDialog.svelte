@@ -64,10 +64,12 @@
       if (bucket) {
         await api.put(`/storage/buckets/${enc(bucket.id)}`, settings)
         toast.success(t('storage.dialog.saved', { bucket: bucket.id }))
-      } else {
-        await api.post('/storage/buckets', { id, ...settings })
-        toast.success(t('storage.dialog.created', { bucket: id }))
+        open = false
+        onsaved()
+        return
       }
+      await api.post('/storage/buckets', { id, ...settings })
+      toast.success(t('storage.dialog.created', { bucket: id }))
       open = false
       onsaved()
     } catch (e) {
@@ -103,8 +105,9 @@
               aria-describedby="bucket-id-hint"
               required
             />
-            {#if nameInvalid}<Field.Error id="bucket-id-hint">{t('storage.dialog.nameInvalid')}</Field.Error>
-            {:else}<Field.Description id="bucket-id-hint">{t('storage.dialog.nameHint')}</Field.Description>{/if}
+            {#if (nameInvalid)}<Field.Error id="bucket-id-hint">{t('storage.dialog.nameInvalid')}</Field.Error>
+            {/if}
+            {#if !(nameInvalid)}<Field.Description id="bucket-id-hint">{t('storage.dialog.nameHint')}</Field.Description>{/if}
           </Field.Field>
         {/if}
         <Field.Field>
@@ -126,8 +129,9 @@
             aria-invalid={!limitOk}
             aria-describedby="bucket-limit-hint"
           />
-          {#if !limitOk}<Field.Error id="bucket-limit-hint">{t('storage.dialog.limitInvalid')}</Field.Error>
-          {:else}<Field.Description id="bucket-limit-hint">
+          {#if (!limitOk)}<Field.Error id="bucket-limit-hint">{t('storage.dialog.limitInvalid')}</Field.Error>
+          {/if}
+          {#if !(!limitOk)}<Field.Description id="bucket-limit-hint">
             {t('storage.dialog.limitHint', { size: formatBytes(serverLimit, intlLocale()) })}
           </Field.Description>{/if}
         </Field.Field>
@@ -141,7 +145,9 @@
         <Dialog.Footer>
           <Button variant="outline" disabled={saving} onclick={guard.request}>{t('common.cancel')}</Button>
           <Button type="submit" disabled={saving || !ready}>
-            {#if saving}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{:else if bucket}<Save data-icon="inline-start" aria-hidden="true" />{:else}<HardDrive data-icon="inline-start" aria-hidden="true" />{/if}
+            {#if (saving)}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{/if}
+            {#if !(saving) && (bucket)}<Save data-icon="inline-start" aria-hidden="true" />{/if}
+            {#if !(saving) && !(bucket)}<HardDrive data-icon="inline-start" aria-hidden="true" />{/if}
             {saving ? t('common.saving') : bucket ? t('storage.dialog.save') : t('storage.dialog.create')}
           </Button>
         </Dialog.Footer>

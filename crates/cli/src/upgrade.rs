@@ -49,14 +49,16 @@ pub fn run(
             return Ok(());
         }
         Direction::Downgrade if !options.allow_downgrade => {
-            let hint = if version.is_none() {
-                format!(
-                    "this nelcota CLI ({this_binary}) is older than the app ({current}); \
+            let hint = match version.is_none() {
+                true => {
+                    format!(
+                        "this nelcota CLI ({this_binary}) is older than the app ({current}); \
                      reinstall the CLI (curl -fsSL https://raw.githubusercontent.com/Nelcota/Nelcota/main/scripts/install.sh | sh) or pass \
                      --version"
-                )
-            } else {
-                "pass --allow-downgrade if this is intended (migrations are not reverted)".into()
+                    )
+                }
+                false => "pass --allow-downgrade if this is intended (migrations are not reverted)"
+                    .into(),
             };
             bail!(
                 "{}: refusing to downgrade {current} → {target}: {hint}",

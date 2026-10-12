@@ -29,6 +29,77 @@ async fn serve(router: Router) -> (String, tokio::task::JoinHandle<()>) {
 }
 
 #[tokio::test]
+async fn non_finite_json_never_reaches_writes_or_rpc_but_explicit_null_does() {
+    #[derive(serde::Serialize)]
+    struct Input {
+        value: Option<f64>,
+        nested: Vec<f32>,
+    }
+    let calls = Arc::new(AtomicUsize::new(0));
+    let router = Router::new().fallback(any({
+        let calls = calls.clone();
+        move |body: String| {
+            calls.fetch_add(1, Ordering::SeqCst);
+            async move {
+                assert_eq!(
+                    serde_json::from_str::<Value>(&body).unwrap(),
+                    json!({ "value": null, "nested": [1.25] })
+                );
+                axum::Json(Value::Null)
+            }
+        }
+    }));
+    let (url, task) = serve(router).await;
+    let client = Client::builder(url).build().unwrap();
+    for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        let input = Input {
+            value: Some(value),
+            nested: Vec::new(),
+        };
+        for query in [
+            client.from("notes").insert(&input),
+            client.from("notes").update(&input),
+            client
+                .from("notes")
+                .upsert(&input, UpsertOptions::default()),
+            client.rpc("echo", &input),
+        ] {
+            assert!(matches!(
+                query.execute::<Value>().await.unwrap_err(),
+                Error::Usage(_)
+            ));
+        }
+    }
+    let nested = Input {
+        value: None,
+        nested: vec![f32::NAN],
+    };
+    assert!(matches!(
+        client
+            .from("notes")
+            .insert(&nested)
+            .execute::<Value>()
+            .await
+            .unwrap_err(),
+        Error::Usage(_)
+    ));
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    let valid = Input {
+        value: None,
+        nested: vec![1.25],
+    };
+    client
+        .from("notes")
+        .insert(&valid)
+        .execute::<Value>()
+        .await
+        .unwrap();
+    client.rpc("echo", &valid).execute::<Value>().await.unwrap();
+    assert_eq!(calls.load(Ordering::SeqCst), 2);
+    task.abort();
+}
+
+#[tokio::test]
 async fn error_bodies_are_bounded_without_losing_status_or_retry_after() {
     let router = Router::new().fallback(any(|request: Request| async move {
         let text = format!(
@@ -144,15 +215,16 @@ async fn read_write_headers_cardinality_and_rpc() {
             "prefer":parts.headers.get("prefer").map(|v| v.to_str().unwrap()),
             "body":serde_json::from_slice::<Value>(&body).ok()}),
                 );
-                let body = if parts.method == "HEAD" || parts.method == "DELETE" {
-                    ""
-                } else if parts.uri.path().ends_with("/rpc/add") {
-                    "12"
-                } else {
-                    r#"[{"id":1,"body":"hello"}]"#
+                let body = match () {
+                    _ if parts.method == "HEAD" || parts.method == "DELETE" => "",
+                    _ if parts.uri.path().ends_with("/rpc/add") => "12",
+                    _ => r#"[{"id":1,"body":"hello"}]"#,
                 };
                 Response::builder()
-                    .status(if parts.method == "DELETE" { 204 } else { 200 })
+                    .status(match parts.method == "DELETE" {
+                        true => 204,
+                        false => 200,
+                    })
                     .header("content-range", "0-0/17")
                     .body(Body::from(body))
                     .unwrap()
@@ -264,16 +336,15 @@ async fn retries_are_bounded_and_mutations_are_never_replayed() {
         .fallback(any(
             |State(count): State<Arc<AtomicUsize>>, request: Request| async move {
                 let n = count.fetch_add(1, Ordering::SeqCst);
-                if request.method() == "GET" && n == 2 {
-                    Response::builder().body(Body::from("[]")).unwrap()
-                } else {
-                    Response::builder()
+                match request.method() == "GET" && n == 2 {
+                    true => Response::builder().body(Body::from("[]")).unwrap(),
+                    false => Response::builder()
                         .status(503)
                         .header("retry-after", "0")
                         .body(Body::from(
                             r#"{"code":"unavailable","message":"try later"}"#,
                         ))
-                        .unwrap()
+                        .unwrap(),
                 }
             },
         ))

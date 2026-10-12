@@ -26,7 +26,8 @@
   <p class="text-base font-semibold">{title}</p>
   {#if description || children}
     <p class="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-      {#if children}{@render children()}{:else}{description}{/if}
+      {#if (children)}{@render children()}{/if}
+      {#if !(children)}{description}{/if}
     </p>
   {/if}
   {#if actions}<div class="mt-4 flex flex-wrap justify-center gap-2">{@render actions()}</div>{/if}

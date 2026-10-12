@@ -144,16 +144,15 @@ fn group(kind: &str, conditions: impl IntoIterator<Item = Condition>) -> Conditi
     let items: Vec<_> = conditions.into_iter().collect();
     let leaves = items.iter().map(|c| c.leaves).sum();
     let depth = items.iter().map(|c| c.depth).max().unwrap_or(0) + 1;
-    let encoded = if items.is_empty() || leaves > 100 || depth > 8 {
-        Err(Error::Usage(
+    let encoded = match items.is_empty() || leaves > 100 || depth > 8 {
+        true => Err(Error::Usage(
             "groups need 1–100 filters and at most 8 nested levels".into(),
-        ))
-    } else {
-        items
+        )),
+        false => items
             .into_iter()
             .map(|c| c.encoded)
             .collect::<Result<Vec<_>>>()
-            .map(|items| format!("{kind}({})", items.join(",")))
+            .map(|items| format!("{kind}({})", items.join(","))),
     };
     Condition {
         encoded,
@@ -163,11 +162,11 @@ fn group(kind: &str, conditions: impl IntoIterator<Item = Condition>) -> Conditi
 }
 
 fn scalar(value: impl Serialize) -> Result<String> {
-    let value = serde_json::to_value(value).map_err(|e| Error::Usage(e.to_string()))?;
+    let value = crate::json::to_value(&value)?;
     encoding::scalar(&value)
 }
 fn in_list(values: impl Serialize) -> Result<String> {
-    let value = serde_json::to_value(values).map_err(|e| Error::Usage(e.to_string()))?;
+    let value = crate::json::to_value(&values)?;
     let items = value
         .as_array()
         .filter(|v| !v.is_empty())
@@ -273,22 +272,18 @@ impl Query {
         self.prefer.push(value.into());
     }
     fn set_body(&mut self, value: &impl Serialize, many: bool) {
-        let value = serde_json::to_value(value)
-            .map_err(|e| Error::Usage(e.to_string()))
-            .and_then(|v| {
-                let good = v.is_object()
-                    || (many
-                        && v.as_array()
-                            .is_some_and(|a| !a.is_empty() && a.iter().all(Value::is_object)));
-                if good {
-                    Ok(v)
-                } else {
-                    Err(Error::Usage(
-                        "body must be an object or a nonempty array of objects for insert/upsert"
-                            .into(),
-                    ))
-                }
-            });
+        let value = crate::json::to_value(value).and_then(|v| {
+            let good = v.is_object()
+                || (many
+                    && v.as_array()
+                        .is_some_and(|a| !a.is_empty() && a.iter().all(Value::is_object)));
+            if good {
+                return Ok(v);
+            }
+            Err(Error::Usage(
+                "body must be an object or a nonempty array of objects for insert/upsert".into(),
+            ))
+        });
         if let Some(value) = self.record(value) {
             self.body = Some(value);
         }
@@ -329,10 +324,9 @@ impl Query {
         }
         self.preference(
             "resolution=",
-            if options.ignore_duplicates {
-                "resolution=ignore-duplicates"
-            } else {
-                "resolution=merge-duplicates"
+            match options.ignore_duplicates {
+                true => "resolution=ignore-duplicates",
+                false => "resolution=merge-duplicates",
             },
         );
         self
@@ -425,14 +419,17 @@ impl Query {
         self
     }
     pub fn matches(mut self, values: &impl Serialize) -> Self {
-        let values = serde_json::to_value(values).map_err(|e| Error::Usage(e.to_string()));
+        let values = crate::json::to_value(values);
         if let Some(value) = self.record(values) {
-            if let Some(values) = value.as_object() {
-                for (key, value) in values {
-                    self = self.eq(key, value);
+            match value.as_object() {
+                Some(values) => {
+                    for (key, value) in values {
+                        self = self.eq(key, value);
+                    }
                 }
-            } else {
-                self.record::<()>(Err(Error::Usage("matches needs an object".into())));
+                _ => {
+                    self.record::<()>(Err(Error::Usage("matches needs an object".into())));
+                }
             }
         }
         self
@@ -482,15 +479,27 @@ impl Query {
     pub fn order_on(mut self, reference: Option<&str>, column: &str, order: Order) -> Self {
         self.record(encoding::identifier(column));
         let key = self.referenced("order", reference);
-        let mut value = format!("{column}.{}", if order.descending { "desc" } else { "asc" });
+        let mut value = format!(
+            "{column}.{}",
+            match order.descending {
+                true => "desc",
+                false => "asc",
+            }
+        );
         if let Some(first) = order.nulls_first {
-            value.push_str(if first { ".nullsfirst" } else { ".nullslast" });
+            value.push_str(match first {
+                true => ".nullsfirst",
+                false => ".nullslast",
+            });
         }
-        if let Some((_, previous)) = self.params.iter_mut().find(|(k, _)| k == &key) {
-            previous.push(',');
-            previous.push_str(&value);
-        } else {
-            self.params.push((key, value));
+        match self.params.iter_mut().find(|(k, _)| k == &key) {
+            Some((_, previous)) => {
+                previous.push(',');
+                previous.push_str(&value);
+            }
+            _ => {
+                self.params.push((key, value));
+            }
         }
         self
     }
@@ -605,10 +614,9 @@ impl Query {
                         0 if mode == Cardinality::Maybe => Value::Null,
                         actual => {
                             return Err(Error::Cardinality {
-                                expected: if mode == Cardinality::One {
-                                    "exactly one"
-                                } else {
-                                    "at most one"
+                                expected: match mode == Cardinality::One {
+                                    true => "exactly one",
+                                    false => "at most one",
                                 },
                                 actual,
                             });

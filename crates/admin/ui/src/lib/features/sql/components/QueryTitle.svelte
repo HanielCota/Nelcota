@@ -45,7 +45,7 @@
 </script>
 
 <div class="flex min-w-0 items-center gap-2">
-  {#if editing}
+  {#if (editing)}
     <input
       bind:this={input}
       bind:value
@@ -55,7 +55,8 @@
       aria-label={t('sql.dialog.renameTitle')}
       class="h-8 w-64 max-w-full rounded-md border bg-background px-2 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring"
     />
-  {:else}
+  {/if}
+  {#if !(editing)}
     <h1 class="min-w-0">
       <button
         type="button"

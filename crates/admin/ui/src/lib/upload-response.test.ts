@@ -35,8 +35,10 @@ describe('XHR upload response budget', () => {
     const xhr = new Reply('1')
     const overflow = vi.fn()
     const cleanup = guardUploadResponse(xhr as unknown as XMLHttpRequest, 1, overflow)
-    if (mode === 'loadend') xhr.dispatchEvent(new Event('loadend'))
-    else cleanup()
+    switch (mode) {
+      case 'loadend': xhr.dispatchEvent(new Event('loadend')); break
+      default: cleanup(); break
+    }
     xhr.progress(2)
     expect(overflow).not.toHaveBeenCalled()
   })

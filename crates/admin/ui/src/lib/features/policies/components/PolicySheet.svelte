@@ -117,8 +117,12 @@
     try {
       const snapshot = $state.snapshot(payload)
       const options = { prepareAccess: !advanced || prepareAccess, ownerColumn: addOwner ? 'user_id' : undefined }
-      if (original) await ddl.replacePolicy(table, original.name, snapshot, false, options)
-      else await ddl.createPolicy(table, snapshot, false, options)
+      if (original) {
+        await ddl.replacePolicy(table, original.name, snapshot, false, options)
+        toast.success(t('policies.sheet.saved', { name: snapshot.name })); open = false; onsaved()
+        return
+      }
+      await ddl.createPolicy(table, snapshot, false, options)
       toast.success(t('policies.sheet.saved', { name: snapshot.name })); open = false; onsaved()
     } catch (error) { failure = errorMessage(error) }
     finally { saving = false }
@@ -136,33 +140,38 @@
       <fieldset class="contents" disabled={saving} aria-busy={saving}>
         {#if !original}<Button variant="ghost" size="sm" class="self-start" onclick={() => { advanced = !advanced; failure = ''; attempted = false }}>{advanced ? t('guided.policy.guided') : t('guided.policy.advanced')}</Button>{/if}
         {#if loadError}<Alert.Root variant="destructive"><Alert.Description>{loadError}</Alert.Description><Button variant="outline" size="sm" onclick={loadColumns}>{t('guided.policy.retry')}</Button></Alert.Root>{/if}
-        {#if advanced}
+        {#if (advanced)}
           <p class="text-sm text-muted-foreground">{t('guided.policy.advancedHint')}</p>
           <Field.Group><Field.Field data-invalid={attempted && !!nameError}><Field.Label for="policy-name">{t('guided.policy.name')}</Field.Label><Input id="policy-name" bind:value={custom.name} aria-invalid={attempted && !!nameError} />{#if attempted && nameError}<Field.Error>{nameError === 'duplicate' ? t('guided.policy.duplicate') : t(`guided.problems.${nameError}`)}</Field.Error>{/if}</Field.Field></Field.Group>
           <PolicySqlFields bind:policy={custom} {ownerColumn} />
           <Field.Group><Field.Field orientation="horizontal"><Checkbox id="policy-prepare" bind:checked={prepareAccess} /><Field.Content><Field.Label for="policy-prepare">{t('guided.policy.activate')}</Field.Label><Field.Description>{t('guided.policy.activateHint')}</Field.Description></Field.Content></Field.Field></Field.Group>
           {#if !rlsEnabled && !prepareAccess}<Alert.Root><Alert.Description>{t('guided.policy.inactive')}</Alert.Description></Alert.Root>{/if}
           <SqlPreview {preview} />
-        {:else}
+        {/if}
+        {#if !(advanced)}
           <div class="flex flex-col gap-1.5"><h3 bind:this={heading} tabindex="-1" class="text-lg font-semibold outline-none">{step === 0 ? t('guided.policy.whoTitle') : step === 1 ? t('guided.policy.actionTitle') : t('guided.review')}</h3>{#if step === 2}<p class="text-sm text-muted-foreground">{t('guided.policy.reviewHint')}</p>{/if}</div>
           {#if loading}<p class="text-sm text-muted-foreground" role="status">{t('guided.policy.loading')}</p>{/if}
-          {#if step === 0}
+          {#if (step === 0)}
             <AccessChoices bind:audience bind:level part="who" />
-          {:else if step === 1}
+          {/if}
+          {#if !(step === 0) && (step === 1)}
             <AccessChoices bind:audience bind:level part="action" />
             {#if audience === 'owner' && !loading && !loadError}
-              {#if !ownerColumns.length}
-                {#if !columns.some(column => column.name === 'user_id')}
+              {#if (!ownerColumns.length)}
+                {#if (!columns.some(column => column.name === 'user_id'))}
                   <Field.Group><Field.Field orientation="horizontal"><Checkbox id="policy-add-owner" bind:checked={createOwner} /><Field.Content><Field.Label for="policy-add-owner">{t('guided.policy.addOwner')}</Field.Label><Field.Description>{t('guided.policy.addOwnerHint')}</Field.Description></Field.Content></Field.Field></Field.Group>
-                {:else}
+                {/if}
+                {#if !(!columns.some(column => column.name === 'user_id'))}
                   <Alert.Root><Alert.Description>{t('guided.policy.noOwner')}</Alert.Description></Alert.Root>
                   <div class="flex flex-wrap gap-2"><Button variant="outline" href={href(`/tables/${encodeURIComponent(table)}/structure`)} target="_blank" rel="noopener">{t('guided.policy.structure')}</Button><Button variant="ghost" onclick={loadColumns}>{t('guided.policy.retry')}</Button></div>
                 {/if}
-              {:else}
+              {/if}
+              {#if !(!ownerColumns.length)}
                 <Field.Group><Field.Field><Field.Label for="policy-owner-column">{t('guided.policy.ownerField')}</Field.Label><Select.Root type="single" bind:value={ownerColumn}><Select.Trigger id="policy-owner-column" class="w-full"><span class="truncate">{ownerColumn}</span></Select.Trigger><Select.Content><Select.Group>{#each ownerColumns as column}<Select.Item value={column.name}>{column.name}</Select.Item>{/each}</Select.Group></Select.Content></Select.Root><Field.Description>{t('guided.policy.ownerHint')}</Field.Description></Field.Field></Field.Group>
               {/if}
             {/if}
-          {:else}
+          {/if}
+          {#if !(step === 0) && !(step === 1)}
             <Alert.Root><Alert.Title>{table}</Alert.Title><Alert.Description>{summary}</Alert.Description></Alert.Root>
             {#if audience === 'owner'}<p class="text-sm text-muted-foreground">{t('guided.policy.ownerSummary', { column: selectedOwner })}</p>{/if}
             {#if addOwner}<Alert.Root><Alert.Description>{t('guided.policy.newOwnerReview')}</Alert.Description></Alert.Root>{/if}
@@ -179,7 +188,8 @@
       <div class="contents sm:flex sm:gap-2">
         {#if !advanced && step > 0}<Button variant="outline" disabled={saving} onclick={() => changeStep(step - 1)}>{t('guided.back')}</Button>{/if}
         <Button class={advanced || step > 0 ? 'max-sm:col-span-2' : undefined} type="submit" form="policy-form" disabled={saving || !advanced && (loading || !!loadError || step === 1 && !ownerValid)}>
-          {#if saving}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{:else if advanced || step === 2}<Save data-icon="inline-start" aria-hidden="true" />{/if}
+          {#if (saving)}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{/if}
+          {#if !(saving) && (advanced || step === 2)}<Save data-icon="inline-start" aria-hidden="true" />{/if}
           {saving ? t('common.saving') : !advanced && step < 2 ? t('guided.next') : original ? t('policies.sheet.savePolicy') : t('guided.policy.submit')}
         </Button>
       </div>

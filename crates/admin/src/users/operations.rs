@@ -132,10 +132,9 @@ const MIN_PASSWORD: usize = 8;
 
 fn check_password(password: &str) -> Result<(), ApiError> {
     validate_password(password).map_err(|error| {
-        let code = if password.chars().count() < MIN_PASSWORD {
-            "password_too_short"
-        } else {
-            "password_too_long"
+        let code = match password.chars().count() < MIN_PASSWORD {
+            true => "password_too_short",
+            false => "password_too_long",
         };
         ApiError::bad_request(code, error.0)
             .params(json!({ "min": MIN_PASSWORD, "max": MAX_PASSWORD }))
@@ -170,16 +169,15 @@ pub(super) async fn create(
             &[&email, &hash],
         )
         .await
-        .map_err(|error| {
-            if error.code() == Some(&SqlState::UNIQUE_VIOLATION) {
-                ApiError::conflict(
+        .map_err(
+            |error| match error.code() == Some(&SqlState::UNIQUE_VIOLATION) {
+                true => ApiError::conflict(
                     "user_already_exists",
                     "a user with this email already exists",
-                )
-            } else {
-                ApiError::from(error)
-            }
-        })?;
+                ),
+                false => ApiError::from(error),
+            },
+        )?;
     tracing::info!("user created by the panel");
     Ok(CreatedUser {
         id: row.get(0),

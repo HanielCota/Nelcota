@@ -59,7 +59,8 @@
       <ImageUp />{profile.avatar === null ? t('shell.account.addPhoto') : t('shell.account.changePhoto')}
     </DropdownMenu.Item>
     <DropdownMenu.Item onclick={toggleMode}>
-      {#if mode.current === 'dark'}<Sun />{t('shell.account.lightTheme')}{:else}<Moon />{t('shell.account.darkTheme')}{/if}
+      {#if (mode.current === 'dark')}<Sun />{t('shell.account.lightTheme')}{/if}
+      {#if !(mode.current === 'dark')}<Moon />{t('shell.account.darkTheme')}{/if}
     </DropdownMenu.Item>
     <DropdownMenu.Sub>
       <DropdownMenu.SubTrigger>

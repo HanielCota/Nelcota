@@ -42,8 +42,11 @@ pub(super) fn parse_select(
             continue;
         }
         if item.contains('(') {
-            let Some(catalog) = catalog else {
-                return Err(invalid("embedding relations is not available here"));
+            let catalog = match catalog {
+                Some(catalog) => catalog,
+                _ => {
+                    return Err(invalid("embedding relations is not available here"));
+                }
             };
             select
                 .embeds
@@ -349,10 +352,9 @@ pub(super) fn parse_in_list(value: &str) -> Result<Vec<String>, QueryError> {
 
 pub(super) fn finish_item(item: &str, quoted: bool) -> String {
     if quoted {
-        item.to_owned()
-    } else {
-        item.trim().to_owned()
+        return item.to_owned();
     }
+    item.trim().to_owned()
 }
 
 pub(super) fn parse_filter(table: &Table, key: &str, value: &str) -> Result<Filter, QueryError> {
@@ -476,8 +478,11 @@ pub(super) fn unquote_operand(filter: &str) -> Result<String, QueryError> {
         Some(rest) => ("not.", rest),
         None => ("", filter),
     };
-    let Some((op, operand)) = rest.split_once('.') else {
-        return Ok(filter.to_owned());
+    let (op, operand) = match rest.split_once('.') {
+        Some((op, operand)) => (op, operand),
+        _ => {
+            return Ok(filter.to_owned());
+        }
     };
     if op == "in" || !operand.starts_with('"') {
         return Ok(filter.to_owned());

@@ -1,0 +1,1 @@
+function e(e){if(e===null||!/^\d+$/.test(e))return 0;let t=Number(e);return Number.isSafeInteger(t)?t:0}export{e as t};

@@ -22,20 +22,21 @@ struct S3 {
 pub fn run(host: &Host, args: InitArgs) -> anyhow::Result<()> {
     // Validate every argument before writing anything: a rejected first call
     // must not leave a half-created host behind.
-    let existing = if host.exists() {
-        let manifest = host.manifest()?;
-        if args.local && !manifest.local {
-            bail!("this host is not local; --local only applies when the host is created");
-        }
-        if manifest.runtime == Runtime::Systemd && !manifest.projects.is_empty() {
-            bail!(
-                "this host runs its project with systemd, which holds one project per machine; \
+    let existing = match host.exists() {
+        true => {
+            let manifest = host.manifest()?;
+            if args.local && !manifest.local {
+                bail!("this host is not local; --local only applies when the host is created");
+            }
+            if manifest.runtime == Runtime::Systemd && !manifest.projects.is_empty() {
+                bail!(
+                    "this host runs its project with systemd, which holds one project per machine; \
                  use a Docker host (nelcota init on another folder or machine) for more"
-            );
+                );
+            }
+            Some(manifest)
         }
-        Some(manifest)
-    } else {
-        None
+        false => None,
     };
     let base_domain = match &args.base_domain {
         Some(base) => Some(normalize_base_domain(base)?),
@@ -163,16 +164,19 @@ fn create_host(
     if args.runtime == Runtime::Systemd {
         native::check_machine()?;
     }
-    if args.skip_checks {
-        warn("checks skipped (--skip-checks)");
-    } else {
-        if args.runtime == Runtime::Docker {
-            checks::docker()?;
+    match args.skip_checks {
+        true => {
+            warn("checks skipped (--skip-checks)");
         }
-        checks::ports()?;
-        match checks::total_ram_mb() {
-            Some(mb) => ok(&format!("RAM: {mb} MB")),
-            None => warn("could not measure RAM; assuming 2 GB"),
+        false => {
+            if args.runtime == Runtime::Docker {
+                checks::docker()?;
+            }
+            checks::ports()?;
+            match checks::total_ram_mb() {
+                Some(mb) => ok(&format!("RAM: {mb} MB")),
+                None => warn("could not measure RAM; assuming 2 GB"),
+            }
         }
     }
 

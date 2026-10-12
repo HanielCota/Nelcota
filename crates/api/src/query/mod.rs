@@ -91,10 +91,11 @@ impl Default for Sql {
 impl Sql {
     fn json(&self, expression: &str) -> String {
         if self.checked_json {
-            format!("extensions.nelcota_check_json(to_json({expression}), {MAX_JSON_BYTES})")
-        } else {
-            format!("to_json({expression})")
+            return format!(
+                "extensions.nelcota_check_json(to_json({expression}), {MAX_JSON_BYTES})"
+            );
         }
+        format!("to_json({expression})")
     }
     fn param(&mut self, param: Param) -> String {
         self.params.push(param);
@@ -1010,10 +1011,9 @@ mod tests {
             [("select", "id,orders(id)"), ("orders.limit", "-1")],
             [("select", "id,orders(id)"), ("orders.or", "(total.zz.1)")],
         ] {
-            let table = if q[0].1.contains("customers") {
-                "orders"
-            } else {
-                "customers"
+            let table = match q[0].1.contains("customers") {
+                true => "orders",
+                false => "customers",
             };
             assert!(request_of(table, &q).is_err(), "{q:?}");
         }

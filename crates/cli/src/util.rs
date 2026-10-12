@@ -43,7 +43,10 @@ fn format_timestamp(secs: u64) -> String {
     let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
     let mp = (5 * doy + 2) / 153;
     let day = doy - (153 * mp + 2) / 5 + 1;
-    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    let month = match mp < 10 {
+        true => mp + 3,
+        false => mp - 9,
+    };
     let year = yoe + era * 400 + i64::from(month <= 2);
     format!(
         "{year:04}{month:02}{day:02}T{:02}{:02}{:02}Z",
@@ -73,10 +76,13 @@ pub fn interactive() -> bool {
 
 /// Question with a default value (Enter accepts the default).
 pub fn ask(question: &str, default: &str) -> String {
-    if default.is_empty() {
-        print!("{question}: ");
-    } else {
-        print!("{question} [{default}]: ");
+    match default.is_empty() {
+        true => {
+            print!("{question}: ");
+        }
+        false => {
+            print!("{question} [{default}]: ");
+        }
     }
     let _ = std::io::stdout().flush();
     let mut line = String::new();
@@ -119,11 +125,17 @@ pub fn confirm(question: &str) -> bool {
 
 /// GET /health over plain TCP (the image is `scratch`, no curl).
 pub fn healthcheck(addr: &str) -> bool {
-    let Some(socket) = addr.to_socket_addrs().ok().and_then(|mut a| a.next()) else {
-        return false;
+    let socket = match addr.to_socket_addrs().ok().and_then(|mut a| a.next()) {
+        Some(socket) => socket,
+        _ => {
+            return false;
+        }
     };
-    let Ok(mut stream) = TcpStream::connect_timeout(&socket, Duration::from_secs(2)) else {
-        return false;
+    let mut stream = match TcpStream::connect_timeout(&socket, Duration::from_secs(2)) {
+        Ok(stream) => stream,
+        _ => {
+            return false;
+        }
     };
     let _ = stream.set_read_timeout(Some(Duration::from_secs(3)));
     let request = "GET /health HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n";

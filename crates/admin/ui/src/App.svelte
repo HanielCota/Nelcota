@@ -43,9 +43,9 @@
       if (e instanceof ApiError && e.status === 401) {
         offline = null
         session.email = null
-      } else {
-        offline = e
+        return
       }
+      offline = e
     } finally {
       checking = false
     }
@@ -67,7 +67,7 @@
 <!-- While the server is unreachable, try again by itself when the network or
      the window comes back. -->
 <svelte:window ononline={retryWhenOffline} onfocus={retryWhenOffline} />
-{#if session.email === undefined && offline}
+{#if (session.email === undefined && offline)}
   <!-- On a card like the login and the 404. -->
   <main class="flex min-h-dvh items-center justify-center bg-background px-4 py-12">
     <div class="flex w-full max-w-md flex-col items-center gap-6 rounded-3xl bg-card px-8 pt-8 pb-10 text-center" role="alert">
@@ -81,11 +81,14 @@
       </Button>
     </div>
   </main>
-{:else if session.email === undefined}
+{/if}
+{#if !(session.email === undefined && offline) && (session.email === undefined)}
   <LoadingScreen />
-{:else if session.email === null}
+{/if}
+{#if !(session.email === undefined && offline) && !(session.email === undefined) && (session.email === null)}
   <Login />
-{:else}
+{/if}
+{#if !(session.email === undefined && offline) && !(session.email === undefined) && !(session.email === null)}
   {#await import('$lib/shell/AuthenticatedShell.svelte')}
     <LoadingScreen />
   {:then shell}

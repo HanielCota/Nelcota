@@ -187,10 +187,9 @@ pub fn create(schema: &str, table: &str, def: &PolicyDef) -> Result<Vec<String>>
         "CREATE POLICY {} ON {} AS {} FOR {} TO {}",
         ident(&def.name),
         qualified(schema, table),
-        if def.permissive {
-            "PERMISSIVE"
-        } else {
-            "RESTRICTIVE"
+        match def.permissive {
+            true => "PERMISSIVE",
+            false => "RESTRICTIVE",
         },
         def.command.as_sql(),
         roles.join(", ")

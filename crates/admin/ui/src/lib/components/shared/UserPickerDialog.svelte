@@ -41,11 +41,13 @@
 <Command.Dialog bind:open title={labels.pickTitle} description={labels.authenticatedHint}>
   <Command.Input bind:value={search} aria-label={labels.search} placeholder={labels.search} />
   <Command.List aria-label={labels.pickTitle} class="max-h-[min(60vh,360px)]">
-    {#if resource.error}
+    {#if (resource.error)}
       <p role="alert" class="px-4 py-6 text-sm text-destructive">{errorMessage(resource.error)}</p>
-    {:else if resource.data && resource.data.users.length === 0}
+    {/if}
+    {#if !(resource.error) && (resource.data && resource.data.users.length === 0)}
       <p role="status" class="px-4 py-6 text-sm text-muted-foreground">{search.trim() ? labels.empty : labels.noUsers}</p>
-    {:else if resource.data}
+    {/if}
+    {#if !(resource.error) && !(resource.data && resource.data.users.length === 0) && (resource.data)}
       <Command.Group heading={labels.pickTitle}>
         {#each resource.data.users as user (user.id)}
           <Command.Item value={`${user.email} ${user.id}`} onSelect={() => pick({ id: user.id, email: user.email })}>
@@ -53,7 +55,8 @@
           </Command.Item>
         {/each}
       </Command.Group>
-    {:else}
+    {/if}
+    {#if !(resource.error) && !(resource.data && resource.data.users.length === 0) && !(resource.data)}
       <p role="status" class="px-4 py-6 text-sm text-muted-foreground">{labels.loading}</p>
     {/if}
   </Command.List>

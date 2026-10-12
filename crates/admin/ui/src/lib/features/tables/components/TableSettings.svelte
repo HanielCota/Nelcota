@@ -92,7 +92,7 @@
         <Input id="settings-comment" bind:value={comment} placeholder={t('tables.settings.descriptionPlaceholder')} />
       </div>
       <!-- Filled only while there is something to save, so the state reads at a glance. -->
-      <Button type="submit" variant={identityChanges.length ? 'default' : 'outline'} disabled={busy !== null || identityChanges.length === 0}>{#if busy === 'identity'}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{:else}<Save data-icon="inline-start" aria-hidden="true" />{/if}{busy === 'identity' ? t('common.saving') : t('tables.settings.save')}</Button>
+      <Button type="submit" variant={identityChanges.length ? 'default' : 'outline'} disabled={busy !== null || identityChanges.length === 0}>{#if (busy === 'identity')}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{/if}{#if !(busy === 'identity')}<Save data-icon="inline-start" aria-hidden="true" />{/if}{busy === 'identity' ? t('common.saving') : t('tables.settings.save')}</Button>
       {#if identityChanges.length && busy !== 'identity'}
         <p class="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground sm:col-span-3" role="status">
           {t('tables.settings.unsaved')}
@@ -103,13 +103,14 @@
   </section>
 
   <section class="flex flex-wrap items-center gap-4 rounded-3xl bg-well p-5">
-    {#if structure.rls_enabled}
+    {#if (structure.rls_enabled)}
       <div class="min-w-0 flex-1 basis-60">
         <h2 class="text-base font-semibold">{t('tables.settings.rls')}</h2>
         <p class="mt-0.5 text-sm text-muted-foreground">{t('tables.settings.rlsOn')}</p>
       </div>
       <Button variant="outline" disabled={busy !== null} onclick={() => (disableRlsOpen = true)}><ShieldOff data-icon="inline-start" aria-hidden="true" />{t('tables.settings.disable')}</Button>
-    {:else}
+    {/if}
+    {#if !(structure.rls_enabled)}
       <div class="min-w-0 flex-1 basis-60">
         <h2 class="text-base font-semibold">{t('tables.settings.rls')}</h2>
         <p class="mt-0.5 text-sm text-destructive">{t('tables.settings.rlsOff')}</p>
@@ -120,7 +121,7 @@
           // No policy yet: RLS would hide every row from the API; ask first.
           if (policies === 0) { enableRlsOpen = true; return }
           apply([{ action: 'set_rls', enabled: true }], 'rls').catch(() => {})
-        }}>{#if busy === 'rls'}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{:else}<ShieldCheck data-icon="inline-start" aria-hidden="true" />{/if}{t('tables.settings.enableRls')}</Button>
+        }}>{#if (busy === 'rls')}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{/if}{#if !(busy === 'rls')}<ShieldCheck data-icon="inline-start" aria-hidden="true" />{/if}{t('tables.settings.enableRls')}</Button>
     {/if}
   </section>
 
@@ -139,7 +140,8 @@
         </p>
       {/if}
       <Button variant={pendingGrants.length ? 'default' : 'outline'} disabled={busy !== null || pendingGrants.length === 0} onclick={() => apply(pendingGrants, 'grants').catch(() => {})}>
-        {#if busy === 'grants'}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{:else}<Save data-icon="inline-start" aria-hidden="true" />{/if}
+        {#if (busy === 'grants')}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{/if}
+        {#if !(busy === 'grants')}<Save data-icon="inline-start" aria-hidden="true" />{/if}
         {busy === 'grants' ? t('common.saving') : t('tables.settings.saveGrants')}
       </Button>
     </div>

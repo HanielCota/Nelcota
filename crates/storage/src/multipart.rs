@@ -102,13 +102,17 @@ impl MultipartUpload for Guard {
 
 impl Drop for Guard {
     fn drop(&mut self) {
-        let Some(mut upload) = self.upload.take() else {
-            return;
+        let mut upload = match self.upload.take() {
+            Some(upload) => upload,
+            _ => {
+                return;
+            }
         };
         let permit = self.permit.take();
         let key = self.key.clone();
-        if let Ok(runtime) = tokio::runtime::Handle::try_current() {
-            runtime.spawn(async move {
+        match tokio::runtime::Handle::try_current() {
+            Ok(runtime) => {
+                runtime.spawn(async move {
                 let _permit = permit;
                 match tokio::time::timeout(CLEANUP_TIMEOUT, upload.abort()).await {
                     Ok(Ok(())) => {},
@@ -116,8 +120,10 @@ impl Drop for Guard {
                     Err(_) => tracing::warn!(%key, "multipart abort timed out; S3 lifecycle cleanup is required"),
                 }
             });
-        } else {
-            tracing::warn!(%key, "runtime stopped before multipart abort; S3 lifecycle cleanup is required");
+            }
+            _ => {
+                tracing::warn!(%key, "runtime stopped before multipart abort; S3 lifecycle cleanup is required");
+            }
         }
     }
 }
@@ -193,14 +199,17 @@ mod tests {
             };
             let mut writer = WriteMultipart::new_with_chunk_size(Box::new(guard), 1);
             writer.write(b"part");
-            if completing {
-                assert!(
-                    tokio::time::timeout(Duration::from_millis(10), writer.finish())
-                        .await
-                        .is_err()
-                );
-            } else {
-                drop(writer);
+            match completing {
+                true => {
+                    assert!(
+                        tokio::time::timeout(Duration::from_millis(10), writer.finish())
+                            .await
+                            .is_err()
+                    );
+                }
+                false => {
+                    drop(writer);
+                }
             }
             let _permit = tokio::time::timeout(Duration::from_secs(1), slots.acquire())
                 .await

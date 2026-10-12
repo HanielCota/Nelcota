@@ -35,9 +35,10 @@
 			class="absolute right-2 flex items-center justify-center pointer-events-none"
 			data-slot="dropdown-menu-checkbox-item-indicator"
 		>
-			{#if indeterminate}
+			{#if (indeterminate)}
 				<MinusIcon  />
-			{:else if checked}
+			{/if}
+			{#if !(indeterminate) && (checked)}
 				<CheckIcon  />
 			{/if}
 		</span>

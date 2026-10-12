@@ -37,13 +37,12 @@ fn enabled(state: &AdminState) -> Result<&StorageState, ApiError> {
 
 fn bucket_id(id: &str) -> Result<&str, ApiError> {
     if nelcota_storage::valid_bucket(id) {
-        Ok(id)
-    } else {
-        Err(ApiError::bad_request(
-            "invalid_bucket_name",
-            "invalid bucket name: lowercase letters, digits, '-' and '_', up to 63",
-        ))
+        return Ok(id);
     }
+    Err(ApiError::bad_request(
+        "invalid_bucket_name",
+        "invalid bucket name: lowercase letters, digits, '-' and '_', up to 63",
+    ))
 }
 
 /// `GET /admin/api/storage`: whether storage is on, and each bucket with its
@@ -51,10 +50,13 @@ fn bucket_id(id: &str) -> Result<&str, ApiError> {
 pub async fn overview(
     State(state): State<AdminState>,
 ) -> Result<Json<crate::contracts::StorageOverview>, ApiError> {
-    let Some(storage) = &state.storage else {
-        return crate::contracts::response::<crate::contracts::StorageOverview>(
-            json!({ "enabled": false }),
-        );
+    let storage = match &state.storage {
+        Some(storage) => storage,
+        _ => {
+            return crate::contracts::response::<crate::contracts::StorageOverview>(
+                json!({ "enabled": false }),
+            );
+        }
     };
     let client = state.db.get().await?;
     let row = client

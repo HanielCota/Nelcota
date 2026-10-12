@@ -47,6 +47,11 @@ at runtime. RLS and GRANTs always remain server/Postgres decisions.
 - Scalar RPC result sets also allow null elements and group numeric unions as
   `(number | string | null)[]`. Functions returning view rows reference the
   generated `Views` section, while table rows reference `Tables`.
+- Non-finite JSON input (`NaN` and infinities) throws `NelcotaUsageError` before
+  authentication or HTTP, instead of silently becoming null. Explicit nulls
+  remain valid. Sessions require the complete session/user shape, with
+  `expires_at` and `expires_in` as safe, non-negative integers;
+  `refreshMargin` must be finite and non-negative.
 - Invalid developer configuration and unsafe identifiers/paths throw
   `NelcotaUsageError`. Errors thrown by user-supplied token/storage/fetch
   configuration outside the HTTP operation remain the caller's responsibility.

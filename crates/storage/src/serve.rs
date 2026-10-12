@@ -49,10 +49,9 @@ const ATTR_CHAR: &AsciiSet = &NON_ALPHANUMERIC
     .remove(b'~');
 
 fn disposition(name: &str, mime: &str, download: bool) -> String {
-    let kind = if mime::inline(mime) && !download {
-        "inline"
-    } else {
-        "attachment"
+    let kind = match mime::inline(mime) && !download {
+        true => "inline",
+        false => "attachment",
     };
     let file = name.rsplit('/').next().unwrap_or(name);
     format!(
@@ -77,14 +76,20 @@ enum Ranged {
 /// One `bytes=` range; several ranges or a malformed header serve the whole
 /// file, as RFC 9110 allows.
 fn parse_range(value: &str, size: u64) -> Ranged {
-    let Some(spec) = value.trim().strip_prefix("bytes=") else {
-        return Ranged::Full;
+    let spec = match value.trim().strip_prefix("bytes=") {
+        Some(spec) => spec,
+        _ => {
+            return Ranged::Full;
+        }
     };
     if spec.contains(',') {
         return Ranged::Full;
     }
-    let Some((start, end)) = spec.trim().split_once('-') else {
-        return Ranged::Full;
+    let (start, end) = match spec.trim().split_once('-') {
+        Some((start, end)) => (start, end),
+        _ => {
+            return Ranged::Full;
+        }
     };
     let (start, end) = (start.trim(), end.trim());
     let range = match (start.parse::<u64>(), end.parse::<u64>()) {

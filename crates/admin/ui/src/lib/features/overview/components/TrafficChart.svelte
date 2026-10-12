@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { dateText } from '$lib/date'
   import { areaPath, monotonePath, nearestIndex, niceTicks, type Point } from '$lib/features/overview/chart'
   import type { MetricsPoint } from '$lib/types'
   import { intlLocale, t } from '$lib/i18n/index.svelte'
@@ -40,13 +41,13 @@
     const fit = Math.max(1, Math.floor(plotWidth / 64))
     return base * Math.max(1, Math.ceil(points.length / base / fit))
   })
-  const labels = $derived(points.map((p, i) => ({ i, text: time.format(new Date(p.at)) })).filter(({ i }) => (points.length - 1 - i) % every === 0))
+  const labels = $derived(points.map((p, i) => ({ i, text: dateText(p.at, time.format) })).filter(({ i }) => (points.length - 1 - i) % every === 0))
 
   const current = $derived(active === null ? null : points[active])
   const valueText = $derived.by(() => {
     const point = current ?? points[points.length - 1]
     if (!point) return ''
-    return `${time.format(new Date(point.at))}: ${fmt.format(point.requests)} ${t('overview.traffic.requests')}, ${fmt.format(point.refused)} ${t('overview.traffic.refused')}`
+    return `${dateText(point.at, time.format)}: ${fmt.format(point.requests)} ${t('overview.traffic.requests')}, ${fmt.format(point.refused)} ${t('overview.traffic.refused')}`
   })
   // Beside the crosshair, on the side with room, so it never hides the point.
   const TOOLTIP = 176
@@ -131,7 +132,7 @@
 
   {#if active !== null && current}
     <div class="pointer-events-none absolute top-4 z-10 w-44 rounded-2xl bg-popover p-3 text-xs shadow-raised" style:left={`${tooltipLeft}px`} role="status">
-      <p class="mb-2 text-muted-foreground">{time.format(new Date(current.at))}</p>
+      <p class="mb-2 text-muted-foreground">{dateText(current.at, time.format)}</p>
       {#if showRequests}
         <p class="flex items-center gap-2">
           <span class="h-0.5 w-3 rounded-full bg-chart-1" aria-hidden="true"></span>

@@ -124,10 +124,13 @@ pub(crate) async fn signup(
         }
         Err(err) => return Err(db_error(err)),
     };
-    let Some(mail_slot) = mail_slot else {
-        let session = start_session(state, &tx, user_id, ip, user_agent).await?;
-        tx.commit().await.map_err(db_error)?;
-        return Ok(session);
+    let mail_slot = match mail_slot {
+        Some(mail_slot) => mail_slot,
+        _ => {
+            let session = start_session(state, &tx, user_id, ip, user_agent).await?;
+            tx.commit().await.map_err(db_error)?;
+            return Ok(session);
+        }
     };
     let (pending, token) = confirmation::pending_signup(&tx, user_id).await?;
     tx.commit().await.map_err(db_error)?;
@@ -144,11 +147,17 @@ pub(crate) async fn password_grant(
     ip: Option<IpAddr>,
     user_agent: Option<&str>,
 ) -> Result<Value, ApiError> {
-    let (Some(email), Some(password)) = (email, password) else {
-        return Err(validation("email and password are required"));
+    let (email, password) = match (email, password) {
+        (Some(email), Some(password)) => (email, password),
+        _ => {
+            return Err(validation("email and password are required"));
+        }
     };
-    let Ok(email) = normalize_email(&email) else {
-        return Err(invalid_grant("invalid email or password"));
+    let email = match normalize_email(&email) {
+        Ok(email) => email,
+        _ => {
+            return Err(invalid_grant("invalid email or password"));
+        }
     };
     // Per-account limit on top of the per-IP one (distributed attacker).
     limit(state, &format!("login:{email}"))?;

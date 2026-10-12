@@ -41,11 +41,13 @@
 		class={cn("text-destructive text-sm font-normal", className)}
 		{...restProps}
 	>
-		{#if children}
+		{#if (children)}
 			{@render children()}
-		{:else if singleErrorMessage}
+		{/if}
+		{#if !(children) && (singleErrorMessage)}
 			{singleErrorMessage}
-		{:else if isMultipleErrors}
+		{/if}
+		{#if !(children) && !(singleErrorMessage) && (isMultipleErrors)}
 			<ul class="ml-4 flex list-disc flex-col gap-1">
 				{#each errors ?? [] as error, index (index)}
 					{#if error?.message}

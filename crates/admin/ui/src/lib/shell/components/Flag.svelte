@@ -25,12 +25,13 @@
 <svg viewBox="0 0 24 24" class={['shrink-0 rounded-full', className]} aria-hidden="true">
   <clipPath id="flag-{locale}"><circle cx="12" cy="12" r="12" /></clipPath>
   <g clip-path="url(#flag-{locale})">
-    {#if locale === 'pt-BR'}
+    {#if (locale === 'pt-BR')}
       <rect width="24" height="24" fill="#009c3b" />
       <polygon points="12,3.2 22.4,12 12,20.8 1.6,12" fill="#ffdf00" />
       <circle cx="12" cy="12" r="4.8" fill="#002776" />
       <path d="M7.4 11.1q4.8-1.7 9.3 1.4" fill="none" stroke="#fff" stroke-width="0.9" />
-    {:else}
+    {/if}
+    {#if !(locale === 'pt-BR')}
       <rect width="24" height="24" fill="#fff" />
       {#each RED_STRIPES as y (y)}<rect {y} width="24" height={24 / 13} fill="#b22234" />{/each}
       <rect width="11" height={(24 / 13) * 7} fill="#3c3b6e" />

@@ -264,10 +264,9 @@ impl BucketFiles {
         options: UploadOptions,
     ) -> Result<StoredObject> {
         let mut spec = Spec::new(
-            if options.upsert {
-                Method::PUT
-            } else {
-                Method::POST
+            match options.upsert {
+                true => Method::PUT,
+                false => Method::POST,
             },
             self.path("", name)?,
         );

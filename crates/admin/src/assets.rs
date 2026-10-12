@@ -25,8 +25,11 @@ fn content_type(path: &str) -> &'static str {
 }
 
 fn ui_file(path: &str) -> Response {
-    let Some(file) = Ui::get(path) else {
-        return StatusCode::NOT_FOUND.into_response();
+    let file = match Ui::get(path) {
+        Some(file) => file,
+        _ => {
+            return StatusCode::NOT_FOUND.into_response();
+        }
     };
     (
         [(header::CONTENT_TYPE, content_type(path))],
@@ -41,10 +44,9 @@ pub(crate) async fn asset(Path(file): Path<String>) -> Response {
     if response.status().is_success() {
         response.headers_mut().insert(
             header::CACHE_CONTROL,
-            if file.ends_with(".html") {
-                HeaderValue::from_static("no-cache")
-            } else {
-                HeaderValue::from_static("public, max-age=31536000, immutable")
+            match file.ends_with(".html") {
+                true => HeaderValue::from_static("no-cache"),
+                false => HeaderValue::from_static("public, max-age=31536000, immutable"),
             },
         );
     }

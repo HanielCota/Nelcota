@@ -40,11 +40,13 @@
         title={owner ? (labels.ownerTriggerTitle ?? labels.label) : labels.label}
         aria-label={`${labels.label}: ${current}`}
       >
-        {#if owner}
+        {#if (owner)}
           <ShieldAlert class="size-3.5 shrink-0" aria-hidden="true" />{labels.ownerTrigger}{#if labels.ownerTriggerMore}<span class="hidden 2xl:inline">{labels.ownerTriggerMore}</span>{/if}
-        {:else if viewer.mode === 'anon'}
+        {/if}
+        {#if !(owner) && (viewer.mode === 'anon')}
           <Globe class="size-3.5 shrink-0" aria-hidden="true" />{labels.asVisitor}
-        {:else}
+        {/if}
+        {#if !(owner) && !(viewer.mode === 'anon')}
           <UserRound class="size-3.5 shrink-0" aria-hidden="true" /><span class="truncate">{labels.asUser(viewer.user?.email ?? '')}</span>
         {/if}
         <ChevronDown class="size-3.5 shrink-0 opacity-70" aria-hidden="true" />

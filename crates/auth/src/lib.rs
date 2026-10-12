@@ -86,8 +86,11 @@ where
     type Rejection = ApiError;
 
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
-        let Some(value) = parts.headers.get(header::AUTHORIZATION) else {
-            return Ok(Auth(Claims::anon()));
+        let value = match parts.headers.get(header::AUTHORIZATION) {
+            Some(value) => value,
+            _ => {
+                return Ok(Auth(Claims::anon()));
+            }
         };
         let token = value
             .to_str()

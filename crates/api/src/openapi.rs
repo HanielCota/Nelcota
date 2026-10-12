@@ -197,10 +197,11 @@ pub fn document(catalog: &Catalog, role: Role) -> Value {
                 .filter(|a| !a.has_default)
                 .map(|a| a.name.as_str())
                 .collect();
-            let returns = if function.returns_set {
-                json!({ "type": "array", "items": json_schema(&function.return_type, &[]) })
-            } else {
-                json_schema(&function.return_type, &[])
+            let returns = match function.returns_set {
+                true => {
+                    json!({ "type": "array", "items": json_schema(&function.return_type, &[]) })
+                }
+                false => json_schema(&function.return_type, &[]),
             };
             paths.insert(
                 format!("/rpc/{}", function.name),
@@ -228,7 +229,7 @@ pub fn document(catalog: &Catalog, role: Role) -> Value {
             "schemas": schemas,
             "securitySchemes": { "bearer": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" } },
         },
-        "security": if role == Role::Anon { json!([{}, { "bearer": [] }]) } else { json!([{ "bearer": [] }]) },
+        "security": match role { Role::Anon => json!([{}, { "bearer": [] }]), _ => json!([{ "bearer": [] }]) },
     })
 }
 

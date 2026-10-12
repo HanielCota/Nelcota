@@ -68,8 +68,11 @@ pub fn prefix(prefix: &str) -> Result<String, ApiError> {
     if prefix.is_empty() {
         return Ok(String::new());
     }
-    let Some(folder) = prefix.strip_suffix('/') else {
-        return Err(invalid("a prefix is a folder and ends in '/'"));
+    let folder = match prefix.strip_suffix('/') {
+        Some(folder) => folder,
+        _ => {
+            return Err(invalid("a prefix is a folder and ends in '/'"));
+        }
     };
     Ok(format!("{}/", object(folder)?))
 }

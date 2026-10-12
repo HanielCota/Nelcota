@@ -707,8 +707,11 @@ impl AuthClient {
         let mut events = self.subscribe();
         let handle = tokio::spawn(async move {
             loop {
-                let Some(inner) = weak.upgrade() else {
-                    return;
+                let inner = match weak.upgrade() {
+                    Some(inner) => inner,
+                    _ => {
+                        return;
+                    }
                 };
                 let client = Client {
                     inner,
@@ -731,7 +734,7 @@ impl AuthClient {
                 drop(client);
                 tokio::select! {
                     _ = tokio::time::sleep(delay.max(Duration::from_secs(1))) => {
-                        let Some(inner) = weak.upgrade() else { return; };
+                        let inner = match weak.upgrade() { Some(inner) => inner, None => return };
                         let client = Client { inner, token: TokenMode::Session, options: Default::default() };
                         if client.auth().get_session().await.is_err() { tokio::time::sleep(Duration::from_secs(10)).await; }
                     }

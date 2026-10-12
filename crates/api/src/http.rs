@@ -79,14 +79,17 @@ pub(crate) async fn read(
     let total = result
         .total
         .map_or_else(|| "*".to_owned(), |n| n.to_string());
-    let range = if result.rows == 0 {
-        format!("*/{total}")
-    } else {
-        format!(
-            "{}-{}/{total}",
-            result.offset,
-            result.offset + result.rows - 1
-        )
+    let range = match result.rows == 0 {
+        true => {
+            format!("*/{total}")
+        }
+        false => {
+            format!(
+                "{}-{}/{total}",
+                result.offset,
+                result.offset + result.rows - 1
+            )
+        }
     };
     let mut response = json_response(StatusCode::OK, result.body);
     if let Ok(value) = HeaderValue::from_str(&range) {

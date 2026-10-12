@@ -19,10 +19,14 @@ for (const [id, source] of Object.entries(documents)) {
   const fragments = proseFragments(markdown)
   if (mode === '--extract') {
     console.log(JSON.stringify({ id, source, fragments }, null, 2))
-  } else if (mode === '--pending') {
+    continue
+  }
+  if (mode === '--pending') {
     const pending = fragments.filter(fragment => !catalog[fragment])
     if (pending.length) console.log(JSON.stringify({ id, source, fragments: pending }, null, 2))
-  } else if (mode === '--import') {
+    continue
+  }
+  if (mode === '--import') {
     if (!selected) throw new Error('--import requires a guide id and a JSON array of translations')
     const values = JSON.parse(await readFile(process.argv[4], 'utf8'))
     if (values.length !== fragments.length) throw new Error(`${id}: expected ${fragments.length} translations, received ${values.length}`)
@@ -32,11 +36,11 @@ for (const [id, source] of Object.entries(documents)) {
     await mkdir(catalogRoot, { recursive: true })
     await writeFile(path, `${JSON.stringify(catalog, null, 2)}\n`)
     console.log(`Saved ${fileURLToPath(path)} (${fragments.length} fragments)`)
-  } else {
-    const errors = validateTranslations(markdown, catalog)
-    for (const error of errors) console.error(`${source}: ${error}`)
-    failures += errors.length
+    continue
   }
+  const errors = validateTranslations(markdown, catalog)
+  for (const error of errors) console.error(`${source}: ${error}`)
+  failures += errors.length
 }
 if (mode === '--check' && !selected) {
   // Track the exact prose emitted by the Rust generator, including templates.
@@ -54,5 +58,5 @@ if (mode === '--check' && !selected) {
 }
 if (mode === '--check') {
   if (failures) { console.error(`Guide translations need updating (${failures} issues). Run npm run guides:pending.`); process.exitCode = 1 }
-  else console.log('All Portuguese guide translations match the project documentation; inline code and links are unchanged.')
+  if (!failures) console.log('All Portuguese guide translations match the project documentation; inline code and links are unchanged.')
 }

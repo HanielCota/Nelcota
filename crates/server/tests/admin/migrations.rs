@@ -246,10 +246,9 @@ async fn concurrent_migration_exports_record_pending_changes_once() {
             json!({ "name": "second_export" })
         )
     );
-    let (winner, loser) = if first.status == StatusCode::OK {
-        (first, second)
-    } else {
-        (second, first)
+    let (winner, loser) = match first.status == StatusCode::OK {
+        true => (first, second),
+        false => (second, first),
     };
     assert_eq!(winner.status, StatusCode::OK);
     assert_eq!(loser.status, StatusCode::CONFLICT);

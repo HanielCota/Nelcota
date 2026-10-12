@@ -75,7 +75,7 @@
         {#if failure}<Field.Error>{failure}</Field.Error>{/if}
         <Dialog.Footer>
           <Button variant="outline" disabled={saving} onclick={guard.request}>{t('common.cancel')}</Button>
-          <Button type="submit" disabled={saving || !ready}>{#if saving}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{:else}<UserPlus data-icon="inline-start" aria-hidden="true" />{/if}{saving ? t('common.creating') : t('users.create.submit')}</Button>
+          <Button type="submit" disabled={saving || !ready}>{#if (saving)}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{/if}{#if !(saving)}<UserPlus data-icon="inline-start" aria-hidden="true" />{/if}{saving ? t('common.creating') : t('users.create.submit')}</Button>
         </Dialog.Footer>
         </fieldset>
     </form>

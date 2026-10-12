@@ -82,10 +82,12 @@
           values,
         })
         toast.success(t('tables.toast.rowsUpdated', { count: res.count }))
-      } else {
-        await api.post(`/tables/${enc(table)}/rows`, { values })
-        toast.success(t('tables.toast.rowInserted'))
+        open = false
+        onsaved()
+        return
       }
+      await api.post(`/tables/${enc(table)}/rows`, { values })
+      toast.success(t('tables.toast.rowInserted'))
       open = false
       onsaved()
     } catch (e) {
@@ -143,7 +145,8 @@
       </span>
       <Button variant="outline" disabled={saving} onclick={guard.request}>{t('common.cancel')}</Button>
       <Button type="submit" form="row-form" disabled={saving || (!inserting && changes === 0)}>
-        {#if saving}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{:else}<Save data-icon="inline-start" aria-hidden="true" />{/if}
+        {#if (saving)}<LoaderCircle data-icon="inline-start" class="animate-spin" aria-hidden="true" />{/if}
+        {#if !(saving)}<Save data-icon="inline-start" aria-hidden="true" />{/if}
         {saving ? t('common.saving') : inserting ? t('tables.row.insert') : t('common.save')}
       </Button>
     </Sheet.Footer>

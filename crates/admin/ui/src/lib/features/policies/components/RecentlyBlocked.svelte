@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { dateText } from '$lib/date'
   import { onMount } from 'svelte'
   import { Button } from '$lib/components/ui/button'
   import { Skeleton } from '$lib/components/ui/skeleton'
@@ -28,7 +29,7 @@
   })
 
   const time = (at: string) =>
-    new Date(at).toLocaleString(intlLocale(), { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    dateText(at, date => date.toLocaleString(intlLocale(), { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit' }))
 
   function who(request: DeniedRequest) {
     if (request.role === 'authenticated' && request.email) return request.email
@@ -54,13 +55,16 @@
     </Button>
   </div>
 
-  {#if resource.error}
+  {#if (resource.error)}
     <LoadError message={errorMessage(resource.error)} onretry={load} busy={resource.loading} />
-  {:else if !data}
+  {/if}
+  {#if !(resource.error) && (!data)}
     <Skeleton class="h-12" />
-  {:else if data.requests.length === 0}
+  {/if}
+  {#if !(resource.error) && !(!data) && (data.requests.length === 0)}
     <p class="rounded-2xl bg-well px-4 py-3.5 text-sm text-muted-foreground">{t('policies.blocked.none')}</p>
-  {:else}
+  {/if}
+  {#if !(resource.error) && !(!data) && !(data.requests.length === 0)}
     <ul class="divide-y overflow-hidden rounded-2xl bg-well">
       {#each shown as request, index (`${request.at}-${index}`)}
         <li class="grid gap-1 px-4 py-3">

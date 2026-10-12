@@ -38,27 +38,18 @@ pub(crate) async fn policy_counts(
 /// RLS state: `ok` (with policies), `warn` (no policies), `danger` (exposed
 /// without RLS), `none` (no RLS and no GRANT) or `view`.
 pub(crate) fn rls_json(table: &Table, policies: usize) -> Value {
-    let (state, label) = if table.kind != TableKind::Table {
-        if table.exposed_without_rls() {
-            (
-                "danger",
-                if table.kind == TableKind::View {
-                    "view owner privileges"
-                } else {
-                    "no row policies"
-                }
-                .to_owned(),
-            )
-        } else {
-            ("view", "view".to_owned())
-        }
-    } else {
-        match (table.rls_enabled, policies) {
+    let (state, label) = match table.kind {
+        TableKind::Table => match (table.rls_enabled, policies) {
             (false, _) if table.exposed_without_rls() => ("danger", "no RLS".to_owned()),
             (false, _) => ("none", "no RLS (no GRANT)".to_owned()),
             (true, 0) => ("warn", "RLS without policies".to_owned()),
             (true, n) => ("ok", format!("RLS · {n} policies")),
+        },
+        TableKind::View if table.exposed_without_rls() => {
+            ("danger", "view owner privileges".to_owned())
         }
+        _ if table.exposed_without_rls() => ("danger", "no row policies".to_owned()),
+        _ => ("view", "view".to_owned()),
     };
     json!({
         "state": state,

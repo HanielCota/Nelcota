@@ -75,7 +75,10 @@ fn restrict(path: &Path, directory: bool) -> io::Result<()> {
         use std::os::unix::fs::PermissionsExt;
         fs::set_permissions(
             path,
-            fs::Permissions::from_mode(if directory { 0o700 } else { 0o600 }),
+            fs::Permissions::from_mode(match directory {
+                true => 0o700,
+                false => 0o600,
+            }),
         )?;
     }
     #[cfg(not(unix))]

@@ -39,9 +39,10 @@ mod tests {
     async fn disk_root_is_private_for_new_and_existing_uploads() {
         let temp = tempfile::tempdir().unwrap();
         for existing in [false, true] {
-            let root = temp
-                .path()
-                .join(if existing { "existing" } else { "nested/new" });
+            let root = temp.path().join(match existing {
+                true => "existing",
+                false => "nested/new",
+            });
             if existing {
                 fs::create_dir_all(root.join("bucket")).unwrap();
                 fs::set_permissions(&root, fs::Permissions::from_mode(0o755)).unwrap();
@@ -186,7 +187,10 @@ impl Store {
 
     /// Starts writing a new object, in parts.
     pub async fn writer(&self, key: &Key) -> Result<WriteMultipart, StoreError> {
-        let part = if self.is_s3() { S3_PART } else { DISK_PART };
+        let part = match self.is_s3() {
+            true => S3_PART,
+            false => DISK_PART,
+        };
         Ok(crate::multipart::writer(
             self.inner.clone(),
             key.clone(),
@@ -238,8 +242,11 @@ impl Store {
         content_type: &str,
         disposition: &str,
     ) -> Result<Option<Url>, StoreError> {
-        let Backend::S3 { s3 } = &self.backend else {
-            return Ok(None);
+        let s3 = match &self.backend {
+            Backend::S3 { s3 } => s3,
+            _ => {
+                return Ok(None);
+            }
         };
         let options = SignedUrlOptions::new().with_query([
             ("response-content-type", content_type),

@@ -38,10 +38,13 @@ pub(crate) fn segment(value: &str) -> String {
     use std::fmt::Write;
     let mut out = String::new();
     for b in value.bytes() {
-        if b.is_ascii_alphanumeric() || b"-._~".contains(&b) {
-            out.push(char::from(b));
-        } else {
-            let _ = write!(out, "%{b:02X}");
+        match b.is_ascii_alphanumeric() || b"-._~".contains(&b) {
+            true => {
+                out.push(char::from(b));
+            }
+            false => {
+                let _ = write!(out, "%{b:02X}");
+            }
         }
     }
     out
@@ -71,15 +74,14 @@ pub(crate) fn object(value: &str) -> Result<String> {
     }
     value
         .split('/')
-        .map(|part| {
-            if part.is_empty() || part == "." || part == ".." || part.len() > 255 {
-                Err(Error::Usage(
+        .map(
+            |part| match part.is_empty() || part == "." || part == ".." || part.len() > 255 {
+                true => Err(Error::Usage(
                     "object path contains an invalid segment".into(),
-                ))
-            } else {
-                Ok(segment(part))
-            }
-        })
+                )),
+                false => Ok(segment(part)),
+            },
+        )
         .collect::<Result<Vec<_>>>()
         .map(|parts| parts.join("/"))
 }

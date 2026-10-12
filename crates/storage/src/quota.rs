@@ -29,19 +29,17 @@ pub(crate) struct Reservation {
 
 fn full(disk: bool) -> ApiError {
     if disk {
-        storage_full("the server's disk is almost full")
-    } else {
-        storage_full("the project's storage quota is full")
+        return storage_full("the server's disk is almost full");
     }
+    storage_full("the project's storage quota is full")
 }
 
 impl Reservation {
     pub(crate) fn check(&self, size: u64) -> Result<(), ApiError> {
         if size > self.bytes {
-            Err(full(self.disk))
-        } else {
-            Ok(())
+            return Err(full(self.disk));
         }
+        Ok(())
     }
 }
 
@@ -66,10 +64,9 @@ pub(crate) async fn reserve(
     limit: u64,
 ) -> Result<Reservation, ApiError> {
     let _admission = state.quota.admission.lock().await;
-    let used = if state.settings.max_total_size.is_some() {
-        db::used_bytes(&state.pool).await?
-    } else {
-        0
+    let used = match state.settings.max_total_size.is_some() {
+        true => db::used_bytes(&state.pool).await?,
+        false => 0,
     };
     let free = state.store.free_bytes();
     let mut reserved = state

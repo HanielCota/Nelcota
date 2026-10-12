@@ -47,13 +47,15 @@
   </PageHeader>
   <div class="-mt-8"><PillTabs label={t('shell.pages.users')} current={'/sign-in'} tabs={[{ path: '/users', label: t('shell.pages.users') }, { path: '/sign-in', label: t('shell.pages.userSignIn') }]} /></div>
 
-  {#if resource.error}
+  {#if (resource.error)}
     <LoadError message={errorMessage(resource.error)} onretry={load} busy={resource.loading} />
-  {:else if !settings}
+  {/if}
+  {#if !(resource.error) && (!settings)}
     <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {#each { length: 6 }, i (i)}<Skeleton class="h-48 rounded-3xl" />{/each}
     </div>
-  {:else}
+  {/if}
+  {#if !(resource.error) && !(!settings)}
     <section class="grid gap-4" aria-labelledby="signin-ways">
       <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
         <h2 id="signin-ways" class="text-lg font-semibold">{t('signIn.summary', { on: enabled, count: options.length })}</h2>
@@ -90,11 +92,12 @@
         {/if}
         <div class="grid gap-2">
           <p class="text-sm text-muted-foreground">{t('signIn.providers.pages')}</p>
-          {#if settings.redirect_urls.length}
+          {#if (settings.redirect_urls.length)}
             <ul class="flex flex-wrap gap-2">
               {#each settings.redirect_urls as url (url)}<li class="max-w-full"><code class="block rounded-lg bg-well px-3 py-1 text-xs break-all">{url}</code></li>{/each}
             </ul>
-          {:else}
+          {/if}
+          {#if !(settings.redirect_urls.length)}
             <p class="text-sm text-warning">{t('signIn.providers.noPages')}</p>
           {/if}
         </div>

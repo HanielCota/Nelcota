@@ -181,19 +181,23 @@ impl JwtVerifier for Keys {
 /// Reads the private key and returns (key, public key `x`, kid).
 fn parse_ed25519(input: &str) -> Result<(EncodingKey, String, String), KeyError> {
     let input = input.trim();
-    let key = if input.contains("-----BEGIN") {
-        EncodingKey::from_ed_pem(input.as_bytes())
-            .map_err(|e| KeyError::InvalidPrivateKey(e.to_string()))?
-    } else {
-        let der = STANDARD
-            .decode(input)
-            .map_err(|e| KeyError::InvalidPrivateKey(format!("base64: {e}")))?;
-        EncodingKey::from_ed_der(&der)
+    let key = match input.contains("-----BEGIN") {
+        true => EncodingKey::from_ed_pem(input.as_bytes())
+            .map_err(|e| KeyError::InvalidPrivateKey(e.to_string()))?,
+        false => {
+            let der = STANDARD
+                .decode(input)
+                .map_err(|e| KeyError::InvalidPrivateKey(format!("base64: {e}")))?;
+            EncodingKey::from_ed_der(&der)
+        }
     };
     let jwk = Jwk::from_encoding_key(&key, Algorithm::EdDSA)
         .map_err(|e| KeyError::InvalidPrivateKey(e.to_string()))?;
-    let AlgorithmParameters::OctetKeyPair(params) = jwk.algorithm else {
-        return Err(KeyError::InvalidPrivateKey("not Ed25519".into()));
+    let params = match jwk.algorithm {
+        AlgorithmParameters::OctetKeyPair(params) => params,
+        _ => {
+            return Err(KeyError::InvalidPrivateKey("not Ed25519".into()));
+        }
     };
     // kid = JWK thumbprint (RFC 7638): stable for the same key.
     let canonical = format!(r#"{{"crv":"Ed25519","kty":"OKP","x":"{}"}}"#, params.x);

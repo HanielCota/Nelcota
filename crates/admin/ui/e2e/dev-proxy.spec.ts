@@ -10,13 +10,15 @@ test('development proxy forwards backend health and preserves the login origin',
     if (req.url === '/health') {
       res.statusCode = healthy ? 200 : 503
       res.end(JSON.stringify({ status: healthy ? 'ok' : 'unhealthy', version: 'test-backend' }))
-    } else if (req.url === '/admin/api/login' && req.method === 'POST') {
+      return
+    }
+    if (req.url === '/admin/api/login' && req.method === 'POST') {
       res.statusCode = req.headers.origin === `http://${req.headers.host}` ? 200 : 403
       res.end(JSON.stringify({ accepted: res.statusCode === 200 }))
-    } else {
-      res.statusCode = 404
-      res.end('{}')
+      return
     }
+    res.statusCode = 404
+    res.end('{}')
   })
   await new Promise<void>((resolve) => backend.listen(0, '127.0.0.1', resolve))
   const backendPort = (backend.address() as AddressInfo).port
@@ -49,8 +51,10 @@ test('development proxy forwards backend health and preserves the login origin',
     })
     expect(crossOrigin.status()).toBe(403)
   } finally {
-    if (previousTarget === undefined) delete process.env.NELCOTA_API_URL
-    else process.env.NELCOTA_API_URL = previousTarget
+    switch (previousTarget) {
+      case undefined: delete process.env.NELCOTA_API_URL; break
+      default: process.env.NELCOTA_API_URL = previousTarget; break
+    }
     await vite?.close()
     await new Promise<void>((resolve, reject) => backend.close((error) => error ? reject(error) : resolve()))
   }

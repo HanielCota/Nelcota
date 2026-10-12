@@ -100,17 +100,19 @@ fn render_conf(env: &str) -> String {
     let mut global = String::from("[global]\n");
     let mut stanza = String::from("\n[main]\n");
     for line in env.lines() {
-        let Some((key, value)) = line
+        let (key, value) = match line
             .strip_prefix("PGBACKREST_")
             .and_then(|l| l.split_once('='))
-        else {
-            continue;
+        {
+            Some((key, value)) => (key, value),
+            _ => {
+                continue;
+            }
         };
         let option = key.to_lowercase().replace('_', "-");
-        let section = if option.starts_with("pg1-") {
-            &mut stanza
-        } else {
-            &mut global
+        let section = match option.starts_with("pg1-") {
+            true => &mut stanza,
+            false => &mut global,
         };
         section.push_str(&format!("{option}={value}\n"));
     }

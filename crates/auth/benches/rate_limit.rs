@@ -19,7 +19,13 @@ fn measure(keys: usize) {
         samples.push(start.elapsed());
     }
     samples.sort();
-    assert_eq!(accepted, if keys == 50_000 { 0 } else { 300 });
+    assert_eq!(
+        accepted,
+        match keys {
+            50_000 => 0,
+            _ => 300,
+        }
+    );
     println!(
         "keys={keys}, median_100_checks={:?}, accepted_new_keys={accepted}",
         samples[1]

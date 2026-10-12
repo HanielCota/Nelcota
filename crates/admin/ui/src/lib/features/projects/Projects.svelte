@@ -64,11 +64,12 @@
   </PageHeader>
 
   {#if failure}<LoadError message={errorMessage(failure)} onretry={load} busy={refreshing} />{/if}
-  {#if !projects && refreshing}
+  {#if (!projects && refreshing)}
     <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {#each [0, 1, 2] as i (i)}<Skeleton class="h-40 rounded-3xl" />{/each}
     </div>
-  {:else if projects}
+  {/if}
+  {#if !(!projects && refreshing) && (projects)}
     {#if projects.length === 0}<EmptyState icon={Boxes} title={t('projects.empty')} description={t('projects.emptyDescription')} />{/if}
     <div class="grid items-start gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {#each projects as project (project.name)}
@@ -89,22 +90,24 @@
           </div>
 
           <div class="flex items-center gap-2 rounded-2xl bg-well px-4 py-3 text-sm">
-            {#if project.healthy}
+            {#if (project.healthy)}
               <CircleCheck class="size-4 text-brand" aria-hidden="true" />
               <span>{t('projects.up')}</span>
               {#if project.latency_ms !== null}
                 <span class="text-muted-foreground tabular-nums">· {project.latency_ms} ms</span>
               {/if}
-            {:else}
+            {/if}
+            {#if !(project.healthy)}
               <CircleAlert class="size-4 text-destructive" aria-hidden="true" />
               <span class="text-destructive">{t('projects.down')}</span>
             {/if}
             {#if project.version}<span class="ml-auto font-mono text-xs text-muted-foreground">v{project.version.replace(/^v/, '')}</span>{/if}
           </div>
 
-          {#if project.current}
+          {#if (project.current)}
             <Button variant="outline" class="w-full" href={href('/')}>{t('projects.back')}</Button>
-          {:else if project.url}
+          {/if}
+          {#if !(project.current) && (project.url)}
             <Button variant="outline" class="w-full" onclick={() => open(project)}>
               {t('projects.open')}<ArrowUpRight data-icon="inline-end" aria-hidden="true" />
             </Button>

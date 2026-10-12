@@ -18,6 +18,23 @@ async function failure(): Promise<ApiError> {
 
 afterEach(() => vi.unstubAllGlobals())
 
+describe('JSON request values', () => {
+  it.each([NaN, Infinity, -Infinity, new Number(NaN)])('refuses non-finite input %s instead of clearing a nullable setting', async value => {
+    const fetch = vi.fn()
+    vi.stubGlobal('fetch', fetch)
+    await expect(api.put('/storage/buckets/documents', { file_size_limit: value })).rejects.toThrow()
+    await expect(api.post('/storage/buckets', { nested: [value] })).rejects.toThrow()
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('still sends an explicit null to clear a setting', async () => {
+    const fetch = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response('{}', { status: 200 }))
+    vi.stubGlobal('fetch', fetch)
+    await api.put('/anything', { file_size_limit: null })
+    expect(fetch.mock.calls[0]?.[1]).toMatchObject({ body: '{"file_size_limit":null}' })
+  })
+})
+
 describe('error responses', () => {
   it.each([undefined, '1', '1000000'])('cancels oversized proxy errors with length %s', async length => {
     const cancel = vi.fn()

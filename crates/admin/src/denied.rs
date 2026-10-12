@@ -64,7 +64,10 @@ pub(crate) fn rfc3339(secs: u64) -> String {
     let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
     let mp = (5 * doy + 2) / 153;
     let day = doy - (153 * mp + 2) / 5 + 1;
-    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    let month = match mp < 10 {
+        true => mp + 3,
+        false => mp - 9,
+    };
     let year = yoe + era * 400 + i64::from(month <= 2);
     format!(
         "{year:04}-{month:02}-{day:02}T{:02}:{:02}:{:02}Z",
