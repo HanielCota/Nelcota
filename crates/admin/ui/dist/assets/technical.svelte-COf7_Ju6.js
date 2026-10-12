@@ -1,0 +1,1 @@
+import{b as e,jt as t,y as n}from"./api-NFrEz-VT.js";var r=`nelcota.technical`,i=t({on:n(r,`off`)===`on`});function a(){i.on=!i.on,e(r,i.on?`on`:`off`)}export{a as n,i as t};

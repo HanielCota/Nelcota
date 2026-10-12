@@ -1,0 +1,1 @@
+import{E as e,T as t}from"./api-NFrEz-VT.js";import{i as n}from"./router.svelte-7P7BV_ey.js";var r=new Set([`$$slots`,`$$events`,`$$legacy`]);function i(i,a){let o=t(a,r),s={name:`plus`,size:24,node:[[`path`,{d:`M5 12h14`}],[`path`,{d:`M12 5v14`}]]};n(i,e(()=>o,{get icon(){return s}}))}export{i as t};
