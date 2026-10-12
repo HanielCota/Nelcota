@@ -20,24 +20,36 @@ export class ApiError extends Error {
   }
 }
 
+let authentication = Promise.resolve()
+
 async function request<T>(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   const encoded = body === undefined ? undefined : JSON.stringify(body, (_key, original: unknown) => {
     const value = original instanceof Number ? original.valueOf() : original
     if (typeof value === 'number' && !Number.isFinite(value)) throw new Error(t('common.invalidNumber'))
     return value
   })
-  if (['/login', '/logout', '/sso'].includes(path)) clearQuerySession()
+  const changesSession = ['/login', '/logout', '/sso'].includes(path)
+  if (changesSession) clearQuerySession()
   const started = querySession()
-  const res = await fetch(`/admin/api${path}`, {
-    method,
-    signal,
-    credentials: 'same-origin',
-    headers: body === undefined ? {} : { 'content-type': 'application/json' },
-    body: encoded,
-  })
-  const result = await parseResponse<T>(res, path, method, started)
-  requireSession(started)
-  return result
+  const send = async () => {
+    requireSession(started)
+    const res = await fetch(`/admin/api${path}`, {
+      method,
+      signal,
+      credentials: 'same-origin',
+      headers: body === undefined ? {} : { 'content-type': 'application/json' },
+      body: encoded,
+    })
+    const result = await parseResponse<T>(res, path, method, started)
+    requireSession(started)
+    return result
+  }
+  if (!changesSession) return send()
+  // Epoch checks cannot undo Set-Cookie. Finish earlier authentication
+  // responses before sending another request that replaces the same cookie.
+  const pending = authentication.then(send)
+  authentication = pending.then(() => {}, () => {})
+  return pending
 }
 
 /** Sends a file as the raw request body (storage uploads). */
