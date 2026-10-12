@@ -194,3 +194,127 @@ async fn files_on_s3() {
         assert_eq!(status, 404, "the bytes are gone from the bucket");
     }
 }
+
+#[tokio::test]
+#[ignore = "needs an S3-compatible service (see the module docs)"]
+async fn timed_out_and_canceled_uploads_leave_no_multipart_parts() {
+    use bytes::Bytes;
+    use futures_util::{StreamExt, stream};
+    use nelcota_core::Claims;
+    use nelcota_storage::UploadOptions;
+    use object_store::{
+        aws::AmazonS3Builder,
+        path::Path,
+        signer::{Method as SignMethod, SignedUrlOptions, Signer},
+    };
+    use std::time::Duration;
+
+    let config = s3_config();
+    let store = nelcota_storage::Store::from_config(&config)
+        .unwrap()
+        .unwrap();
+    let s3 = AmazonS3Builder::new()
+        .with_bucket_name(config.storage_s3_bucket.as_deref().unwrap())
+        .with_region(&config.storage_s3_region)
+        .with_access_key_id(config.storage_s3_access_key_id.as_deref().unwrap())
+        .with_secret_access_key(
+            config
+                .storage_s3_secret_access_key
+                .as_ref()
+                .unwrap()
+                .expose(),
+        )
+        .with_endpoint(config.storage_s3_endpoint.as_deref().unwrap())
+        .with_allow_http(
+            config
+                .storage_s3_endpoint
+                .as_deref()
+                .unwrap()
+                .starts_with("http://"),
+        )
+        .build()
+        .unwrap();
+    let mut options = Options::default();
+    options.storage.max_file_size = 32 * 1024 * 1024;
+    options.storage.upload_timeout = Duration::from_secs(3);
+    options.store = Some(Arc::new(store));
+    let app = TestApp::spawn_with(options).await;
+    let bucket = format!("abort-{}", uuid::Uuid::new_v4());
+    app.admin_client
+        .execute("INSERT INTO storage.buckets (id) VALUES ($1)", &[&bucket])
+        .await
+        .unwrap();
+    let prefix = format!("{bucket}/");
+    let http = reqwest::Client::builder().no_proxy().build().unwrap();
+    let listing = async || {
+        let signed = s3
+            .signed_url_opts(
+                SignMethod::GET,
+                &Path::from(""),
+                Duration::from_secs(30),
+                &SignedUrlOptions::new().with_query([("uploads", ""), ("prefix", prefix.as_str())]),
+            )
+            .await
+            .unwrap();
+        let response = http.get(signed).send().await.unwrap();
+        assert!(response.status().is_success());
+        response.text().await.unwrap().contains("<Upload>")
+    };
+    for canceled in [false, true] {
+        let state = app.storage.clone();
+        let upload_bucket = bucket.clone();
+        let task = tokio::spawn(async move {
+            let body = stream::iter([
+                Ok(Bytes::from(vec![b'x'; 8 * 1024 * 1024])),
+                Ok(Bytes::from(vec![b'x'; 2 * 1024 * 1024])),
+            ])
+            .chain(stream::pending());
+            state
+                .upload(
+                    Claims::from_payload(json!({"role":"service_role"})).unwrap(),
+                    &upload_bucket,
+                    "unfinished.bin",
+                    UploadOptions::default(),
+                    Box::pin(body),
+                )
+                .await
+        });
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(2);
+        while !listing().await {
+            assert!(
+                tokio::time::Instant::now() < deadline,
+                "multipart upload never started"
+            );
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        if canceled {
+            task.abort();
+            let Err(error) = task.await else {
+                panic!("canceled upload completed");
+            };
+            assert!(error.is_cancelled());
+        } else {
+            let error = task.await.unwrap().err().unwrap();
+            assert_eq!(error.status(), StatusCode::REQUEST_TIMEOUT);
+            assert_eq!(error.code(), "upload_timeout");
+        }
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(11);
+        while listing().await {
+            assert!(
+                tokio::time::Instant::now() < deadline,
+                "multipart parts were not aborted"
+            );
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        let count: i64 = app
+            .admin_client
+            .query_one(
+                "SELECT count(*) FROM storage.objects WHERE bucket_id = $1",
+                &[&bucket],
+            )
+            .await
+            .unwrap()
+            .get(0);
+        assert_eq!(count, 0, "unfinished uploads must not publish metadata");
+    }
+}

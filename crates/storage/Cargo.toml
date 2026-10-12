@@ -11,6 +11,7 @@ rust-version.workspace = true
 nelcota-core.workspace = true
 nelcota-auth.workspace = true
 axum.workspace = true
+async-trait = "0.1.92"
 bytes.workspace = true
 deadpool-postgres.workspace = true
 futures-util.workspace = true

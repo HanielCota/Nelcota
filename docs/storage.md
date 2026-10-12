@@ -64,6 +64,14 @@ deadline, including pool and quota waits (`408 upload_timeout`); metadata
 publication then settles with database timeouts so cancellation cannot delete
 bytes after an ambiguous commit.
 
+Canceled or timed-out multipart uploads abort their uploaded parts in a bounded
+cleanup task. Creation and cleanup share the 32-upload capacity; creation may
+settle for up to 30 seconds and abort for up to 10 seconds after cancellation.
+Configure an S3 `AbortIncompleteMultipartUpload` lifecycle rule as well: process
+crashes, unavailable providers or an initiation response lost before its upload
+ID arrives cannot be cleaned up reliably by the server. Object garbage
+collection only sees completed objects, not unfinished multipart parts.
+
 `storage.usage` holds the committed byte total. Statement-level triggers update
 it transactionally for inserts, updates, deletes, upserts and truncation,
 including administrative SQL; bulk statements aggregate their changes once.
