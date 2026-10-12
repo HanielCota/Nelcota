@@ -114,6 +114,11 @@ com Web Locks. Em ambientes sem Web Locks, passe
 No servidor, use um cliente por requisição e encaminhe o token do usuário.
 Um `service_role` deve permanecer apenas no servidor, pois ignora RLS.
 
+Cada chave de storage mantém um verificador OAuth pendente. Iniciar outro login
+substitui a tentativa anterior; a gravação, o redirecionamento e o consumo no
+callback usam o mesmo bloqueio. Para fluxos de login independentes, use chaves
+de storage diferentes.
+
 HTTP, rede, timeout e cancelamento retornam `{ data, error }`. Configuração
 inválida pode lançar uma exceção. Para liberar timers e listeners, use
 `nelcota.dispose()`; para encerrar a sessão, use `await nelcota.auth.signOut()`.

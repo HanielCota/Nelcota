@@ -9,6 +9,7 @@ import { isBrowser } from '../core/jwt.js';
 import { SessionManager, type AuthListener, type AuthOptions, type AuthRequestOptions } from './manager.js';
 export type { AuthEvent, AuthListener, AuthOptions, AuthRequestOptions } from './manager.js';
 import { challengeFor, createVerifier } from './pkce.js';
+import { withLock } from './coordination.js';
 import { isSession, isUser, type Session, type User } from './session.js';
 
 export type OAuthProvider = 'google' | 'github';
@@ -114,26 +115,34 @@ export class AuthClient {
    */
   async signInWithOAuth(input: OAuthInput): Promise<Result<{ url: string }>> {
     const redirectTo = absoluteUrl(input.redirectTo, 'redirectTo').href;
-    const verifier = createVerifier();
-    await this.#manager.storage.setItem(`${this.#manager.key}.pkce`, verifier);
-    const query = new URLSearchParams({
-      provider: input.provider,
-      redirect_to: redirectTo,
-      code_challenge: await challengeFor(verifier),
-      code_challenge_method: 'S256',
+    const provider = input.provider, redirect = input.redirect ?? true;
+    const key = `${this.#manager.key}.pkce`;
+    return withLock(key, async () => {
+      const verifier = createVerifier();
+      const challenge = await challengeFor(verifier);
+      await this.#manager.storage.setItem(key, verifier);
+      const query = new URLSearchParams({
+        provider,
+        redirect_to: redirectTo,
+        code_challenge: challenge,
+        code_challenge_method: 'S256',
+      });
+      const url = this.#http.href('/auth/v1/authorize', query);
+      if (redirect && isBrowser()) globalThis.location.assign(url);
+      return ok({ url });
     });
-    const url = this.#http.href('/auth/v1/authorize', query);
-    if ((input.redirect ?? true) && isBrowser()) globalThis.location.assign(url);
-    return ok({ url });
   }
 
   /** Trades the `code` from the OAuth redirect (and the stored verifier) for a session. */
   async exchangeCode(code: string, options: AuthRequestOptions = {}): Promise<Result<Session>> {
     return this.#manager.authenticate(async () => {
       const key = `${this.#manager.key}.pkce`;
-      const verifier = await this.#manager.storage.getItem(key);
-      // The code is spent on the first try, right or wrong: the verifier goes too.
-      await this.#manager.storage.removeItem(key);
+      const verifier = await withLock(key, async () => {
+        const stored = await this.#manager.storage.getItem(key);
+        // Code consumption cannot erase a verifier concurrently being published.
+        await this.#manager.storage.removeItem(key);
+        return stored;
+      });
       if (!verifier) return fail(clientError('pkce_missing', 'No sign-in was started in this browser (PKCE verifier missing)'));
       return this.#token('pkce', { auth_code: code, code_verifier: verifier }, options);
     }, session => session);
