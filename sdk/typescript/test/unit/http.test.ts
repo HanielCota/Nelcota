@@ -9,6 +9,35 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+describe('JSON input boundaries', () => {
+  it.each([NaN, Infinity, -Infinity, new Number(NaN)])('rejects non-finite writes and RPC input before auth or HTTP (%s)', async value => {
+    const mock = mockFetch();
+    const token = vi.fn(() => null);
+    const nelcota = createClient('https://api.example.com', { fetch: mock.fetch, accessToken: token, auth: { autoRefresh: false } });
+    try {
+      for (const query of [
+        nelcota.from('notes').insert({ nested: { values: [value] } }),
+        nelcota.from('notes').update({ value }),
+        nelcota.from('notes').upsert({ value }),
+      ]) await expect(query.execute()).rejects.toBeInstanceOf(NelcotaUsageError);
+      await expect(nelcota.rpc('echo', { value })).rejects.toBeInstanceOf(NelcotaUsageError);
+      expect(mock.calls).toHaveLength(0);
+      expect(token).not.toHaveBeenCalled();
+    } finally { nelcota.dispose(); }
+  });
+
+  it('preserves explicit nulls and finite numbers in writes and RPC', async () => {
+    const mock = mockFetch(empty(), json(null));
+    const nelcota = createClient('https://api.example.com', { fetch: mock.fetch, auth: { autoRefresh: false } });
+    const input = { value: null, nested: [1.25, null], label: 'NaN' };
+    try {
+      expect((await nelcota.from('notes').insert(input)).error).toBeNull();
+      expect((await nelcota.rpc('echo', input)).error).toBeNull();
+      expect(mock.calls.map(call => JSON.parse(call.body!))).toEqual([input, input]);
+    } finally { nelcota.dispose(); }
+  });
+});
+
 describe('error response budgets', () => {
   it.each([undefined, '1', '1000000'])('cancels oversized error pages with length %s', async length => {
     const cancel = vi.fn();

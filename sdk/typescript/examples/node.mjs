@@ -13,6 +13,7 @@ export async function runExample({ url, email, password, signUp = false }) {
   try {
     await authenticate();
     const session = unwrap(await client.auth.getSession());
+    if (!session) throw new Error('Authentication did not produce a session');
     const note = unwrap(await client.from('notes').insert({ body: 'Hello from Node' }).select('id,body').single());
     const { data: notes } = await client.from('notes').select('id,body').order('id', { ascending: false }).limit(20).throwOnError();
     const files = client.storage.from('files');

@@ -162,11 +162,11 @@ fn group(kind: &str, conditions: impl IntoIterator<Item = Condition>) -> Conditi
 }
 
 fn scalar(value: impl Serialize) -> Result<String> {
-    let value = serde_json::to_value(value).map_err(|e| Error::Usage(e.to_string()))?;
+    let value = crate::json::to_value(&value)?;
     encoding::scalar(&value)
 }
 fn in_list(values: impl Serialize) -> Result<String> {
-    let value = serde_json::to_value(values).map_err(|e| Error::Usage(e.to_string()))?;
+    let value = crate::json::to_value(&values)?;
     let items = value
         .as_array()
         .filter(|v| !v.is_empty())
@@ -272,21 +272,18 @@ impl Query {
         self.prefer.push(value.into());
     }
     fn set_body(&mut self, value: &impl Serialize, many: bool) {
-        let value = serde_json::to_value(value)
-            .map_err(|e| Error::Usage(e.to_string()))
-            .and_then(|v| {
-                let good = v.is_object()
-                    || (many
-                        && v.as_array()
-                            .is_some_and(|a| !a.is_empty() && a.iter().all(Value::is_object)));
-                if good {
-                    return Ok(v);
-                }
-                Err(Error::Usage(
-                    "body must be an object or a nonempty array of objects for insert/upsert"
-                        .into(),
-                ))
-            });
+        let value = crate::json::to_value(value).and_then(|v| {
+            let good = v.is_object()
+                || (many
+                    && v.as_array()
+                        .is_some_and(|a| !a.is_empty() && a.iter().all(Value::is_object)));
+            if good {
+                return Ok(v);
+            }
+            Err(Error::Usage(
+                "body must be an object or a nonempty array of objects for insert/upsert".into(),
+            ))
+        });
         if let Some(value) = self.record(value) {
             self.body = Some(value);
         }
@@ -422,7 +419,7 @@ impl Query {
         self
     }
     pub fn matches(mut self, values: &impl Serialize) -> Self {
-        let values = serde_json::to_value(values).map_err(|e| Error::Usage(e.to_string()));
+        let values = crate::json::to_value(values);
         if let Some(value) = self.record(values) {
             match value.as_object() {
                 Some(values) => {

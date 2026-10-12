@@ -1,7 +1,8 @@
 /** One owner for session persistence, lifecycle transitions and refresh timers. */
-import { clientError, fail, ok, type Result } from '../core/errors.js';
+import { NelcotaUsageError, clientError, fail, ok, type Result } from '../core/errors.js';
 import { abortable } from '../core/cancellation.js';
 import { isBrowser } from '../core/jwt.js';
+import { encodeJson } from '../core/json.js';
 import { Broadcast, withLock } from './coordination.js';
 import { isSession, memoryStorage, parseSession, secondsLeft, type Session, type SessionStorage, type User } from './session.js';
 
@@ -46,13 +47,15 @@ export class SessionManager {
   #disposed = false;
 
   constructor(url: URL, options: AuthOptions, private rotate: (token: string, options: AuthRequestOptions) => Promise<Result<Session>>) {
+    const margin = options.refreshMargin ?? 60;
+    if (!Number.isFinite(margin) || margin < 0) throw new NelcotaUsageError('refreshMargin must be a finite non-negative number');
     this.storage = options.storage ?? browserStorage() ?? memoryStorage();
     const pathname = url.pathname;
     let end = pathname.length;
     while (end > 0 && pathname[end - 1] === '/') end--;
     const path = pathname.slice(0, end);
     this.key = options.storageKey ?? `nelcota.${url.host}${path}.session`;
-    this.#margin = options.refreshMargin ?? 60;
+    this.#margin = margin;
     this.#autoRefresh = options.autoRefresh ?? isBrowser();
     this.#onBackgroundError = options.onBackgroundError;
     if (isBrowser()) this.#broadcast = new Broadcast(`${this.key}.channel`, () => this.#background(this.#reload()));
@@ -98,20 +101,21 @@ export class SessionManager {
     });
   }
   async #write(session: Session | null, event: AuthEvent): Promise<void> {
+    const encoded = encodeJson(session);
     this.#session = session;
     this.#dirty = true;
     this.#schedule(null);
     try {
-      await this.#persist();
+      await this.#persist(encoded);
       this.#schedule(session);
     }
     finally {
       this.#emit(event, session);
     }
   }
-  async #persist(): Promise<void> {
+  async #persist(encoded?: string): Promise<void> {
     const session = this.#session;
-    await (session ? this.storage.setItem(this.key, JSON.stringify(session)) : this.storage.removeItem(this.key));
+    await (session ? this.storage.setItem(this.key, encoded ?? encodeJson(session)) : this.storage.removeItem(this.key));
     this.#dirty = false;
     this.#broadcast?.notify();
   }
