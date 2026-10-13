@@ -1,0 +1,94 @@
+{
+  "rust": {
+    "rust-pass1.log": {
+      "passed": 482,
+      "failed": 0,
+      "ignored": 2
+    },
+    "rust-pass2.log": {
+      "passed": 488,
+      "failed": 0,
+      "ignored": 2
+    },
+    "auth-reuse-review1.log": {
+      "passed": 9,
+      "failed": 0,
+      "ignored": 0
+    },
+    "refresh-batch-regressions.log": {
+      "passed": 54,
+      "failed": 0,
+      "ignored": 0
+    }
+  },
+  "panel": {
+    "unit_runs": [
+      390,
+      390
+    ],
+    "chromium_runs": [
+      61,
+      61
+    ],
+    "typecheck_errors": 0,
+    "typecheck_warnings": 0
+  },
+  "typescript_sdk": {
+    "unit_runs": [
+      173,
+      173
+    ],
+    "type_runs": [
+      15,
+      15
+    ],
+    "contract_runs": [
+      31,
+      31,
+      31
+    ],
+    "two_tab_browser_and_demo": "passed on corrected release"
+  },
+  "real_s3_regressions": {
+    "runs": [
+      2,
+      2
+    ]
+  },
+  "upgrade": {
+    "from": "0.3.1",
+    "corrected_release_and_backup_restore": "passed"
+  },
+  "auth_archives": {
+    "build_without_excluded_capabilities": "passed",
+    "signup_rotation_jwks_shutdown": "passed",
+    "compile_only_with_unusable_inherited_url": "passed"
+  },
+  "python_and_native_config_regressions": 22,
+  "native_base_errors": 0,
+  "native_import_errors": 0,
+  "optional_native_advisories": {
+    "errors": 1169,
+    "warnings": 31,
+    "execution_failures": 0
+  },
+  "dependencies": {
+    "cargo_audit_vulnerabilities": 0,
+    "cargo_deny": "advisories/bans/licenses/sources passed",
+    "panel_npm_vulnerabilities": 0,
+    "sdk_npm_vulnerabilities": 0
+  },
+  "scope": "Completed functional checks, two goal execution passes, two corrective reviews and final performance/S3 evidence; broad optional advisory findings remain triaged.",
+  "archive_optimized_python": "Rejected before fixture creation",
+  "measured_soaks": 3,
+  "pre_pr_review": {
+    "rls_integration_tests_passed": 10,
+    "python_and_native_config_regressions": 22,
+    "native_base_errors": 0,
+    "native_import_errors": 0,
+    "rls_counterbalanced_pairs_passed": 2,
+    "rls_nominal_samples": 12,
+    "sdk_failure_annotation_tail": "verified with oversized startup output",
+    "standalone_consumer_build_outputs": "ignored by its local .gitignore"
+  }
+}

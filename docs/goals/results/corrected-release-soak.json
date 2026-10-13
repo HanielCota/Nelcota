@@ -1,0 +1,168 @@
+{
+  "status": "passed",
+  "baseline_git": "a7b77634361961023341eba540bb8dfc5e5ef6e3",
+  "binary_sha256": "30da8265cc948d5b352b69322f7f21a39d3b84bdac868e9b253078be7b3ca64a",
+  "fixture": {
+    "cpu_affinity": [
+      0,
+      1,
+      2
+    ],
+    "app_cpus": 1,
+    "app_memory_mb": 128,
+    "pg_cpus": 1,
+    "pg_memory_mb": 384,
+    "generator_memory_mb": 512,
+    "generator_go_memory_limit_mib": 448,
+    "pool": 8,
+    "max_connections": 40,
+    "pg_data": "disposable disk volume",
+    "max_wal_mb": 64,
+    "max_fixture_disk_mb": 512,
+    "storage_backend": "disk",
+    "dataset": {
+      "products": 100000,
+      "private": 100000,
+      "objects": 10000
+    },
+    "k6": "grafana/k6:1.6.1@sha256:a5ad6bc089a08d77c3ec49f3db8c6fa7a148e4073efcac44c675dbaf3568d8e1",
+    "postgres_version": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+    "images": {
+      "ubuntu:24.04": [
+        "ubuntu@sha256:534baea6a22c03a63003dbc8dbe78fe34bc0d7e595d9a9dc9834884ff530eb55"
+      ],
+      "postgres:17-alpine": [
+        "postgres@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24"
+      ],
+      "grafana/k6:1.6.1@sha256:a5ad6bc089a08d77c3ec49f3db8c6fa7a148e4073efcac44c675dbaf3568d8e1": [
+        "grafana/k6@sha256:a5ad6bc089a08d77c3ec49f3db8c6fa7a148e4073efcac44c675dbaf3568d8e1"
+      ]
+    }
+  },
+  "capacity": {
+    "mixed_median_rps": 741.5270950610816,
+    "soak_rps": 593,
+    "p95_regression_gate": 1.1,
+    "throughput_regression_gate": 0.9
+  },
+  "soak": {
+    "requests": 1065313,
+    "duration_seconds": 1800.0169796969997,
+    "rps": 591.8349726786056,
+    "p50_ms": 5.47385,
+    "p95_ms": 95.84157259999999,
+    "p99_ms": 302.63009835999986,
+    "unexpected_rate": 0,
+    "failed_checks": 0,
+    "dropped_iterations": 2094
+  },
+  "stress": {
+    "16": {
+      "requests": 12575,
+      "duration_seconds": 20.155678692,
+      "rps": 623.893652610723,
+      "p50_ms": 8.403106,
+      "p95_ms": 110.92426249999978,
+      "p99_ms": 365.7726920000001,
+      "unexpected_rate": 0,
+      "failed_checks": 0,
+      "dropped_iterations": 0
+    },
+    "32": {
+      "requests": 13861,
+      "duration_seconds": 20.048397347,
+      "rps": 691.376959469238,
+      "p50_ms": 15.067836,
+      "p95_ms": 137.430557,
+      "p99_ms": 736.5379484,
+      "unexpected_rate": 0,
+      "failed_checks": 0,
+      "dropped_iterations": 0
+    },
+    "64": {
+      "requests": 14247,
+      "duration_seconds": 20.526212078,
+      "rps": 694.0881223413812,
+      "p50_ms": 30.049977,
+      "p95_ms": 357.9942019999944,
+      "p99_ms": 1500.2892559999996,
+      "unexpected_rate": 0,
+      "failed_checks": 0,
+      "dropped_iterations": 0
+    },
+    "128": {
+      "requests": 14052,
+      "duration_seconds": 20.537346548,
+      "rps": 684.2169199977996,
+      "p50_ms": 134.521198,
+      "p95_ms": 543.3018339999986,
+      "p99_ms": 1466.3042822699997,
+      "unexpected_rate": 0,
+      "failed_checks": 0,
+      "dropped_iterations": 0
+    }
+  },
+  "recovery": {
+    "before-restart": {
+      "requests": 12387,
+      "duration_seconds": 20.008751964,
+      "rps": 619.0790921036379,
+      "p50_ms": 2.850317,
+      "p95_ms": 35.99223689999995,
+      "p99_ms": 61.24912133999989,
+      "unexpected_rate": 0,
+      "failed_checks": 0,
+      "dropped_iterations": 0
+    },
+    "after-restart": {
+      "requests": 12724,
+      "duration_seconds": 20.043378273,
+      "rps": 634.8231234621873,
+      "p50_ms": 2.6796735,
+      "p95_ms": 34.695825249999906,
+      "p99_ms": 59.922561730000076,
+      "unexpected_rate": 0,
+      "failed_checks": 0,
+      "dropped_iterations": 0
+    }
+  },
+  "resources": {
+    "samples": 205,
+    "maximum_sample_gap_seconds": 25.5,
+    "app_peak_rss_mib": 45.75,
+    "app_final_rss_mib": 45.21875,
+    "app_tail_20min_rss_mib_range": [
+      44.91015625,
+      45.21875
+    ],
+    "pg_peak_disk_mib": 247,
+    "peak_connections": 16,
+    "peak_queue_outstanding": 20,
+    "app_peak_working_set_mib": 31.54,
+    "pg_peak_working_set_mib": 205.7,
+    "app_peak_cpu_percent": 110.98,
+    "pg_peak_cpu_percent": 104.3,
+    "sampler_errors": true,
+    "sampler_error_context": "One sample could not inspect the intentionally removed app during restart; maximum sample gap 25.5s."
+  },
+  "final_invariants": {
+    "auth": {
+      "users": 1,
+      "password_hashes": 1
+    },
+    "outstanding": 0,
+    "database": {
+      "connections": 15,
+      "idle_in_transaction": 0,
+      "waiting_locks": 0
+    },
+    "signature_errors": 0,
+    "file_integrity": {
+      "verified_objects": 129,
+      "maximum_object_bytes": 64
+    },
+    "app_running": true,
+    "app_oom_killed": false,
+    "pg_oom_killed": false
+  }
+}

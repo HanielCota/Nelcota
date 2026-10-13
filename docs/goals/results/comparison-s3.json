@@ -1,0 +1,33 @@
+{
+  "p95_limit": 1.1,
+  "rps_minimum": 0.9,
+  "fixture_differences": [],
+  "rows": [
+    {
+      "workload": "storage",
+      "baseline": {
+        "successful_runs": 3,
+        "failures": 0,
+        "p50_ms": 12.295625,
+        "p95_ms": 79.7873241,
+        "p99_ms": 103.15214605000014,
+        "rps": 631.270513605479,
+        "duration_seconds": 30.028331106
+      },
+      "candidate": {
+        "successful_runs": 3,
+        "failures": 0,
+        "p50_ms": 11.296983,
+        "p95_ms": 79.89027569999999,
+        "p99_ms": 98.9171425599999,
+        "rps": 651.4235998714265,
+        "duration_seconds": 30.041218122
+      },
+      "comparable": true,
+      "p95_ratio": 1.0012903252635839,
+      "rps_ratio": 1.0319246437645946,
+      "gate_passed": true
+    }
+  ],
+  "failed": []
+}
