@@ -80,14 +80,23 @@ async fn storage_listing_does_not_spill_all_metadata_before_limiting_the_page() 
     let claims = Claims::from_payload(json!({"role":"service_role"})).unwrap();
     let mut client = app.pool.get().await.unwrap();
     let tx = begin_request(&mut client, &claims).await.unwrap();
-    tx.batch_execute("SET LOCAL work_mem = '1MB'")
+    tx.batch_execute("SET LOCAL work_mem = '1MB'; SET LOCAL enable_bitmapscan = off")
         .await
         .unwrap();
     let sql = include_str!("../../storage/src/list.sql");
+    let directory_key: Vec<u8> = Vec::new();
+    let directory_upper: Option<Vec<u8>> = None;
     let plan: serde_json::Value = tx
         .query_one(
             &format!("EXPLAIN (ANALYZE,BUFFERS,FORMAT JSON) {sql}"),
-            &[&"audit-scale", &"%", &0_i32, &10_i64, &0_i64],
+            &[
+                &"audit-scale",
+                &"",
+                &directory_key,
+                &directory_upper,
+                &10_i64,
+                &0_i64,
+            ],
         )
         .await
         .unwrap()
