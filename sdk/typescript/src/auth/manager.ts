@@ -34,7 +34,6 @@ function browserStorage(): SessionStorage | undefined {
 export class SessionManager {
   // Shared with the OAuth verifier store, using a distinct key suffix.
   readonly storage: SessionStorage;
-  readonly #nativeStorage: boolean;
   readonly key: string;
   readonly #margin: number;
   readonly #autoRefresh: boolean;
@@ -50,9 +49,7 @@ export class SessionManager {
   constructor(url: URL, options: AuthOptions, private rotate: (token: string, options: AuthRequestOptions) => Promise<Result<Session>>) {
     const margin = options.refreshMargin ?? 60;
     if (!Number.isFinite(margin) || margin < 0) throw new NelcotaUsageError('refreshMargin must be a finite non-negative number');
-    const nativeStorage = browserStorage();
-    this.storage = options.storage ?? nativeStorage ?? memoryStorage();
-    this.#nativeStorage = nativeStorage !== undefined && this.storage === nativeStorage;
+    this.storage = options.storage ?? browserStorage() ?? memoryStorage();
     const pathname = url.pathname;
     let end = pathname.length;
     while (end > 0 && pathname[end - 1] === '/') end--;
@@ -124,10 +121,8 @@ export class SessionManager {
   async #persist(encoded?: string): Promise<void> {
     const session = this.#session;
     await (session ? this.storage.setItem(this.key, encoded ?? encodeJson(session)) : this.storage.removeItem(this.key));
-    // Firefox may publish localStorage snapshots only at a task boundary.
-    // Keep the Web Lock until that boundary, before broadcasting or letting
-    // another tab reread and rotate a refresh token that was already spent.
-    if (this.#nativeStorage) await new Promise<void>(resolve => setTimeout(resolve, 0));
+    // Publish Firefox's localStorage task snapshot before releasing the lock.
+    if (this.storage === browserStorage()) await new Promise<void>(resolve => setTimeout(resolve, 0));
     this.#dirty = false;
     this.#broadcast?.notify();
   }
