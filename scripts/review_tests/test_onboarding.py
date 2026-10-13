@@ -22,6 +22,8 @@ class Ownership(unittest.TestCase):
         self.fixture = onboarding.Quickstart("/bin/false", Path(self.temporary.name))
         self.info = {"Id": "owned-id", "Config": {"Env": ["POSTGRES_PASSWORD=generated-password"]},
                      "Mounts": [{"Name": self.fixture.volume, "Destination": "/var/lib/postgresql/data"}]}
+        self.volume = {"Name": self.fixture.volume,
+                       "Labels": {onboarding.VOLUME_OWNER_LABEL: self.fixture.run_id}}
 
     def test_matching_password_and_data_volume_establish_ownership(self):
         self.assertTrue(onboarding.owned_container(self.info, {"POSTGRES_PASSWORD": "generated-password"},
@@ -43,7 +45,7 @@ class Ownership(unittest.TestCase):
         self.fixture.claimed = True
         (self.fixture.root / ".nelcota").mkdir()
         (self.fixture.root / ".nelcota/dev.env").write_text("POSTGRES_PASSWORD=other-password\n")
-        with mock.patch.object(onboarding, "inspect", return_value=self.info), \
+        with mock.patch.object(onboarding, "inspect", side_effect=[self.info, self.volume]), \
              mock.patch.object(onboarding.subprocess, "run") as command:
             with self.assertRaisesRegex(RuntimeError, "ownership"):
                 self.fixture.cleanup()
@@ -53,9 +55,35 @@ class Ownership(unittest.TestCase):
         self.fixture.claimed = True
         with mock.patch.object(onboarding, "inspect", side_effect=[None, {"Name": self.fixture.volume}]), \
              mock.patch.object(onboarding.subprocess, "run") as command:
-            with self.assertRaisesRegex(RuntimeError, "unclaimed"):
+            with self.assertRaisesRegex(RuntimeError, "volume ownership"):
                 self.fixture.cleanup()
             command.assert_not_called()
+
+    def test_cleanup_preserves_a_volume_with_another_runs_label(self):
+        self.fixture.claimed = True
+        self.volume["Labels"][onboarding.VOLUME_OWNER_LABEL] = "another-run"
+        with mock.patch.object(onboarding, "inspect", side_effect=[self.info, self.volume]), \
+             mock.patch.object(onboarding.subprocess, "run") as command:
+            with self.assertRaisesRegex(RuntimeError, "volume ownership"):
+                self.fixture.cleanup()
+            command.assert_not_called()
+
+    def test_cleanup_removes_only_its_labeled_volume_after_early_start_failure(self):
+        self.fixture.claimed = True
+        with mock.patch.object(onboarding, "inspect", side_effect=[None, self.volume]), \
+             mock.patch.object(onboarding.subprocess, "run") as command:
+            self.assertEqual(self.fixture.cleanup(), "owned volume removed; no database container created")
+            self.assertEqual(command.call_args.args[0], ["docker", "volume", "rm", self.fixture.volume])
+
+    def test_concurrent_volume_creation_is_rejected_before_starting_the_server(self):
+        self.volume["Labels"][onboarding.VOLUME_OWNER_LABEL] = "another-run"
+        with mock.patch.object(onboarding, "inspect", side_effect=[None, None, self.volume]), \
+             mock.patch.object(onboarding.subprocess, "run") as command, \
+             mock.patch.object(self.fixture, "start") as start:
+            with self.assertRaisesRegex(RuntimeError, "concurrently created"):
+                self.fixture.run()
+            start.assert_not_called()
+            self.assertEqual(command.call_args.args[0][:3], ["docker", "volume", "create"])
 
     def test_daemon_failure_is_not_treated_as_missing_database(self):
         result = subprocess.CompletedProcess([], 1, b"", b"Cannot connect to the Docker daemon")

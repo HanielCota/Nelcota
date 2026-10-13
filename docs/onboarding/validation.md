@@ -34,7 +34,7 @@ separate real cancellation check sent SIGTERM after startup: the runner exited
 non-zero, recorded failure and removed its owned database container/volume.
 Pre-existing development and shared test databases were preserved.
 
-Supporting checks passed: 36 Python review-tool regressions (including 11 new
+Supporting checks passed: 39 Python review-tool regressions (including 14 new
 installer, ownership, redirect, response-size and child-process checks), 33
 panel guide tests (including the external Notes guide link), Portuguese guide
 consistency, panel/server builds and panel type/diagnostic checks,

@@ -24,6 +24,7 @@ import urllib.request
 
 ROOT = Path(__file__).resolve().parents[1]
 BODY_LIMIT = 1024 * 1024
+VOLUME_OWNER_LABEL = "nelcota.onboarding.run"
 
 
 def require(condition, message):
@@ -135,6 +136,12 @@ def owned_container(info, state, volume):
                "/var/lib/postgresql/data" for mount in info["Mounts"])
 
 
+def owned_volume(info, run_id):
+    if not info:
+        return False
+    return (info.get("Labels") or {}).get(VOLUME_OWNER_LABEL) == run_id
+
+
 class Quickstart:
     def __init__(self, binary, report_dir):
         self.binary = binary
@@ -145,6 +152,7 @@ class Quickstart:
             self.db_port = free_port()
         self.container = f"nelcota-dev-postgres-{self.db_port}"
         self.volume = self.container + "-data"
+        self.run_id = secrets.token_hex(16)
         self.api = Api(f"http://127.0.0.1:{self.api_port}")
         self.process = None
         self.environment = {key: value for key, value in os.environ.items()
@@ -191,13 +199,18 @@ class Quickstart:
         if not self.claimed:
             return "no database created"
         info = inspect("container", self.container)
+        volume = inspect("volume", self.volume)
+        if not info and not volume:
+            return "no database created"
+        require(owned_volume(volume, self.run_id),
+                "Cleanup refused: database volume ownership could not be verified")
         state = {}
         if (self.root / ".nelcota/dev.env").exists():
             state = state_values(self.root)
         if not info:
-            require(inspect("volume", self.volume) is None,
-                    "Cleanup refused: an unclaimed database volume remains")
-            return "no database created"
+            subprocess.run(["docker", "volume", "rm", self.volume], check=True,
+                           stdout=subprocess.DEVNULL, timeout=30)
+            return "owned volume removed; no database container created"
         require(owned_container(info, state, self.volume),
                 "Cleanup refused: database ownership could not be verified")
         subprocess.run(["docker", "rm", "-f", info["Id"]], check=True,
@@ -254,6 +267,11 @@ class Quickstart:
         require(inspect("volume", self.volume) is None,
                 "Selected database volume already exists; refusing to reuse it")
         self.claimed = True
+        subprocess.run(["docker", "volume", "create", "--label",
+                        VOLUME_OWNER_LABEL + "=" + self.run_id, self.volume], check=True,
+                       stdout=subprocess.DEVNULL, timeout=30)
+        require(owned_volume(inspect("volume", self.volume), self.run_id),
+                "Selected volume was concurrently created by another run; refusing to reuse it")
         version = self.start()
         state = state_values(self.root)
         database = inspect("container", self.container)

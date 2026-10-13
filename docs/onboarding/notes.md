@@ -136,8 +136,10 @@ local ports, invokes the real `dev`, `migrate` and `types` commands, checks
 panel login, creates two users, tests Notes and file isolation, checks logout
 and restarts both the API and PostgreSQL. It verifies account identity,
 saved notes, exact file bytes and signing keys after restart. It removes only
-the database container and volume whose generated credentials and mount
-match its own fixture. Existing databases are never reused.
+the database container whose generated credentials and mount match its own
+fixture, and the volume carrying that run's unique ownership label. A volume
+created concurrently by another run is rejected before starting the server.
+Existing databases are never reused.
 
 To exercise the browser example too, build the SDK as above and install the
 browser test dependency:
