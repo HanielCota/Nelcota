@@ -906,6 +906,32 @@ source support. PostgreSQL array elements can be null even in NOT NULL columns;
 generated scalar and enum arrays therefore use `(T | null)[]`. Column
 nullability remains separate. Regenerate schema types after updating the SDK.
 
+**D100. Panel database work has bounded budgets and indexed storage pages.**
+Table previews reuse one admin connection and roll back the caller's role before
+reading owner metadata. Small-table counts probe at most 10,001 rows with a
+250 ms statement timeout. When a table outgrows its small estimate, its total
+becomes unknown until statistics provide a larger estimate.
+
+Table exports use two dedicated connection slots shared by all panel sessions,
+with a 30-second statement timeout and a two-minute response lifetime. Dropping
+a response cancels its query. Completion checks the deadline directly and
+arbitrates atomically with interruption, so a delayed watchdog cannot report a
+late export as complete. Admission stays occupied during bounded cancellation.
+
+Storage directory pages seek through a generated parent-path byte key and skip
+each returned folder's subtree. Immediate files use an ordered generated
+scope-fingerprint/name index; exact bucket and parent checks reject collisions.
+Every seek remains subject to the caller's object RLS. Listing transactions
+disable bitmap scans locally to favor ordered seeks before statistics catch up.
+The pure key helpers allow public execution to preserve custom SQL writers;
+their generated values convey no additional access privileges.
+
+V14 indexes the stable creation-time/ID user order. V15 computes stored directory
+keys and scope fingerprints and builds their indexes under the migration lock.
+Large installations need time for this one-time metadata rewrite. Upgrade tests
+verify original rows, schema objects, policies and files, including legacy SQL
+paths whose multibyte names exceed the HTTP byte limit.
+
 ### Known pending items
 
 - Filtering parent rows by their embeds (`!inner`) and self-referencing embeds.
