@@ -4,7 +4,7 @@ import type { StorageBrowserAdapter } from './browser.svelte'
 
 export const storageBrowserAdapter: StorageBrowserAdapter = {
   async info(bucket, signal) {
-    const data = await api.get<StorageOverview>('/storage', { signal })
+    const data = await api.get<StorageOverview>(`/storage?${new URLSearchParams({ bucket })}`, { signal })
     const found = data.enabled ? data.buckets.find(item => item.id === bucket) : undefined
     return data.enabled && found ? { bucket: found, publicOrigin: data.public_url ?? location.origin, serverLimit: data.max_file_size } : null
   },

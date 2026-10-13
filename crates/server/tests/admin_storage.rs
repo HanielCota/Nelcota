@@ -19,6 +19,57 @@ async fn upload(app: &TestApp, cookie: &str, bucket: &str, name: &str, body: &[u
 }
 
 #[tokio::test]
+async fn bucket_info_is_scoped_without_changing_the_overview_contract() {
+    let app = TestApp::spawn().await;
+    let cookie = login(&app).await;
+    app.admin_client.batch_execute("INSERT INTO storage.buckets (id) VALUES ('docs'),('other');
+        INSERT INTO storage.objects (bucket_id,name,version,size,mime_type,etag)
+        VALUES ('docs','one.txt',gen_random_uuid(),7,'text/plain','etag'), ('other','two.txt',gen_random_uuid(),900,'text/plain','etag');").await.unwrap();
+    let scoped = send(
+        &app,
+        Method::GET,
+        "/admin/api/storage?bucket=docs",
+        &cookie,
+        json!(null),
+    )
+    .await;
+    assert_eq!(scoped.status, StatusCode::OK, "{}", scoped.text);
+    assert_eq!(scoped.body["buckets"].as_array().unwrap().len(), 1);
+    assert_eq!(scoped.body["buckets"][0]["id"], "docs");
+    assert_eq!(scoped.body["buckets"][0]["files"], 1);
+    assert_eq!(scoped.body["buckets"][0]["bytes"], 7);
+    let all = send(
+        &app,
+        Method::GET,
+        "/admin/api/storage",
+        &cookie,
+        json!(null),
+    )
+    .await;
+    assert_eq!(all.body["buckets"].as_array().unwrap().len(), 2);
+    let absent = send(
+        &app,
+        Method::GET,
+        "/admin/api/storage?bucket=missing",
+        &cookie,
+        json!(null),
+    )
+    .await;
+    assert_eq!(absent.body["buckets"], json!([]));
+    let invalid = send(
+        &app,
+        Method::GET,
+        "/admin/api/storage?bucket=Bad",
+        &cookie,
+        json!(null),
+    )
+    .await;
+    assert_eq!(invalid.status, StatusCode::BAD_REQUEST);
+    let unauthenticated = app.get("/admin/api/storage?bucket=docs", None).await;
+    assert_eq!(unauthenticated.0, StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
 async fn buckets_and_files_from_the_panel() {
     let app = TestApp::spawn().await;
     let cookie = login(&app).await;
