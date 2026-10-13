@@ -78,6 +78,12 @@ fallback. Only Web Locks coordinate separate browser tabs. If a browser lacks
 Web Locks, use per-tab sessionStorage or an adapter with external coordination;
 the module-local queue does not guarantee cross-tab rotation safety.
 
+For native localStorage, the lock owner yields to a new browser task before
+reading storage. Lock grants and storage updates use separate delivery queues;
+acquiring a lock alone does not refresh a tab's storage view. Cached reads and
+custom storage adapters do not incur this delay. Native writes also finish their
+browser task before the owner releases the lock.
+
 The refresh margin is capped at half the token lifetime, so short-lived tokens
 and large configured margins do not rotate fresh sessions repeatedly. Background
 jitter stays within the scheduled delay. An already expired token waits ten

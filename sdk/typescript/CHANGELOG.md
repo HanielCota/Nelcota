@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Observe native browser storage updates after acquiring the session lock,
+  preventing queued tabs from rotating the same refresh token twice.
 - Preserve unsafe integers and decimal digits in JSON responses as strings,
   including nested values and RPC results. Ordinary numbers remain numeric.
   Regenerate schema types: Postgres numeric types that may exceed JavaScript

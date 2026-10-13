@@ -1,4 +1,5 @@
 {
+  "Observe native browser storage updates after acquiring the session lock,\npreventing queued tabs from rotating the same refresh token twice.": "Observar as atualizações do armazenamento nativo do navegador após adquirir o lock da sessão, evitando que abas na fila renovem o mesmo refresh token duas vezes.",
   "Changelog": "Histórico de alterações",
   "First npm release. Changes since the release candidate:": "Primeira publicação no npm. Alterações desde a versão candidata:",
   "Add `auth.updateUser({ password?, currentPassword?, data? })` for the new\n`PUT /auth/v1/user`: change the password (other sessions end) or merge\n`user_metadata`. Needs a server with that endpoint.": "Adiciona `auth.updateUser({ password?, currentPassword?, data? })` para o novo `PUT /auth/v1/user`: altera a senha (as outras sessões são encerradas) ou mescla `user_metadata`. Requer um servidor com esse endpoint.",

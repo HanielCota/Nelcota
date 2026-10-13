@@ -127,7 +127,45 @@ describe('password sign-in', () => {
 });
 
 describe('refresh', () => {
-  it('holds the shared lock until native storage publishes its task snapshot', async () => {
+  it('leaves the lock-grant task before reading a native storage snapshot', async () => {
+    vi.stubGlobal('window', {});
+    vi.stubGlobal('document', {});
+    vi.stubGlobal('BroadcastChannel', undefined);
+    let committed = JSON.stringify(session(5));
+    let visible = committed;
+    const storage = {
+      getItem: () => visible,
+      setItem: (_key: string, value: string) => { committed = visible = value; },
+      removeItem: () => { committed = visible = ''; },
+    };
+    vi.stubGlobal('localStorage', storage);
+    let queue: Promise<unknown> = Promise.resolve();
+    vi.stubGlobal('navigator', { locks: {
+      request: <T>(_name: string, task: () => Promise<T>) => {
+        // A queued tab can enter the callback with its earlier storage view.
+        // The write becomes visible on the next task, independently of the lock.
+        const snapshot = committed;
+        const result = queue.then(() => {
+          visible = snapshot;
+          setTimeout(() => { visible = committed; }, 0);
+          return task();
+        });
+        queue = result.then(() => undefined, () => undefined);
+        return result;
+      },
+    } });
+    const mock = mockFetch(json(session(900, 'refresh-2', 'access-2')), json(session(900, 'refresh-3', 'access-3')));
+    const clients = [0, 1].map(() => createClient('https://api.example.com', {
+      fetch: mock.fetch, auth: { autoRefresh: false },
+    }));
+    try {
+      const results = await Promise.all(clients.map(client => client.auth.getSession()));
+      expect(mock.calls).toHaveLength(1);
+      expect(results.map(result => result.data?.refresh_token)).toEqual(['refresh-2', 'refresh-2']);
+    } finally { clients.forEach(client => client.dispose()); }
+  });
+
+  it('observes native writes published after the previous owner releases the lock', async () => {
     vi.stubGlobal('window', {});
     vi.stubGlobal('document', {});
     vi.stubGlobal('BroadcastChannel', undefined);
