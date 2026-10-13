@@ -89,6 +89,46 @@
     "rls_counterbalanced_pairs_passed": 2,
     "rls_nominal_samples": 12,
     "sdk_failure_annotation_tail": "verified with oversized startup output",
-    "standalone_consumer_build_outputs": "ignored by its local .gitignore"
+    "standalone_consumer_build_outputs": "ignored by its local .gitignore",
+    "fixture_environment_smoke": {
+      "status": "passed",
+      "protocol": "Three five-second nominal mixed runs plus warmup, recovery and restart; a fixture transport regression, not a new performance comparison.",
+      "binary_sha256": "30da8265cc948d5b352b69322f7f21a39d3b84bdac868e9b253078be7b3ca64a",
+      "samples": [
+        {
+          "duration": "5s",
+          "requests": 3440,
+          "failed_checks": 0,
+          "unexpected_rate": 0
+        },
+        {
+          "duration": "5s",
+          "requests": 3405,
+          "failed_checks": 0,
+          "unexpected_rate": 0
+        },
+        {
+          "duration": "5s",
+          "requests": 3488,
+          "failed_checks": 0,
+          "unexpected_rate": 0
+        }
+      ],
+      "final_invariants": {
+        "outstanding": 0,
+        "signature_errors": 0,
+        "database": {
+          "connections": 11,
+          "idle_in_transaction": 0,
+          "waiting_locks": 0
+        },
+        "file_integrity": {
+          "verified_objects": 17,
+          "maximum_object_bytes": 64
+        }
+      },
+      "app_oom": false,
+      "pg_oom": false
+    }
   }
 }

@@ -120,3 +120,9 @@ never use that option to certify a candidate. `--workloads` and `--steady`
 select smaller investigations, while `--soak-seconds 0` disables the long soak.
 TLS verification in the original read runner is enabled by default; only a
 controlled development test should set `INSECURE_TLS=true`.
+
+Campaign credentials are generated at runtime and passed to native k6 through
+the Docker child environment. The generator command contains the environment
+variable name, without its value; no plaintext credential fixture file is
+written or mounted. Treat Docker daemon access as privileged, as for the
+application and database containers' existing runtime configuration.

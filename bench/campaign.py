@@ -391,28 +391,25 @@ def campaign(arguments):
                 {"Cookie": cookie, "Origin": base},
             )
             receiver.secret = hook["secret"]
-            fixture = directory / "fixture.json"
-            fixture.write_text(
-                json.dumps(
+            # Runtime credentials stay in memory. Docker inherits this payload
+            # from the child environment, without a plaintext fixture file or
+            # credential-bearing command arguments.
+            fixture = {
+                "base": base,
+                "email": email,
+                "password": password,
+                "access": token(
+                    jwt,
                     {
-                        "base": base,
-                        "email": email,
-                        "password": password,
-                        "access": token(
-                            jwt,
-                            {
-                                "role": "authenticated",
-                                "sub": user,
-                                "exp": int(time.time()) + 7200,
-                            },
-                        ),
-                        "user": user,
-                        "service": service,
-                        "cookie": cookie,
-                    }
-                )
-            )
-            fixture.chmod(0o444)
+                        "role": "authenticated",
+                        "sub": user,
+                        "exp": int(time.time()) + 7200,
+                    },
+                ),
+                "user": user,
+                "service": service,
+                "cookie": cookie,
+            }
             metadata = {
                 "binary_sha256": hashlib.file_digest(
                     arguments.binary.open("rb"), "sha256"
@@ -530,11 +527,7 @@ def campaign(arguments):
                     {"email": email, "password": password},
                     {"Origin": base},
                 )
-                values = json.loads(fixture.read_text())
-                values["cookie"] = headers["Set-Cookie"].split(";", 1)[0]
-                fixture.chmod(0o600)
-                fixture.write_text(json.dumps(values))
-                fixture.chmod(0o444)
+                fixture["cookie"] = headers["Set-Cookie"].split(";", 1)[0]
 
             def run(label, workload, duration, vus=16, rate=0, overload=False):
                 command = [
@@ -558,13 +551,11 @@ def campaign(arguments):
                     "-v",
                     str(ROOT / "bench/campaign.js") + ":/campaign.js:ro",
                     "-v",
-                    str(fixture) + ":/fixture.json:ro",
-                    "-v",
                     str(output) + ":/reports",
                     "-e",
                     "GOMEMLIMIT=448MiB",
                     "-e",
-                    "FIXTURE=/fixture.json",
+                    "FIXTURE",
                     "-e",
                     "WORKLOAD=" + workload,
                     "-e",
@@ -584,7 +575,11 @@ def campaign(arguments):
                 print("Running", label, workload, duration, flush=True)
                 with (output / (label + ".log")).open("w") as target:
                     result = subprocess.run(
-                        command, stdout=target, stderr=subprocess.STDOUT, timeout=3900
+                        command,
+                        stdout=target,
+                        stderr=subprocess.STDOUT,
+                        timeout=3900,
+                        env={**os.environ, "FIXTURE": json.dumps(fixture)},
                     )
                 if result.returncode:
                     state = json.loads(docker("inspect", app))[0]["State"]

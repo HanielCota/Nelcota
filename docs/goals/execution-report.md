@@ -272,3 +272,14 @@ Raw attempts are retained in ignored `.tools/reports/goals/`; sanitized results
 are versioned here. The manual stress workflow uploads diagnostics on a
 self-hosted Linux runner labeled `nelcota-benchmark`. No runner was provisioned,
 package published, repository extracted or external service deployed.
+
+PR review found CodeQL alert 144 in the benchmark's temporary credential JSON.
+The harness now keeps that fixture in memory and supplies it through the Docker
+child environment, without writing/mounting a credential file or including its
+value in generator command arguments. Three five-second mixed samples plus
+warmup, recovery and restart passed on the unchanged release binary: no failed
+checks, queue residue, idle transactions, waiting locks or OOM; all bounded
+fixture objects passed byte verification. This is a fixture transport regression
+check, rather than a replacement for the recorded 30-second comparisons/soaks.
+The pre-PR review also bounds SDK failure annotations to preserve their final
+error and ignores local standalone-consumer build output.

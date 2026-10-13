@@ -3,7 +3,7 @@ import http from 'k6/http';
 import { check } from 'k6';
 import { Trend, Rate } from 'k6/metrics';
 
-const fixture = JSON.parse(open(__ENV.FIXTURE));
+const fixture = JSON.parse(__ENV.FIXTURE);
 const base = fixture.base;
 const kind = __ENV.WORKLOAD || 'mixed';
 const vus = Number(__ENV.VUS || 16);
