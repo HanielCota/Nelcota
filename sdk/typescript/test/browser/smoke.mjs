@@ -136,6 +136,7 @@ try {
   // Two actual pages share localStorage and Web Locks, rather than a mocked
   // lock manager. Rotation must leave both pages with the same live session.
   await tab.evaluate(async (api) => {
+    if (!navigator.locks) throw new Error('Cross-tab rotation requires Web Locks');
     const { createClient } = await import('/dist/index.js');
     globalThis.sdkClient = createClient(api, { auth: { autoRefresh: false } });
     const signup = await globalThis.sdkClient.auth.signUp({ email: `tabs-${crypto.randomUUID()}@example.com`, password: 'browser-tabs-password' });
@@ -150,21 +151,43 @@ try {
     globalThis.sdkClient = createClient(api, { auth: { autoRefresh: false } });
   }, api);
   let refreshRequests = 0;
+  const rotationRequests = [];
   for (const page of [tab, other]) page.on('request', request => {
-    if (new URL(request.url()).searchParams.get('grant_type') === 'refresh_token') refreshRequests++;
+    if (new URL(request.url()).searchParams.get('grant_type') === 'refresh_token') {
+      refreshRequests++;
+      rotationRequests.push({ page: page === tab ? 'first' : 'second', token: request.postDataJSON().refresh_token });
+    }
   });
-  const sessions = await Promise.all([tab, other].map((page) => page.evaluate(() => globalThis.sdkClient.auth.getSession())));
-  const shared = sessions.every((value) => value.error === null && value.data !== null)
-    && sessions[0].data.refresh_token === sessions[1].data.refresh_token
-    && refreshRequests === 1;
-  failed ||= !shared;
-  console.log(`${shared ? 'ok  ' : 'FAIL'} refresh across two real tabs`);
-  if (!shared) console.log('Rotation diagnostics:', {
-    refreshRequests,
-    errors: sessions.map(value => value.error?.code ?? null),
-    present: sessions.map(value => value.data !== null),
-    matching: sessions[0].data?.refresh_token === sessions[1].data?.refresh_token,
-  });
+  const rounds = 10;
+  for (let round = 0; round < rounds; round++) {
+    const before = refreshRequests;
+    const sessions = await Promise.all([tab, other].map((page) => page.evaluate(() => globalThis.sdkClient.auth.getSession())));
+    const shared = sessions.every((value) => value.error === null && value.data !== null)
+      && sessions[0].data.refresh_token === sessions[1].data.refresh_token
+      && refreshRequests - before === 1;
+    failed ||= !shared;
+    if (!shared) {
+      console.log('FAIL refresh across two real tabs');
+      console.log('Rotation diagnostics:', {
+        round: round + 1,
+        refreshRequests: refreshRequests - before,
+        errors: sessions.map(value => value.error?.code ?? null),
+        present: sessions.map(value => value.data !== null),
+        matching: sessions[0].data?.refresh_token === sessions[1].data?.refresh_token,
+        sameInputToken: rotationRequests.slice(before).every(request => request.token === rotationRequests[before].token),
+        owners: rotationRequests.slice(before).map(request => request.page),
+      });
+      break;
+    }
+    if (round === rounds - 1) {
+      console.log(`ok  refresh across two real tabs (${rounds} rounds)`);
+      break;
+    }
+    // Keep both clients warm and expiring for the next contention. Transfer
+    // the same session without ever printing its tokens in CI diagnostics.
+    const expiring = { ...sessions[0].data, expires_at: Math.floor(Date.now() / 1000) + 5 };
+    await Promise.all([tab, other].map(page => page.evaluate(session => globalThis.sdkClient.auth.setSession(session), expiring)));
+  }
   await tab.evaluate(() => globalThis.sdkClient.auth.signOut());
   await other.waitForFunction(async () => (await globalThis.sdkClient.auth.getSession()).data === null);
   console.log('ok  sign-out broadcast to the other tab');

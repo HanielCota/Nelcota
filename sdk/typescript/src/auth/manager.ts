@@ -81,6 +81,9 @@ export class SessionManager {
     // Keep the newer local state until a later persistence attempt succeeds.
     if (this.#dirty) return this.#session ?? null;
     if (!force && this.#session !== undefined) return this.#session;
+    // Web Locks and native storage use separate delivery queues. Leave the
+    // grant task before reading the previous owner's storage write.
+    if (this.storage === browserStorage()) await new Promise<void>(resolve => setTimeout(resolve, 0));
     const stored = await this.storage.getItem(this.key);
     this.#session = parseSession(stored);
     if (stored !== null && this.#session === null) await this.storage.removeItem(this.key);
@@ -121,7 +124,7 @@ export class SessionManager {
   async #persist(encoded?: string): Promise<void> {
     const session = this.#session;
     await (session ? this.storage.setItem(this.key, encoded ?? encodeJson(session)) : this.storage.removeItem(this.key));
-    // Publish Firefox's localStorage task snapshot before releasing the lock.
+    // Finish this owner's native write task before handing the lock over.
     if (this.storage === browserStorage()) await new Promise<void>(resolve => setTimeout(resolve, 0));
     this.#dirty = false;
     this.#broadcast?.notify();
