@@ -245,6 +245,83 @@ async fn post(router: Router, path: &str, value: Value) -> (u16, Value) {
 }
 
 #[tokio::test]
+async fn refresh_lifetimes_match_postgres_range_and_invalid_manual_state_rolls_back() {
+    let database = Database::new().await;
+    let keys =
+        Arc::new(Keys::new(Some(&nelcota_auth::generate_ed25519_private_key()), None).unwrap());
+    let mut state = database.state(keys);
+    let mut settings = (*state.settings).clone();
+    let valid_days: i32 = database
+        .client
+        .query_one(
+            "SELECT floor((extract(epoch FROM '294276-12-30 00:00:00+00'::timestamptz)
+                - extract(epoch FROM now())) / 86400)::int4",
+            &[],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    settings.refresh_ttl_days = valid_days as u32;
+    assert!(settings.validate().is_ok());
+    let representable: bool = database
+        .client
+        .query_one(
+            "SELECT (now() + make_interval(days => $1)) IS NOT NULL",
+            &[&valid_days],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    assert!(representable);
+    let invalid_days = i32::MAX;
+    assert!(
+        database
+            .client
+            .query_one(
+                "SELECT (now() + make_interval(days => $1)) IS NOT NULL",
+                &[&invalid_days],
+            )
+            .await
+            .is_err(),
+        "The fixture must reproduce timestamp overflow despite fitting int4"
+    );
+    settings.refresh_ttl_days = invalid_days as u32;
+    assert!(settings.validate().is_err());
+    assert!(
+        AuthState::new(
+            state.pool.clone(),
+            state.keys.clone(),
+            state.passwords.clone(),
+            settings.clone(),
+            1000,
+        )
+        .is_err()
+    );
+    // Public fields retain compatibility: an invalid manually assembled state
+    // must fail without leaving a partially created user/session/token.
+    state.settings = Arc::new(settings);
+    let (status, _) = post(
+        nelcota_auth::router(state),
+        "/auth/v1/signup",
+        json!({"email":"ttl@example.com","password":Uuid::new_v4().to_string()}),
+    )
+    .await;
+    assert_eq!(status, 500);
+    let retained: i64 = database
+        .client
+        .query_one(
+            "SELECT (SELECT count(*) FROM auth.users)
+                 + (SELECT count(*) FROM auth.sessions)
+                 + (SELECT count(*) FROM auth.refresh_tokens)",
+            &[],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    assert_eq!(retained, 0);
+}
+
+#[tokio::test]
 async fn fresh_auth_setup_is_scoped_idempotent_and_serializes_instances() {
     let database = Database::new().await;
     assert_eq!(

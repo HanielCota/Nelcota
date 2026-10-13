@@ -69,12 +69,21 @@ async fn issue_tokens(
     session_id: Uuid,
     user: &SessionUser,
 ) -> Result<Value, ApiError> {
-    let (refresh_token, hash) = new_opaque_token();
-    if state.settings.access_ttl_secs == 0 || state.settings.refresh_ttl_days == 0 {
+    let now = get_current_timestamp();
+    if state.settings.access_ttl_secs == 0
+        || !nelcota_core::config::refresh_lifetime_is_representable(
+            now,
+            state.settings.refresh_ttl_days,
+        )
+    {
         return Err(ApiError::internal());
     }
+    let expires_at = now
+        .checked_add(state.settings.access_ttl_secs)
+        .ok_or_else(ApiError::internal)?;
     let ttl_days =
         i32::try_from(state.settings.refresh_ttl_days).map_err(|_| ApiError::internal())?;
+    let (refresh_token, hash) = new_opaque_token();
     tx.execute(
         "INSERT INTO auth.refresh_tokens (session_id, token_hash, expires_at)
          VALUES ($1, $2, now() + make_interval(days => $3))",
@@ -83,10 +92,6 @@ async fn issue_tokens(
     .await
     .map_err(db_error)?;
 
-    let now = get_current_timestamp();
-    let expires_at = now
-        .checked_add(state.settings.access_ttl_secs)
-        .ok_or_else(ApiError::internal)?;
     let claims = json!({
         "iss": state.settings.issuer,
         "aud": "authenticated",

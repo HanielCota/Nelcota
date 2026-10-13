@@ -33,9 +33,9 @@ impl AuthSettings {
                 "access lifetime must be positive and representable",
             ));
         }
-        if self.refresh_ttl_days == 0 || i32::try_from(self.refresh_ttl_days).is_err() {
+        if !nelcota_core::config::refresh_lifetime_is_representable(now, self.refresh_ttl_days) {
             return Err(SettingsError(
-                "refresh lifetime must fit a positive PostgreSQL interval",
+                "refresh lifetime must produce a representable PostgreSQL expiration",
             ));
         }
         for page in [
@@ -161,6 +161,8 @@ mod tests {
         assert!(value.validate().is_err());
         value = settings();
         value.refresh_ttl_days = u32::MAX;
+        assert!(value.validate().is_err());
+        value.refresh_ttl_days = i32::MAX as u32;
         assert!(value.validate().is_err());
         for page in [
             "javascript:alert(1)",
