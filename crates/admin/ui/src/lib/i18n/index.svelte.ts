@@ -6,7 +6,7 @@
 // `{ 'pt-BR': {...}, en: {...} }`. The English object is typed against the
 // Portuguese one, so a missing or extra key is a type error.
 
-import { ApiError } from '../api'
+import { ApiError } from '../api-error'
 import { readText, write } from '../local-storage'
 import common from './messages/common'
 import shell from './messages/shell'
