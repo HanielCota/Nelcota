@@ -11,6 +11,8 @@ mod auth;
 mod migrations;
 #[path = "admin/overview.rs"]
 mod overview;
+#[path = "admin/performance.rs"]
+mod performance;
 #[path = "admin/policies.rs"]
 mod policies;
 #[path = "admin/profile.rs"]

@@ -57,6 +57,7 @@ pub use error::ApiError;
 use error::api_not_found;
 use middleware::{same_origin, security_headers};
 pub use state::AdminState;
+pub use tables::ExportExecutor;
 pub fn router(state: AdminState) -> Router {
     let protected = Router::new()
         .route("/admin/api/session", get(session))

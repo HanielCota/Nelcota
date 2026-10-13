@@ -1,6 +1,8 @@
 //! Table export as CSV or JSON, streamed from Postgres: one record at a time
 //! goes straight into the response, without building the whole file in
 //! memory. Follows the grid's sort and filters.
+mod connection;
+pub use connection::ExportExecutor;
 
 use std::{error::Error, future::ready};
 
@@ -179,8 +181,9 @@ pub async fn export(
     let sql = query::select_rows(&schema, &table, &request);
 
     // Filter errors show up here, before the first byte: they become a 400.
-    let client = state.db.get().await?;
-    let rows = client
+    let connection = state.exports.connect(&state.db_config).await?;
+    let rows = connection
+        .client
         .query_raw(sql.text.as_str(), sql.param_refs())
         .await
         .map_err(user_query_error)?;
@@ -198,9 +201,9 @@ pub async fn export(
     });
     let stream = stream::once(ready(Ok::<_, BoxError>(header)))
         .chain(body)
-        // The connection stays with the stream until the end, then returns to the pool.
+        // The dedicated connection lives with this stream, under its own budget.
         .chain(stream::once(async move {
-            drop(client);
+            connection.finish()?;
             Ok(footer.to_owned())
         }))
         .inspect(move |chunk| {

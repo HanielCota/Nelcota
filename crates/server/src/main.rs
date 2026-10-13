@@ -152,7 +152,8 @@ async fn serve(config: Config) -> anyhow::Result<()> {
                     allow_loopback: config.webhooks_allow_loopback,
                 },
                 sql: Arc::default(),
-                // 3: a long export holds its own and the panel keeps going with the others.
+                exports: Arc::default(),
+                // Ordinary panel requests have a pool separate from SQL and exports.
                 db: db::admin_pool(&admin, 3),
                 db_config: admin.clone(),
                 catalog: state.catalog.clone(),
