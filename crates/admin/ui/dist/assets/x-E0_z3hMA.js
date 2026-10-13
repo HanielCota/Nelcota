@@ -1,0 +1,1 @@
+import{_ as e,v as t}from"./index.svelte-Bu8KNU-r.js";import{i as n}from"./router.svelte-BglKDo3Q.js";var r=new Set([`$$slots`,`$$events`,`$$legacy`]);function i(i,a){let o=e(a,r),s={name:`x`,size:24,node:[[`path`,{d:`M18 6 6 18`}],[`path`,{d:`m6 6 12 12`}]]};n(i,t(()=>o,{get icon(){return s}}))}export{i as t};

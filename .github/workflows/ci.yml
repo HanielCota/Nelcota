@@ -24,9 +24,15 @@ jobs:
           components: clippy, rustfmt
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       - run: cargo fmt --all --check
+      - run: python3 scripts/check-boundaries.py
       - run: cargo clippy --all-targets -- -D warnings
       # Integration tests start Postgres 17 via testcontainers (the runner's Docker).
       - run: cargo test --all
+      - name: auth archive consumer
+        run: |
+          cargo package -p nelcota-core -p nelcota-auth --no-verify
+          python3 scripts/test-auth-package.py --run
+
       # Storage on a real S3-compatible service (presigned URLs, multipart).
       - name: storage on S3
         env:
@@ -46,6 +52,17 @@ jobs:
             sleep 1
           done
           cargo test -p nelcota-server --test storage_s3 -- --ignored
+
+  native-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: python3 scripts/install-oxlint.py
+      - run: python3 scripts/run-preset.py base
+      - run: python3 scripts/run-preset.py performance/imports
+      - run: python3 -m unittest discover -s scripts/review_tests -v
 
   supply-chain:
     runs-on: ubuntu-latest

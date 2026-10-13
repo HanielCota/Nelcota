@@ -127,6 +127,39 @@ describe('password sign-in', () => {
 });
 
 describe('refresh', () => {
+  it('holds the shared lock until native storage publishes its task snapshot', async () => {
+    vi.stubGlobal('window', {});
+    vi.stubGlobal('document', {});
+    vi.stubGlobal('BroadcastChannel', undefined);
+    const committed = new Map([[KEY, JSON.stringify(session(5))]]);
+    const storage = {
+      getItem: (key: string) => committed.get(key) ?? null,
+      // Firefox can publish a native localStorage write at a task boundary,
+      // after its synchronous setItem has already returned.
+      setItem: (key: string, value: string) => { setTimeout(() => committed.set(key, value), 0); },
+      removeItem: (key: string) => { setTimeout(() => committed.delete(key), 0); },
+    };
+    vi.stubGlobal('localStorage', storage);
+    let queue: Promise<unknown> = Promise.resolve();
+    vi.stubGlobal('navigator', { locks: {
+      request: <T>(_name: string, task: () => Promise<T>) => {
+        const result = queue.then(task);
+        queue = result.then(() => undefined, () => undefined);
+        return result;
+      },
+    } });
+    const mock = mockFetch(json(session(900, 'refresh-2', 'access-2')), json(session(900, 'refresh-3', 'access-3')));
+    const clients = [0, 1].map(() => createClient('https://api.example.com', {
+      fetch: mock.fetch, auth: { autoRefresh: false },
+    }));
+    try {
+      const results = await Promise.all(clients.map(client => client.auth.getSession()));
+      expect(mock.calls).toHaveLength(1);
+      expect(results.map(result => result.data?.refresh_token)).toEqual(['refresh-2', 'refresh-2']);
+      expect(JSON.parse(storage.getItem(KEY)!).refresh_token).toBe('refresh-2');
+    } finally { clients.forEach(client => client.dispose()); }
+  });
+
   it('uses another tab\'s replacement when its broadcast reload overtakes an expired read', async () => {
     vi.stubGlobal('window', {});
     vi.stubGlobal('document', {});

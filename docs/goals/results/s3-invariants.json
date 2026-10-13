@@ -1,0 +1,76 @@
+{
+  "baseline-s3-trusted": {
+    "binary_sha256": "d06b0b8423938cf9680b13363c067853f1633f96d4df5173600a3b6387c9089f",
+    "storage_backend": "s3",
+    "images": {
+      "ubuntu:24.04": [
+        "ubuntu@sha256:534baea6a22c03a63003dbc8dbe78fe34bc0d7e595d9a9dc9834884ff530eb55"
+      ],
+      "postgres:17-alpine": [
+        "postgres@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24"
+      ],
+      "grafana/k6:1.6.1@sha256:a5ad6bc089a08d77c3ec49f3db8c6fa7a148e4073efcac44c675dbaf3568d8e1": [
+        "grafana/k6@sha256:a5ad6bc089a08d77c3ec49f3db8c6fa7a148e4073efcac44c675dbaf3568d8e1"
+      ],
+      "rustfs/rustfs:1.0.1": [
+        "rustfs/rustfs@sha256:1803faef57627e2d9c2e7d89d655d712ddded5389040054987163043fecb6a3c"
+      ]
+    },
+    "s3_fixture": {
+      "cpu_affinity": 3,
+      "cpus": 1,
+      "memory_mb": 512,
+      "ca_bundle_sha256": "43e169bf3454bc74c12d3df8c1403f0b4e7da135bf5959f8ab31eb634896bf73"
+    },
+    "fixture_objects": {
+      "verified_objects": 17,
+      "maximum_object_bytes": 64
+    },
+    "signature_errors": 0,
+    "outstanding_after_recovery": 664,
+    "database": {
+      "connections": 11,
+      "idle_in_transaction": 0,
+      "waiting_locks": 0
+    },
+    "app_oom_killed": false,
+    "pg_oom_killed": false
+  },
+  "candidate-s3-trusted": {
+    "binary_sha256": "30da8265cc948d5b352b69322f7f21a39d3b84bdac868e9b253078be7b3ca64a",
+    "storage_backend": "s3",
+    "images": {
+      "ubuntu:24.04": [
+        "ubuntu@sha256:534baea6a22c03a63003dbc8dbe78fe34bc0d7e595d9a9dc9834884ff530eb55"
+      ],
+      "postgres:17-alpine": [
+        "postgres@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24"
+      ],
+      "grafana/k6:1.6.1@sha256:a5ad6bc089a08d77c3ec49f3db8c6fa7a148e4073efcac44c675dbaf3568d8e1": [
+        "grafana/k6@sha256:a5ad6bc089a08d77c3ec49f3db8c6fa7a148e4073efcac44c675dbaf3568d8e1"
+      ],
+      "rustfs/rustfs:1.0.1": [
+        "rustfs/rustfs@sha256:1803faef57627e2d9c2e7d89d655d712ddded5389040054987163043fecb6a3c"
+      ]
+    },
+    "s3_fixture": {
+      "cpu_affinity": 3,
+      "cpus": 1,
+      "memory_mb": 512,
+      "ca_bundle_sha256": "43e169bf3454bc74c12d3df8c1403f0b4e7da135bf5959f8ab31eb634896bf73"
+    },
+    "fixture_objects": {
+      "verified_objects": 17,
+      "maximum_object_bytes": 64
+    },
+    "signature_errors": 0,
+    "outstanding_after_recovery": 0,
+    "database": {
+      "connections": 11,
+      "idle_in_transaction": 0,
+      "waiting_locks": 0
+    },
+    "app_oom_killed": false,
+    "pg_oom_killed": false
+  }
+}

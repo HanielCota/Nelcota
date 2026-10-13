@@ -6,6 +6,7 @@
 //! only AUTHENTICATES: authorization belongs exclusively to RLS.
 
 mod accounts;
+mod bootstrap;
 mod confirmation;
 mod credentials;
 mod db;
@@ -31,17 +32,18 @@ use axum::{
     extract::{FromRef, FromRequestParts},
     http::{header, request::Parts},
 };
-use nelcota_core::{ApiError, Claims};
+pub use nelcota_core::{ApiError, Claims, InvalidClaims, Role};
 
+pub use bootstrap::{AUTH_MIGRATION_VERSIONS, BootstrapError, bootstrap};
 pub use credentials::{InvalidCredential, normalize_email, validate_password};
 pub use handlers::router;
 pub use keys::{KeyError, Keys, generate_ed25519_private_key};
 pub use mail::{Email, MailDelivery, MailError, Mailer, SmtpMailer};
 pub use oauth::{OAuth, Provider, ProviderEndpoints, ProviderKind};
 pub use password::{Passwords, hash_password, verify_password};
-pub use prune::{Pruned, prune, spawn_pruner};
+pub use prune::{Pruned, prune, pruner_task, spawn_pruner};
 pub use rate_limit::{RateLimiter, SESSION_RATE_LIMIT_FACTOR};
-pub use state::{AuthSettings, AuthState, EmailLinks};
+pub use state::{AuthSettings, AuthState, EmailLinks, SettingsError};
 
 #[derive(Debug, thiserror::Error)]
 pub enum VerifyError {

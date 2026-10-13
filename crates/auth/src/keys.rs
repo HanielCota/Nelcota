@@ -30,6 +30,8 @@ pub enum KeyError {
     InvalidPrivateKey(String),
     #[error("no signing key configured")]
     NoKey,
+    #[error("HS256 secret must contain at least 32 bytes")]
+    WeakSecret,
 }
 
 struct Signer {
@@ -69,6 +71,9 @@ impl Keys {
     /// `hs256_secret`: HS256 secret. With both, signs with EdDSA and accepts
     /// either when verifying (useful to migrate away from HS256).
     pub fn new(private_key: Option<&str>, hs256_secret: Option<&[u8]>) -> Result<Self, KeyError> {
+        if hs256_secret.is_some_and(|secret| secret.len() < 32) {
+            return Err(KeyError::WeakSecret);
+        }
         let ed = private_key.map(parse_ed25519).transpose()?;
         let hs = hs256_secret.map(|secret| HsVerifier {
             key: DecodingKey::from_secret(secret),
@@ -131,11 +136,18 @@ impl Keys {
         days: u64,
     ) -> Result<String, jsonwebtoken::errors::Error> {
         let now = jsonwebtoken::get_current_timestamp();
+        let expires_at = days
+            .checked_mul(86_400)
+            .and_then(|ttl| now.checked_add(ttl))
+            .filter(|_| days > 0)
+            .ok_or_else(|| {
+                jsonwebtoken::errors::Error::from(jsonwebtoken::errors::ErrorKind::InvalidToken)
+            })?;
         self.sign(&serde_json::json!({
             "iss": issuer,
             "role": "service_role",
             "iat": now,
-            "exp": now + days * 86_400,
+            "exp": expires_at,
         }))
     }
 
@@ -217,6 +229,22 @@ pub fn generate_ed25519_private_key() -> String {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn service_token_rejects_unrepresentable_lifetimes() {
+        let keys = super::Keys::new(Some(&super::generate_ed25519_private_key()), None).unwrap();
+        assert!(keys.service_role_token("nelcota", u64::MAX).is_err());
+    }
+
+    #[test]
+    fn reusable_keys_reject_short_hmac_secrets() {
+        let mut secret = [0_u8; 31];
+        getrandom::fill(&mut secret).unwrap();
+        assert!(super::Keys::new(None, Some(&secret)).is_err());
+        assert!(
+            super::Keys::new(Some(&super::generate_ed25519_private_key()), Some(&secret)).is_err()
+        );
+    }
+
     use super::*;
     use serde_json::json;
 

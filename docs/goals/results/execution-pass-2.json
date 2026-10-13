@@ -1,0 +1,164 @@
+{
+  "status": "passed",
+  "baseline_git": "a7b77634361961023341eba540bb8dfc5e5ef6e3",
+  "binary_sha256": "fd05f47e6a9b4c5e78a738b3684ca5699263f1aea8db87220e2f9053bc790fa9",
+  "fixture": {
+    "cpu_affinity": [
+      0,
+      1,
+      2
+    ],
+    "app_cpus": 1,
+    "app_memory_mb": 128,
+    "pg_cpus": 1,
+    "pg_memory_mb": 384,
+    "generator_memory_mb": 512,
+    "generator_go_memory_limit_mib": 448,
+    "pool": 8,
+    "max_connections": 40,
+    "pg_data": "disposable disk volume",
+    "max_wal_mb": 64,
+    "max_fixture_disk_mb": 512,
+    "storage_backend": "disk",
+    "dataset": {
+      "products": 100000,
+      "private": 100000,
+      "objects": 10000
+    },
+    "k6": "grafana/k6:1.6.1@sha256:a5ad6bc089a08d77c3ec49f3db8c6fa7a148e4073efcac44c675dbaf3568d8e1",
+    "postgres_version": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+    "images": {
+      "ubuntu:24.04": [
+        "ubuntu@sha256:534baea6a22c03a63003dbc8dbe78fe34bc0d7e595d9a9dc9834884ff530eb55"
+      ],
+      "postgres:17-alpine": [
+        "postgres@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24"
+      ],
+      "grafana/k6:1.6.1@sha256:a5ad6bc089a08d77c3ec49f3db8c6fa7a148e4073efcac44c675dbaf3568d8e1": [
+        "grafana/k6@sha256:a5ad6bc089a08d77c3ec49f3db8c6fa7a148e4073efcac44c675dbaf3568d8e1"
+      ]
+    }
+  },
+  "capacity": {
+    "mixed_median_rps": 574.8719371552716,
+    "soak_rps": 459,
+    "p95_regression_gate": 1.1,
+    "throughput_regression_gate": 0.9
+  },
+  "soak": {
+    "requests": 826057,
+    "duration_seconds": 1800.005454351,
+    "rps": 458.91916494099655,
+    "p50_ms": 2.305594,
+    "p95_ms": 26.278189999999977,
+    "p99_ms": 52.97888687999975,
+    "unexpected_rate": 0,
+    "failed_checks": 0,
+    "dropped_iterations": 147
+  },
+  "stress": {
+    "16": {
+      "requests": 12391,
+      "duration_seconds": 20.043617709,
+      "rps": 618.2017727486483,
+      "p50_ms": 17.353195,
+      "p95_ms": 75.591786,
+      "p99_ms": 217.3933869000004,
+      "unexpected_rate": 0,
+      "failed_checks": 0,
+      "dropped_iterations": 0
+    },
+    "32": {
+      "requests": 11028,
+      "duration_seconds": 20.066759191,
+      "rps": 549.565572349425,
+      "p50_ms": 38.489836499999996,
+      "p95_ms": 170.80384564999997,
+      "p99_ms": 649.1637012299984,
+      "unexpected_rate": 0,
+      "failed_checks": 0,
+      "dropped_iterations": 0
+    },
+    "64": {
+      "requests": 11529,
+      "duration_seconds": 20.673132257,
+      "rps": 557.6803677679873,
+      "p50_ms": 81.71811,
+      "p95_ms": 293.468086,
+      "p99_ms": 1243.3268446399777,
+      "unexpected_rate": 0,
+      "failed_checks": 0,
+      "dropped_iterations": 0
+    },
+    "128": {
+      "requests": 11549,
+      "duration_seconds": 20.360471685,
+      "rps": 567.2265445848387,
+      "p50_ms": 199.858542,
+      "p95_ms": 573.5419558000001,
+      "p99_ms": 965.756314720001,
+      "unexpected_rate": 0,
+      "failed_checks": 0,
+      "dropped_iterations": 0
+    }
+  },
+  "recovery": {
+    "before-restart": {
+      "requests": 11036,
+      "duration_seconds": 20.053188582,
+      "rps": 550.3364193116927,
+      "p50_ms": 3.474023,
+      "p95_ms": 35.90594275,
+      "p99_ms": 66.50825445,
+      "unexpected_rate": 0,
+      "failed_checks": 0,
+      "dropped_iterations": 0
+    },
+    "after-restart": {
+      "requests": 10968,
+      "duration_seconds": 20.037305324,
+      "rps": 547.3789924667617,
+      "p50_ms": 3.3625195,
+      "p95_ms": 35.56498219999999,
+      "p99_ms": 67.21023908999997,
+      "unexpected_rate": 0,
+      "failed_checks": 0,
+      "dropped_iterations": 0
+    }
+  },
+  "resources": {
+    "samples": 207,
+    "maximum_sample_gap_seconds": 13.699999999999932,
+    "app_peak_rss_mib": 46.52734375,
+    "app_final_rss_mib": 42.5,
+    "app_tail_20min_rss_mib_range": [
+      41.56640625,
+      42.5
+    ],
+    "pg_peak_disk_mib": 220,
+    "peak_connections": 16,
+    "peak_queue_outstanding": 15,
+    "app_peak_working_set_mib": 32.09,
+    "pg_peak_working_set_mib": 188.1,
+    "app_peak_cpu_percent": 102.27,
+    "pg_peak_cpu_percent": 104.57,
+    "sampler_errors": false
+  },
+  "final_invariants": {
+    "auth": {
+      "users": 1,
+      "password_hashes": 1
+    },
+    "outstanding": 0,
+    "database": {
+      "connections": 15,
+      "idle_in_transaction": 0,
+      "waiting_locks": 0
+    },
+    "signature_errors": 0,
+    "file_integrity": null,
+    "app_running": true,
+    "app_oom_killed": false,
+    "pg_oom_killed": false
+  }
+}

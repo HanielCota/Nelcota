@@ -29,8 +29,15 @@ pub struct Pruned {
 
 /// Runs [`prune`] in the background, once an hour.
 pub fn spawn_pruner(pool: Pool) {
+    // Preserve the existing detached helper for the monolith.
+    drop(pruner_task(pool));
+}
+
+/// Owned pruner task for hosts that explicitly abort and await it at shutdown.
+pub fn pruner_task(pool: Pool) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(EVERY);
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         loop {
             interval.tick().await;
             match prune(&pool).await {
@@ -46,7 +53,7 @@ pub fn spawn_pruner(pool: Pool) {
                 Err(err) => tracing::warn!(error = err.message(), "auth session pruning failed"),
             }
         }
-    });
+    })
 }
 
 /// One pass, in batches of [`BATCH`] rows per transaction.

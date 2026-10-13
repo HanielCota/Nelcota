@@ -4,7 +4,10 @@ description = "Config, errors, connection pool and the per-request transaction s
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-publish.workspace = true
+publish = true
+repository.workspace = true
+readme = "README.md"
+include = ["src/**", "migrations/**", "Cargo.toml", "README.md", "build.rs", "LICENSE"]
 rust-version.workspace = true
 
 [dependencies]

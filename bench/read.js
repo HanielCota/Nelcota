@@ -7,7 +7,7 @@ const BASE = __ENV.BASE_URL || 'http://app:8000';
 export const options = {
   vus: Number(__ENV.VUS || 32),
   duration: __ENV.DURATION || '30s',
-  insecureSkipTLSVerify: true,
+  insecureSkipTLSVerify: __ENV.INSECURE_TLS === 'true',
   summaryTrendStats: ['avg', 'p(50)', 'p(95)', 'p(99)', 'max'],
   thresholds: { http_req_failed: ['rate<0.001'] },
 };

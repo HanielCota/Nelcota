@@ -46,7 +46,13 @@ impl Worker {
             loop {
                 tokio::select! {
                     _ = signal.changed() => break,
-                    _ = tasks.join_next(), if !tasks.is_empty() => {},
+                    _ = tasks.join_next(), if !tasks.is_empty() => {
+                        // Refill completed slots immediately. Keep timed polls
+                        // for an empty queue, and coalesce ready completions so
+                        // a fast batch does not cause one claim per result.
+                        while tasks.try_join_next().is_some() {}
+                        tick.reset_immediately();
+                    },
                     _ = tick.tick(), if tasks.len()<CONCURRENCY => {
                         match queue::claim(&worker.pool,CONCURRENCY-tasks.len()).await {
                             Ok(jobs) => for job in jobs { worker.dispatch(&mut tasks,job); },

@@ -1,0 +1,1 @@
+import{Ct as e,d as t,f as n}from"./index.svelte-Bu8KNU-r.js";var r=`nelcota.technical`,i=e({on:t(r,`off`)===`on`});function a(){i.on=!i.on,n(r,i.on?`on`:`off`)}export{a as n,i as t};

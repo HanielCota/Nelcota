@@ -1,1 +1,0 @@
-import{E as e,T as t}from"./api-BSe22wRV.js";import{i as n}from"./router.svelte-BTkNmWKZ.js";var r=new Set([`$$slots`,`$$events`,`$$legacy`]);function i(i,a){let o=t(a,r),s={name:`maximize-2`,size:24,node:[[`path`,{d:`M15 3h6v6`}],[`path`,{d:`m21 3-7 7`}],[`path`,{d:`m3 21 7-7`}],[`path`,{d:`M9 21H3v-6`}]]};n(i,e(()=>o,{get icon(){return s}}))}export{i as t};

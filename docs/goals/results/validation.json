@@ -1,0 +1,182 @@
+{
+  "rust": {
+    "rust-pass1.log": {
+      "passed": 482,
+      "failed": 0,
+      "ignored": 2
+    },
+    "rust-pass2.log": {
+      "passed": 488,
+      "failed": 0,
+      "ignored": 2
+    },
+    "auth-reuse-review1.log": {
+      "passed": 9,
+      "failed": 0,
+      "ignored": 0
+    },
+    "refresh-batch-regressions.log": {
+      "passed": 54,
+      "failed": 0,
+      "ignored": 0
+    }
+  },
+  "panel": {
+    "unit_runs": [
+      390,
+      390
+    ],
+    "chromium_runs": [
+      61,
+      61
+    ],
+    "typecheck_errors": 0,
+    "typecheck_warnings": 0
+  },
+  "typescript_sdk": {
+    "unit_runs": [
+      173,
+      173
+    ],
+    "type_runs": [
+      15,
+      15
+    ],
+    "contract_runs": [
+      31,
+      31,
+      31
+    ],
+    "two_tab_browser_and_demo": "passed on corrected release"
+  },
+  "real_s3_regressions": {
+    "runs": [
+      2,
+      2
+    ]
+  },
+  "upgrade": {
+    "from": "0.3.1",
+    "corrected_release_and_backup_restore": "passed"
+  },
+  "auth_archives": {
+    "build_without_excluded_capabilities": "passed",
+    "signup_rotation_jwks_shutdown": "passed",
+    "compile_only_with_unusable_inherited_url": "passed"
+  },
+  "python_and_native_config_regressions": 22,
+  "native_base_errors": 0,
+  "native_import_errors": 0,
+  "optional_native_advisories": {
+    "errors": 1169,
+    "warnings": 31,
+    "execution_failures": 0
+  },
+  "dependencies": {
+    "cargo_audit_vulnerabilities": 0,
+    "cargo_deny": "advisories/bans/licenses/sources passed",
+    "panel_npm_vulnerabilities": 0,
+    "sdk_npm_vulnerabilities": 0
+  },
+  "scope": "Completed functional checks, two goal execution passes, two corrective reviews and final performance/S3 evidence; broad optional advisory findings remain triaged.",
+  "archive_optimized_python": "Rejected before fixture creation",
+  "measured_soaks": 3,
+  "pre_pr_review": {
+    "rls_integration_tests_passed": 10,
+    "python_and_native_config_regressions": 22,
+    "native_base_errors": 0,
+    "native_import_errors": 0,
+    "rls_counterbalanced_pairs_passed": 2,
+    "rls_nominal_samples": 12,
+    "sdk_failure_annotation_tail": "verified with oversized startup output",
+    "standalone_consumer_build_outputs": "ignored by its local .gitignore",
+    "fixture_environment_smoke": {
+      "status": "passed",
+      "protocol": "Three five-second nominal mixed runs plus warmup, recovery and restart; a fixture transport regression, not a new performance comparison.",
+      "binary_sha256": "30da8265cc948d5b352b69322f7f21a39d3b84bdac868e9b253078be7b3ca64a",
+      "samples": [
+        {
+          "duration": "5s",
+          "requests": 3440,
+          "failed_checks": 0,
+          "unexpected_rate": 0
+        },
+        {
+          "duration": "5s",
+          "requests": 3405,
+          "failed_checks": 0,
+          "unexpected_rate": 0
+        },
+        {
+          "duration": "5s",
+          "requests": 3488,
+          "failed_checks": 0,
+          "unexpected_rate": 0
+        }
+      ],
+      "final_invariants": {
+        "outstanding": 0,
+        "signature_errors": 0,
+        "database": {
+          "connections": 11,
+          "idle_in_transaction": 0,
+          "waiting_locks": 0
+        },
+        "file_integrity": {
+          "verified_objects": 17,
+          "maximum_object_bytes": 64
+        }
+      },
+      "app_oom": false,
+      "pg_oom": false
+    }
+  },
+  "pr_corrective_review": {
+    "rust_auth_and_core_units": 59,
+    "auth_reuse_postgres_tests": 10,
+    "python_and_preset_regressions": 25,
+    "sdk_units": 174,
+    "sdk_type_tests": 15,
+    "sdk_check_build_and_package": "passed",
+    "rust_all_targets_clippy": "passed",
+    "native_base_errors": 0,
+    "native_import_errors": 0,
+    "ttl_overflow_reproduction": "Both validators initially accepted i32::MAX days; new regressions failed before correction. Real PostgreSQL reproduces overflow and accepts the conservative upper boundary; invalid manual auth state rolls back signup.",
+    "sampler_normal_campaign": {
+      "status": "passed",
+      "sample_count": 6,
+      "maximum_internal_gap_seconds": 13.0
+    },
+    "sampler_fault_campaign": {
+      "status": "expected rejection",
+      "resource_violations": [
+        {
+          "sampler_error": "Injected resource sampler failure"
+        },
+        {
+          "sampler_error": "Injected resource sampler failure"
+        },
+        {
+          "sampler_error": "Injected resource sampler failure"
+        },
+        {
+          "sampler_error": "Injected resource sampler failure"
+        },
+        {
+          "sampler_error": "Injected resource sampler failure"
+        },
+        {
+          "sampler_error": "Injected resource sampler failure"
+        },
+        {
+          "sampler_error": "Injected resource sampler failure"
+        },
+        {
+          "resource_samples": 0,
+          "minimum": 2
+        }
+      ]
+    },
+    "sdk_native_snapshot_reproduction": "Before correction, two clients rotated twice before native storage published its task snapshot; after correction only one rotation occurs and both receive the same token. Firefox/WebKit verification is gated by CI; local browser download is unavailable under current network access."
+  }
+}

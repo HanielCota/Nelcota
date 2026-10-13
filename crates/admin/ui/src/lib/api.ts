@@ -4,21 +4,8 @@ import { responseContract } from './contracts'
 import { t } from './i18n/index.svelte'
 import { clearQuerySession, invalidateReads, queryRead, querySession } from './query-client'
 import { readBody } from './read-body'
-
-/**
- * Failed request. `message` is the server's English text; `code` and `params`
- * let the panel show it in the chosen language (see `errorMessage` in i18n).
- */
-export class ApiError extends Error {
-  constructor(
-    message: string,
-    public status: number,
-    public code?: string,
-    public params?: Record<string, string | number>,
-  ) {
-    super(message)
-  }
-}
+import { ApiError } from './api-error'
+export { ApiError } from './api-error'
 
 let authentication = Promise.resolve()
 

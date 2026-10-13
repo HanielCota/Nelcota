@@ -10,6 +10,18 @@ use figment::{
 };
 use serde::{Deserialize, Serialize};
 
+/// Validate a positive day interval against PostgreSQL 17's timestamp horizon.
+/// Its exclusive upper bound is 294277-01-01 UTC. Keep one day of headroom
+/// for fractional seconds and timezone changes when adding a day interval.
+pub fn refresh_lifetime_is_representable(now: u64, days: u32) -> bool {
+    const END_UNIX_SECS: u64 = 9_224_318_016_000;
+    if days == 0 || i32::try_from(days).is_err() {
+        return false;
+    }
+    now.checked_add(u64::from(days) * 86_400)
+        .is_some_and(|expires| expires < END_UNIX_SECS - 86_400)
+}
+
 /// Sensitive value: never shows in `Debug` (and therefore never reaches a log).
 #[derive(Clone, Default, Deserialize, Serialize)]
 #[serde(transparent)]
@@ -265,6 +277,17 @@ impl Config {
                 "NELCOTA_JWT_EXPIRY_SECS and NELCOTA_REFRESH_TOKEN_TTL_DAYS must be > 0",
             ));
         }
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(|_| ConfigError::Invalid("system clock is before the Unix epoch"))?
+            .as_secs();
+        if now.checked_add(self.jwt_expiry_secs).is_none()
+            || !refresh_lifetime_is_representable(now, self.refresh_token_ttl_days)
+        {
+            return Err(ConfigError::Invalid(
+                "auth token lifetimes exceed their representable range",
+            ));
+        }
         if self.db_pool_size == 0 {
             return Err(ConfigError::Invalid("NELCOTA_DB_POOL_SIZE must be > 0"));
         }
@@ -517,6 +540,36 @@ mod tests {
             jwt_secret: Some(Secret::new("a-secret-with-at-least-32-characters")),
             ..Config::default()
         }
+    }
+
+    #[test]
+    fn token_lifetimes_cannot_overflow() {
+        for value in [
+            Config {
+                jwt_expiry_secs: u64::MAX,
+                ..valid()
+            },
+            Config {
+                refresh_token_ttl_days: u32::MAX,
+                ..valid()
+            },
+            Config {
+                refresh_token_ttl_days: i32::MAX as u32,
+                ..valid()
+            },
+        ] {
+            assert!(value.validate().is_err());
+        }
+    }
+
+    #[test]
+    fn refresh_lifetime_respects_timestamp_headroom_and_checked_addition() {
+        let now = 1_791_849_600;
+        let maximum = ((9_224_318_016_000 - 86_400 - now - 1) / 86_400) as u32;
+        assert!(refresh_lifetime_is_representable(now, maximum));
+        assert!(!refresh_lifetime_is_representable(now, maximum + 1));
+        assert!(!refresh_lifetime_is_representable(now, 0));
+        assert!(!refresh_lifetime_is_representable(u64::MAX, 1));
     }
 
     #[test]

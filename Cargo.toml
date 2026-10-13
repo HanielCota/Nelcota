@@ -11,8 +11,8 @@ rust-version = "1.99"
 repository = "https://github.com/Nelcota/Nelcota"
 
 [workspace.dependencies]
-nelcota-core = { path = "crates/core" }
-nelcota-auth = { path = "crates/auth" }
+nelcota-core = { path = "crates/core", version = "0.4.0" }
+nelcota-auth = { path = "crates/auth", version = "0.4.0" }
 nelcota-api = { path = "crates/api" }
 nelcota-cli = { path = "crates/cli" }
 nelcota-admin = { path = "crates/admin" }

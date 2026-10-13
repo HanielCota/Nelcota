@@ -121,6 +121,8 @@ export class SessionManager {
   async #persist(encoded?: string): Promise<void> {
     const session = this.#session;
     await (session ? this.storage.setItem(this.key, encoded ?? encodeJson(session)) : this.storage.removeItem(this.key));
+    // Publish Firefox's localStorage task snapshot before releasing the lock.
+    if (this.storage === browserStorage()) await new Promise<void>(resolve => setTimeout(resolve, 0));
     this.#dirty = false;
     this.#broadcast?.notify();
   }

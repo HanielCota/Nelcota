@@ -1,0 +1,481 @@
+{
+  "protocol": "Two isolated matched RLS pairs, with execution order A-B-B-A; each campaign has three fresh 10-second and three analyzed 30-second runs at 16 VUs, followed by mixed recovery/restart checks.",
+  "baseline_git": "a7b77634361961023341eba540bb8dfc5e5ef6e3",
+  "execution_order": [
+    "baseline-1",
+    "candidate-1",
+    "candidate-2",
+    "baseline-2"
+  ],
+  "comparisons": [
+    {
+      "pair": 1,
+      "execution_order": [
+        "baseline",
+        "candidate"
+      ],
+      "p95_limit": 1.1,
+      "rps_minimum": 0.9,
+      "fixture_differences": [],
+      "rows": [
+        {
+          "workload": "rls",
+          "baseline": {
+            "successful_runs": 3,
+            "failures": 0,
+            "p50_ms": 9.720987,
+            "p95_ms": 14.37115925,
+            "p99_ms": 18.119952950000002,
+            "rps": 1575.4066536487653,
+            "duration_seconds": 30.007466642999997
+          },
+          "candidate": {
+            "successful_runs": 3,
+            "failures": 0,
+            "p50_ms": 9.772706,
+            "p95_ms": 13.933458,
+            "p99_ms": 17.598335,
+            "rps": 1560.4607439286078,
+            "duration_seconds": 30.007780728
+          },
+          "comparable": true,
+          "p95_ratio": 0.969543079831921,
+          "rps_ratio": 0.9905129829904288,
+          "gate_passed": true
+        }
+      ],
+      "failed": []
+    },
+    {
+      "pair": 2,
+      "execution_order": [
+        "candidate",
+        "baseline"
+      ],
+      "p95_limit": 1.1,
+      "rps_minimum": 0.9,
+      "fixture_differences": [],
+      "rows": [
+        {
+          "workload": "rls",
+          "baseline": {
+            "successful_runs": 3,
+            "failures": 0,
+            "p50_ms": 10.715408,
+            "p95_ms": 16.098345799999997,
+            "p99_ms": 21.609915120000004,
+            "rps": 1411.9299934546368,
+            "duration_seconds": 30.008094292
+          },
+          "candidate": {
+            "successful_runs": 3,
+            "failures": 0,
+            "p50_ms": 9.978456000000001,
+            "p95_ms": 14.81467605,
+            "p99_ms": 19.444845020000002,
+            "rps": 1517.0477785723494,
+            "duration_seconds": 30.007792018
+          },
+          "comparable": true,
+          "p95_ratio": 0.9202607667925733,
+          "rps_ratio": 1.0744497146494607,
+          "gate_passed": true
+        }
+      ],
+      "failed": []
+    }
+  ],
+  "campaigns": {
+    "baseline-rls-pre-pr-1": {
+      "metadata": {
+        "binary_sha256": "d06b0b8423938cf9680b13363c067853f1633f96d4df5173600a3b6387c9089f",
+        "git": "a7b77634361961023341eba540bb8dfc5e5ef6e3",
+        "dirty": true,
+        "cpu_count": 5,
+        "cpu_affinity": [
+          0,
+          1,
+          2
+        ],
+        "app_cpus": 1,
+        "app_memory_mb": 128,
+        "pg_cpus": 1,
+        "pg_memory_mb": 384,
+        "generator_memory_mb": 512,
+        "generator_go_memory_limit_mib": 448,
+        "pg_data": "disposable disk volume",
+        "max_wal_mb": 64,
+        "max_fixture_disk_mb": 512,
+        "pool": 8,
+        "max_connections": 40,
+        "k6": "grafana/k6:1.6.1@sha256:a5ad6bc089a08d77c3ec49f3db8c6fa7a148e4073efcac44c675dbaf3568d8e1",
+        "storage_backend": "disk",
+        "steady_rate": 0,
+        "steady_duration": "30s",
+        "workloads": [
+          "rls"
+        ],
+        "postgres_version": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+        "images": {
+          "ubuntu:24.04": [
+            "ubuntu@sha256:534baea6a22c03a63003dbc8dbe78fe34bc0d7e595d9a9dc9834884ff530eb55"
+          ],
+          "postgres:17-alpine": [
+            "postgres@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24"
+          ],
+          "grafana/k6:1.6.1@sha256:a5ad6bc089a08d77c3ec49f3db8c6fa7a148e4073efcac44c675dbaf3568d8e1": [
+            "grafana/k6@sha256:a5ad6bc089a08d77c3ec49f3db8c6fa7a148e4073efcac44c675dbaf3568d8e1"
+          ]
+        },
+        "dataset": {
+          "products": 100000,
+          "private": 100000,
+          "objects": 10000
+        },
+        "started_utc": "2026-10-13T14:46:41Z"
+      },
+      "nominal_samples": [
+        {
+          "p95_ms": 14.37115925,
+          "p99_ms": 18.119952950000002,
+          "rps": 1575.4066536487653,
+          "unexpected_rate": 0,
+          "failed_checks": 0
+        },
+        {
+          "p95_ms": 13.9539875,
+          "p99_ms": 17.210657650000005,
+          "rps": 1581.043721510816,
+          "unexpected_rate": 0,
+          "failed_checks": 0
+        },
+        {
+          "p95_ms": 14.8058415,
+          "p99_ms": 18.66393430000005,
+          "rps": 1472.000303307977,
+          "unexpected_rate": 0,
+          "failed_checks": 0
+        }
+      ],
+      "analyzed_plan": {
+        "node": "Index Scan",
+        "index": "bench_private_pkey",
+        "rows": 20,
+        "rows_removed_by_filter": 20,
+        "execution_time_ms": 0.08
+      },
+      "outside_nominal_failures": [
+        {
+          "label": "queue-recovery",
+          "outstanding": 582
+        }
+      ],
+      "final_invariants": {
+        "outstanding": 582,
+        "signature_errors": 0,
+        "database": {
+          "connections": 11,
+          "idle_in_transaction": 0,
+          "waiting_locks": 0
+        },
+        "file_integrity": {
+          "verified_objects": 5,
+          "maximum_object_bytes": 64
+        }
+      },
+      "app_oom": false,
+      "pg_oom": false
+    },
+    "candidate-rls-pre-pr-1": {
+      "metadata": {
+        "binary_sha256": "30da8265cc948d5b352b69322f7f21a39d3b84bdac868e9b253078be7b3ca64a",
+        "git": "a7b77634361961023341eba540bb8dfc5e5ef6e3",
+        "dirty": true,
+        "cpu_count": 5,
+        "cpu_affinity": [
+          0,
+          1,
+          2
+        ],
+        "app_cpus": 1,
+        "app_memory_mb": 128,
+        "pg_cpus": 1,
+        "pg_memory_mb": 384,
+        "generator_memory_mb": 512,
+        "generator_go_memory_limit_mib": 448,
+        "pg_data": "disposable disk volume",
+        "max_wal_mb": 64,
+        "max_fixture_disk_mb": 512,
+        "pool": 8,
+        "max_connections": 40,
+        "k6": "grafana/k6:1.6.1@sha256:a5ad6bc089a08d77c3ec49f3db8c6fa7a148e4073efcac44c675dbaf3568d8e1",
+        "storage_backend": "disk",
+        "steady_rate": 0,
+        "steady_duration": "30s",
+        "workloads": [
+          "rls"
+        ],
+        "postgres_version": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+        "images": {
+          "ubuntu:24.04": [
+            "ubuntu@sha256:534baea6a22c03a63003dbc8dbe78fe34bc0d7e595d9a9dc9834884ff530eb55"
+          ],
+          "postgres:17-alpine": [
+            "postgres@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24"
+          ],
+          "grafana/k6:1.6.1@sha256:a5ad6bc089a08d77c3ec49f3db8c6fa7a148e4073efcac44c675dbaf3568d8e1": [
+            "grafana/k6@sha256:a5ad6bc089a08d77c3ec49f3db8c6fa7a148e4073efcac44c675dbaf3568d8e1"
+          ]
+        },
+        "dataset": {
+          "products": 100000,
+          "private": 100000,
+          "objects": 10000
+        },
+        "started_utc": "2026-10-13T14:50:21Z"
+      },
+      "nominal_samples": [
+        {
+          "p95_ms": 13.566203,
+          "p99_ms": 16.826295400000003,
+          "rps": 1588.3714852793398,
+          "unexpected_rate": 0,
+          "failed_checks": 0
+        },
+        {
+          "p95_ms": 13.933458,
+          "p99_ms": 17.598335,
+          "rps": 1559.6288317426418,
+          "unexpected_rate": 0,
+          "failed_checks": 0
+        },
+        {
+          "p95_ms": 14.402397699999998,
+          "p99_ms": 17.845968159999995,
+          "rps": 1560.4607439286078,
+          "unexpected_rate": 0,
+          "failed_checks": 0
+        }
+      ],
+      "analyzed_plan": {
+        "node": "Index Scan",
+        "index": "bench_private_pkey",
+        "rows": 20,
+        "rows_removed_by_filter": 20,
+        "execution_time_ms": 0.085
+      },
+      "outside_nominal_failures": [],
+      "final_invariants": {
+        "outstanding": 0,
+        "signature_errors": 0,
+        "database": {
+          "connections": 11,
+          "idle_in_transaction": 0,
+          "waiting_locks": 0
+        },
+        "file_integrity": {
+          "verified_objects": 5,
+          "maximum_object_bytes": 64
+        }
+      },
+      "app_oom": false,
+      "pg_oom": false
+    },
+    "baseline-rls-pre-pr-2": {
+      "metadata": {
+        "binary_sha256": "d06b0b8423938cf9680b13363c067853f1633f96d4df5173600a3b6387c9089f",
+        "git": "a7b77634361961023341eba540bb8dfc5e5ef6e3",
+        "dirty": true,
+        "cpu_count": 5,
+        "cpu_affinity": [
+          0,
+          1,
+          2
+        ],
+        "app_cpus": 1,
+        "app_memory_mb": 128,
+        "pg_cpus": 1,
+        "pg_memory_mb": 384,
+        "generator_memory_mb": 512,
+        "generator_go_memory_limit_mib": 448,
+        "pg_data": "disposable disk volume",
+        "max_wal_mb": 64,
+        "max_fixture_disk_mb": 512,
+        "pool": 8,
+        "max_connections": 40,
+        "k6": "grafana/k6:1.6.1@sha256:a5ad6bc089a08d77c3ec49f3db8c6fa7a148e4073efcac44c675dbaf3568d8e1",
+        "storage_backend": "disk",
+        "steady_rate": 0,
+        "steady_duration": "30s",
+        "workloads": [
+          "rls"
+        ],
+        "postgres_version": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+        "images": {
+          "ubuntu:24.04": [
+            "ubuntu@sha256:534baea6a22c03a63003dbc8dbe78fe34bc0d7e595d9a9dc9834884ff530eb55"
+          ],
+          "postgres:17-alpine": [
+            "postgres@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24"
+          ],
+          "grafana/k6:1.6.1@sha256:a5ad6bc089a08d77c3ec49f3db8c6fa7a148e4073efcac44c675dbaf3568d8e1": [
+            "grafana/k6@sha256:a5ad6bc089a08d77c3ec49f3db8c6fa7a148e4073efcac44c675dbaf3568d8e1"
+          ]
+        },
+        "dataset": {
+          "products": 100000,
+          "private": 100000,
+          "objects": 10000
+        },
+        "started_utc": "2026-10-13T14:56:44Z"
+      },
+      "nominal_samples": [
+        {
+          "p95_ms": 16.098345799999997,
+          "p99_ms": 21.609915120000004,
+          "rps": 1411.9299934546368,
+          "unexpected_rate": 0,
+          "failed_checks": 0
+        },
+        {
+          "p95_ms": 16.652561650000003,
+          "p99_ms": 22.080753340000033,
+          "rps": 1371.8310631588529,
+          "unexpected_rate": 0,
+          "failed_checks": 0
+        },
+        {
+          "p95_ms": 15.499885799999998,
+          "p99_ms": 21.341628939999943,
+          "rps": 1522.755812327011,
+          "unexpected_rate": 0,
+          "failed_checks": 0
+        }
+      ],
+      "analyzed_plan": {
+        "node": "Index Scan",
+        "index": "bench_private_pkey",
+        "rows": 20,
+        "rows_removed_by_filter": 20,
+        "execution_time_ms": 0.084
+      },
+      "outside_nominal_failures": [
+        {
+          "label": "queue-recovery",
+          "outstanding": 712
+        }
+      ],
+      "final_invariants": {
+        "outstanding": 712,
+        "signature_errors": 0,
+        "database": {
+          "connections": 11,
+          "idle_in_transaction": 0,
+          "waiting_locks": 0
+        },
+        "file_integrity": {
+          "verified_objects": 5,
+          "maximum_object_bytes": 64
+        }
+      },
+      "app_oom": false,
+      "pg_oom": false
+    },
+    "candidate-rls-pre-pr-2": {
+      "metadata": {
+        "binary_sha256": "30da8265cc948d5b352b69322f7f21a39d3b84bdac868e9b253078be7b3ca64a",
+        "git": "a7b77634361961023341eba540bb8dfc5e5ef6e3",
+        "dirty": true,
+        "cpu_count": 5,
+        "cpu_affinity": [
+          0,
+          1,
+          2
+        ],
+        "app_cpus": 1,
+        "app_memory_mb": 128,
+        "pg_cpus": 1,
+        "pg_memory_mb": 384,
+        "generator_memory_mb": 512,
+        "generator_go_memory_limit_mib": 448,
+        "pg_data": "disposable disk volume",
+        "max_wal_mb": 64,
+        "max_fixture_disk_mb": 512,
+        "pool": 8,
+        "max_connections": 40,
+        "k6": "grafana/k6:1.6.1@sha256:a5ad6bc089a08d77c3ec49f3db8c6fa7a148e4073efcac44c675dbaf3568d8e1",
+        "storage_backend": "disk",
+        "steady_rate": 0,
+        "steady_duration": "30s",
+        "workloads": [
+          "rls"
+        ],
+        "postgres_version": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+        "images": {
+          "ubuntu:24.04": [
+            "ubuntu@sha256:534baea6a22c03a63003dbc8dbe78fe34bc0d7e595d9a9dc9834884ff530eb55"
+          ],
+          "postgres:17-alpine": [
+            "postgres@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24"
+          ],
+          "grafana/k6:1.6.1@sha256:a5ad6bc089a08d77c3ec49f3db8c6fa7a148e4073efcac44c675dbaf3568d8e1": [
+            "grafana/k6@sha256:a5ad6bc089a08d77c3ec49f3db8c6fa7a148e4073efcac44c675dbaf3568d8e1"
+          ]
+        },
+        "dataset": {
+          "products": 100000,
+          "private": 100000,
+          "objects": 10000
+        },
+        "started_utc": "2026-10-13T14:53:33Z"
+      },
+      "nominal_samples": [
+        {
+          "p95_ms": 13.58463225,
+          "p99_ms": 16.598948000000018,
+          "rps": 1557.364240146027,
+          "unexpected_rate": 0,
+          "failed_checks": 0
+        },
+        {
+          "p95_ms": 15.7877115,
+          "p99_ms": 20.10675115,
+          "rps": 1442.4920025450438,
+          "unexpected_rate": 0,
+          "failed_checks": 0
+        },
+        {
+          "p95_ms": 14.81467605,
+          "p99_ms": 19.444845020000002,
+          "rps": 1517.0477785723494,
+          "unexpected_rate": 0,
+          "failed_checks": 0
+        }
+      ],
+      "analyzed_plan": {
+        "node": "Index Scan",
+        "index": "bench_private_pkey",
+        "rows": 20,
+        "rows_removed_by_filter": 20,
+        "execution_time_ms": 0.079
+      },
+      "outside_nominal_failures": [],
+      "final_invariants": {
+        "outstanding": 0,
+        "signature_errors": 0,
+        "database": {
+          "connections": 11,
+          "idle_in_transaction": 0,
+          "waiting_locks": 0
+        },
+        "file_integrity": {
+          "verified_objects": 5,
+          "maximum_object_bytes": 64
+        }
+      },
+      "app_oom": false,
+      "pg_oom": false
+    }
+  },
+  "limitations": "The historical full-matrix RLS failure remains valid evidence. These isolated measurements reduce execution-order bias and show no repeatable RLS regression on this host; they do not establish the precise cause of historical variation or production capacity. Baseline queue recovery failures are outside the nominal RLS comparisons and are recorded separately."
+}

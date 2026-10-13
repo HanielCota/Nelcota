@@ -1,0 +1,19 @@
+[package]
+name = "nelcota-auth-consumer"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+# Keep this consumer outside the root workspace, including when copied elsewhere.
+[workspace]
+
+[dependencies]
+nelcota-auth = { path = "../../crates/auth", version = "0.4.0" }
+axum = "0.8"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "net"] }
+tokio-postgres = "0.7"
+deadpool-postgres = "0.14"
+tower-http = { version = "0.7", features = ["timeout"] }
+
+[profile.dev]
+debug = 0

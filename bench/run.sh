@@ -15,7 +15,8 @@ sleep 1
 echo "== k6: ${VUS:-32} virtual users for ${DURATION:-30s}"
 docker run --rm -i --network nelcota_web \
   -e VUS="${VUS:-32}" -e DURATION="${DURATION:-30s}" -e BASE_URL="${BASE_URL:-http://app:8000}" \
-  grafana/k6:latest run --quiet - < "$HERE/read.js"
+  -e INSECURE_TLS="${INSECURE_TLS:-false}" \
+  grafana/k6:1.6.1@sha256:a5ad6bc089a08d77c3ec49f3db8c6fa7a148e4073efcac44c675dbaf3568d8e1 run --quiet - < "$HERE/read.js"
 
 echo "== Memory"
 docker stats --no-stream --format 'table {{.Name}}\t{{.MemUsage}}\t{{.CPUPerc}}' | grep -E 'NAME|nelcota'

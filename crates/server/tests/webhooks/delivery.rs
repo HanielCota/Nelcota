@@ -13,6 +13,48 @@ use std::{sync::Arc, time::Duration};
 use tokio::sync::Notify;
 
 #[tokio::test]
+async fn fast_destinations_refill_worker_slots_without_waiting_for_each_poll() {
+    let app = TestApp::spawn().await;
+    let receiver = Receiver::with_options([204], None, None).await;
+    support::hook(&app, &receiver.url, 3).await;
+    app.admin_client.execute("INSERT INTO public.todos(user_id,title) SELECT $1,'burst ' || i FROM generate_series(1,64) i", &[&app.user_a]).await.unwrap();
+    let worker = support::worker(&app).spawn();
+    let completed = tokio::time::timeout(Duration::from_secs(5), async {
+        while receiver.requests().len() < 64 {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await;
+    worker.shutdown().await;
+    assert!(
+        completed.is_ok(),
+        "Fast destinations were capped by the idle poll interval: {} delivered",
+        receiver.requests().len()
+    );
+    let events: std::collections::HashSet<_> = receiver
+        .requests()
+        .iter()
+        .map(|request| {
+            request.headers["x-nelcota-event-id"]
+                .to_str()
+                .unwrap()
+                .to_owned()
+        })
+        .collect();
+    assert_eq!(events.len(), 64);
+    let succeeded: i64 = app
+        .admin_client
+        .query_one(
+            "SELECT count(*) FROM nelcota.webhook_deliveries WHERE status='succeeded'",
+            &[],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    assert_eq!(succeeded, 64);
+}
+
+#[tokio::test]
 async fn signed_delivery_retries_then_replay_preserves_original_history() {
     let app = TestApp::spawn().await;
     let receiver = Receiver::with_options([503, 204, 204], None, Some("30")).await;

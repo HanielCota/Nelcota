@@ -149,11 +149,22 @@ try {
     const { createClient } = await import('/dist/index.js');
     globalThis.sdkClient = createClient(api, { auth: { autoRefresh: false } });
   }, api);
+  let refreshRequests = 0;
+  for (const page of [tab, other]) page.on('request', request => {
+    if (new URL(request.url()).searchParams.get('grant_type') === 'refresh_token') refreshRequests++;
+  });
   const sessions = await Promise.all([tab, other].map((page) => page.evaluate(() => globalThis.sdkClient.auth.getSession())));
   const shared = sessions.every((value) => value.error === null && value.data !== null)
-    && sessions[0].data.refresh_token === sessions[1].data.refresh_token;
+    && sessions[0].data.refresh_token === sessions[1].data.refresh_token
+    && refreshRequests === 1;
   failed ||= !shared;
   console.log(`${shared ? 'ok  ' : 'FAIL'} refresh across two real tabs`);
+  if (!shared) console.log('Rotation diagnostics:', {
+    refreshRequests,
+    errors: sessions.map(value => value.error?.code ?? null),
+    present: sessions.map(value => value.data !== null),
+    matching: sessions[0].data?.refresh_token === sessions[1].data?.refresh_token,
+  });
   await tab.evaluate(() => globalThis.sdkClient.auth.signOut());
   await other.waitForFunction(async () => (await globalThis.sdkClient.auth.getSession()).data === null);
   console.log('ok  sign-out broadcast to the other tab');
