@@ -99,21 +99,38 @@ impl StorageState {
         let prefix = path::prefix(prefix)?;
         let limit = limit.unwrap_or(100).clamp(1, MAX_LIST);
         let offset = offset.max(0);
-        let pattern = format!(
-            "{}%",
-            prefix
-                .replace('\\', "\\\\")
-                .replace('%', "\\%")
-                .replace('_', "\\_")
-        );
-        let skip = prefix.chars().count() as i32;
+        // UTF-8 plus NUL segment separators matches the generated directory key.
+        // Advancing its final NUL to 1 skips precisely this prefix's subtree.
+        let key: Vec<u8> = prefix
+            .bytes()
+            .map(|byte| match byte {
+                b'/' => 0,
+                _ => byte,
+            })
+            .collect();
+        let upper = match key.is_empty() {
+            true => None,
+            false => {
+                let mut upper = key.clone();
+                if let Some(last) = upper.last_mut() {
+                    *last = 1;
+                }
+                Some(upper)
+            }
+        };
         let db_err = |e| ApiError::from_db(e, claims.role());
         let mut client = self.pool.get().await.map_err(ApiError::from_pool)?;
         let tx = begin_request(&mut client, claims).await.map_err(db_err)?;
+        // Keep the ordered page seek even before ANALYZE: missing parent
+        // statistics can make a bitmap scan collect every file, then sort it.
+        // This setting is local to the listing transaction.
+        tx.batch_execute("SET LOCAL enable_bitmapscan = off")
+            .await
+            .map_err(db_err)?;
         let row = tx
             .query_one(
                 include_str!("list.sql"),
-                &[&bucket, &pattern, &skip, &limit, &offset],
+                &[&bucket, &prefix, &key, &upper, &limit, &offset],
             )
             .await
             .map_err(db_err)?;

@@ -92,25 +92,40 @@ pub(crate) fn exposed(catalog: &Catalog) -> Vec<&str> {
         .collect()
 }
 
-/// Exact count for small (or never analysed) tables; the planner's estimate
-/// for large ones, so it never costs a seq scan.
+/// Probe at most 10,001 visible rows with a short lock/statement budget.
+/// Planner estimates can lag behind a bulk import; they cannot bound a scan.
 pub(crate) async fn row_count(
-    client: &Client,
+    client: &mut Client,
     schema: &str,
     table: &Table,
     estimate: i64,
 ) -> (Option<i64>, bool) {
     if table.kind == TableKind::Table && estimate < 10_000 {
         let sql = format!(
-            "SELECT count(*) FROM {}.{}",
+            "SELECT count(*) FROM (SELECT 1 FROM {}.{} LIMIT 10001) AS limited",
             query::ident(schema),
             query::ident(&table.name)
         );
-        if let Ok(row) = client.query_one(sql.as_str(), &[]).await {
-            return (Some(row.get(0)), true);
+        if let Some(count) = count_probe(client, &sql).await
+            && count <= 10_000
+        {
+            return (Some(count), true);
         }
+        // A stale small estimate is misleading when the probe disproves it.
+        return (None, false);
     }
     ((estimate >= 0).then_some(estimate), false)
+}
+
+async fn count_probe(client: &mut Client, sql: &str) -> Option<i64> {
+    let tx = client.transaction().await.ok()?;
+    tx.batch_execute("SET LOCAL statement_timeout = '250ms'")
+        .await
+        .ok()?;
+    let count = tx.query_one(sql, &[]).await.ok().map(|row| row.get(0));
+    // Explicitly finish failed transactions before another table is counted.
+    tx.rollback().await.ok()?;
+    count
 }
 
 pub(crate) async fn estimates(

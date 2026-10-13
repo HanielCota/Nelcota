@@ -4,14 +4,14 @@ use crate::{
     tables::catalog::{estimates, exposed, grants, kind, policy_counts, rls_json, row_count},
 };
 use axum::{Json, extract::State};
-use futures_util::future::{join_all, try_join3};
+use futures_util::future::try_join3;
 use serde_json::json;
 type ApiResult<T> = Result<Json<T>, ApiError>;
 
 pub async fn overview(State(state): State<AdminState>) -> ApiResult<crate::contracts::Overview> {
     let catalog = state.catalog.get();
     // A single connection, with the independent queries pipelined on it.
-    let client = state.db.get().await?;
+    let mut client = state.db.get().await?;
     let (policies, estimates, users) = try_join3(
         policy_counts(&client, &catalog.schema),
         estimates(&client, &catalog.schema),
@@ -29,14 +29,10 @@ pub async fn overview(State(state): State<AdminState>) -> ApiResult<crate::contr
     .await?;
     let (signed_in_users, users): (i64, i64) = (users.get(1), users.get(0));
 
-    let counts = join_all(catalog.tables.values().map(|table| {
-        let estimate = estimates.get(&table.name).copied().unwrap_or(-1);
-        row_count(&client, &catalog.schema, table, estimate)
-    }))
-    .await;
-
     let mut tables = Vec::new();
-    for (table, (rows, exact)) in catalog.tables.values().zip(counts) {
+    for table in catalog.tables.values() {
+        let estimate = estimates.get(&table.name).copied().unwrap_or(-1);
+        let (rows, exact) = row_count(&mut client, &catalog.schema, table, estimate).await;
         tables.push(json!({
             "name": table.name,
             "kind": kind(table),

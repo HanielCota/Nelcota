@@ -238,13 +238,12 @@ impl TableQuery {
 /// Rows and their count as `claims` would get them through the API (role,
 /// grants and RLS), in a transaction that is rolled back.
 async fn read_as(
-    state: &AdminState,
+    client: &mut deadpool_postgres::Object,
     claims: &nelcota_core::Claims,
     sql: &query::Sql,
     count: &query::Sql,
 ) -> Result<(String, Option<i64>), ApiError> {
-    let mut client = state.db.get().await?;
-    let tx = nelcota_core::db::begin_request(&mut client, claims).await?;
+    let tx = nelcota_core::db::begin_request(client, claims).await?;
     tx.batch_execute("SET LOCAL statement_timeout = '5s'")
         .await?;
     let rows: String = tx
@@ -257,6 +256,9 @@ async fn read_as(
         .await
         .ok()
         .map(|row| row.get(0));
+    // Restore the owner role before this same connection reads metadata.
+    // A failed count may have aborted the transaction; rollback handles both.
+    tx.rollback().await?;
     Ok((rows, total))
 }
 
@@ -301,7 +303,7 @@ pub async fn table(
     let (json_rows, (estimates, policies), viewed_total) = match &viewer {
         Some(claims) => {
             let count = query::count(&catalog.schema, &table, &request);
-            let (rows, total) = read_as(&state, claims, &sql, &count).await?;
+            let (rows, total) = read_as(&mut client, claims, &sql, &count).await?;
             let meta = try_join(
                 estimates(&client, &catalog.schema),
                 policy_counts(&client, &catalog.schema),
@@ -355,7 +357,7 @@ pub async fn table(
                 let total = bounded_count(&mut client, &count).await;
                 (total, total.is_some())
             }
-            false => row_count(&client, &catalog.schema, &table, estimate).await,
+            false => row_count(&mut client, &catalog.schema, &table, estimate).await,
         },
     };
     let columns: Vec<Value> = table

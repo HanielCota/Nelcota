@@ -73,6 +73,30 @@ reaching a display limit, preserving transaction semantics. Dropping the HTTP
 future sends a Postgres cancellation request and closes its dedicated connection.
 Ordinary API pool connections stay separate.
 
+Table previews reuse one admin connection and roll back the caller's role
+before reading owner metadata. Table exports use separate connections, with
+two concurrent downloads, a 30-second statement timeout and a two-minute
+response lifetime. Dropping a response cancels the query; a deadline closes
+the connection even when its body is not polled. Admission remains occupied
+through cancellation, and an interrupted stream fails instead of reporting
+a complete file. Small-table counts probe at most 10,001 rows under a 250 ms
+statement timeout; outgrown small-table estimates produce an unknown total.
+
+Storage directory listing seeks through a generated parent-path byte key,
+skipping each returned folder's subtree. Every seek runs against
+`storage.objects` under the caller's RLS. NUL-separated UTF-8 segments preserve
+C ordering and isolate literal prefixes, including Unicode, `%` and `_`.
+An ordered scope-fingerprint/name index pages immediate files. Its generated
+integer fingerprint supports seeks under RLS; exact bucket and parent checks
+reject hash collisions. Listing transactions disable bitmap scans locally
+to favor ordered page seeks when statistics are missing.
+The key helpers only transform their inputs;
+public execution preserves custom SQL writers without changing object RLS.
+A bucket browser requests only that bucket's usage. Migrations V14 and V15
+add user ordering and directory indexes. V15 computes the derived keys for
+existing metadata and rebuilds the table under the migration lock, so
+upgrades of large stores need time for that one-time rewrite.
+
 DDL commits once and reports `applied` plus `catalog_pending`. An introspection
 failure after COMMIT does not turn a successful mutation into an error. Catalog
 reloads are serialized, and one worker retries failed refreshes with backoff;

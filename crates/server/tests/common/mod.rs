@@ -112,6 +112,8 @@ impl Mailer for Outbox {
 
 pub struct Options {
     pub pool_size: usize,
+    pub admin_pool_size: usize,
+    pub export_timeout: Duration,
     /// Password recovery and magic link on (with the [`Outbox`] instead of SMTP).
     pub mail: bool,
     /// Another mailer for delivery failure and resource-budget tests.
@@ -139,6 +141,8 @@ impl Default for Options {
     fn default() -> Self {
         Options {
             pool_size: 4,
+            admin_pool_size: 2,
+            export_timeout: Duration::from_secs(120),
             mail: true,
             mailer: None,
             confirm_email: false,
@@ -165,6 +169,7 @@ impl Default for Options {
 pub struct TestApp {
     pub router: Router,
     pub pool: deadpool_postgres::Pool,
+    pub admin_pool: deadpool_postgres::Pool,
     pub admin: tokio_postgres::Config,
     pub admin_client: tokio_postgres::Client,
     pub keys: Arc<Keys>,
@@ -275,10 +280,12 @@ impl TestApp {
             }),
         };
         let passwords = Arc::new(Passwords::new(2));
+        let admin_pool = db::admin_pool(&admin, options.admin_pool_size);
         let panel = nelcota_admin::AdminState {
             webhooks: nelcota_webhooks::destination::Policy::default(),
             sql: Arc::default(),
-            db: db::admin_pool(&admin, 2),
+            exports: Arc::new(nelcota_admin::ExportExecutor::new(options.export_timeout)),
+            db: admin_pool.clone(),
             db_config: admin.clone(),
             catalog: catalog.clone(),
             credentials: Arc::new(nelcota_admin::Credentials {
@@ -379,6 +386,7 @@ impl TestApp {
             storage,
             storage_dir,
             pool,
+            admin_pool,
             admin,
             admin_client,
             keys,

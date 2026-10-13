@@ -1,5 +1,7 @@
 //! Dependencies shared by the panel workflows.
-use crate::{Credentials, DeniedLog, HostLink, Metrics, Sessions, SqlExecutor, TokenIssuer};
+use crate::{
+    Credentials, DeniedLog, ExportExecutor, HostLink, Metrics, Sessions, SqlExecutor, TokenIssuer,
+};
 use deadpool_postgres::Pool;
 use nelcota_api::CatalogHandle;
 use nelcota_auth::{Passwords, RateLimiter};
@@ -10,9 +12,11 @@ pub struct AdminState {
     pub webhooks: nelcota_webhooks::destination::Policy,
     /// Bounded SQL executions shared by all panel sessions.
     pub sql: Arc<SqlExecutor>,
+    /// Dedicated, bounded export connections; slow downloads never hold `db`.
+    pub exports: Arc<ExportExecutor>,
     /// Admin pool (role that owns the schema).
     pub db: Pool,
-    /// Admin config, for the SQL editor's dedicated connections.
+    /// Admin config, for dedicated SQL editor and export connections.
     pub db_config: tokio_postgres::Config,
     pub catalog: Arc<CatalogHandle>,
     pub credentials: Arc<Credentials>,

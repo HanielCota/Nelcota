@@ -45,10 +45,16 @@ fn bucket_id(id: &str) -> Result<&str, ApiError> {
     ))
 }
 
-/// `GET /admin/api/storage`: whether storage is on, and each bucket with its
-/// file count and bytes.
+#[derive(Deserialize)]
+pub struct OverviewQuery {
+    bucket: Option<String>,
+}
+
+/// `GET /admin/api/storage?bucket=`: storage configuration and usage, optionally
+/// scoped to one bucket so opening its browser does not aggregate other buckets.
 pub async fn overview(
     State(state): State<AdminState>,
+    Query(query): Query<OverviewQuery>,
 ) -> Result<Json<crate::contracts::StorageOverview>, ApiError> {
     let storage = match &state.storage {
         Some(storage) => storage,
@@ -58,6 +64,7 @@ pub async fn overview(
             );
         }
     };
+    let bucket = query.bucket.as_deref().map(bucket_id).transpose()?;
     let client = state.db.get().await?;
     let row = client
         .query_one(
@@ -65,8 +72,9 @@ pub async fn overview(
                 SELECT k.id, k.public, k.file_size_limit, k.allowed_mime_types, k.created_at,
                        count(o.id) AS files, coalesce(sum(o.size), 0)::bigint AS bytes
                   FROM storage.buckets k LEFT JOIN storage.objects o ON o.bucket_id = k.id
+                 WHERE ($1::text IS NULL OR k.id = $1)
                  GROUP BY k.id) b",
-            &[],
+            &[&bucket],
         )
         .await?;
     let buckets: Value = serde_json::from_str(row.get(0))?;
