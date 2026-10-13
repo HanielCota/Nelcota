@@ -28,6 +28,19 @@ jobs:
       - run: cargo clippy --all-targets -- -D warnings
       # Integration tests start Postgres 17 via testcontainers (the runner's Docker).
       - run: cargo test --all
+      - name: documented Notes onboarding
+        timeout-minutes: 5
+        run: |
+          cargo build --locked -p nelcota-server
+          python3 scripts/test-onboarding.py --binary target/debug/nelcota
+      - name: Notes acceptance report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: notes-native-acceptance
+          path: .tools/reports/onboarding/**/report.json
+          if-no-files-found: ignore
+          retention-days: 7
       - name: auth archive consumer
         run: |
           cargo package -p nelcota-core -p nelcota-auth --no-verify

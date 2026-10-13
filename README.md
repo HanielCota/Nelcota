@@ -85,6 +85,10 @@ systemd unit.
 install to `nelcota dev`, a migration, generated types and the SDK in a few
 minutes. Something not working? See [troubleshooting](docs/troubleshooting.md).
 
+For one complete installation with private notes, file uploads and a restart
+check, follow [Notes staging](docs/onboarding/notes.md). Its native acceptance
+runner uses Python and Docker, with no Node requirement for the backend.
+
 ## Usage in 1 minute
 
 **1. Write a table and its policy in plain SQL.**

@@ -20,8 +20,10 @@ On macOS or Windows, build it with Cargo (it installs the `nelcota` command):
 cargo install --git https://github.com/Nelcota/Nelcota nelcota-server
 ```
 
-Working on Nelcota itself? Run `cargo run -- dev` from a clone instead of
-`nelcota dev` below.
+Working on Nelcota itself? Build with `cargo build --locked -p nelcota-server`
+and use the absolute path to `target/debug/nelcota` from your application's
+folder. See the [complete Notes staging guide](onboarding/notes.md) for the
+isolated project, browser example and repeatable acceptance check.
 
 ## 2. Start the development environment
 
@@ -57,6 +59,10 @@ sign-up returns a session right away.
 
 Leave `nelcota dev` running and open a second terminal in the same folder.
 Migrations are plain SQL files named `V<n>__<name>.sql` in `migrations/`:
+
+```sh
+mkdir -p migrations src
+```
 
 ```sql
 -- migrations/V1__notes.sql

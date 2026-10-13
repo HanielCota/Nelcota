@@ -3,6 +3,39 @@
 Server releases are listed here. The [TypeScript SDK](sdk/typescript/CHANGELOG.md)
 and [Rust SDK](sdk/rust/CHANGELOG.md) have independent package versions.
 
+## Unreleased
+
+### Added
+
+- A [complete Notes staging guide](docs/onboarding/notes.md) and isolated
+  native acceptance runner covering installation, migrations, generated types,
+  panel login, two-user RLS, private files, logout and restart persistence.
+- Reusable auth/core package boundaries, scoped database bootstrap and an
+  external archive consumer; integration and release evidence under `docs/goals/`.
+
+### Fixed
+
+- Allow installation into a writable user-owned `PREFIX` without sudo while
+  preserving checksum verification before replacing the existing binary.
+- Bound password hashing workers and refill completed webhook delivery slots
+  promptly. Rotate refresh sessions with one database statement.
+- Reject refresh lifetimes outside PostgreSQL's timestamp range before
+  persisting tokens.
+- Index user and storage directory listings, cap panel pagination inputs and
+  remove cyclic imports in the embedded panel.
+
+### Upgrade notes
+
+- Startup applies internal migrations `V14__user_listing_index.sql` and
+  `V15__storage_directory_index.sql` when upgrading from `0.4.0`. Plan a
+  maintenance window for large user or storage metadata tables.
+- Keep database backups and their paired disk snapshots before upgrading.
+  See [release handoff](docs/onboarding/release.md) for validation and rollback.
+- The TypeScript SDK's cross-tab storage publication correction needs a
+  separate SDK package release; installing the server does not update clients.
+- This section describes an unpublished candidate. The published `0.4.0`
+  binaries and image do not contain these changes.
+
 ## 0.4.0 — 2026-10-11
 
 ### Added

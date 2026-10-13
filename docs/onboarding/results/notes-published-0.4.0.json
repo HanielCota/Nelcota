@@ -1,0 +1,14 @@
+{
+  "status": "passed",
+  "checks": [
+    "native server, healthy database, private credentials and panel login",
+    "Notes migration, repeat migration and both generated type formats",
+    "signup, password login and Notes isolation against reads, writes and forged owners",
+    "file upload, exact download and private file isolation",
+    "logout rejects reuse of the retired refresh token",
+    "server and database restart preserve accounts, notes, file bytes and signing keys"
+  ],
+  "binary_sha256": "d9e999287b0bd78d38baa7c9d21c06a975dff38ae96eaf9ade49bf575d0e66ed",
+  "version": "0.4.0",
+  "cleanup": "owned database container and volume removed"
+}
