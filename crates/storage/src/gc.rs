@@ -23,6 +23,7 @@ const BATCH: usize = 500;
 pub fn spawn_collector(pool: Pool, store: Arc<Store>) {
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(EVERY);
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         // The first tick fires at once; give the server a minute first.
         tokio::time::sleep(Duration::from_secs(60)).await;
         loop {
