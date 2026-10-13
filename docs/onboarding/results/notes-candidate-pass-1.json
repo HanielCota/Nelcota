@@ -9,12 +9,12 @@
     "server and database restart preserve accounts, notes, file bytes and signing keys",
     "existing Notes browser example: signup, login, save, list, upload, RLS and logout"
   ],
-  "binary_sha256": "5b3022d197f797f6a855f5e6ccf0acf96122d0426ca5f05122032db91d8afaa6",
-  "started_at": "2026-10-13T16:38:27.057029+00:00",
+  "binary_sha256": "8b07a2320fd41206e185828dbd3c9bdffa7aa7fa73b19931f0abdf859eba38cd",
+  "started_at": "2026-10-13T17:01:12.359864+00:00",
   "browser_requested": true,
   "version": "0.4.0",
   "cleanup": "owned database container and volume removed",
   "postgres_image_id": "sha256:79bd7c99e923138f136f8009d6bffa66e21e9d4fda5c0c561b00fc9c90cfe537",
   "postgres_version_num": 170011,
-  "completed_at": "2026-10-13T16:38:40.685571+00:00"
+  "completed_at": "2026-10-13T17:01:24.488447+00:00"
 }

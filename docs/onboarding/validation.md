@@ -35,8 +35,9 @@ non-zero, recorded failure and removed its owned database container/volume.
 Pre-existing development and shared test databases were preserved.
 
 Supporting checks passed: 36 Python review-tool regressions (including 11 new
-installer, ownership, redirect, response-size and child-process checks), 32
-panel guide tests, Portuguese guide consistency, panel/server builds,
+installer, ownership, redirect, response-size and child-process checks), 33
+panel guide tests (including the external Notes guide link), Portuguese guide
+consistency, panel/server builds and panel type/diagnostic checks,
 TypeScript SDK type check, native Oxlint base/import presets with zero findings,
 capability boundaries, shell syntax, workflow YAML and documentation links.
 
