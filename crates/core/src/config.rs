@@ -265,6 +265,17 @@ impl Config {
                 "NELCOTA_JWT_EXPIRY_SECS and NELCOTA_REFRESH_TOKEN_TTL_DAYS must be > 0",
             ));
         }
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(|_| ConfigError::Invalid("system clock is before the Unix epoch"))?
+            .as_secs();
+        if now.checked_add(self.jwt_expiry_secs).is_none()
+            || i32::try_from(self.refresh_token_ttl_days).is_err()
+        {
+            return Err(ConfigError::Invalid(
+                "auth token lifetimes exceed their representable range",
+            ));
+        }
         if self.db_pool_size == 0 {
             return Err(ConfigError::Invalid("NELCOTA_DB_POOL_SIZE must be > 0"));
         }
@@ -516,6 +527,22 @@ mod tests {
             authenticator_password: Secret::new("a-password-of-16+"),
             jwt_secret: Some(Secret::new("a-secret-with-at-least-32-characters")),
             ..Config::default()
+        }
+    }
+
+    #[test]
+    fn token_lifetimes_cannot_overflow() {
+        for value in [
+            Config {
+                jwt_expiry_secs: u64::MAX,
+                ..valid()
+            },
+            Config {
+                refresh_token_ttl_days: u32::MAX,
+                ..valid()
+            },
+        ] {
+            assert!(value.validate().is_err());
         }
     }
 

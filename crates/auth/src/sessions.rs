@@ -70,7 +70,11 @@ async fn issue_tokens(
     user: &SessionUser,
 ) -> Result<Value, ApiError> {
     let (refresh_token, hash) = new_opaque_token();
-    let ttl_days = i32::try_from(state.settings.refresh_ttl_days).unwrap_or(i32::MAX);
+    if state.settings.access_ttl_secs == 0 || state.settings.refresh_ttl_days == 0 {
+        return Err(ApiError::internal());
+    }
+    let ttl_days =
+        i32::try_from(state.settings.refresh_ttl_days).map_err(|_| ApiError::internal())?;
     tx.execute(
         "INSERT INTO auth.refresh_tokens (session_id, token_hash, expires_at)
          VALUES ($1, $2, now() + make_interval(days => $3))",
@@ -80,7 +84,9 @@ async fn issue_tokens(
     .map_err(db_error)?;
 
     let now = get_current_timestamp();
-    let expires_at = now + state.settings.access_ttl_secs;
+    let expires_at = now
+        .checked_add(state.settings.access_ttl_secs)
+        .ok_or_else(ApiError::internal)?;
     let claims = json!({
         "iss": state.settings.issuer,
         "aud": "authenticated",
@@ -185,14 +191,14 @@ pub(crate) async fn refresh(state: &AuthState, token: Option<String>) -> Result<
     }
 
     tx.execute(
-        "UPDATE auth.refresh_tokens SET revoked = true WHERE id = $1",
-        &[&token_id],
-    )
-    .await
-    .map_err(db_error)?;
-    tx.execute(
-        "UPDATE auth.sessions SET refreshed_at = now() WHERE id = $1",
-        &[&session_id],
+        // Both rows are already locked. Rotate their state in one round trip;
+        // the token insertion and response still share this transaction.
+        "WITH retired AS (
+             UPDATE auth.refresh_tokens SET revoked = true WHERE id = $1 RETURNING id
+         )
+         UPDATE auth.sessions SET refreshed_at = now()
+         WHERE id = $2 AND EXISTS (SELECT 1 FROM retired)",
+        &[&token_id, &session_id],
     )
     .await
     .map_err(db_error)?;

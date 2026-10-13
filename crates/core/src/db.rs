@@ -15,84 +15,10 @@ use tokio_postgres::NoTls;
 
 use crate::Claims;
 
-mod embedded {
-    refinery::embed_migrations!("../../migrations");
-}
-
-/// Control table of the internal migrations (documented in docs/architecture.md).
-pub const MIGRATIONS_TABLE: &str = "nelcota.schema_migrations";
-
-#[derive(Debug, thiserror::Error)]
-pub enum BootstrapError {
-    #[error("failed to connect to Postgres: {0}")]
-    Connect(#[source] tokio_postgres::Error),
-    #[error("failed to prepare the database: {0}")]
-    Sql(#[from] tokio_postgres::Error),
-    #[error("failed to apply migrations: {0}")]
-    Migration(#[from] refinery::Error),
-}
-
-/// Applies the internal migrations and (re)sets the `authenticator` password.
-/// Idempotent; an advisory lock prevents races between instances.
-pub async fn bootstrap(
-    admin: &tokio_postgres::Config,
-    authenticator_password: &str,
-    statement_timeout_secs: u64,
-) -> Result<(), BootstrapError> {
-    let (mut client, connection) = admin
-        .connect(NoTls)
-        .await
-        .map_err(BootstrapError::Connect)?;
-    let connection = tokio::spawn(async move {
-        if let Err(err) = connection.await {
-            tracing::error!(error = %err, "admin connection closed with an error");
-        }
-    });
-
-    client
-        .batch_execute(
-            "SELECT pg_advisory_lock(hashtext('nelcota.migrations'));
-             CREATE SCHEMA IF NOT EXISTS nelcota;",
-        )
-        .await?;
-
-    let mut runner = embedded::migrations::runner();
-    runner.set_migration_table_name(MIGRATIONS_TABLE);
-    let report = runner.run_async(&mut client).await?;
-    for migration in report.applied_migrations() {
-        tracing::info!(migration = %migration, "migration applied");
-    }
-
-    // The SCRAM verifier is computed here: the plain-text password never
-    // travels nor shows up in Postgres statement logs.
-    let verifier = postgres_protocol::password::scram_sha_256(authenticator_password.as_bytes());
-    let statement: String = client
-        .query_one(
-            "SELECT format('ALTER ROLE authenticator WITH PASSWORD %L', $1::text)",
-            &[&verifier],
-        )
-        .await?
-        .get(0);
-    client.batch_execute(&statement).await?;
-    // Per-statement time cap on the API connections. It covers every request
-    // role: `ALTER ROLE anon SET ...` would have no effect, because Postgres
-    // only applies per-role settings at login (authenticator).
-    let statement: String = client
-        .query_one(
-            "SELECT format('ALTER ROLE authenticator SET statement_timeout = %L', $1::text)",
-            &[&format!("{statement_timeout_secs}s")],
-        )
-        .await?
-        .get(0);
-    client.batch_execute(&statement).await?;
-    client
-        .batch_execute("SELECT pg_advisory_unlock(hashtext('nelcota.migrations'))")
-        .await?;
-
-    drop(client);
-    let _ = connection.await;
-    Ok(())
-}
+mod bootstrap;
+pub use bootstrap::{
+    AUTH_MIGRATION_VERSIONS, BootstrapError, MIGRATIONS_TABLE, bootstrap, bootstrap_migrations,
+};
 
 /// Connection config as `authenticator` (same host/database as the admin URL).
 pub fn authenticator_config(

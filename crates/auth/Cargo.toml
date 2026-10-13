@@ -4,7 +4,9 @@ description = "JWT verification (behind a trait) and the claims extractor for ax
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-publish.workspace = true
+publish = true
+repository.workspace = true
+readme = "README.md"
 rust-version.workspace = true
 
 [dependencies]
@@ -39,4 +41,8 @@ workspace = true
 
 [[bench]]
 name = "rate_limit"
+harness = false
+
+[[bench]]
+name = "operations"
 harness = false

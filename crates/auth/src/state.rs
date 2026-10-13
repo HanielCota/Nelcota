@@ -17,6 +17,52 @@ pub struct AuthSettings {
     pub links: EmailLinks,
 }
 
+#[derive(Debug, thiserror::Error)]
+#[error("invalid auth settings: {0}")]
+pub struct SettingsError(pub &'static str);
+
+impl AuthSettings {
+    /// Validate standalone hosts before accepting requests.
+    pub fn validate(&self) -> Result<(), SettingsError> {
+        if self.issuer.trim().is_empty() {
+            return Err(SettingsError("issuer must not be empty"));
+        }
+        let now = jsonwebtoken::get_current_timestamp();
+        if self.access_ttl_secs == 0 || now.checked_add(self.access_ttl_secs).is_none() {
+            return Err(SettingsError(
+                "access lifetime must be positive and representable",
+            ));
+        }
+        if self.refresh_ttl_days == 0 || i32::try_from(self.refresh_ttl_days).is_err() {
+            return Err(SettingsError(
+                "refresh lifetime must fit a positive PostgreSQL interval",
+            ));
+        }
+        for page in [
+            &self.links.recovery,
+            &self.links.signup_confirmation,
+            &self.links.magic_link,
+        ]
+        .into_iter()
+        .flatten()
+        {
+            let url =
+                url::Url::parse(page).map_err(|_| SettingsError("invalid email link page"))?;
+            if !matches!(url.scheme(), "http" | "https")
+                || url.host_str().is_none()
+                || url.fragment().is_some()
+                || !url.username().is_empty()
+                || url.password().is_some()
+            {
+                return Err(SettingsError(
+                    "email link pages need HTTP(S), a host and no fragment or credentials",
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
 /// App pages that receive the links sent by email. A flow without its page
 /// is off.
 #[derive(Clone, Debug, Default)]
@@ -58,8 +104,74 @@ pub struct AuthState {
     pub oauth: Option<Arc<OAuth>>,
 }
 
+impl AuthState {
+    /// Construct a bounded standalone host. Optional mail and OAuth adapters
+    /// can be assigned before passing the state to `router`.
+    pub fn new(
+        pool: Pool,
+        keys: Arc<Keys>,
+        passwords: Arc<Passwords>,
+        settings: AuthSettings,
+        requests_per_minute: u32,
+    ) -> Result<Self, SettingsError> {
+        settings.validate()?;
+        if requests_per_minute == 0 {
+            return Err(SettingsError("rate limit must be positive"));
+        }
+        Ok(Self {
+            pool,
+            keys,
+            passwords,
+            limiter: Arc::new(RateLimiter::new(requests_per_minute)),
+            session_limiter: Arc::new(RateLimiter::new(
+                requests_per_minute.saturating_mul(crate::SESSION_RATE_LIMIT_FACTOR),
+            )),
+            settings: Arc::new(settings),
+            mailer: None,
+            mail_delivery: Arc::default(),
+            oauth: None,
+        })
+    }
+}
+
 impl FromRef<AuthState> for SharedVerifier {
     fn from_ref(state: &AuthState) -> Self {
         state.keys.clone() as Arc<dyn JwtVerifier>
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn settings() -> AuthSettings {
+        AuthSettings {
+            issuer: "consumer".into(),
+            access_ttl_secs: 900,
+            refresh_ttl_days: 30,
+            signup_enabled: true,
+            trust_proxy: false,
+            links: EmailLinks::default(),
+        }
+    }
+    #[test]
+    fn standalone_settings_reject_overflow_and_unsafe_link_pages() {
+        assert!(settings().validate().is_ok());
+        let mut value = settings();
+        value.access_ttl_secs = u64::MAX;
+        assert!(value.validate().is_err());
+        value = settings();
+        value.refresh_ttl_days = u32::MAX;
+        assert!(value.validate().is_err());
+        for page in [
+            "javascript:alert(1)",
+            "https://user:password@example.com",
+            "https://example.com/#existing",
+            "http:///",
+            "",
+        ] {
+            value = settings();
+            value.links.recovery = Some(page.into());
+            assert!(value.validate().is_err(), "{page}");
+        }
     }
 }

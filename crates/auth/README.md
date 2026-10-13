@@ -1,0 +1,15 @@
+# nelcota-auth
+
+Authentication for Rust, Axum 0.8 and PostgreSQL 17. Authorization belongs to
+PostgreSQL RLS. This package depends on `nelcota-core`, without importing the
+Nelcota server, CLI, panel, REST, storage or webhook capabilities.
+
+The public facade includes `bootstrap`, `AuthState::new`, `AuthSettings`, `router`,
+`Keys`, `JwtVerifier`, `Claims`, `Role`, `Passwords`, mail/OAuth adapters and the
+owned `pruner_task`. HTTP errors use `ApiError`; construction fails with typed
+configuration, key or bootstrap errors. Secrets must be generated at runtime.
+
+See [the integration guide](https://github.com/Nelcota/Nelcota/blob/main/docs/auth-integration.md)
+and the standalone `examples/auth-consumer` application. No Node runtime is
+required. Packaging is tested from `.crate` archives; registry publication is a
+separate release step, with core released before auth at matching versions.
