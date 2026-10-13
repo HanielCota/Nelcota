@@ -67,6 +67,17 @@ jobs:
               message = message.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
               print('::error title=SDK contract diagnostics::' + message)
           PY
+      - name: documented Notes browser example
+        timeout-minutes: 5
+        run: python3 ../../scripts/test-onboarding.py --binary ../../target/debug/nelcota --browser
+      - name: Notes browser acceptance report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: notes-browser-acceptance
+          path: .tools/reports/onboarding/**/report.json
+          if-no-files-found: ignore
+          retention-days: 7
 
   sdk-node:
     runs-on: ubuntu-latest

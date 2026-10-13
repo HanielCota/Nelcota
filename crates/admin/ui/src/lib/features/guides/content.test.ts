@@ -21,6 +21,15 @@ describe('bundled guides', () => {
     expect(guideLink('javascript:alert(1)', 'docs/api.md')).toBeNull()
     expect(guideLink('%invalid', 'docs/api.md')).toBeNull()
   })
+
+  it('keeps the Notes staging recipe reachable outside the bundled reader', () => {
+    const target = 'https://github.com/Nelcota/Nelcota/blob/main/docs/onboarding/notes.md#3-apply-the-notes-schema'
+    expect(guideLink('onboarding/notes.md#3-apply-the-notes-schema', 'docs/quickstart.md')).toBe(target)
+    const blocks = readMarkdown('[Notes staging](onboarding/notes.md#3-apply-the-notes-schema)', 'docs/quickstart.md')
+    const html = blocks.filter(block => block.type === 'html').map(block => block.html).join('')
+    expect(html).toContain(`href="${target}"`)
+    expect(html).toContain('target="_blank" rel="noopener noreferrer"')
+  })
 })
 
 describe('guide reader', () => {

@@ -32,10 +32,23 @@ for tool in curl sha256sum; do
   command -v "$tool" >/dev/null 2>&1 || die "$tool not found (apt install curl coreutils, or your distribution's equivalent)"
 done
 
-SUDO=""
-if [ "$(id -u)" -ne 0 ]; then
-  command -v sudo >/dev/null 2>&1 && SUDO="sudo" || die "run as root (or install sudo)"
-fi
+as_root() {
+  if [ "$(id -u)" -eq 0 ]; then
+    "$@"
+    return
+  fi
+  command -v sudo >/dev/null 2>&1 || die "this operation needs root (or sudo); use a writable PREFIX and NELCOTA_SKIP_DOCKER=1 for a user installation"
+  sudo "$@"
+}
+
+install_binary() {
+  if mkdir -p "$PREFIX" 2>/dev/null && [ -w "$PREFIX" ]; then
+    install -m 0755 "$TMP/$BIN" "$PREFIX/nelcota"
+    return
+  fi
+  as_root mkdir -p "$PREFIX"
+  as_root install -m 0755 "$TMP/$BIN" "$PREFIX/nelcota"
+}
 
 case "$VERSION" in
   latest) BASE="https://github.com/$REPO/releases/latest/download" ;;
@@ -53,14 +66,15 @@ curl -fsSL "$BASE/$BIN.sha256" -o "$TMP/$BIN.sha256"
 say "Checking the checksum (SHA-256)"
 (cd "$TMP" && sha256sum -c "$BIN.sha256") >/dev/null || die "checksum does not match; aborted"
 
-$SUDO install -m 0755 "$TMP/$BIN" "$PREFIX/nelcota"
+install_binary
 say "nelcota installed at $PREFIX/nelcota ($("$PREFIX/nelcota" --version))"
 
 if ! command -v docker >/dev/null 2>&1; then
   case "${NELCOTA_SKIP_DOCKER:-0}" in
     1) say "Docker not installed (NELCOTA_SKIP_DOCKER=1): use 'nelcota init --runtime systemd', or install Docker first" ;;
     *) say "Docker not found: installing it with the official script (get.docker.com)"
-       curl -fsSL https://get.docker.com | $SUDO sh ;;
+       curl -fsSL https://get.docker.com -o "$TMP/install-docker.sh"
+       as_root sh "$TMP/install-docker.sh" ;;
   esac
 fi
 
