@@ -13,6 +13,12 @@ REVOKE ALL ON FUNCTION public.upgrade_add_note(text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.upgrade_add_note(text) TO authenticated;
 INSERT INTO public.upgrade_notes(user_id,title,extra,amount,tags) VALUES (:'alice'::uuid,'preservação 🐘', '{"nested":{"nullable":null},"list":[1,"á",true]}',1234567890123456.12345678,ARRAY['one','dois']),(:'bob'::uuid,'Bob private row',NULL,0.00000001,ARRAY[]::text[]);
 INSERT INTO storage.buckets(id) VALUES('upgrade-files');
+-- Legacy SQL paths allow 1024 characters, which can exceed the HTTP byte cap.
+-- Migration indexes must preserve these rows without duplicating the full name.
+INSERT INTO storage.objects(bucket_id,name,owner,version,size,mime_type,etag)
+SELECT 'upgrade-files',string_agg(chr(n),'' ORDER BY n)||'/leaf.txt',:'alice'::uuid,
+       gen_random_uuid(),0,'text/plain','legacy-sql-metadata'
+FROM generate_series(20000,20799) n;
 CREATE POLICY own_upgrade_files ON storage.objects FOR ALL TO authenticated USING(bucket_id='upgrade-files' AND owner=auth.uid()) WITH CHECK(bucket_id='upgrade-files' AND owner=auth.uid());
 INSERT INTO nelcota.admin_avatar(email,content_type,image) VALUES('admin@example.com','image/png',decode('89504e470d0a1a0a','hex'));
 INSERT INTO auth.identities(user_id,provider,provider_id,email,identity_data) VALUES(:'alice'::uuid,'github','upgrade-fixture-identity','alice-upgrade@example.com','{"login":"alice"}');

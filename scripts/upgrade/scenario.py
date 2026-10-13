@@ -469,6 +469,52 @@ class UpgradeScenario:
             users, files, [before_rows, bob_rows], tables, functions, before, disk_before, dump
         )
 
+    def validate_performance_additions(self, after, baseline):
+        """Verify each additive change, then compare all original schema/data."""
+        table_oids = {t["schema"] + "." + t["table"]: t["oid"] for t in baseline.tables}
+        expected_indexes = []
+        if 14 in self.expected_migrations:
+            expected_indexes.append({
+                "indrelid": table_oids["auth.users"],
+                "definition": "CREATE INDEX users_created_id_idx ON auth.users USING btree (created_at DESC, id DESC)",
+            })
+        if 15 in self.expected_migrations:
+            expected_indexes.append({
+                "indrelid": table_oids["storage.objects"],
+                "definition": "CREATE INDEX objects_directory_idx ON storage.objects USING btree (bucket_id, directory_key)",
+            })
+            expected_indexes.append({
+                "indrelid": table_oids["storage.objects"],
+                "definition": "CREATE INDEX objects_directory_files_idx ON storage.objects USING btree (directory_scope, name)",
+            })
+            originals = [c for c in baseline.schema["columns"] if c["attrelid"] == table_oids["storage.objects"]]
+            expected_column = {
+                "attrelid": table_oids["storage.objects"], "attnum": max(c["attnum"] for c in originals) + 1,
+                "attname": "directory_key", "type": "bytea", "attnotnull": False,
+                "attidentity": "", "attgenerated": "s", "default_value": "storage.directory_key(name)",
+            }
+            expected_scope = {
+                "attrelid": table_oids["storage.objects"], "attnum": expected_column["attnum"] + 1,
+                "attname": "directory_scope", "type": "integer", "attnotnull": False,
+                "attidentity": "", "attgenerated": "s",
+                "default_value": "storage.directory_hash(bucket_id, storage.directory_key(name))",
+            }
+            added_columns = [c for c in after["columns"] if c not in baseline.schema["columns"]]
+            assert added_columns == [expected_column, expected_scope], "Unexpected column addition or generated expression"
+            assert int(self.sql("SELECT count(*) FROM storage.objects WHERE directory_key IS DISTINCT FROM storage.directory_key(name);")) == 0
+            assert int(self.sql("SELECT count(*) FROM storage.objects WHERE directory_scope IS DISTINCT FROM storage.directory_hash(bucket_id, directory_key);")) == 0
+            assert self.sql("SELECT encode(storage.directory_key('a-/nested/file.txt'),'hex');").strip() == "612d006e657374656400"
+            after["columns"].remove(expected_column)
+            after["columns"].remove(expected_scope)
+            # Project only the verified new field away; every original value is
+            # still compared byte-for-byte in Postgres' canonical JSON format.
+            after["tables"]["storage.objects"] = self.query(
+                "SELECT coalesce(jsonb_agg((to_jsonb(t)-'directory_key'-'directory_scope')::text ORDER BY (to_jsonb(t)-'directory_key'-'directory_scope')::text),'[]'::jsonb) FROM storage.objects t;"
+            )
+        added_indexes = [i for i in after["indexes"] if i not in baseline.schema["indexes"]]
+        assert sorted(added_indexes, key=lambda i: i["definition"]) == sorted(expected_indexes, key=lambda i: i["definition"]), "Unexpected index addition or missing performance index"
+        after["indexes"] = [i for i in after["indexes"] if i not in expected_indexes]
+
     def validate_migration(self, baseline):
         alice, bob = baseline.sessions
         a, b = (alice["user"]["id"], bob["user"]["id"])
@@ -487,6 +533,7 @@ class UpgradeScenario:
         after["tables"]["nelcota.schema_migrations"] = [
             r for r in migration_rows if json.loads(r)["version"] <= 12
         ]
+        self.validate_performance_additions(after, baseline)
         assert after == baseline.schema, "Pre-existing data, sequences or schema changed"
         assert self.file_hashes() == baseline.disk_hashes
         assert int(self.sql("SELECT count(*) FROM nelcota.webhook_deliveries;")) == 0
