@@ -41,7 +41,8 @@ TypeScript SDK type check, native Oxlint base/import presets with zero findings,
 capability boundaries, shell syntax, workflow YAML and documentation links.
 
 The native and browser acceptance steps are configured in CI, with only
-sanitized JSON reports retained as artifacts. These workflow changes have not
-yet run on GitHub for this patch. This evidence does not establish a public
+sanitized JSON reports retained as artifacts. The local results above were
+recorded before the PR's CI execution; see [PR #83](https://github.com/Nelcota/Nelcota/pull/83)
+for its workflow results. This evidence does not establish a public
 VPS deployment, DNS/TLS, SMTP/OAuth, S3 acceptance or a new sustained-load soak.
 See the [release handoff](release.md) for those separate gates.
