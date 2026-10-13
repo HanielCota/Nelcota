@@ -60,6 +60,16 @@ def free_port():
         return probe.getsockname()[1]
 
 
+def resource_evidence_violations(samples, duration_seconds):
+    if len(samples) < 2:
+        return [{"resource_samples": len(samples), "minimum": 2}]
+    boundaries = [0, *(sample["elapsed"] for sample in samples), duration_seconds]
+    gap = max(right - left for left, right in zip(boundaries, boundaries[1:]))
+    if gap > 30:
+        return [{"maximum_sample_gap_seconds": gap, "limit": 30}]
+    return []
+
+
 def token(secret, claims):
     encode = lambda value: base64.urlsafe_b64encode(value).decode().rstrip("=")
     head = encode(b'{"alg":"HS256","typ":"JWT"}')
@@ -113,6 +123,8 @@ def campaign(arguments):
     receiver.requests = deque(maxlen=2048)
     receiver.errors = deque(maxlen=256)
     stop = threading.Event()
+    restarting = threading.Event()
+    sampling_epoch = 0
     samples = []
     resource_violations = []
     sampler = None
@@ -462,6 +474,10 @@ def campaign(arguments):
 
             def sample():
                 while not stop.is_set():
+                    if restarting.is_set():
+                        stop.wait(0.1)
+                        continue
+                    epoch = sampling_epoch
                     try:
                         stats = docker(
                             "stats", "--no-stream", "--format", "{{json .}}", app, pg
@@ -488,6 +504,8 @@ def campaign(arguments):
                             raise RuntimeError(
                                 "Fixture exceeded its 512-MiB disk budget"
                             )
+                        if epoch != sampling_epoch:
+                            continue
                         samples.append(
                             {
                                 "elapsed": round(time.monotonic() - started, 1),
@@ -506,11 +524,11 @@ def campaign(arguments):
                             target.write(json.dumps(samples[-1]) + "\n")
                         if len(samples) > 1000:
                             del samples[:500]
-                    except (
-                        RuntimeError,
-                        ValueError,
-                        subprocess.TimeoutExpired,
-                    ) as error:
+                    except Exception as error:
+                        # Ignore only observations crossing the explicit restart
+                        # window. All other sampler failures invalidate evidence.
+                        if epoch == sampling_epoch and not restarting.is_set():
+                            resource_violations.append({"sampler_error": str(error)})
                         with (output / "sampler-errors.log").open("a") as target:
                             target.write(str(error) + "\n")
                     stop.wait(10)
@@ -694,10 +712,14 @@ def campaign(arguments):
                 if not arguments.no_stress:
                     run("stress-" + str(load), "mixed", "20s", load, overload=True)
             run("recovery-before-restart", "mixed", "20s", 4)
+            restarting.set()
+            sampling_epoch += 1
             docker("stop", "-t", "10", app)
             docker("rm", app)
             start()
             relogin()
+            sampling_epoch += 1
+            restarting.clear()
             run("recovery-after-restart", "mixed", "20s", 4)
             if arguments.soak_seconds:
                 run("soak", "mixed", str(arguments.soak_seconds) + "s", 16, soak_rate)
@@ -786,6 +808,13 @@ def campaign(arguments):
                 raise RuntimeError("Database work remained after traffic stopped")
             if receiver.errors:
                 raise RuntimeError("Webhook signature invariants failed")
+            stop.set()
+            sampler.join(timeout=50)
+            if sampler.is_alive():
+                resource_violations.append({"sampler_shutdown": "timed out"})
+            resource_violations.extend(
+                resource_evidence_violations(samples, time.monotonic() - started)
+            )
             if resource_violations:
                 (output / "resource-violations.json").write_text(
                     json.dumps(resource_violations, indent=2)

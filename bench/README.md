@@ -126,3 +126,9 @@ the Docker child environment. The generator command contains the environment
 variable name, without its value; no plaintext credential fixture file is
 written or mounted. Treat Docker daemon access as privileged, as for the
 application and database containers' existing runtime configuration.
+
+Resource evidence requires at least two successful samples and a maximum
+30-second gap, including the beginning/end of observed traffic. Sampler
+exceptions invalidate the campaign unless the observation crossed its explicit
+server-restart window; cross-restart observations are discarded. The sampler
+must finish before the final evidence gate, so a late failure cannot be hidden.

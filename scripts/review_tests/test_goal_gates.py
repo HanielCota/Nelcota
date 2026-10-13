@@ -185,12 +185,39 @@ class Ownership(unittest.TestCase):
 
 
 class DiagnosticSafety(unittest.TestCase):
-    def test_docker_timeout_does_not_expose_credential_arguments(self):
+    def campaign_module(self):
         spec = importlib.util.spec_from_file_location(
             "goal_campaign", ROOT / "bench/campaign.py"
         )
         campaign = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(campaign)
+        return campaign
+
+    def test_missing_resource_samples_cannot_certify_campaign(self):
+        campaign = self.campaign_module()
+        self.assertTrue(campaign.resource_evidence_violations([], 50))
+        self.assertTrue(campaign.resource_evidence_violations([{"elapsed": 1}], 50))
+
+    def test_resource_observation_gap_cannot_certify_campaign(self):
+        campaign = self.campaign_module()
+        self.assertTrue(
+            campaign.resource_evidence_violations([{"elapsed": 1}, {"elapsed": 32}], 35)
+        )
+        self.assertEqual(
+            campaign.resource_evidence_violations(
+                [{"elapsed": 1}, {"elapsed": 15}], 20
+            ),
+            [],
+        )
+
+    def test_early_stopped_sampler_cannot_certify_unobserved_tail(self):
+        campaign = self.campaign_module()
+        self.assertTrue(
+            campaign.resource_evidence_violations([{"elapsed": 1}, {"elapsed": 15}], 46)
+        )
+
+    def test_docker_timeout_does_not_expose_credential_arguments(self):
+        campaign = self.campaign_module()
         timeout = subprocess.TimeoutExpired(
             ["docker", "run", "-e", "PASSWORD=fixture-secret"], 45
         )
