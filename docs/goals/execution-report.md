@@ -283,3 +283,31 @@ fixture objects passed byte verification. This is a fixture transport regression
 check, rather than a replacement for the recorded 30-second comparisons/soaks.
 The pre-PR review also bounds SDK failure annotations to preserve their final
 error and ignores local standalone-consumer build output.
+
+The PR's automated review additionally identified a refresh TTL that fits int4
+but overflows PostgreSQL timestamps, and missing sampler evidence that could
+still certify traffic. Both constructor/server TTL regressions failed before
+correction. A shared validator now checks the PostgreSQL 17 timestamp horizon
+with one day of headroom; issuance also checks manually assembled auth state.
+A real-PostgreSQL regression verifies a valid near-horizon interval, reproduces
+int4-sized overflow, rejects construction and proves failed signup rolls back.
+All 59 auth/core unit and ten auth-reuse integration tests passed, as did
+all-target Clippy. Resource collection now rejects missing samples, ordinary
+sampler exceptions and gaps above 30 seconds, including unobserved traffic
+tails; only explicit restart crossings are exempted. A real mixed campaign
+passed with the new gate, while an otherwise-successful campaign with every
+resource observation deliberately failed was correctly rejected. All 25
+Python/preset regressions and mandatory native gates passed.
+
+The improved SDK failure annotation exposed intermittent Firefox two-tab
+rotation failure. A native-storage task-snapshot regression reproduced two
+rotations before persistence became visible. Browser-native storage writes now
+retain the shared lock through a task boundary before broadcasting/releasing;
+custom asynchronous adapters and Node memory storage retain their existing
+behavior. The real-browser check requires exactly one refresh request and
+matching sessions, with credential-free failure diagnostics. All 174 SDK units,
+15 type tests, checks, build and package tests passed. Firefox/WebKit coverage
+is verified in CI; local Playwright browser downloads are restricted in this
+environment. These follow-up input, persistence and evidence corrections have
+targeted regressions and CI gates; the versioned long-soak binary predates them
+and is not represented as a measurement of every subsequent PR revision.
