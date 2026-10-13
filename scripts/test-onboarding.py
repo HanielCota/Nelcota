@@ -408,7 +408,7 @@ def main():
     finally:
         try:
             report["cleanup"] = fixture.cleanup()
-        except Exception:
+        except BaseException:
             report["status"] = "failed"
             report["cleanup"] = "failed; inspect the owned disposable fixture"
             raise

@@ -4,6 +4,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import importlib.util
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import threading
 import unittest
@@ -95,6 +96,19 @@ class Ownership(unittest.TestCase):
         result = subprocess.CompletedProcess([], 1, b"[]", b"Error response: no such volume")
         with mock.patch.object(onboarding.subprocess, "run", return_value=result):
             self.assertIsNone(onboarding.inspect("volume", "fixture"))
+
+    def test_cleanup_cancellation_cannot_leave_a_passed_report(self):
+        self.fixture.run = mock.Mock(return_value="fixture-version")
+        self.fixture.cleanup = mock.Mock(side_effect=KeyboardInterrupt)
+        with mock.patch.object(onboarding, "Quickstart", return_value=self.fixture), \
+             mock.patch.object(onboarding.subprocess, "run"), \
+             mock.patch.object(sys, "argv", ["test-onboarding.py", "--binary", "/bin/true"]):
+            with self.assertRaises(KeyboardInterrupt):
+                onboarding.main()
+        import json
+        report = json.loads((self.fixture.root / "report.json").read_text())
+        self.assertEqual(report["status"], "failed")
+        self.assertIn("failed", report["cleanup"])
 
 
 class Diagnostics(unittest.TestCase):
