@@ -9,7 +9,7 @@ mod listener;
 mod model;
 mod refresh;
 
-pub use listener::spawn_reload_listener;
+pub use listener::{ReloadListener, spawn_reload_listener};
 pub use model::{Argument, Catalog, Column, ForeignKey, Function, Privileges, Table, TableKind};
 pub use refresh::CatalogHandle;
 

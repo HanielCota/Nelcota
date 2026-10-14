@@ -25,7 +25,7 @@ use axum::{
     extract::FromRef,
     routing::{get, post},
 };
-pub use catalog::{Catalog, CatalogHandle, spawn_reload_listener};
+pub use catalog::{Catalog, CatalogHandle, ReloadListener, spawn_reload_listener};
 use deadpool_postgres::Pool;
 use nelcota_auth::SharedVerifier;
 use std::sync::Arc;
