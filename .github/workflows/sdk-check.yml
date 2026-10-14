@@ -38,6 +38,7 @@ jobs:
       - run: npm run size
       - run: npm run test:package
       - run: node test/runtime/smoke.mjs
+      - run: npm run test:memory
       - run: bun test/runtime/smoke.mjs
       - run: deno run --allow-net --allow-read --allow-env test/runtime/smoke.mjs
       - run: cargo build -p nelcota-server
@@ -102,3 +103,4 @@ jobs:
       - run: npm run build
       - run: npm run test:package
       - run: node test/runtime/smoke.mjs
+      - run: npm run test:memory
