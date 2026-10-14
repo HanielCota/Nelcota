@@ -59,6 +59,46 @@ test('lost start response is reconciled without automatically retrying a mutatio
   expect(starts).toHaveLength(2); expect(starts[0].key).toMatch(/^[a-f0-9]{64}$/); expect(starts[0].key).toBe(starts[1].key)
   await page.reload(); await expect(page.getByText('Preparando artefatos', { exact: true })).toBeVisible()
 })
+test('login resumes status polling after logout overtakes an older poll', async ({ page }) => {
+  await controller(page)
+  let reads = 0
+  let started!: () => void
+  let release!: () => void
+  const pending = new Promise<void>(resolve => { started = resolve })
+  const held = new Promise<void>(resolve => { release = resolve })
+  await page.route('**/admin/api/updates', async route => {
+    const request = route.request()
+    if (request.method() === 'GET') {
+      reads++
+      if (reads === 2) {
+        started()
+        await held
+        await route.fulfill({ status: 401, json: { result: 'error', code: 'session_expired' } }).catch(() => {})
+        return
+      }
+      await route.fulfill({ json: { result: 'status', data: status } })
+      return
+    }
+    const action = request.postDataJSON().action
+    expect(['login', 'logout']).toContain(action)
+    await route.fulfill({ json: action === 'login' ? { result: 'session', email: status.email } : { result: 'done' } })
+  })
+  try {
+    await page.goto('/admin/')
+    await expect(page.getByRole('button', { name: 'Preparar atualização' })).toBeVisible()
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')))
+    await pending
+    await page.getByRole('button', { name: 'Sair', exact: true }).click()
+    await page.getByLabel('Email', { exact: true }).fill('operator@example.test')
+    await page.getByLabel('Senha', { exact: true }).fill('operator-test-password')
+    await page.getByRole('button', { name: 'Entrar', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Entrar', exact: true })).toHaveCount(0)
+    release()
+    await expect(page.getByRole('button', { name: 'Preparar atualização' })).toBeVisible()
+    expect(reads).toBeGreaterThanOrEqual(3)
+  } finally { release() }
+})
+
 test('committed incident recovery requires password and preserves the data boundary after reload', async ({ page }) => {
   await controller(page)
   const incident = { ...job, phase: 'needs_operator', sequence: 8, committed: true, error: 'worker_interrupted' }
@@ -75,4 +115,45 @@ test('committed incident recovery requires password and preserves the data bound
   await page.getByLabel('Confirme a senha do operador').fill('operator-test-password')
   await page.getByRole('button', { name: 'Recuperar operação', exact: true }).first().click()
   await expect.poll(() => recoveries).toBe(1)
+})
+
+test('an expired online poll cannot replace a newly authenticated session', async ({ page }) => {
+  await controller(page)
+  let reads = 0
+  let started!: () => void
+  let release!: () => void
+  const pending = new Promise<void>(resolve => { started = resolve })
+  const held = new Promise<void>(resolve => { release = resolve })
+  await page.route('**/admin/api/updates', async route => {
+    if (route.request().method() === 'POST') {
+      expect(route.request().postDataJSON().action).toBe('login')
+      await route.fulfill({ json: { result: 'session', email: status.email } })
+      return
+    }
+    const current = ++reads
+    if (current === 2) {
+      started()
+      await held
+      await route.fulfill({ status: 401, body: '<html>Expired</html>' }).catch(() => {})
+      return
+    }
+    if (current === 1) {
+      await route.fulfill({ status: 401, body: '<html>Expired</html>' })
+      return
+    }
+    await route.fulfill({ json: { result: 'status', data: status } })
+  })
+  try {
+    await page.goto('/admin/')
+    await expect(page.getByLabel('Email', { exact: true })).toBeVisible()
+    await page.evaluate(() => window.dispatchEvent(new Event('online')))
+    await pending
+    await page.getByLabel('Email', { exact: true }).fill('operator@example.test')
+    await page.getByLabel('Senha', { exact: true }).fill('operator-test-password')
+    await page.getByRole('button', { name: 'Entrar', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Preparar atualização' })).toBeVisible()
+    release()
+    await expect(page.getByRole('button', { name: 'Preparar atualização' })).toBeVisible()
+    expect(reads).toBeGreaterThanOrEqual(3)
+  } finally { release() }
 })

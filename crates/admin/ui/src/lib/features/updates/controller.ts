@@ -1,4 +1,5 @@
 import { translate, i18n } from '$lib/i18n/index.svelte'
+import { readBody } from '$lib/read-body'
 export const phases = ['preparing', 'pausing', 'capturing', 'backup_verified', 'activating', 'validating', 'committing', 'succeeded', 'recovering', 'resuming_previous', 'recovered', 'failed_before_change', 'needs_operator'] as const
 export type Phase = typeof phases[number]
 export type Job = { id: string; project: string; current: string; target: string; phase: Phase; sequence: number; updated_at: number; committed: boolean; error: string | null }
@@ -40,8 +41,14 @@ export function message(code: string): string {
 }
 export async function request(body?: object, signal?: AbortSignal): Promise<Record<string, unknown>> {
   const response = await fetch('/admin/api/updates', { method: body ? 'POST' : 'GET', credentials: 'same-origin', headers: body ? { 'Content-Type': 'application/json', 'X-Nelcota-Updates': '1' } : {}, body: body ? JSON.stringify(body) : undefined, signal })
-  const value: unknown = await response.json()
-  if (!record(value)) throw new ControllerError(502, 'invalid_response')
+  const status = response.ok ? 502 : response.status
+  const code = response.ok ? 'invalid_response' : 'operation_blocked'
+  const bounded = await readBody(response, response.ok ? 1024 * 1024 : 64 * 1024, signal)
+  if (!bounded) throw new ControllerError(status, code)
+  let value: unknown
+  try { value = JSON.parse(await bounded.text()) }
+  catch { throw new ControllerError(status, code) }
+  if (!record(value)) throw new ControllerError(status, code)
   if (!response.ok || value.result === 'error') throw new ControllerError(response.status, typeof value.code === 'string' ? value.code : 'operation_blocked')
   return value
 }

@@ -19,7 +19,7 @@
   let key = ''
   let alive = true
   let generation = 0
-  let polling = false
+  let polling: number | null = null
   let timer: ReturnType<typeof setTimeout> | undefined
   let attempts = 0
   const requests = new Set<AbortController>()
@@ -38,8 +38,8 @@
     timer = setTimeout(() => void refresh(), delay)
   }
   async function refresh() {
-    if (!alive || polling) return
-    clearTimeout(timer); polling = true
+    if (!alive || polling === generation) return
+    clearTimeout(timer); polling = generation
     const revision = generation
     try {
       const reply = await call()
@@ -50,14 +50,14 @@
       if (!alive || revision !== generation) return
       if (error instanceof ControllerError && error.status === 401) { signedOut = true; status = null; clearApproval(); return }
       offline = true; attempts++
-    } finally { polling = false; if (alive && revision === generation) schedule() }
+    } finally { if (polling === revision) polling = null; if (alive && revision === generation) schedule() }
   }
   onMount(() => { void refresh(); return () => { alive = false; generation++; clearTimeout(timer); for (const abort of requests) abort.abort() } })
   async function login(event: SubmitEvent) {
     event.preventDefault()
     if (busy || !email.trim() || !password) return
     busy = true; failure = null
-    try { await call({ action: 'login', email: email.trim(), password }); if (!alive) return; signedOut = false; await refresh() }
+    try { await call({ action: 'login', email: email.trim(), password }); if (!alive) return; generation++; clearTimeout(timer); for (const abort of requests) abort.abort(); signedOut = false; await refresh() }
     catch (error) { if (alive) failure = error instanceof ControllerError ? message(error.code) : t('updates.reconnect') }
     finally { password = ''; busy = false }
   }
@@ -81,7 +81,7 @@
   async function logout() {
     if (busy) return
     busy = true
-    try { await call({ action: 'logout' }); generation++; status = null; signedOut = true; clearApproval(); clearTimeout(timer) }
+    try { await call({ action: 'logout' }); generation++; status = null; signedOut = true; clearApproval(); clearTimeout(timer); for (const abort of requests) abort.abort() }
     catch { failure = t('updates.reconnect') }
     finally { busy = false }
   }
