@@ -117,3 +117,18 @@ Run the matrix with the exact installed controller and published candidate,
 record binary/source/release identity and restore RPO/RTO, retain diagnostics and
 create the root-owned validation report only from that evidence. Installation
 has no HTTP bypass and remains disabled until all required report checks pass.
+
+## Pre-merge dependency review
+
+On 2026-10-14 the follow-up CI exposed four newly published rustls advisories:
+RUSTSEC-2026-0346 (session Debug secrets), 0347 (buffered data after ECH rejection),
+0348 (Brotli certificate decompression allocation), and 0349 (unauthenticated
+key-exchange prediction). The earlier green CI predates those advisory records.
+The workspace minimum and lockfile now select rustls 0.23.46, the patched version
+for all four, retaining the same TLS provider/features.
+
+Local cargo-deny 0.20.2 passes advisories, bans, licenses and sources; cargo-audit
+reports zero non-ignored vulnerabilities. No new advisory exception was added.
+Seven real-server Rust SDK contracts and twelve transport tests passed, as did
+formatting and capability/migration-byte boundaries. Final-source CI is tracked
+on the pull request before merging this dependency update.
