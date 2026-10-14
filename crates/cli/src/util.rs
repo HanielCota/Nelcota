@@ -125,6 +125,12 @@ pub fn confirm(question: &str) -> bool {
 
 /// GET /health over plain TCP (the image is `scratch`, no curl).
 pub fn healthcheck(addr: &str) -> bool {
+    http_ok(addr, "/health")
+}
+pub(crate) fn deployment_ready(addr: &str) -> bool {
+    http_ok(addr, "/admin/api/whoami")
+}
+fn http_ok(addr: &str, path: &str) -> bool {
     let socket = match addr.to_socket_addrs().ok().and_then(|mut a| a.next()) {
         Some(socket) => socket,
         _ => {
@@ -138,7 +144,7 @@ pub fn healthcheck(addr: &str) -> bool {
         }
     };
     let _ = stream.set_read_timeout(Some(Duration::from_secs(3)));
-    let request = "GET /health HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n";
+    let request = format!("GET {path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
     if stream.write_all(request.as_bytes()).is_err() {
         return false;
     }

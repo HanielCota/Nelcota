@@ -33,6 +33,7 @@ mod storage;
 mod storage_access;
 mod tables;
 mod tokens;
+pub mod updates;
 mod users;
 mod webhooks;
 
@@ -116,6 +117,7 @@ pub fn router(state: AdminState) -> Router {
             put(policies::replace).delete(policies::drop),
         )
         .route("/admin/api/projects", get(projects::list))
+        .route("/admin/api/updates", get(updates::information))
         .route("/admin/api/projects/status", get(projects::status))
         .route("/admin/api/sso/handoff", post(sso::handoff))
         .route("/admin/api/tokens/service-role", post(tokens::service_role))

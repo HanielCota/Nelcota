@@ -68,7 +68,14 @@ pub fn write(host: &Host, manifest: &Manifest) -> anyhow::Result<()> {
         })
         .map(|project| project.name.clone())
         .collect();
-    let content = render_paused(manifest, &paused);
+    let mut content = render_paused(manifest, &paused);
+    if let Some(config) = crate::updates::descriptor(host.root())? {
+        let domain = config
+            .origin
+            .strip_prefix("https://")
+            .context("invalid controller origin")?;
+        content.push_str(&format!("\n{domain} {{\n\treverse_proxy unix//run/nelcota-updates-http/http.sock\n\theader Strict-Transport-Security \"max-age=31536000\"\n}}\n"));
+    }
     if manifest.runtime == Runtime::Systemd {
         return write_native(&content);
     }
@@ -81,7 +88,14 @@ pub fn write(host: &Host, manifest: &Manifest) -> anyhow::Result<()> {
     // Atomic swap inside the mounted folder (a single-file bind would not see the rename).
     let tmp = dir.join("config").join("Caddyfile.tmp");
     fs::write(&tmp, content)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&tmp, fs::Permissions::from_mode(0o644))?;
+    }
+    fs::File::open(&tmp)?.sync_all()?;
     fs::rename(&tmp, dir.join("config").join("Caddyfile"))?;
+    fs::File::open(dir.join("config"))?.sync_all()?;
     Ok(())
 }
 
@@ -202,7 +216,14 @@ fn write_native(content: &str) -> anyhow::Result<()> {
     let path = std::path::Path::new("/etc/caddy/Caddyfile");
     let tmp = path.with_extension("nelcota-tmp");
     fs::write(&tmp, content)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&tmp, fs::Permissions::from_mode(0o644))?;
+    }
+    fs::File::open(&tmp)?.sync_all()?;
     fs::rename(&tmp, path)?;
+    fs::File::open("/etc/caddy")?.sync_all()?;
     Ok(())
 }
 

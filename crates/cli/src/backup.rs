@@ -4,8 +4,9 @@ use crate::project::Project;
 use anyhow::{Context, bail};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+mod files;
 mod remote;
-pub(crate) use remote::s3_configured;
+pub(crate) use remote::{s3_configured, verify_remote};
 mod workflow;
 #[cfg(test)]
 pub(crate) use workflow::prune;
@@ -156,12 +157,12 @@ pub fn capture(project: &Project, path: &Path) -> anyhow::Result<()> {
                 crate::private_fs::dir(&root)?;
                 let mut records = Vec::with_capacity(objects.len());
                 for object in objects {
-                    let source = object_path(&project.storage_dir(), &object.key)?;
+                    let mut source = files::read(&project.storage_dir(), &object.key)?;
                     let destination = object_path(&root, &object.key)?;
                     crate::private_fs::dir(
                         destination.parent().context("invalid object directory")?,
                     )?;
-                    crate::private_fs::copy(&source, &destination)
+                    crate::private_fs::copy_reader(&mut source, &destination, object.size)
                         .with_context(|| format!("could not snapshot {}", object.key))?;
                     let (size, sha256) = checksum(&destination)?;
                     if size != object.size {
@@ -250,26 +251,14 @@ pub fn archive(dump: &Path, destination: &Path) -> anyhow::Result<()> {
 pub fn restore_files(project: &Project, dump: &Path, manifest: &Manifest) -> anyhow::Result<()> {
     let target = project.storage_dir();
     fs::create_dir_all(&target)?;
-    #[cfg(unix)]
-    let owner = {
-        use std::os::unix::fs::MetadataExt;
-        let metadata = fs::metadata(&target)?;
-        format!("{}:{}", metadata.uid(), metadata.gid())
-    };
     let source = bundle_path(dump)?.join("objects");
     for file in &manifest.objects {
-        let destination = object_path(&target, &file.key)?;
-        fs::create_dir_all(destination.parent().context("invalid object directory")?)?;
-        crate::private_fs::copy(object_path(&source, &file.key)?, destination)?;
-    }
-    #[cfg(unix)]
-    if !std::process::Command::new("chown")
-        .args(["-R", &owner])
-        .arg(&target)
-        .status()?
-        .success()
-    {
-        bail!("could not restore file ownership");
+        files::restore(
+            &target,
+            &file.key,
+            files::read(&source, &file.key)?,
+            file.size,
+        )?;
     }
     Ok(())
 }

@@ -62,3 +62,24 @@ pub(crate) async fn spa() -> Response {
         .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-cache"));
     response
 }
+
+/// The same bundle has a separate entry mode without project session handoff.
+pub(crate) async fn controller_spa() -> Response {
+    let file = match Ui::get("index.html") {
+        Some(file) => file,
+        None => return StatusCode::NOT_FOUND.into_response(),
+    };
+    let html = String::from_utf8_lossy(&file.data).replacen(
+        "<head>",
+        "<head><meta name=\"nelcota-updates-controller\" content=\"1\">",
+        1,
+    );
+    (
+        [
+            (header::CONTENT_TYPE, "text/html; charset=utf-8"),
+            (header::CACHE_CONTROL, "no-cache"),
+        ],
+        html,
+    )
+        .into_response()
+}

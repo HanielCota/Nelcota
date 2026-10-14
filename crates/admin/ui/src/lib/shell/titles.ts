@@ -11,6 +11,7 @@ const titles: Record<string, MessageKey> = {
   '/sign-in': 'shell.pages.userSignIn',
   '/storage': 'shell.pages.storage',
   '/policies': 'shell.pages.policies',
+  '/updates': 'shell.pages.updates',
   '/projects': 'shell.pages.projects',
   '/connect': 'shell.pages.connect',
   '/guides': 'shell.pages.guides',

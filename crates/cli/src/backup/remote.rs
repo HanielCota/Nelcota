@@ -13,6 +13,7 @@ struct BackupS3 {
     access_key: String,
     secret_key: String,
     region: String,
+    native: bool,
 }
 
 impl BackupS3 {
@@ -24,6 +25,7 @@ impl BackupS3 {
                 .with_context(|| format!("{key} is not set in host.env (see docs/backup.md)"))
         };
         Ok(BackupS3 {
+            native: host.require()?.runtime == crate::host::Runtime::Systemd,
             endpoint: get("NELCOTA_BACKUP_S3_ENDPOINT")?,
             bucket: get("NELCOTA_BACKUP_S3_BUCKET")?,
             access_key: get("NELCOTA_BACKUP_S3_ACCESS_KEY")?,
@@ -44,6 +46,28 @@ impl BackupS3 {
         args: &[&str],
     ) -> anyhow::Result<()> {
         let dir = fs::canonicalize(dir)?.display().to_string();
+        if self.native {
+            let args: Vec<_> = args
+                .iter()
+                .map(|value| match value.strip_prefix("/data") {
+                    Some(path) => format!("{dir}{path}"),
+                    None => (*value).to_owned(),
+                })
+                .collect();
+            let status = Command::new("aws")
+                .arg("s3")
+                .args(args)
+                .args(["--endpoint-url", &self.endpoint])
+                .env("AWS_ACCESS_KEY_ID", &self.access_key)
+                .env("AWS_SECRET_ACCESS_KEY", &self.secret_key)
+                .env("AWS_DEFAULT_REGION", &self.region)
+                .status()
+                .context("native backup requires AWS CLI v2")?;
+            if !status.success() {
+                bail!("native offsite backup transport failed");
+            }
+            return Ok(());
+        }
         // Windows marks canonical paths as verbatim (`\\?\C:\...`), which
         // `docker -v` reads as extra colons.
         let dir = dir.strip_prefix(r"\\?\").unwrap_or(&dir);
@@ -166,6 +190,99 @@ pub(super) fn sync_files_down(host: &Host, project: &Project, dump: &Path) -> an
     )?;
     crate::private_fs::seal_tree(&dir)?;
     ok("files restored");
+    Ok(())
+}
+
+/// Read back the exact offsite pair before a deployment may touch the database.
+pub(crate) fn verify_remote(
+    host: &Host,
+    project: &Project,
+    dump: &Path,
+    scratch: &Path,
+) -> anyhow::Result<()> {
+    let s3 = BackupS3::from_host(host)?;
+    let name = dump
+        .file_name()
+        .and_then(|name| name.to_str())
+        .context("invalid dump filename")?;
+    let temporary = tempfile::tempdir_in(scratch)?;
+    s3.run(
+        temporary.path(),
+        false,
+        None,
+        &[
+            "cp",
+            &format!("s3://{}/{}/{name}", s3.bucket, project.name),
+            &format!("/data/{name}"),
+            "--only-show-errors",
+        ],
+    )?;
+    let fetched = temporary.path().join(name);
+    if nelcota_deployment::digest_file(&fetched, u64::MAX - 1)?
+        != nelcota_deployment::digest_file(dump, u64::MAX - 1)?
+    {
+        bail!("offsite dump checksum mismatch");
+    }
+    if project.stores_files_on_disk()? {
+        let bundle = crate::backup::bundle_path(&fetched)?;
+        crate::private_fs::dir(&bundle)?;
+        s3.run(
+            &bundle,
+            false,
+            None,
+            &[
+                "sync",
+                &s3.files_url(&project.name, dump)?,
+                "/data",
+                "--only-show-errors",
+            ],
+        )?;
+        crate::private_fs::seal_tree(&bundle)?;
+        if nelcota_deployment::digest_file(&bundle.join("manifest.json"), 16 * 1024 * 1024)?
+            != nelcota_deployment::digest_file(
+                &crate::backup::bundle_path(dump)?.join("manifest.json"),
+                16 * 1024 * 1024,
+            )?
+        {
+            bail!("offsite file manifest mismatch");
+        }
+        crate::backup::validate(&fetched)?;
+    }
+    // Recovery configuration contains keys; require server-side encryption.
+    let config = scratch.join("previous.env");
+    let url = format!(
+        "s3://{}/{}/deployments/{}/previous.env",
+        s3.bucket,
+        project.name,
+        scratch
+            .file_name()
+            .and_then(|name| name.to_str())
+            .context("invalid job directory")?
+    );
+    s3.run(
+        scratch,
+        true,
+        None,
+        &[
+            "cp",
+            "/data/previous.env",
+            &url,
+            "--sse",
+            "AES256",
+            "--only-show-errors",
+        ],
+    )?;
+    s3.run(
+        temporary.path(),
+        false,
+        None,
+        &["cp", &url, "/data/previous.env", "--only-show-errors"],
+    )?;
+    if nelcota_deployment::digest_file(&config, 65536)?
+        != nelcota_deployment::digest_file(&temporary.path().join("previous.env"), 65536)?
+    {
+        bail!("offsite configuration checksum mismatch");
+    }
     Ok(())
 }
 

@@ -14,7 +14,10 @@
   import { crumbsFor, documentTitle } from '$lib/shell/titles'
   import { errorMessage, t } from '$lib/i18n/index.svelte'
 
+  const controller = document.querySelector('meta[name=nelcota-updates-controller]')?.getAttribute('content') === '1'
+
   onMount(async () => {
+    if (controller) return
     // Coming from another panel on the host (single sign-on): trade the token for a session.
     const token = takeHandoffToken()
     if (token) {
@@ -57,7 +60,7 @@
 
   // Tab title: the current page (or the login) followed by the product name.
   const title = $derived(
-    session.email === null ? `${t('shell.pages.signIn')} · Nelcota` : session.email ? documentTitle(crumbsFor(route.path)) : 'Nelcota',
+    controller ? `${t('updates.controller')} · Nelcota` : session.email === null ? `${t('shell.pages.signIn')} · Nelcota` : session.email ? documentTitle(crumbsFor(route.path)) : 'Nelcota',
   )
 </script>
 
@@ -67,7 +70,7 @@
 <!-- While the server is unreachable, try again by itself when the network or
      the window comes back. -->
 <svelte:window ononline={retryWhenOffline} onfocus={retryWhenOffline} />
-{#if (session.email === undefined && offline)}
+{#if !controller && (session.email === undefined && offline)}
   <!-- On a card like the login and the 404. -->
   <main class="flex min-h-dvh items-center justify-center bg-background px-4 py-12">
     <div class="flex w-full max-w-md flex-col items-center gap-6 rounded-3xl bg-card px-8 pt-8 pb-10 text-center" role="alert">
@@ -82,13 +85,13 @@
     </div>
   </main>
 {/if}
-{#if !(session.email === undefined && offline) && (session.email === undefined)}
+{#if !controller && !(session.email === undefined && offline) && (session.email === undefined)}
   <LoadingScreen />
 {/if}
-{#if !(session.email === undefined && offline) && !(session.email === undefined) && (session.email === null)}
+{#if !controller && !(session.email === undefined && offline) && !(session.email === undefined) && (session.email === null)}
   <Login />
 {/if}
-{#if !(session.email === undefined && offline) && !(session.email === undefined) && !(session.email === null)}
+{#if !controller && !(session.email === undefined && offline) && !(session.email === undefined) && !(session.email === null)}
   {#await import('$lib/shell/AuthenticatedShell.svelte')}
     <LoadingScreen />
   {:then shell}
@@ -98,4 +101,8 @@
       <div class="w-full"><LoadError message={errorMessage(error)} onretry={() => window.location.reload()} /></div>
     </main>
   {/await}
+{/if}
+
+{#if controller}
+  {#await import('$lib/features/updates/UpdatesConsole.svelte')}<LoadingScreen />{:then updates}<updates.default />{:catch error}<main class="mx-auto max-w-xl p-8"><LoadError message={errorMessage(error)} onretry={() => window.location.reload()} /></main>{/await}
 {/if}

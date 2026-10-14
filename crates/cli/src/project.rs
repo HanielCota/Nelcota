@@ -255,7 +255,7 @@ impl Project {
 
     // ------------------------------------------------------- docker compose
 
-    fn compose_command(&self) -> Command {
+    pub(crate) fn compose_command(&self) -> Command {
         compose_command(&self.dir)
     }
 

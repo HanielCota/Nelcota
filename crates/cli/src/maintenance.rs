@@ -17,13 +17,15 @@ pub(crate) struct Maintenance<'a> {
 impl<'a> Maintenance<'a> {
     pub(crate) fn enter(host: &'a Host, project: &'a Project) -> anyhow::Result<Self> {
         let marker = project.path(MARKER);
-        fs::OpenOptions::new()
+        let file = fs::OpenOptions::new()
             .write(true)
             .create_new(true)
             .open(&marker)
             .context(
                 "project already in maintenance; recover it with `nelcota up` before upgrading",
             )?;
+        file.sync_all()?;
+        fs::File::open(project.path(""))?.sync_all()?;
         let guard = Self {
             host,
             project,
@@ -37,12 +39,14 @@ impl<'a> Maintenance<'a> {
     /// a failed upgrade or restore: a restore is how such a project recovers.
     pub(crate) fn hold(host: &'a Host, project: &'a Project) -> anyhow::Result<Self> {
         let marker = project.path(MARKER);
-        fs::OpenOptions::new()
+        let file = fs::OpenOptions::new()
             .write(true)
             .create(true)
             .truncate(false)
             .open(&marker)
             .context("could not close the maintenance gate")?;
+        file.sync_all()?;
+        fs::File::open(project.path(""))?.sync_all()?;
         let guard = Self {
             host,
             project,
@@ -60,6 +64,7 @@ impl<'a> Maintenance<'a> {
 
     pub(crate) fn finish(self) -> anyhow::Result<()> {
         fs::remove_file(&self.marker)?;
+        fs::File::open(self.project.path(""))?.sync_all()?;
         if let Err(error) = self.apply() {
             // Preserve the gate on disk too, so a later proxy restart is safe.
             fs::write(&self.marker, b"")?;

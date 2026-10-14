@@ -13,6 +13,11 @@ fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     match nelcota_cli::run(cli).context("nelcota")? {
         Outcome::Done => Ok(()),
+        Outcome::UpdatesServe(config) => tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .enable_all()
+            .build()?
+            .block_on(nelcota_admin::updates::serve(config)),
         Outcome::Serve(config) => tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()?
@@ -21,6 +26,7 @@ fn main() -> anyhow::Result<()> {
 }
 
 async fn serve(config: Config) -> anyhow::Result<()> {
+    config.validate()?;
     init_tracing(config.log_format);
 
     let admin = config.database_config()?;
@@ -99,7 +105,9 @@ async fn serve(config: Config) -> anyhow::Result<()> {
         None => None,
     };
     // Expired refresh tokens and dead sessions, once an hour.
-    nelcota_auth::spawn_pruner(pool.clone());
+    if !config.deployment_validation {
+        nelcota_auth::spawn_pruner(pool.clone());
+    }
     let passwords = Arc::new(Passwords::new(hash_concurrency()));
     let auth = AuthState {
         mailer,
@@ -135,7 +143,9 @@ async fn serve(config: Config) -> anyhow::Result<()> {
         Some(store) => {
             let store = Arc::new(store);
             tracing::info!(backend = ?config.storage_backend, "file storage enabled");
-            nelcota_storage::spawn_collector(pool.clone(), store.clone());
+            if !config.deployment_validation {
+                nelcota_storage::spawn_collector(pool.clone(), store.clone());
+            }
             Some(nelcota_storage::StorageState::new(
                 pool.clone(),
                 keys.clone(),
@@ -187,6 +197,7 @@ async fn serve(config: Config) -> anyhow::Result<()> {
             None
         }
     };
+    let validation_storage = storage.clone();
     let router = app(
         state,
         auth,
@@ -195,26 +206,72 @@ async fn serve(config: Config) -> anyhow::Result<()> {
         Duration::from_secs(config.request_timeout_secs),
     );
 
+    let traffic_gate = match config.deployment_validation {
+        true => nelcota_server::deployment::TrafficGate::with_proof(
+            config
+                .deployment_gate
+                .clone()
+                .context("missing deployment gate")?,
+            config
+                .deployment_id
+                .clone()
+                .context("missing deployment identity")?,
+        ),
+        false => nelcota_server::deployment::TrafficGate::new(false),
+    };
+    let router = router.layer(axum::middleware::from_fn_with_state(
+        traffic_gate.clone(),
+        nelcota_server::deployment::reject_uncommitted,
+    ));
     let listener = tokio::net::TcpListener::bind(config.listen)
         .await
         .with_context(|| format!("could not listen on {}", config.listen))?;
     tracing::info!(addr = %config.listen, "nelcota is up");
-    // A dedicated pool isolates dispatch/retention from API and panel SQL.
-    let webhooks = nelcota_webhooks::Worker::new(
-        db::admin_pool(&config.database_config()?, 2),
-        nelcota_webhooks::destination::Policy {
-            allow_loopback: config.webhooks_allow_loopback,
-        },
-    )
-    .context("could not initialize webhook dispatch")?
-    .spawn();
+    // No external-effect worker starts until the durable deployment commit.
+    let worker_pool = db::admin_pool(&config.database_config()?, 2);
+    let worker_policy = nelcota_webhooks::destination::Policy {
+        allow_loopback: config.webhooks_allow_loopback,
+    };
+    let validation = config.deployment_validation;
+    let gate = config.deployment_gate.clone();
+    let identity = config.deployment_id.clone();
+    if validation && gate.is_none() {
+        anyhow::bail!("validation mode requires a deployment gate");
+    }
+    let webhook_worker = nelcota_webhooks::Worker::new(worker_pool, worker_policy)
+        .context("could not initialize webhook dispatch")?;
+    let effects = tokio::spawn(async move {
+        if validation {
+            let path = gate.expect("checked deployment gate");
+            loop {
+                if nelcota_server::deployment::committed(
+                    &path,
+                    identity.as_deref().unwrap_or_default(),
+                ) {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_secs(1)).await;
+            }
+            traffic_gate.commit();
+            nelcota_auth::spawn_pruner(pool.clone());
+            if let Some(storage) = validation_storage {
+                nelcota_storage::spawn_collector(pool.clone(), storage.store.clone());
+            }
+        }
+        webhook_worker.spawn()
+    });
     let result = axum::serve(
         listener,
         router.into_make_service_with_connect_info::<SocketAddr>(),
     )
     .with_graceful_shutdown(shutdown_signal())
     .await;
-    webhooks.shutdown().await;
+    if !effects.is_finished() {
+        effects.abort();
+    }
+    if let Ok(worker) = effects.await {
+        worker.shutdown().await;
+    }
     result?;
     Ok(())
 }

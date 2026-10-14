@@ -45,12 +45,14 @@ pub struct RegistryProject {
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Registry {
     #[serde(default)]
+    pub updates_origin: Option<String>,
+    #[serde(default)]
     pub panel_login: String,
     #[serde(default)]
     pub projects: Vec<RegistryProject>,
 }
 
-fn read_registry(host: &HostLink) -> Registry {
+pub(crate) fn read_registry(host: &HostLink) -> Registry {
     host.registry
         .as_ref()
         .and_then(|path| std::fs::read(path).ok())

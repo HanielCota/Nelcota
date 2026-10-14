@@ -6,12 +6,13 @@ import tomllib
 ROOT = Path(__file__).resolve().parents[1]
 EXPECTED = {
     "core": set(),
+    "deployment": set(),
     "auth": {"core"},
     "api": {"core", "auth"},
     "storage": {"core", "auth"},
     "webhooks": {"core"},
-    "admin": {"core", "auth", "api", "storage", "webhooks"},
-    "cli": {"core", "auth", "api"},
+    "admin": {"deployment", "core", "auth", "api", "storage", "webhooks"},
+    "cli": {"core", "auth", "api", "deployment"},
     "server": {"core", "auth", "api", "storage", "webhooks", "admin", "cli"},
 }
 

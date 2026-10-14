@@ -60,77 +60,80 @@
       <!-- Keep absolute accessibility labels inside this scroll container. -->
       <main bind:this={content} id="conteudo" tabindex="-1" aria-label={pageLabel} class="relative min-h-0 min-w-0 flex-1 overflow-auto outline-none">
         {#key pageKey}
+          {#if path === '/updates'}
+            {#await import('$lib/features/updates/Updates.svelte')}{@render loading()}{:then m}<m.default />{:catch error}{@render failed(error)}{/await}
+          {/if}
           {#if (path === '/')}
             {#await import('$lib/features/overview/Overview.svelte')}
               {@render loading()}
             {:then m}<m.default />{:catch error}{@render failed(error)}{/await}
           {/if}
-          {#if !(path === '/') && (path === '/tables' || tableName)}
+          {#if !(path === '/updates') && !(path === '/') && (path === '/tables' || tableName)}
             {#await import('$lib/features/tables/TableEditor.svelte')}
               {@render loading()}
             {:then m}<m.default name={tableName} view={structureName ? 'structure' : 'data'} />{:catch error}{@render failed(error)}{/await}
           {/if}
-          {#if !(path === '/') && !(path === '/tables' || tableName) && (path === '/sql')}
+          {#if !(path === '/updates') && !(path === '/') && !(path === '/tables' || tableName) && (path === '/sql')}
             {#await import('$lib/features/sql/SqlEditor.svelte')}
               {@render loading()}
             {:then m}<m.default />{:catch error}{@render failed(error)}{/await}
           {/if}
-          {#if !(path === '/') && !(path === '/tables' || tableName) && !(path === '/sql') && (path === '/migrations')}
+          {#if !(path === '/updates') && !(path === '/') && !(path === '/tables' || tableName) && !(path === '/sql') && (path === '/migrations')}
             {#await import('$lib/features/migrations/Migrations.svelte')}
               {@render loading()}
             {:then m}<m.default />{:catch error}{@render failed(error)}{/await}
           {/if}
-          {#if !(path === '/') && !(path === '/tables' || tableName) && !(path === '/sql') && !(path === '/migrations') && (path === '/users')}
+          {#if !(path === '/updates') && !(path === '/') && !(path === '/tables' || tableName) && !(path === '/sql') && !(path === '/migrations') && (path === '/users')}
             {#await import('$lib/features/users/Users.svelte')}
               {@render loading()}
             {:then m}<m.default />{:catch error}{@render failed(error)}{/await}
           {/if}
-          {#if !(path === '/') && !(path === '/tables' || tableName) && !(path === '/sql') && !(path === '/migrations') && !(path === '/users') && (path === '/sign-in')}
+          {#if !(path === '/updates') && !(path === '/') && !(path === '/tables' || tableName) && !(path === '/sql') && !(path === '/migrations') && !(path === '/users') && (path === '/sign-in')}
             {#await import('$lib/features/sign-in/SignIn.svelte')}
               {@render loading()}
             {:then m}<m.default />{:catch error}{@render failed(error)}{/await}
           {/if}
-          {#if !(path === '/') && !(path === '/tables' || tableName) && !(path === '/sql') && !(path === '/migrations') && !(path === '/users') && !(path === '/sign-in') && (path === '/storage')}
+          {#if !(path === '/updates') && !(path === '/') && !(path === '/tables' || tableName) && !(path === '/sql') && !(path === '/migrations') && !(path === '/users') && !(path === '/sign-in') && (path === '/storage')}
             {#await import('$lib/features/storage/Storage.svelte')}
               {@render loading()}
             {:then m}<m.default />{:catch error}{@render failed(error)}{/await}
           {/if}
-          {#if !(path === '/') && !(path === '/tables' || tableName) && !(path === '/sql') && !(path === '/migrations') && !(path === '/users') && !(path === '/sign-in') && !(path === '/storage') && (bucketName)}
+          {#if !(path === '/updates') && !(path === '/') && !(path === '/tables' || tableName) && !(path === '/sql') && !(path === '/migrations') && !(path === '/users') && !(path === '/sign-in') && !(path === '/storage') && (bucketName)}
             {#await import('$lib/features/storage/StorageBucket.svelte')}
               {@render loading()}
             {:then m}<m.default bucket={bucketName} />{:catch error}{@render failed(error)}{/await}
           {/if}
-          {#if !(path === '/') && !(path === '/tables' || tableName) && !(path === '/sql') && !(path === '/migrations') && !(path === '/users') && !(path === '/sign-in') && !(path === '/storage') && !(bucketName) && (path === '/policies')}
+          {#if !(path === '/updates') && !(path === '/') && !(path === '/tables' || tableName) && !(path === '/sql') && !(path === '/migrations') && !(path === '/users') && !(path === '/sign-in') && !(path === '/storage') && !(bucketName) && (path === '/policies')}
             {#await import('$lib/features/policies/Policies.svelte')}
               {@render loading()}
             {:then m}<m.default />{:catch error}{@render failed(error)}{/await}
           {/if}
-          {#if !(path === '/') && !(path === '/tables' || tableName) && !(path === '/sql') && !(path === '/migrations') && !(path === '/users') && !(path === '/sign-in') && !(path === '/storage') && !(bucketName) && !(path === '/policies') && (path === '/webhooks')}
+          {#if !(path === '/updates') && !(path === '/') && !(path === '/tables' || tableName) && !(path === '/sql') && !(path === '/migrations') && !(path === '/users') && !(path === '/sign-in') && !(path === '/storage') && !(bucketName) && !(path === '/policies') && (path === '/webhooks')}
             {#await import('$lib/features/webhooks/Webhooks.svelte')}
               {@render loading()}
             {:then m}<m.default />{:catch error}{@render failed(error)}{/await}
           {/if}
-          {#if !(path === '/') && !(path === '/tables' || tableName) && !(path === '/sql') && !(path === '/migrations') && !(path === '/users') && !(path === '/sign-in') && !(path === '/storage') && !(bucketName) && !(path === '/policies') && !(path === '/webhooks') && (deliveryId)}
+          {#if !(path === '/updates') && !(path === '/') && !(path === '/tables' || tableName) && !(path === '/sql') && !(path === '/migrations') && !(path === '/users') && !(path === '/sign-in') && !(path === '/storage') && !(bucketName) && !(path === '/policies') && !(path === '/webhooks') && (deliveryId)}
             {#await import('$lib/features/webhooks/DeliveryDetail.svelte')}
               {@render loading()}
             {:then m}<m.default id={deliveryId} />{:catch error}{@render failed(error)}{/await}
           {/if}
-          {#if !(path === '/') && !(path === '/tables' || tableName) && !(path === '/sql') && !(path === '/migrations') && !(path === '/users') && !(path === '/sign-in') && !(path === '/storage') && !(bucketName) && !(path === '/policies') && !(path === '/webhooks') && !(deliveryId) && (path === '/projects')}
+          {#if !(path === '/updates') && !(path === '/') && !(path === '/tables' || tableName) && !(path === '/sql') && !(path === '/migrations') && !(path === '/users') && !(path === '/sign-in') && !(path === '/storage') && !(bucketName) && !(path === '/policies') && !(path === '/webhooks') && !(deliveryId) && (path === '/projects')}
             {#await import('$lib/features/projects/Projects.svelte')}
               {@render loading()}
             {:then m}<m.default />{:catch error}{@render failed(error)}{/await}
           {/if}
-          {#if !(path === '/') && !(path === '/tables' || tableName) && !(path === '/sql') && !(path === '/migrations') && !(path === '/users') && !(path === '/sign-in') && !(path === '/storage') && !(bucketName) && !(path === '/policies') && !(path === '/webhooks') && !(deliveryId) && !(path === '/projects') && (path === '/connect')}
+          {#if !(path === '/updates') && !(path === '/') && !(path === '/tables' || tableName) && !(path === '/sql') && !(path === '/migrations') && !(path === '/users') && !(path === '/sign-in') && !(path === '/storage') && !(bucketName) && !(path === '/policies') && !(path === '/webhooks') && !(deliveryId) && !(path === '/projects') && (path === '/connect')}
             {#await import('$lib/features/api/ApiPage.svelte')}
               {@render loading()}
             {:then m}<m.default />{:catch error}{@render failed(error)}{/await}
           {/if}
-          {#if !(path === '/') && !(path === '/tables' || tableName) && !(path === '/sql') && !(path === '/migrations') && !(path === '/users') && !(path === '/sign-in') && !(path === '/storage') && !(bucketName) && !(path === '/policies') && !(path === '/webhooks') && !(deliveryId) && !(path === '/projects') && !(path === '/connect') && (path === '/guides' || guide)}
+          {#if !(path === '/updates') && !(path === '/') && !(path === '/tables' || tableName) && !(path === '/sql') && !(path === '/migrations') && !(path === '/users') && !(path === '/sign-in') && !(path === '/storage') && !(bucketName) && !(path === '/policies') && !(path === '/webhooks') && !(deliveryId) && !(path === '/projects') && !(path === '/connect') && (path === '/guides' || guide)}
             {#await import('$lib/features/guides/Guides.svelte')}
               {@render loading()}
             {:then m}<m.default />{:catch error}{@render failed(error)}{/await}
           {/if}
-          {#if !(path === '/') && !(path === '/tables' || tableName) && !(path === '/sql') && !(path === '/migrations') && !(path === '/users') && !(path === '/sign-in') && !(path === '/storage') && !(bucketName) && !(path === '/policies') && !(path === '/webhooks') && !(deliveryId) && !(path === '/projects') && !(path === '/connect') && !(path === '/guides' || guide)}<NotFound />{/if}
+          {#if !(path === '/updates') && !(path === '/') && !(path === '/tables' || tableName) && !(path === '/sql') && !(path === '/migrations') && !(path === '/users') && !(path === '/sign-in') && !(path === '/storage') && !(bucketName) && !(path === '/policies') && !(path === '/webhooks') && !(deliveryId) && !(path === '/projects') && !(path === '/connect') && !(path === '/guides' || guide)}<NotFound />{/if}
         {/key}
       </main>
     </div>

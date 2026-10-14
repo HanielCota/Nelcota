@@ -7,6 +7,10 @@ and [Rust SDK](sdk/rust/CHANGELOG.md) have independent package versions.
 
 ### Added
 
+- Opt-in native panel update management with a separate operator origin, scoped
+  host authorization, verified release readiness, durable jobs and SSH recovery.
+  Production activation requires the exact-binary VPS acceptance gates in
+  [the update operating guide](docs/panel-updates.md).
 - A [complete Notes staging guide](docs/onboarding/notes.md) and isolated
   native acceptance runner covering installation, migrations, generated types,
   panel login, two-user RLS, private files, logout and restart persistence.
@@ -15,6 +19,8 @@ and [Rust SDK](sdk/rust/CHANGELOG.md) have independent package versions.
 
 ### Fixed
 
+- Prevent privileged backup reads and restores from following application-owned
+  bucket/object symlinks outside the project's storage directory.
 - Allow installation into a writable user-owned `PREFIX` without sudo while
   preserving checksum verification before replacing the existing binary.
 - Bound password hashing workers and refill completed webhook delivery slots
