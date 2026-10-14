@@ -52,7 +52,7 @@ impl Phase {
             || (!self.terminal() && next == Recovering && self != Committing)
     }
 }
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct PublicJob {
     pub id: String,
@@ -156,7 +156,35 @@ impl Journal {
         validate_job(job)?;
         let dir = self.directory(&job.public.id)?;
         private_dir(&dir)?;
-        atomic_write(&dir.join("job.json"), &serde_json::to_vec(job)?)
+        let path = dir.join("job.json");
+        // Callers hold the host lease. Compare the authoritative receipt too:
+        // rename may have succeeded even when the caller observed an fsync error.
+        match fs::symlink_metadata(&path) {
+            Ok(_) => {
+                let previous: Job = serde_json::from_slice(&read_private(&path, 16384)?)?;
+                validate_job(&previous)?;
+                if previous.public.id != job.public.id
+                    || previous.public.project != job.public.project
+                    || previous.public.current != job.public.current
+                    || previous.public.target != job.public.target
+                    || previous.actor != job.actor
+                    || previous.request_key != job.request_key
+                    || previous.fingerprint != job.fingerprint
+                    || previous.public.sequence > job.public.sequence
+                    || (previous.public.sequence == job.public.sequence
+                        && previous.public != job.public)
+                    || (previous.public.committed && !job.public.committed)
+                    || (previous.restored && !job.restored)
+                    || (previous.public.phase.terminal()
+                        && previous.public.phase != job.public.phase)
+                {
+                    bail!("stale deployment receipt");
+                }
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error.into()),
+        }
+        atomic_write(&path, &serde_json::to_vec(job)?)
     }
     pub fn begin(
         &self,

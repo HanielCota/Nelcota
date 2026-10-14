@@ -227,6 +227,91 @@ fn failed_persistence_cannot_flip_the_in_memory_commit_decision() {
     assert!(!job.public.committed);
     assert_eq!(job.public.phase, Phase::Validating);
 }
+
+#[test]
+fn stale_error_handling_cannot_erase_either_durable_resume_decision() {
+    for restored in [false, true] {
+        let (_temp, journal) = fixture();
+        let mut job = journal
+            .begin(
+                "app",
+                "0.4.0",
+                "0.5.0",
+                "owner",
+                &token().unwrap(),
+                &token().unwrap(),
+            )
+            .unwrap();
+        receipts(&mut job);
+        journal.advance(&mut job, Phase::Pausing, None).unwrap();
+        let phase = match restored {
+            true => {
+                journal.advance(&mut job, Phase::Recovering, None).unwrap();
+                Phase::ResumingPrevious
+            }
+            false => {
+                for phase in [
+                    Phase::Capturing,
+                    Phase::BackupVerified,
+                    Phase::Activating,
+                    Phase::Validating,
+                ] {
+                    journal.advance(&mut job, phase, None).unwrap();
+                }
+                Phase::Committing
+            }
+        };
+        // A rename may persist the next receipt before fsync fails, leaving
+        // the caller's in-memory job at the preceding stage.
+        let mut stale = job.clone();
+        job.restored = restored;
+        journal.advance(&mut job, phase, None).unwrap();
+        let receipt =
+            fs::read(journal.directory(&job.public.id).unwrap().join("job.json")).unwrap();
+        assert!(
+            journal
+                .advance(&mut stale, Phase::NeedsOperator, Some("recovery_failed"))
+                .is_err()
+        );
+        // A larger sequence cannot revoke the irreversible decision either.
+        stale.public.sequence = job.public.sequence + 1;
+        assert!(journal.save(&stale).is_err());
+        assert_eq!(
+            fs::read(journal.directory(&job.public.id).unwrap().join("job.json")).unwrap(),
+            receipt
+        );
+        assert!(journal.list().unwrap()[0].public.committed);
+    }
+}
+
+#[test]
+fn a_stale_writer_cannot_reopen_a_completed_job() {
+    let (_temp, journal) = fixture();
+    let mut job = journal
+        .begin(
+            "app",
+            "0.4.0",
+            "0.5.0",
+            "owner",
+            &token().unwrap(),
+            &token().unwrap(),
+        )
+        .unwrap();
+    let mut stale = job.clone();
+    journal
+        .advance(&mut job, Phase::FailedBeforeChange, None)
+        .unwrap();
+    assert!(
+        journal
+            .advance(&mut stale, Phase::NeedsOperator, Some("worker_unavailable"))
+            .is_err()
+    );
+    assert!(journal.save(&stale).is_err());
+    assert_eq!(
+        journal.list().unwrap()[0].public.phase,
+        Phase::FailedBeforeChange
+    );
+}
 #[test]
 fn resumed_previous_version_also_forbids_a_second_snapshot_restore() {
     let (_temp, journal) = fixture();
@@ -364,6 +449,7 @@ fn active_jobs_remain_visible_when_wall_clock_moves_backwards() {
             .advance(&mut job, Phase::FailedBeforeChange, None)
             .unwrap();
         job.public.updated_at = 1000 + index;
+        job.public.sequence += 1;
         journal.save(&job).unwrap();
     }
     let mut active = journal
@@ -377,6 +463,7 @@ fn active_jobs_remain_visible_when_wall_clock_moves_backwards() {
         )
         .unwrap();
     active.public.updated_at = 1;
+    active.public.sequence += 1;
     journal.save(&active).unwrap();
     let first = journal.list().unwrap().remove(0);
     assert_eq!(first.public.id, active.public.id);

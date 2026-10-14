@@ -49,6 +49,12 @@ silently replaced. DNS/HTTPS, service startup and the root-owned files must be
 checked on the real host before enabling installation. A failed enrollment may
 leave installed files/accounts; inspect and repair them over SSH before retrying.
 
+Native enrollment and every update preflight require the canonical project unit,
+no systemd drop-ins and no pending daemon reload. Overrides can change the actual
+database or environment without changing the project's `.env`; they therefore
+require separate operator review. Preparation also verifies that the active
+native PID uses the installed executable before capturing its recovery identity.
+
 Open `/admin/updates` in a project panel or go directly to
 `https://updates.example.com/admin/`. Sign in with the enrolled operator.
 Project-admin, SSO, bearer and service-role credentials do not grant deployment
@@ -144,6 +150,10 @@ may write data even before public traffic opens. Failure after either boundary
 preserves current data; it never automatically restores an earlier snapshot.
 A failed/uncertain restore leaves maintenance closed. Worker/job crashes become
 `needs_operator`; journal corruption never becomes guessed success.
+Recovery error handling reloads the authoritative receipt, including when rename
+succeeded before fsync reported an error. Older/conflicting sequences cannot
+overwrite newer receipts, revoke either irreversible decision or reopen a
+completed job.
 
 The browser polls with a single request loop, bounded backoff and stale-sequence
 protection. Closing the page cancels only browser requests. Mutating requests

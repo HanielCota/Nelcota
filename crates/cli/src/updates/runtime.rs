@@ -113,6 +113,9 @@ pub fn blockers(policy: &Policy, project: &Project) -> Vec<String> {
     {
         reasons.push("compose_enrollment_required".into());
     }
+    if project.runtime == Runtime::Systemd && !super::enroll::native_unit_enrolled(project) {
+        reasons.push("configuration_layout_not_enrolled".into());
+    }
     if !reasons.is_empty() {
         return reasons;
     }
@@ -217,8 +220,8 @@ pub fn execute(policy: &Policy, id: &str, recover: bool) -> anyhow::Result<()> {
     let (host, project) = project(policy, &job.public.project)?;
     if recover {
         let result = recovery(policy, &host, &project, &journal, &mut job);
-        if result.is_err() && !job.public.phase.terminal() {
-            journal.advance(&mut job, Phase::NeedsOperator, Some("recovery_failed"))?;
+        if result.is_err() {
+            record_recovery_failure(&journal, &mut job)?;
         }
         return result;
     }
@@ -246,14 +249,24 @@ pub fn execute(policy: &Policy, id: &str, recover: bool) -> anyhow::Result<()> {
                 journal.advance(&mut job, Phase::NeedsOperator, Some("deployment_failed"))?;
                 if !job.public.committed
                     && recovery(policy, &host, &project, &journal, &mut job).is_err()
-                    && !job.public.phase.terminal()
                 {
-                    journal.advance(&mut job, Phase::NeedsOperator, Some("recovery_failed"))?;
+                    record_recovery_failure(&journal, &mut job)?;
                 }
             }
         }
     }
     result
+}
+fn record_recovery_failure(journal: &Journal, job: &mut Job) -> anyhow::Result<()> {
+    *job = journal
+        .list()?
+        .into_iter()
+        .find(|entry| entry.public.id == job.public.id)
+        .context("recovery receipt lost; keep maintenance closed")?;
+    if !job.public.phase.terminal() {
+        journal.advance(job, Phase::NeedsOperator, Some("recovery_failed"))?;
+    }
+    Ok(())
 }
 fn deploy(
     policy: &Policy,
@@ -627,7 +640,6 @@ fn validate_binary_identity(
 ) -> anyhow::Result<()> {
     match project.runtime {
         Runtime::Systemd => {
-            let file = fs::metadata(native::deployed_binary())?;
             let unit = native::app_unit(&project.name);
             let pid = probes::output(Command::new("systemctl").args([
                 "show",
@@ -640,16 +652,11 @@ fn validate_binary_identity(
             if pid == 0 {
                 bail!("native application is not running");
             }
-            let running = fs::metadata(format!("/proc/{pid}/exe"))?;
-            use std::os::unix::fs::MetadataExt;
-            if running.dev() != file.dev() || running.ino() != file.ino() {
-                bail!("native application runs a different executable");
-            }
-            if digest_file(&native::deployed_binary(), 256 * 1024 * 1024)?
-                != binary.context("missing binary identity")?
-            {
-                bail!("installed binary mismatch");
-            }
+            validate_running_binary(
+                &native::deployed_binary(),
+                Path::new(&format!("/proc/{pid}/exe")),
+                binary.context("missing binary identity")?,
+            )?;
         }
         Runtime::Docker => {
             let target = image.context("missing image identity")?;
@@ -685,6 +692,21 @@ fn validate_binary_identity(
     Ok(())
 }
 
+fn validate_running_binary(installed: &Path, running: &Path, digest: &str) -> anyhow::Result<()> {
+    use std::os::unix::fs::MetadataExt;
+    let installed_metadata = fs::metadata(installed)?;
+    let running_metadata = fs::metadata(running)?;
+    if running_metadata.dev() != installed_metadata.dev()
+        || running_metadata.ino() != installed_metadata.ino()
+    {
+        bail!("native application runs a different executable");
+    }
+    if digest_file(installed, 256 * 1024 * 1024)? != digest {
+        bail!("installed binary mismatch");
+    }
+    Ok(())
+}
+
 fn resume_previous_gate(project: &Project) -> anyhow::Result<()> {
     let id = project.env().get("NELCOTA_DEPLOYMENT_ID")?;
     let contents = match id {
@@ -704,6 +726,8 @@ fn validate_current(project: &Project, version: &str) -> anyhow::Result<()> {
             "--version",
         ]))?,
         Runtime::Systemd => {
+            let digest = digest_file(&native::deployed_binary(), 256 * 1024 * 1024)?;
+            validate_binary_identity(project, None, Some(&digest))?;
             probes::output(Command::new(native::deployed_binary()).arg("--version"))?
         }
     };
@@ -756,5 +780,96 @@ fn wait_ready(project: &Project) -> anyhow::Result<()> {
             bail!("committed application routes remain gated");
         }
         std::thread::sleep(Duration::from_millis(250));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn recovery_errors_preserve_the_authoritative_resume_decision() {
+        for restored in [false, true] {
+            let temporary = tempfile::tempdir().unwrap();
+            let journal = Journal::open(temporary.path()).unwrap();
+            let mut job = journal
+                .begin(
+                    "shop",
+                    "0.4.0",
+                    "0.5.0",
+                    "operator",
+                    &nelcota_deployment::token().unwrap(),
+                    &nelcota_deployment::token().unwrap(),
+                )
+                .unwrap();
+            job.expected_env_sha256 = Some(nelcota_deployment::token().unwrap());
+            job.manifest_sha256 = Some(nelcota_deployment::token().unwrap());
+            job.previous_config_sha256 = Some(nelcota_deployment::token().unwrap());
+            job.target_binary_sha256 = Some(nelcota_deployment::token().unwrap());
+            job.previous_binary = Some(nelcota_deployment::token().unwrap());
+            job.migration_version = 15;
+            job.backup = Some("/backups/snapshot.dump".into());
+            job.dump_sha256 = Some(nelcota_deployment::token().unwrap());
+            journal.advance(&mut job, Phase::Pausing, None).unwrap();
+            let boundary = match restored {
+                true => {
+                    journal.advance(&mut job, Phase::Recovering, None).unwrap();
+                    Phase::ResumingPrevious
+                }
+                false => {
+                    for phase in [
+                        Phase::Capturing,
+                        Phase::BackupVerified,
+                        Phase::Activating,
+                        Phase::Validating,
+                    ] {
+                        journal.advance(&mut job, phase, None).unwrap();
+                    }
+                    Phase::Committing
+                }
+            };
+            let mut stale = job.clone();
+            job.restored = restored;
+            journal.advance(&mut job, boundary, None).unwrap();
+            record_recovery_failure(&journal, &mut stale).unwrap();
+            assert_eq!(stale.public.phase, Phase::NeedsOperator);
+            assert!(stale.public.committed);
+            assert_eq!(stale.restored, restored);
+            assert_eq!(journal.list().unwrap()[0].public, stale.public);
+            assert!(
+                journal
+                    .advance(&mut stale, Phase::Recovering, None)
+                    .is_err()
+            );
+        }
+    }
+
+    #[test]
+    fn running_native_identity_rejects_replacement_even_with_the_same_hash() {
+        struct Process(std::process::Child);
+        impl Drop for Process {
+            fn drop(&mut self) {
+                let _ = self.0.kill();
+                let _ = self.0.wait();
+            }
+        }
+        let temporary = tempfile::tempdir().unwrap();
+        let installed = temporary.path().join("installed");
+        fs::copy("/bin/sleep", &installed).unwrap();
+        let process = Process(Command::new(&installed).arg("30").spawn().unwrap());
+        let running = std::path::PathBuf::from(format!("/proc/{}/exe", process.0.id()));
+        let digest = digest_file(&installed, 256 * 1024 * 1024).unwrap();
+        validate_running_binary(&installed, &running, &digest).unwrap();
+        assert!(
+            validate_running_binary(&installed, &running, &nelcota_deployment::token().unwrap())
+                .is_err()
+        );
+
+        let replacement = temporary.path().join("replacement");
+        fs::copy(&installed, &replacement).unwrap();
+        fs::rename(replacement, &installed).unwrap();
+        assert_eq!(digest_file(&installed, 256 * 1024 * 1024).unwrap(), digest);
+        let failure = validate_running_binary(&installed, &running, &digest).unwrap_err();
+        assert!(failure.to_string().contains("different executable"));
     }
 }

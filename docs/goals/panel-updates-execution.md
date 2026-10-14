@@ -50,6 +50,23 @@ backup reads/restores now use directory handles and refuse bucket/object symlink
 traversal; restore no longer recursively chowns application-controlled paths.
 Corrupt deployment state is reported as unavailable rather than a login failure.
 
+## Pull request review corrections
+
+- A stale in-memory job could overwrite a newer durable receipt when handling an
+  error. Two regression tests failed before the fix. Journal writes now preserve
+  immutable request identity, sequence progress, completed phases and both
+  irreversible decisions; explicit and automatic recovery errors reload the
+  authoritative receipt before recording failure.
+- Native preparation previously queried the installed binary's version without
+  proving the active PID used that file. It now checks inode/device and hash
+  before capturing the previous executable. A real subprocess regression rejects
+  an atomic replacement even when the replacement has identical bytes.
+- Native enrollment checked only the unit file, and later preflight did not
+  recheck that configuration. Both now reject noncanonical units, drop-ins and
+  pending daemon reloads, including database/environment overrides. The parser
+  regression uses synthetic systemd properties; actual systemd acceptance remains
+  pending.
+
 ## Local evidence
 
 The targeted checks executed on Linux amd64 with Rust 1.99.0, Postgres 17,
@@ -59,8 +76,8 @@ production acceptance reports.
 
 | Check | Result and practical limit |
 |---|---|
-| Deployment domain | 13 tests passed, including 16 concurrent callers, idempotency, incomplete-stage reconciliation, corrupt/missing receipts, persistence failure, both irreversible boundaries and backwards wall time |
-| CLI library | 62 tests passed before the additional real-IPC test; the final updates subset passed 9 tests including that test |
+| Deployment domain | 15 tests passed, including 16 concurrent callers, idempotency, incomplete-stage reconciliation, corrupt/missing receipts, persistence failure, stale writers, both irreversible boundaries and backwards wall time |
+| CLI library | 62 tests passed before the additional real-IPC test; the reviewed updates subset passed 12 tests including that test, native process/configuration identity and recovery receipt reload |
 | Privileged worker transport | Actual root worker in an isolated, network-disabled Docker container passed; another UID with socket-group access was rejected, the approved UID authenticated, project scope held and installation stayed blocked without validation evidence |
 | Backup boundary | 4 tests passed, including real Postgres historical-file restore/corruption/retention and source/destination symlink escape rejection |
 | HTTP controller | 3 tests passed: origin/Host/CSRF, project/bearer/duplicate-cookie/injected-input rejection and secure cookie without token disclosure |
