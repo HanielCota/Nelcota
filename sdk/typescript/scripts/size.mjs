@@ -27,11 +27,12 @@ const BUDGETS = {
   // Bounded streaming error reads add about 200 B gzip to the HTTP closure.
   // Lossless JSON decoding adds about 380 B gzip to each HTTP closure.
   // Session-shape, refresh-margin and non-finite JSON input guards.
-  'index.js': 14_950,
+  // Native IndexedDB session handoff adds about 1.5 KiB gzip to auth/root only.
+  'index.js': 16_500,
   // Standalone factories include HTTP and keep the other feature modules out.
   'rest/index.js': 9_350,
   // Failed persistence must retain rotated tokens; background failures are observed.
-  'auth/index.js': 9_200,
+  'auth/index.js': 10_650,
   'storage/index.js': 7_200,
 };
 

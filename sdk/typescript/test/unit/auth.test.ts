@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { IDBFactory } from 'fake-indexeddb';
 import { createClient, memoryStorage, NelcotaUsageError, type AuthEvent, type SessionStorage } from '../../src/index.js';
 import { challengeFor } from '../../src/auth/pkce.js';
 import { empty, json, mockFetch, session } from './helpers.js';
@@ -128,6 +129,7 @@ describe('password sign-in', () => {
 
 describe('refresh', () => {
   it('leaves the lock-grant task before reading a native storage snapshot', async () => {
+    vi.stubGlobal('indexedDB', new IDBFactory());
     vi.stubGlobal('window', {});
     vi.stubGlobal('document', {});
     vi.stubGlobal('BroadcastChannel', undefined);
@@ -166,6 +168,7 @@ describe('refresh', () => {
   });
 
   it('observes native writes published after the previous owner releases the lock', async () => {
+    vi.stubGlobal('indexedDB', new IDBFactory());
     vi.stubGlobal('window', {});
     vi.stubGlobal('document', {});
     vi.stubGlobal('BroadcastChannel', undefined);
@@ -194,7 +197,7 @@ describe('refresh', () => {
       const results = await Promise.all(clients.map(client => client.auth.getSession()));
       expect(mock.calls).toHaveLength(1);
       expect(results.map(result => result.data?.refresh_token)).toEqual(['refresh-2', 'refresh-2']);
-      expect(JSON.parse(storage.getItem(KEY)!).refresh_token).toBe('refresh-2');
+      await vi.waitFor(() => expect(JSON.parse(storage.getItem(KEY)!).refresh_token).toBe('refresh-2'));
     } finally { clients.forEach(client => client.dispose()); }
   });
 

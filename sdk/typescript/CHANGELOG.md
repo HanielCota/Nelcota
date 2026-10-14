@@ -2,8 +2,11 @@
 
 ## Unreleased
 
-- Observe native browser storage updates after acquiring the session lock,
-  preventing queued tabs from rotating the same refresh token twice.
+- Coordinate native browser sessions through committed IndexedDB receipts,
+  preventing queued tabs from rotating a token from a stale localStorage view.
+  Reserve rotations before HTTP and prevent late responses from undoing logout.
+  Native persistence now requires IndexedDB; reload all tabs when upgrading.
+  Interrupted rotations require the owning client to retry or a new sign-in.
 - Preserve unsafe integers and decimal digits in JSON responses as strings,
   including nested values and RPC results. Ordinary numbers remain numeric.
   Regenerate schema types: Postgres numeric types that may exceed JavaScript

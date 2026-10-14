@@ -66,23 +66,33 @@ at runtime. RLS and GRANTs always remain server/Postgres decisions.
 
 ## Sessions and lifecycle
 
-Each client owns its session adapter. The default is localStorage in browsers
-and a separate in-memory adapter elsewhere. A custom adapter can be sync or
-async. Instantiate a server client per request or supply a per-request token.
+Each client owns its session adapter. Native localStorage uses an IndexedDB
+journal as authoritative session state, with localStorage as a compatibility
+mirror. Elsewhere the default is a separate in-memory adapter. A custom adapter
+can be sync or async. Instantiate a server client per request or supply a per-request token.
 The default storage key includes the host and base path, so projects under
 different paths cannot overwrite each other's sessions in a shared adapter.
 
 Refresh calls on one auth client share a promise. Clients sharing an adapter
 and storage key are serialized with Web Locks, with a module-local queue as a
-fallback. Only Web Locks coordinate separate browser tabs. If a browser lacks
-Web Locks, use per-tab sessionStorage or an adapter with external coordination;
-the module-local queue does not guarantee cross-tab rotation safety.
+fallback. Native browser sessions also commit a refresh reservation before HTTP
+and read the replacement only after the IndexedDB transaction commits. Web Locks
+alone do not order another tab's localStorage visibility. Without Web Locks,
+the journal rejects competing owners instead of waiting for their replacement.
+Custom shared adapters require Web Locks or external coordination; otherwise use
+per-tab sessionStorage. The module-local queue cannot coordinate separate tabs.
 
-For native localStorage, the lock owner yields to a new browser task before
-reading storage. Lock grants and storage updates use separate delivery queues;
-acquiring a lock alone does not refresh a tab's storage view. Cached reads and
-custom storage adapters do not incur this delay. Native writes also finish their
-browser task before the owner releases the lock.
+Native persistence requires IndexedDB and bounds each database open and
+transaction to five seconds. Connections close after every operation. A foreign
+unfinished reservation requires a new sign-in, an owning-client retry, or
+signOut; it never falls back to the potentially spent token in localStorage.
+A committed logout supersedes dirty state in other clients and late refresh
+responses cannot overwrite it. Broadcasts carry change notifications, not tokens.
+
+The journal imports existing localStorage state once per storage key. Reload all
+tabs when upgrading to avoid mixing SDK coordination protocols. Use `signOut()`
+or clear all site data to remove sessions; editing only localStorage no longer
+changes the authoritative session. Custom adapters retain their existing semantics.
 
 The refresh margin is capped at half the token lifetime, so short-lived tokens
 and large configured margins do not rotate fresh sessions repeatedly. Background
@@ -106,8 +116,10 @@ Storage errors still reject explicit auth methods. Unexpected background
 adapter errors are observed through the optional `auth.onBackgroundError`
 handler; automatic refresh pauses until a session is written successfully.
 Handler exceptions are isolated. Network errors returned in results keep the
-existing bounded refresh retry. Other clients and processes cannot recover a
-session that failed to persist; repair the adapter before sharing its state.
+existing bounded refresh retry. Native clients block on another owner's
+unfinished reservation; an accepted replacement remains with its owner until
+it can be persisted or a newer committed session or logout supersedes it.
+Custom adapters require repair before sharing state that failed to persist.
 
 An explicit `accessToken` controls REST/storage requests and disables automatic
 session refresh in the combined client. Auth methods remain available and may

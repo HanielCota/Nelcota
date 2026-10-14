@@ -4,12 +4,13 @@ import { abortable } from '../core/cancellation.js';
 import { isBrowser } from '../core/jwt.js';
 import { encodeJson } from '../core/json.js';
 import { Broadcast, withLock } from './coordination.js';
+import { BrowserSessionConflictError, BrowserSessionState } from './browser-state.js';
 import { isSession, memoryStorage, parseSession, secondsLeft, type Session, type SessionStorage, type User } from './session.js';
 
 export type AuthEvent = 'signed_in' | 'signed_out' | 'refreshed' | 'user_updated';
 export type AuthListener = (event: AuthEvent, session: Session | null) => void;
 export interface AuthOptions {
-  /** Default: localStorage in browsers, memory elsewhere. */
+  /** Default: native localStorage with an IndexedDB coordination journal in browsers, memory elsewhere. */
   storage?: SessionStorage;
   /** Default: nelcota.<host><base-path>.session. */
   storageKey?: string;
@@ -39,6 +40,7 @@ export class SessionManager {
   readonly #autoRefresh: boolean;
   readonly #listeners = new Set<AuthListener>();
   readonly #broadcast: Broadcast | undefined;
+  readonly #native: BrowserSessionState | undefined;
   readonly #onBackgroundError: AuthOptions['onBackgroundError'];
   #session: Session | null | undefined;
   #dirty = false;
@@ -49,12 +51,18 @@ export class SessionManager {
   constructor(url: URL, options: AuthOptions, private rotate: (token: string, options: AuthRequestOptions) => Promise<Result<Session>>) {
     const margin = options.refreshMargin ?? 60;
     if (!Number.isFinite(margin) || margin < 0) throw new NelcotaUsageError('refreshMargin must be a finite non-negative number');
-    this.storage = options.storage ?? browserStorage() ?? memoryStorage();
+    const native = browserStorage();
+    this.storage = options.storage ?? native ?? memoryStorage();
     const pathname = url.pathname;
     let end = pathname.length;
     while (end > 0 && pathname[end - 1] === '/') end--;
     const path = pathname.slice(0, end);
     this.key = options.storageKey ?? `nelcota.${url.host}${path}.session`;
+    if (native && this.storage === native) {
+      let factory: IDBFactory | undefined;
+      try { factory = globalThis.indexedDB; } catch { /* Report unavailable storage on the first operation. */ }
+      this.#native = new BrowserSessionState(this.key, factory);
+    }
     this.#margin = margin;
     this.#autoRefresh = options.autoRefresh ?? isBrowser();
     this.#onBackgroundError = options.onBackgroundError;
@@ -76,18 +84,28 @@ export class SessionManager {
     // Keep the existing name to coordinate with other clients/tabs as well.
     return withLock(`${this.key}.refresh`, task);
   }
-  async #read(force = false): Promise<Session | null> {
+  async #read(force = false, allowPending = false): Promise<Session | null> {
     // Storage may still contain a spent token or a session already signed out.
     // Keep the newer local state until a later persistence attempt succeeds.
-    if (this.#dirty) return this.#session ?? null;
-    if (!force && this.#session !== undefined) return this.#session;
-    // Web Locks and native storage use separate delivery queues. Leave the
-    // grant task before reading the previous owner's storage write.
-    if (this.storage === browserStorage()) await new Promise<void>(resolve => setTimeout(resolve, 0));
-    const stored = await this.storage.getItem(this.key);
+    if (!this.#native && this.#dirty) return this.#session ?? null;
+    if (!this.#native && !force && this.#session !== undefined) return this.#session;
+    const stored = await this.#stored(allowPending);
     this.#session = parseSession(stored);
-    if (stored !== null && this.#session === null) await this.storage.removeItem(this.key);
+    if (stored !== null && this.#session === null) {
+      await this.#native?.write(null);
+      await this.storage.removeItem(this.key);
+    }
     return this.#session;
+  }
+  async #stored(allowPending: boolean): Promise<string | null> {
+    if (!this.#native) return this.storage.getItem(this.key);
+    const snapshot = await this.#native.read(() => {
+      const value = this.storage.getItem(this.key);
+      if (value !== null && typeof value !== 'string') throw new Error('Native browser storage must be synchronous');
+      return value;
+    }, this.#dirty ? (this.#session ? encodeJson(this.#session) : null) : undefined, allowPending);
+    this.#dirty = snapshot.retainDirty;
+    return snapshot.value;
   }
   current(): Promise<Session | null> { return this.#locked(() => this.#read()); }
   #marginFor(session: Session): number {
@@ -97,10 +115,10 @@ export class SessionManager {
   }
   async #reload(): Promise<void> {
     await this.#locked(async () => {
-      if (this.#dirty) return;
+      if (this.#dirty && !this.#native) return;
       const before = this.#session;
       const after = await this.#read(true);
-      this.#schedule(after);
+      this.#schedule(this.#dirty ? null : after);
       if (after === null) {
         if (before) this.#emit('signed_out', null);
         return;
@@ -108,24 +126,35 @@ export class SessionManager {
       this.#emit(before ? 'refreshed' : 'signed_in', after);
     });
   }
-  async #write(session: Session | null, event: AuthEvent): Promise<void> {
+  async #write(session: Session | null, event: AuthEvent, completingRefresh = false): Promise<void> {
     const encoded = encodeJson(session);
     this.#session = session;
     this.#dirty = true;
     this.#schedule(null);
     try {
-      await this.#persist(encoded);
+      await this.#persist(encoded, completingRefresh);
       this.#schedule(session);
     }
+    catch (error) {
+      if (error instanceof BrowserSessionConflictError) {
+        // The response lost ownership: never announce its discarded session.
+        this.#session = null;
+        this.#dirty = false;
+        try { await this.#read(true); }
+        catch { /* Keep local state cleared if the authoritative read fails. */ }
+        event = this.#session ? 'signed_in' : 'signed_out';
+        this.#schedule(this.#session);
+      }
+      throw error;
+    }
     finally {
-      this.#emit(event, session);
+      this.#emit(event, this.#session ?? null);
     }
   }
-  async #persist(encoded?: string): Promise<void> {
+  async #persist(encoded?: string, completingRefresh = false): Promise<void> {
     const session = this.#session;
+    await this.#native?.write(session ? encoded ?? encodeJson(session) : null, completingRefresh);
     await (session ? this.storage.setItem(this.key, encoded ?? encodeJson(session)) : this.storage.removeItem(this.key));
-    // Finish this owner's native write task before handing the lock over.
-    if (this.storage === browserStorage()) await new Promise<void>(resolve => setTimeout(resolve, 0));
     this.#dirty = false;
     this.#broadcast?.notify();
   }
@@ -168,14 +197,15 @@ export class SessionManager {
         const current = await this.#read(true);
         if (!current) return fail(clientError('session_missing', 'Not signed in'));
         if (current.refresh_token !== known.refresh_token && secondsLeft(current) > this.#marginFor(current)) return ok(current);
+        await this.#native?.reserve(current);
         // Once started, rotation owns its lifetime. A cancelled waiter must
         // not discard the replacement for a token already spent by the server.
         const result = await this.rotate(current.refresh_token, options.timeout === undefined ? {} : { timeout: options.timeout });
         if (result.error) {
-          if (result.error.code === 'invalid_grant') await this.#write(null, 'signed_out');
+          if (result.error.code === 'invalid_grant') await this.#write(null, 'signed_out', true);
           return result;
         }
-        await this.#write(result.data, 'refreshed');
+        await this.#write(result.data, 'refreshed', true);
         return result;
       });
     })().finally(() => { this.#refreshing = null; });
@@ -192,7 +222,7 @@ export class SessionManager {
   }
   signOut(revoke: (session: Session) => Promise<Result<null>>): Promise<Result<null>> {
     return this.#locked(async () => {
-      const current = await this.#read(true);
+      const current = await this.#read(true, true);
       if (!current) {
         this.#session = null;
         if (this.#dirty) await this.#persist();
@@ -213,10 +243,12 @@ export class SessionManager {
     const jitter = Math.random() * Math.min(5000, wait / 2);
     const due = delayMs ?? Math.max(remaining <= 0 ? RETRY_REFRESH_MS : 1000, wait - jitter);
     this.#timer = setTimeout(() => {
-      this.#background(this.refresh().then(async ({ error }) => {
+      this.#background(this.get().then(async ({ data, error }) => {
         if (error && error.code !== 'invalid_grant' && error.code !== 'session_missing') {
           this.#schedule(await this.current(), RETRY_REFRESH_MS);
+          return;
         }
+        if (!this.#dirty) this.#schedule(data);
       }));
     }, Math.min(due, 2 ** 31 - 1));
     (this.#timer as { unref?: () => void }).unref?.();

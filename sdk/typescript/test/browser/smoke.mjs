@@ -158,7 +158,7 @@ try {
       rotationRequests.push({ page: page === tab ? 'first' : 'second', token: request.postDataJSON().refresh_token });
     }
   });
-  const rounds = 10;
+  const rounds = 100;
   for (let round = 0; round < rounds; round++) {
     const before = refreshRequests;
     const sessions = await Promise.all([tab, other].map((page) => page.evaluate(() => globalThis.sdkClient.auth.getSession())));
