@@ -35,6 +35,10 @@ or dropping them does not leave a task per waiter or stop an accepted rotation.
 Default sessions never persist outside memory. Shared stores across independently
 constructed clients/processes require their own coordination.
 
+On-demand and background refresh cap the configured margin at half the token
+lifetime. Short-lived fresh sessions and oversized margins do not cause a
+rotation on every request or timer tick; explicit refresh remains available.
+
 Generated models provide serde shapes, not compile-time verification of string
 queries. Missing required selected columns fail decoding. Numeric precision is
 preserved by arbitrary_precision; write null and omitted fields differ.
