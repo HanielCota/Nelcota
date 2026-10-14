@@ -35,8 +35,10 @@ export async function upload<T>(path: string, file: File, parse: (response: Resp
     },
     getResponseData: () => ({}),
   })
-  uppy.on('upload-progress', (_file, status) => progress?.(status.bytesUploaded ?? 0, status.bytesTotal ?? file.size))
-  uppy.on('upload-error', (_file, error) => { failure ??= error })
+  const onProgress = (_file: unknown, status: { bytesUploaded?: number; bytesTotal?: number | null }) => progress?.(status.bytesUploaded ?? 0, status.bytesTotal ?? file.size)
+  const onError = (_file: unknown, error: unknown) => { failure ??= error }
+  uppy.on('upload-progress', onProgress)
+  uppy.on('upload-error', onError)
   try {
     uppy.addFile({ name: file.name, type: file.type, data: file })
     const outcome = await uppy.upload()
@@ -45,5 +47,12 @@ export async function upload<T>(path: string, file: File, parse: (response: Resp
     progress?.(file.size, file.size)
     return result
   } catch (error) { throw failure ?? error }
-  finally { responseCleanup(); uppy.destroy() }
+  finally {
+    responseCleanup()
+    // Uppy can retain itself briefly through its notification timers after
+    // destroy. Remove our listeners so those timers cannot retain the File.
+    uppy.off('upload-progress', onProgress)
+    uppy.off('upload-error', onError)
+    uppy.destroy()
+  }
 }

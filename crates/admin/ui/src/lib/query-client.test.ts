@@ -74,3 +74,34 @@ it('observes cancellation triggered while the fetcher starts', async () => {
     return 'cancelled data'
   }, controller.signal)).rejects.toMatchObject({ name: 'AbortError' })
 })
+
+// Run with Vitest's `--pool forks --execArgv=--expose-gc`.
+const collect = (globalThis as { gc?: () => void }).gc
+it.skipIf(!collect)('releases cancelled readers while another reader still waits', async () => {
+  let finish!: (value: string) => void
+  const active = queryRead('/retention', 'admin', () => new Promise<string>(resolve => { finish = resolve }))
+  async function cancel() {
+    const controller = new AbortController()
+    const reference = new WeakRef(controller.signal)
+    const pending = queryRead('/retention', 'admin', async () => 'unexpected', controller.signal)
+    controller.abort()
+    // Vitest retains async assertion failures and their native stack frames
+    // until the test finishes. Do not let the test harness own these signals.
+    await pending.then(() => { throw new Error('Reader ignored cancellation') }, error => {
+      if (!(error instanceof DOMException) || error.name !== 'AbortError') throw error
+    })
+    return reference
+  }
+  try {
+    const references = []
+    for (let index = 0; index < 1000; index++) references.push(await cancel())
+    for (let index = 0; index < 10; index++) {
+      await new Promise(resolve => setTimeout(resolve, 0))
+      collect!()
+    }
+    expect(references.filter(reference => reference.deref() !== undefined)).toHaveLength(0)
+  } finally {
+    finish('accepted')
+    expect(await active).toBe('accepted')
+  }
+})

@@ -58,6 +58,11 @@
   let conflicts = $state<File[]>([])
   let conflictTarget = $state<{ bucket: string; prefix: string } | null>(null)
   let replaceOpen = $state(false)
+  $effect(() => {
+    if (replaceOpen) return
+    conflicts = []
+    conflictTarget = null
+  })
   let removing = $state<StoredFile | null>(null)
   let removeOpen = $state(false)
   let picker = $state<HTMLInputElement>()

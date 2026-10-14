@@ -9,6 +9,15 @@ export const queryClient = new QueryClient({
 let revision = 0
 const readers = new Map<string, number>()
 
+type Outcome<T> = { value: T } | { error: unknown }
+type Waiter<T> = { complete: ((outcome: Outcome<T>) => void) | undefined }
+
+// Keep promise reactions outside the reader's closure. An aborted reader
+// clears its slot, releasing its signal and component before the fetch settles.
+function observe<T>(pending: Promise<T>, waiter: Waiter<T>) {
+  void pending.then(value => waiter.complete?.({ value }), error => waiter.complete?.({ error }))
+}
+
 export const querySession = () => session.epoch
 
 export function clearQuerySession() {
@@ -27,9 +36,17 @@ export async function queryRead<T>(path: string, account: string | null | undefi
     const pending = queryClient.fetchQuery({ queryKey, queryFn: ({ signal }) => fetcher(signal), staleTime: freshForMs })
     // Cancelling one reader must not cancel another reader of the same query.
     const result = signal ? await new Promise<T>((resolve, reject) => {
-      const abort = () => reject(signal.reason ?? new DOMException('Aborted', 'AbortError'))
+      const waiter: Waiter<T> = { complete: undefined }
+      const complete = (outcome: Outcome<T>) => {
+        waiter.complete = undefined
+        signal.removeEventListener('abort', abort)
+        if ('error' in outcome) { reject(outcome.error); return }
+        resolve(outcome.value)
+      }
+      const abort = () => complete({ error: signal.reason ?? new DOMException('Aborted', 'AbortError') })
+      waiter.complete = complete
       signal.addEventListener('abort', abort, { once: true })
-      pending.then(resolve, reject).finally(() => signal.removeEventListener('abort', abort))
+      observe(pending, waiter)
       // A synchronous adapter can abort while fetchQuery starts its request.
       if (signal.aborted) abort()
     }) : await pending

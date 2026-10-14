@@ -29,6 +29,8 @@
     controller = undefined
     if (objectUrl) URL.revokeObjectURL(objectUrl)
     objectUrl = ''
+    media = ''
+    text = ''
   }
 
   async function load() {
