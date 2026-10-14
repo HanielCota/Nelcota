@@ -24,7 +24,8 @@ export interface Session {
 }
 
 /**
- * Where the session is kept. `localStorage` and `sessionStorage` fit as is;
+ * Where the session is kept. Native `localStorage` also uses an IndexedDB
+ * coordination journal; `sessionStorage` and custom adapters keep their own state.
  * a server keeps it per request (a cookie adapter) or in memory.
  */
 export interface SessionStorage {

@@ -56,6 +56,8 @@ fn replace(path: &Path, write: impl FnOnce(&mut File) -> io::Result<()>) -> io::
     write(temporary.as_file_mut())?;
     temporary.as_file().sync_all()?;
     temporary.persist(path).map_err(|error| error.error)?;
+    #[cfg(unix)]
+    File::open(parent)?.sync_all()?;
     Ok(())
 }
 
@@ -64,6 +66,30 @@ pub(crate) fn copy(source: impl AsRef<Path>, destination: impl AsRef<Path>) -> i
     let mut copied = 0;
     replace(destination.as_ref(), |destination| {
         copied = io::copy(&mut source, destination)?;
+        Ok(())
+    })?;
+    Ok(copied)
+}
+
+pub(crate) fn copy_reader(
+    source: &mut impl io::Read,
+    destination: &Path,
+    maximum: u64,
+) -> io::Result<u64> {
+    let mut copied = 0;
+    replace(destination, |file| {
+        copied = io::copy(
+            &mut io::Read::take(
+                &mut *source,
+                maximum
+                    .checked_add(1)
+                    .ok_or_else(|| io::Error::other("object size overflow"))?,
+            ),
+            file,
+        )?;
+        if copied != maximum {
+            return Err(io::Error::other("snapshot file size changed"));
+        }
         Ok(())
     })?;
     Ok(copied)

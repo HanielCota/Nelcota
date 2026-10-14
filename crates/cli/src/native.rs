@@ -15,6 +15,7 @@ mod binary;
 mod postgres;
 mod provisioning;
 mod units;
+pub(crate) use units::render_unit;
 
 pub use binary::{deploy_binary, deployed_binary, rollback_binary};
 pub use postgres::{PG_DATA, POSTGRES_UNIT, configure_postgres};

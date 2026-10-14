@@ -202,12 +202,13 @@ const stop = nelcota.auth.onChange((event, session) => {
 });
 ```
 
-**Sessions.** In browsers the session is kept in `localStorage`; elsewhere
-it is kept in memory. Pass `auth: { storage }` to change that, for example
-with a cookie adapter for server-side rendering. Anything with
-`getItem`/`setItem`/`removeItem` works, sync or async.
+**Sessions.** In browsers, native `localStorage` uses an IndexedDB journal
+as the authoritative session state and mirrors committed sessions to
+`localStorage`. Elsewhere sessions stay in memory. Pass `auth: { storage }`
+to use a custom adapter, for example a cookie adapter for server-side
+rendering. Anything with `getItem`/`setItem`/`removeItem` works, sync or async.
 
-`localStorage` can be read by any script on the page, so the usual XSS
+Browser storage can be read by any script on the page, so the usual XSS
 hygiene applies (a Content Security Policy, no untrusted HTML). The session
 holds a short-lived access token (15 minutes by default) and a refresh
 token that rotates on every use.
@@ -219,13 +220,32 @@ The server ends a session whose refresh token is used twice, so refreshes
 are coordinated:
 
 - One refresh at a time in a process, however many requests are waiting.
-- Across tabs, a Web Lock serializes refreshes, and a tab that waited takes
-  the session the other tab got.
+- Across tabs, a Web Lock serializes refreshes. A committed IndexedDB
+  receipt hands the replacement to the next owner even when its
+  `localStorage` view is stale. A reservation is committed before HTTP.
+
+Native browser persistence requires IndexedDB. Storage failures reject
+explicit auth calls; observe automatic refresh failures with
+`auth.onBackgroundError`. If an owner disappears during rotation or cannot
+save its replacement, another client refuses to reuse the reserved token.
+Retry from the owning client, sign in again, or call `signOut()` to clear it.
 
 Without Web Locks, a local queue coordinates clients in the same module
-instance only. For separate tabs on such a browser, use
-`auth: { storage: sessionStorage }` or an externally coordinated adapter.
+instance. The native journal prevents competing owners from spending a
+reserved token, but cannot make them wait for the replacement. Custom shared
+adapters need Web Locks or external coordination; use
+`auth: { storage: sessionStorage }` for separate per-tab sessions.
 Keep the same storage key when sharing a session adapter.
+
+On upgrade, the journal imports the existing `localStorage` session once.
+Reload all open tabs to avoid mixing old and new coordination protocols.
+Use `signOut()` or clear all site data to remove native sessions; editing
+only `localStorage` no longer changes authoritative session state.
+
+Failed sign-in/logout publication keeps the newer local state while the exact
+prior journal revision remains current, even if another client wrote that
+prior revision. A new committed revision supersedes it, including an explicit
+publication of the same value.
 
 If a refresh fails for a transient reason, the old token is still sent. The
 request then fails with 401 instead of silently running as a visitor.
@@ -246,6 +266,12 @@ Each storage key holds one pending OAuth verifier: starting another sign-in
 replaces the previous attempt. Verifier publication, navigation and callback
 consumption use the same lock so asynchronous work cannot reorder them. Use
 separate storage keys for independent login flows.
+
+Native PKCE publication and consumption also use the IndexedDB journal, so
+stale localStorage cannot supply an older verifier or reuse a consumed one.
+An already cancelled exchange keeps its verifier. Once consumption begins,
+the bounded exchange persists an accepted session even if its caller cancels
+the wait; the first exchange's timeout still applies.
 
 **Email links** arrive as `https://your.app/page#type=...&token=...`.
 `readEmailLink()` takes the token and removes it from the address bar and

@@ -6,6 +6,7 @@
 //   node test/browser/smoke.mjs <api url> <service_role token>
 
 import { createServer } from 'node:http';
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { dirname, extname, join, normalize, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -158,7 +159,7 @@ try {
       rotationRequests.push({ page: page === tab ? 'first' : 'second', token: request.postDataJSON().refresh_token });
     }
   });
-  const rounds = 10;
+  const rounds = 100;
   for (let round = 0; round < rounds; round++) {
     const before = refreshRequests;
     const sessions = await Promise.all([tab, other].map((page) => page.evaluate(() => globalThis.sdkClient.auth.getSession())));
@@ -188,9 +189,45 @@ try {
     const expiring = { ...sessions[0].data, expires_at: Math.floor(Date.now() / 1000) + 5 };
     await Promise.all([tab, other].map(page => page.evaluate(session => globalThis.sdkClient.auth.setSession(session), expiring)));
   }
+  const oauthSession = (await tab.evaluate(() => globalThis.sdkClient.auth.getSession())).data;
+  if (!oauthSession) throw new Error('OAuth fixture needs the native browser session');
   await tab.evaluate(() => globalThis.sdkClient.auth.signOut());
   await other.waitForFunction(async () => (await globalThis.sdkClient.auth.getSession()).data === null);
   console.log('ok  sign-out broadcast to the other tab');
+
+  // Exercise native verifier storage in each engine with a controlled HTTP
+  // exchange. Provider validation has dedicated server regressions.
+  let challenge = '';
+  let exchanges = 0;
+  const matchedChallenges = [];
+  const callback = (url) => url.pathname === '/auth/v1/token' && url.searchParams.get('grant_type') === 'pkce';
+  for (const page of [tab, other]) await page.route(callback, async route => {
+    if (route.request().method() !== 'POST') { await route.continue(); return; }
+    exchanges++;
+    const verifier = route.request().postDataJSON()?.code_verifier;
+    const matches = typeof verifier === 'string' && createHash('sha256').update(verifier).digest('base64url') === challenge;
+    matchedChallenges.push(matches);
+    await route.fulfill({ status: matches ? 200 : 400, headers: { 'access-control-allow-origin': '*' }, json: matches ? oauthSession : { code: 'invalid_grant', message: 'PKCE mismatch' } });
+  });
+  for (let flow = 0; flow < 2; flow++) {
+    const started = await tab.evaluate(redirectTo => globalThis.sdkClient.auth.signInWithOAuth({ provider: 'github', redirectTo, redirect: false }), `${origin}/app`);
+    if (started.error) throw new Error('Native PKCE publication failed');
+    challenge = new URL(started.data.url).searchParams.get('code_challenge');
+    if (flow === 1) {
+      const cancelled = await tab.evaluate(async () => (await globalThis.sdkClient.auth.exchangeCode('browser-code', { signal: AbortSignal.abort() })).error?.code);
+      if (cancelled !== 'aborted') throw new Error('Cancelled PKCE exchange did not preserve its claim boundary');
+    }
+    // Error subclasses lose custom fields across Playwright serialization.
+    // Extract codes in the browser so negative assertions verify the SDK result.
+    const accepted = await other.evaluate(async () => { const value = await globalThis.sdkClient.auth.exchangeCode('browser-code'); return { code: value.error?.code ?? null, present: Boolean(value.data) }; });
+    const repeated = await tab.evaluate(async () => (await globalThis.sdkClient.auth.exchangeCode('browser-code')).error?.code);
+    if (accepted.code || !accepted.present || repeated !== 'pkce_missing' || exchanges !== flow + 1) {
+      console.log('PKCE diagnostics:', { flow, exchanges, accepted: accepted.code, present: accepted.present, repeated, matchedChallenges });
+      throw new Error('Native PKCE handoff or one-time consumption failed');
+    }
+  }
+  for (const page of [tab, other]) await page.unroute(callback);
+  console.log('ok  native PKCE across real tabs: matching challenge, one-time consumption and pre-cancelled exchange');
   await Promise.all([tab, other].map((page) => page.evaluate(() => globalThis.sdkClient.dispose())));
 
   await other.goto(`${origin}/demo`);

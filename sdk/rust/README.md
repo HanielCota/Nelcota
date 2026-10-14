@@ -128,7 +128,9 @@ persistent store need external coordination: the store interface alone does
 not serialize refresh. A spent refresh token terminates its server session.
 
 Refresh runs before expiry when a request needs a token. Opt-in background
-refresh stops when its handle is dropped. Rotation continues if a waiter is
+refresh stops when its handle is dropped. Both paths cap the configured refresh
+margin at half the token lifetime, avoiding repeated rotation of fresh
+short-lived tokens. Rotation continues if a waiter is
 cancelled/dropped, so a consumed refresh token can still be replaced locally.
 A transient failure keeps the previous identity; an invalid grant clears the
 session and returns the failure to the initiating request. Logout waits for

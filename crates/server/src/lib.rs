@@ -2,6 +2,8 @@
 //! It lives in a lib (not only in `main`) so the integration tests use the
 //! same `Router` as production.
 
+pub mod deployment;
+
 use std::time::Duration;
 
 use axum::{

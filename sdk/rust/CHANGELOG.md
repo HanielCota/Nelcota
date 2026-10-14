@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Cap foreground and background refresh margins at half the token lifetime,
+  avoiding unnecessary rotation of fresh short-lived sessions or sessions with
+  oversized configured margins.
+
 ## 0.1.2 — 2026-10-11
 
 - Bound HTTP error bodies to 64 KiB while preserving status and `Retry-After`.

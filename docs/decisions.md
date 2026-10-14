@@ -932,6 +932,19 @@ Large installations need time for this one-time metadata rewrite. Upgrade tests
 verify original rows, schema objects, policies and files, including legacy SQL
 paths whose multibyte names exceed the HTTP byte limit.
 
+**D101. Updates use a separately enrolled native control plane.** The same
+binary runs an unprivileged HTTP/UI role and a restricted root IPC worker, on a
+management origin independent of project traffic. Project/SSO/service-role
+credentials grant no host authority; root-owned enrollment binds operator scope
+to a project incarnation. Only official, ready, digested and attested stable
+artifacts are eligible. The deployment capability owns typed receipts, shared
+host leases and durable transitions; CLI adapters own runtime effects and the
+admin crate owns HTTP/embedded UI. Both public-traffic commit and restarting a
+restored version are irreversible data boundaries. Candidate routes/background
+effects stay gated by an operation identity. Production installation starts
+disabled until exact-binary VPS fault/offsite evidence passes. See
+[the operating guide](panel-updates.md) and [G03](goals/panel-updates-and-recovery.md).
+
 ### Known pending items
 
 - Filtering parent rows by their embeds (`!inner`) and self-referencing embeds.

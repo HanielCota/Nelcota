@@ -219,6 +219,7 @@ impl ClientBuilder {
         self.store = Some(store);
         self
     }
+    /// Refresh this far before expiry, capped at half the session token lifetime.
     pub fn refresh_margin(mut self, margin: Duration) -> Self {
         self.margin = margin;
         self

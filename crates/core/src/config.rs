@@ -147,6 +147,11 @@ pub struct Config {
     /// Development-only HTTP webhooks to localhost/127.0.0.1/::1. LAN and
     /// metadata addresses stay blocked. Public destinations require HTTPS.
     pub webhooks_allow_loopback: bool,
+    /// Controller-owned validation gate; background effects wait for commit.
+    pub deployment_validation: bool,
+    pub deployment_gate: Option<std::path::PathBuf>,
+    /// Binds the gate to exactly one candidate, including after rollback.
+    pub deployment_id: Option<String>,
     /// File storage: `off`, `disk` or `s3`.
     pub storage_backend: StorageBackend,
     /// Directory of the disk backend.
@@ -221,6 +226,9 @@ impl Default for Config {
             statement_timeout_secs: 10,
             log_format: LogFormat::Text,
             webhooks_allow_loopback: false,
+            deployment_validation: false,
+            deployment_gate: None,
+            deployment_id: None,
             storage_backend: StorageBackend::Off,
             storage_dir: None,
             storage_s3_endpoint: None,
@@ -251,6 +259,33 @@ impl Config {
     }
 
     pub fn validate(&self) -> Result<(), ConfigError> {
+        if self.deployment_validation && !cfg!(target_os = "linux") {
+            return Err(ConfigError::Invalid(
+                "deployment validation requires the Linux controller",
+            ));
+        }
+        if self.deployment_validation
+            && self.deployment_id.as_ref().is_none_or(|id| {
+                id.len() != 64
+                    || !id
+                        .bytes()
+                        .all(|c| c.is_ascii_digit() || (b'a'..=b'f').contains(&c))
+            })
+        {
+            return Err(ConfigError::Invalid(
+                "deployment validation requires a candidate identity",
+            ));
+        }
+        if self.deployment_validation
+            && self
+                .deployment_gate
+                .as_ref()
+                .is_none_or(|path| !path.is_absolute())
+        {
+            return Err(ConfigError::Invalid(
+                "deployment validation requires an absolute controller-owned gate",
+            ));
+        }
         if self.database_url.expose().is_empty() {
             return Err(ConfigError::Invalid("NELCOTA_DATABASE_URL is required"));
         }
@@ -771,5 +806,34 @@ mod tests {
         ] {
             assert!(config.mail().is_err(), "{config:?}");
         }
+    }
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_validation_candidate_requires_a_bounded_identity_and_absolute_gate() {
+        let mut config = Config {
+            deployment_validation: true,
+            ..Config::default()
+        };
+        assert!(matches!(
+            config.validate(),
+            Err(ConfigError::Invalid(
+                "deployment validation requires a candidate identity"
+            ))
+        ));
+        config.deployment_id = Some("a".repeat(64));
+        config.deployment_gate = Some("relative/gate".into());
+        assert!(matches!(
+            config.validate(),
+            Err(ConfigError::Invalid(
+                "deployment validation requires an absolute controller-owned gate"
+            ))
+        ));
+        config.deployment_id = Some("../invalid".into());
+        assert!(config.validate().is_err());
+        let previous: Config =
+            serde_json::from_value(serde_json::to_value(Config::default()).unwrap()).unwrap();
+        assert!(!previous.deployment_validation);
+        assert!(previous.deployment_gate.is_none());
+        assert!(previous.deployment_id.is_none());
     }
 }

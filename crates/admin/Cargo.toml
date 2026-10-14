@@ -8,6 +8,9 @@ publish.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+nelcota-deployment.workspace = true
+anyhow.workspace = true
+url.workspace = true
 nelcota-core.workspace = true
 nelcota-auth.workspace = true
 nelcota-storage.workspace = true
@@ -28,7 +31,7 @@ rust-embed.workspace = true
 serde.workspace = true
 serde_json = { workspace = true, features = ["raw_value"] }
 sha2.workspace = true
-tokio = { workspace = true, features = ["rt", "net", "time", "io-util"] }
+tokio = { workspace = true, features = ["rt", "net", "time", "io-util", "sync"] }
 tokio-postgres.workspace = true
 tracing.workspace = true
 ts-rs = "12.0.1"
@@ -36,3 +39,7 @@ schemars = "1.2.2"
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+tower.workspace = true
+tempfile = "3.27.0"

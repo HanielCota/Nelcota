@@ -25,9 +25,25 @@ pub fn render(manifest: &Manifest) -> String {
 pub fn write(host: &Host, manifest: &Manifest) -> anyhow::Result<()> {
     let dir = host.shared_dir();
     fs::create_dir_all(&dir)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&dir, fs::Permissions::from_mode(0o755))?;
+    }
     let tmp = dir.join("projects.json.tmp");
-    fs::write(&tmp, render(manifest))?;
+    let mut value: serde_json::Value = serde_json::from_str(&render(manifest))?;
+    if let Some(config) = crate::updates::descriptor(host.root())? {
+        value["updates_origin"] = json!(config.origin);
+    }
+    fs::write(&tmp, serde_json::to_vec_pretty(&value)?)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&tmp, fs::Permissions::from_mode(0o644))?;
+    }
+    fs::File::open(&tmp)?.sync_all()?;
     fs::rename(&tmp, dir.join("projects.json"))?;
+    fs::File::open(&dir)?.sync_all()?;
     Ok(())
 }
 

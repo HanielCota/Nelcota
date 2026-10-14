@@ -54,6 +54,42 @@ async fn server(fail: bool) -> (String, Arc<AtomicUsize>, tokio::task::JoinHandl
 }
 
 #[tokio::test]
+async fn fresh_sessions_do_not_rotate_with_short_lifetimes_or_large_margins() {
+    for (lifetime, margin) in [(30, 60), (900, 10_000)] {
+        let (url, count, server_task) = server(false).await;
+        let client = Client::builder(url)
+            .refresh_margin(Duration::from_secs(margin))
+            .build()
+            .unwrap();
+        let mut fresh = session("a0", "r0");
+        fresh.expires_in = lifetime;
+        fresh.expires_at = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+            + lifetime;
+        client.auth().set_session(fresh).await.unwrap();
+        for _ in 0..20 {
+            assert_eq!(
+                client
+                    .auth()
+                    .get_session()
+                    .await
+                    .unwrap()
+                    .unwrap()
+                    .refresh_token,
+                "r0"
+            );
+        }
+        let background = client.auth().start_auto_refresh();
+        tokio::time::sleep(Duration::from_millis(1200)).await;
+        assert_eq!(count.load(Ordering::SeqCst), 0);
+        drop(background);
+        server_task.abort();
+    }
+}
+
+#[tokio::test]
 async fn concurrent_clones_refresh_once_and_logout_cannot_restore_session() {
     let (url, count, server) = server(false).await;
     let client = Client::builder(url).build().unwrap();

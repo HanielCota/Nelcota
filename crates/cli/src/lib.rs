@@ -28,6 +28,7 @@ mod project;
 mod projects;
 mod registry;
 mod scaffold;
+mod updates;
 mod upgrade;
 mod util;
 
@@ -66,6 +67,8 @@ pub struct Cli {
 
 #[derive(Subcommand, Debug)]
 pub enum Command {
+    /// Secure, separately authenticated host update controller.
+    Updates(updates::UpdatesArgs),
     /// Starts the HTTP server (the default when no command is given).
     Serve,
     /// Creates a project (and the host, the first time).
@@ -358,10 +361,48 @@ pub enum Outcome {
     Done,
     /// Start the HTTP server with this configuration.
     Serve(Box<Config>),
+    UpdatesServe(nelcota_deployment::protocol::ControllerConfig),
 }
 
 pub fn run(cli: Cli) -> anyhow::Result<Outcome> {
     let host = host::Host::new(&cli.dir);
+    // Every enrolled host mutation participates in the same deployment lease.
+    let _deployment = match cli.command.as_ref() {
+        Some(
+            Command::Init(_)
+            | Command::Up
+            | Command::Down { .. }
+            | Command::Remove { .. }
+            | Command::PanelLogin { .. }
+            | Command::Migrate { .. }
+            | Command::Upgrade { .. }
+            | Command::Backup { .. }
+            | Command::Restore { .. }
+            | Command::Pitr { .. }
+            | Command::AdminPassword,
+        ) if cli.dir.join(host::MANIFEST).is_file() => {
+            let lease = nelcota_deployment::HostLock::acquire(&cli.dir)?;
+            let journal = nelcota_deployment::Journal::open(&cli.dir)?;
+            if journal
+                .list()?
+                .iter()
+                .any(|job| !job.public.phase.terminal())
+            {
+                bail!(
+                    "deployment needs recovery: use nelcota updates recover before mutating this host"
+                );
+            }
+            Some(lease)
+        }
+        _ => None,
+    };
+    if matches!(cli.command, Some(Command::Upgrade { .. }))
+        && cli.dir.join("updates-controller.json").is_file()
+    {
+        bail!(
+            "enrolled hosts upgrade through the updates controller; use `updates recover` over SSH for recovery"
+        );
+    }
     let selection = cli.project.as_deref();
     let done = |r: anyhow::Result<()>| r.map(|()| Outcome::Done);
 
@@ -376,6 +417,7 @@ pub fn run(cli: Cli) -> anyhow::Result<Outcome> {
 
     match cli.command.unwrap_or(Command::Serve) {
         Command::Serve => Ok(Outcome::Serve(Box::new(Config::load()?))),
+        Command::Updates(args) => updates::run(&cli.dir, args),
         Command::Init(mut args) => {
             if args.project.is_none() {
                 args.project = cli.project.clone();

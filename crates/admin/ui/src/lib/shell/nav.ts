@@ -55,6 +55,7 @@ export const navItems: NavItem[] = [
   ...navPills.slice(2),
   { title: 'shell.pages.userSignIn', path: '/sign-in', icon: LogIn },
   { title: 'shell.pages.projects', path: '/projects', icon: Boxes },
+  { title: 'shell.pages.updates', path: '/updates', icon: History },
   { title: 'shell.pages.guides', path: '/guides', icon: BookOpen },
 ]
 

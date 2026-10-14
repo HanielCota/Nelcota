@@ -2,8 +2,16 @@
 
 ## Unreleased
 
-- Observe native browser storage updates after acquiring the session lock,
-  preventing queued tabs from rotating the same refresh token twice.
+- Coordinate native browser sessions through committed IndexedDB receipts,
+  preventing queued tabs from rotating a token from a stale localStorage view.
+  Reserve rotations before HTTP and prevent late responses from undoing logout.
+  Native persistence now requires IndexedDB; reload all tabs when upgrading.
+  Interrupted rotations require the owning client to retry or a new sign-in.
+- Preserve failed sign-in/logout state over an unchanged foreign receipt;
+  unique committed revisions distinguish old state from later decisions.
+- Journal native PKCE verifiers and consume them atomically. An already
+  cancelled exchange leaves the verifier available; a claimed exchange keeps
+  ownership until its accepted session is persisted even if a waiter cancels.
 - Preserve unsafe integers and decimal digits in JSON responses as strings,
   including nested values and RPC results. Ordinary numbers remain numeric.
   Regenerate schema types: Postgres numeric types that may exceed JavaScript

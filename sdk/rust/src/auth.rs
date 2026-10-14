@@ -216,6 +216,9 @@ impl Manager {
             events: broadcast::channel(32).0,
         }
     }
+    fn margin_for(&self, session: &Session) -> Duration {
+        self.margin.min(Duration::from_secs(session.expires_in) / 2)
+    }
     async fn load(&self, state: &mut State) -> Result<()> {
         if !state.loaded {
             let session = self.storage.load().await?;
@@ -291,7 +294,9 @@ impl AuthClient {
         manager.load(&mut state).await?;
         match &state.session {
             None => Ok(None),
-            Some(session) if session.expires_in_now() > manager.margin => Ok(Some(session.clone())),
+            Some(session) if session.expires_in_now() > manager.margin_for(session) => {
+                Ok(Some(session.clone()))
+            }
             _ => {
                 drop(state);
                 self.refresh_since(observed).await.map(Some)
@@ -729,7 +734,7 @@ impl AuthClient {
                 let session = state.session.clone();
                 drop(state);
                 let delay = session
-                    .map(|s| s.expires_in_now().saturating_sub(client.inner.auth.margin))
+                    .map(|s| s.expires_in_now().saturating_sub(manager.margin_for(&s)))
                     .unwrap_or(Duration::from_secs(30));
                 drop(client);
                 tokio::select! {
