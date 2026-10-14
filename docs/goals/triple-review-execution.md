@@ -110,6 +110,13 @@ real Chromium tab-contention rounds. Rust SDK: 31 unit/integration tests and
 10 doctests, targeted Clippy and seven real-server HTTP cases passed. The same
 fresh-session regression also exercises the opt-in background timer.
 
+The native PKCE protocol also passed across two real Chromium tabs with a
+controlled HTTP exchange: an independently hashed challenge matches the
+published verifier, a consumed verifier cannot be used a second time, and
+pre-cancellation preserves the next exchange. This exercises actual browser
+storage/crypto/locking; the HTTP response is a fixture and is not live provider
+acceptance. The same browser gate runs on Firefox/WebKit in final CI.
+
 Panel checks passed: 35 lifetime/cache/transport tests, 41 guide/controller
 tests, Svelte/TypeScript checks, five real Chromium update cases and production
 build. The added online/expired-poll case confirms that an old 401 cannot replace
