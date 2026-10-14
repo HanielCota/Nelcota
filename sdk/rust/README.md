@@ -5,7 +5,7 @@ and file storage under PostgreSQL RLS. For native applications using Tokio.
 
 ```toml
 [dependencies]
-nelcota-client = "0.1"
+nelcota-client = "0.1.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
@@ -34,6 +34,13 @@ let response = client.from("notes").select("id,body")
 for note in response.data { println!("{}: {}", note.id, note.body); }
 # Ok(()) }
 ```
+
+## Version scope
+
+This reference describes current source. The published package is 0.1.2;
+Unreleased refresh-margin/finite-input fixes and expanded lifecycle checks
+require a new SDK build/package. Installing a server release does not update clients. Use registry
+installation for released behavior and a path/archive dependency for development.
 
 ## REST
 

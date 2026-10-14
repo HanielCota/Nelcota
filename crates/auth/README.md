@@ -13,3 +13,11 @@ See [the integration guide](https://github.com/Nelcota/Nelcota/blob/main/docs/au
 and the standalone `examples/auth-consumer` application. No Node runtime is
 required. Packaging is tested from `.crate` archives; registry publication is a
 separate release step, with core released before auth at matching versions.
+
+## Version scope and prerequisites
+
+This facade and archive workflow describe unpublished source after server 0.4.0.
+Use Rust 1.99+, Axum 0.8, private PostgreSQL 17 and matched auth/core versions.
+Do not infer registry availability from the workspace version. The integration
+guide covers bootstrap, private keys, no-TLS database topology, adapters and
+owned background-task shutdown.

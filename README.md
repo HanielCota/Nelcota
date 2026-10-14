@@ -4,230 +4,130 @@
 
 # Nelcota
 
-**Open source backend-as-a-service, simple and lock-in free.**<br>
-Plain Postgres + one Rust binary + a 5-minute deploy on a VPS.
+Open source backend-as-a-service for applications that use PostgreSQL.<br>
+One Rust binary provides REST, authentication, file storage, webhooks and an admin panel.
 
 [![CI](https://github.com/Nelcota/Nelcota/actions/workflows/ci.yml/badge.svg)](https://github.com/Nelcota/Nelcota/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/Nelcota/Nelcota?color=1a7a45)](https://github.com/Nelcota/Nelcota/releases/latest)
-[![License](https://img.shields.io/badge/license-Apache--2.0-1a7a45)](LICENSE)
-![Postgres 17](https://img.shields.io/badge/Postgres-17-336791?logo=postgresql&logoColor=white)
-![Rust](https://img.shields.io/badge/Rust-stable-b7410e?logo=rust&logoColor=white)
+[Releases](https://github.com/Nelcota/Nelcota/releases) · [Apache-2.0](LICENSE)
 
-[Quickstart](docs/quickstart.md) · [Deploy](docs/deploy.md) · [REST API](docs/api.md) · [Panel](docs/panel.md) · [Changelog](CHANGELOG.md) · [Docs](#documentation) · [nelcota.com](https://nelcota.com)
+[Quickstart](docs/quickstart.md) · [Deploy](docs/deploy.md) · [Documentation](docs/README.md) · [Changelog](CHANGELOG.md)
 
 </div>
 
-<br>
-
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/panel-overview-dark.png">
-  <img src="docs/assets/panel-overview-light.png" alt="The Nelcota admin panel: requests over the last 24 hours, tables, users and refused calls">
+  <img src="docs/assets/panel-overview-light.png" alt="Nelcota panel showing API traffic, tables and users">
 </picture>
 
 ## Why Nelcota
 
-- **Postgres is the product.** Schema, RLS policies and functions are plain SQL
-  and keep working without Nelcota.
-- **Authorization belongs to RLS.** The API only validates the JWT and assumes
-  its role inside a transaction. It never decides permissions on its own.
-- **One binary, everything included.** REST, auth, storage, an admin panel and
-  a deploy CLI, with nothing else to run beside Postgres.
-- **Open standards.** JWT/JWKS, PHC argon2id, OAuth 2.0 + PKCE, plain SQL,
-  OpenAPI, S3-compatible. You can leave and take everything with you
-  ([leaving.md](docs/leaving.md)).
+Use Nelcota when you want to own your database and deploy your backend on a VPS.
+Your schema, grants, row-level security policies and functions remain SQL you
+can export. PostgreSQL enforces data access; you do not need a separate Node
+service for the backend or panel. Production deployments also use Caddy for
+HTTPS, and optional integrations need their own SMTP or S3 provider.
+
+## Quickstart
+
+You need Linux, Docker, `curl` and `jq`. The installer downloads a published
+binary and verifies its checksum. Use a fresh application directory:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/Nelcota/Nelcota/main/scripts/install.sh | NELCOTA_SKIP_DOCKER=1 sh
+mkdir notes-app && cd notes-app
+nelcota dev
+```
+
+Keep that terminal running. In a second terminal, enter `notes-app` and run:
+
+```sh
+set -eu
+mkdir -p migrations
+cat > migrations/V1__notes.sql <<'SQL'
+CREATE TABLE public.notes (
+    id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    owner uuid NOT NULL DEFAULT auth.uid(),
+    body text NOT NULL
+);
+ALTER TABLE public.notes ENABLE ROW LEVEL SECURITY;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.notes TO authenticated;
+CREATE POLICY notes_owner ON public.notes FOR ALL TO authenticated
+    USING (owner = auth.uid()) WITH CHECK (owner = auth.uid());
+SQL
+nelcota migrate
+SESSION=$(curl -fsS -X POST http://127.0.0.1:8000/auth/v1/signup \
+  -H 'content-type: application/json' \
+  -d '{"email":"ana@example.com","password":"a-development-password"}')
+TOKEN=$(printf '%s' "$SESSION" | jq -er '.access_token')
+NELCOTA_SCHEMA_READY=0
+for attempt in 1 2 3 4 5 6 7 8 9 10; do
+  NELCOTA_READ_STATUS=$(curl -sS -o /dev/null -w '%{http_code}' \
+    http://127.0.0.1:8000/rest/v1/notes -H "authorization: Bearer $TOKEN")
+  if [ "$NELCOTA_READ_STATUS" = 200 ]; then NELCOTA_SCHEMA_READY=1; break; fi
+  [ "$NELCOTA_READ_STATUS" = 404 ] || { printf '%s\n' 'Readiness request failed' >&2; exit 1; }
+  sleep 0.2
+done
+[ "$NELCOTA_SCHEMA_READY" = 1 ] || { printf '%s\n' 'Schema is not ready' >&2; exit 1; }
+curl -fsS -X POST http://127.0.0.1:8000/rest/v1/notes \
+  -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' \
+  -H 'prefer: return=representation' -d '{"body":"My first note"}'
+curl -fsS 'http://127.0.0.1:8000/rest/v1/notes?order=id.desc' \
+  -H "authorization: Bearer $TOKEN"
+```
+
+The last request returns your note under RLS. This account/password is a local
+example. The [full quickstart](docs/quickstart.md) adds the shared SDK schema,
+generated types and a runnable client. On macOS/Windows, build with Rust as
+explained there. The panel is at `http://127.0.0.1:8000/admin/`; read its generated
+credentials locally from `.nelcota/dev.env`.
+
+> [!WARNING]
+> A `service_role` token bypasses RLS. Keep it in trusted backend code; never
+> include it in a browser, mobile app or public example configuration.
 
 ## What's inside
 
-| | |
+| Capability | Reference |
 | --- | --- |
-| **REST API** | Generated from your schema: filters, ordering, writes, RPC and OpenAPI at `/rest/v1/` ([api.md](docs/api.md)) |
-| **Auth** | EdDSA JWT + JWKS, argon2id, refresh with rotation, password recovery, email confirmation, magic link, sign-in with Google or GitHub ([jwt-and-roles.md](docs/jwt-and-roles.md)) |
-| **Storage** | Files under the same RLS policies, bytes on disk or in any S3 bucket, signed URLs ([storage.md](docs/storage.md)) |
-| **Events and webhooks** | Committed table changes, signed HTTPS delivery, a persistent queue, retries and delivery history with resend ([webhooks.md](docs/webhooks.md)) |
-| **Admin panel** | Table editor with inline editing, SQL editor with autocomplete, users, RLS policies, files and migrations generated from panel changes, in English and Portuguese ([panel.md](docs/panel.md)) |
-| **Deploy CLI** | Fresh VPS to HTTPS, several isolated projects per server, backups and point-in-time recovery ([deploy.md](docs/deploy.md)) |
-| **SDKs** | [`@nelcota/client`](sdk/typescript/README.md) for JavaScript/TypeScript and [`nelcota-client`](sdk/rust/README.md) for Rust, plus generated types |
+| Schema-derived REST, filters, relations, RPC and OpenAPI | [REST API](docs/api.md) |
+| Password/email/OAuth sign-in, Ed25519 JWTs and refresh rotation | [Auth schema](docs/schema-auth.md), [JWT and roles](docs/jwt-and-roles.md) |
+| Private/public files, disk/S3 storage and signed URLs | [Storage](docs/storage.md) |
+| Transactional events and signed delivery with retries | [Webhooks](docs/webhooks.md) |
+| Embedded English/Portuguese database and account administration | [Panel](docs/panel.md) |
+| Docker/systemd deployment, isolated projects, backups and database PITR | [Deploy](docs/deploy.md), [Backup](docs/backup.md) |
+| JavaScript/TypeScript and native Rust clients | [TypeScript SDK](sdk/typescript/README.md), [Rust SDK](sdk/rust/README.md) |
 
-## Deploy: fresh VPS → HTTPS
+## Status and roadmap
 
-```sh
-curl -fsSL https://raw.githubusercontent.com/Nelcota/Nelcota/main/scripts/install.sh | sh
-nelcota init api.yourdomain.com
-nelcota up
-```
+The latest published server is **0.4.0**. SDKs have independent versions.
+`main` contains unpublished fixes and reusable auth/core packaging; see the
+[changelog](CHANGELOG.md) and [release handoff](docs/onboarding/release.md).
+A source build can report the same binary version as a published release until
+its version is bumped: identify it by tag/commit and artifact hash.
 
-**Several projects on the same VPS**, each one isolated (Postgres, users, keys,
-backups), with its own domain or a subdomain and a single sign-on for every
-panel:
+Controlled panel updates are implemented in `main`, but require a new official
+release and exact-binary VPS acceptance before activation. They are unavailable
+in published 0.4.0. See [the update guide](docs/panel-updates.md).
 
-```sh
-nelcota init api.shop.com                              # own domain
-nelcota init --project blog --base-domain example.com  # subdomain: blog.example.com
-nelcota up && nelcota projects
-```
-
-<details>
-<summary><b>Backups, point-in-time recovery and running without Docker</b></summary>
-
-<br>
-
-Backup and restore are in [docs/backup.md](docs/backup.md), including
-point-in-time recovery (`nelcota -p shop pitr enable`: WAL archived to S3,
-restore to any second).
-
-A VPS that holds a single project can skip Docker: `nelcota init <domain>
---runtime systemd` installs Postgres and Caddy from apt and runs the app as a
-systemd unit.
-
-</details>
-
-**New here?** The [local development quickstart](docs/quickstart.md) goes from
-install to `nelcota dev`, a migration, generated types and the SDK in a few
-minutes. Something not working? See [troubleshooting](docs/troubleshooting.md).
-
-For one complete installation with private notes, file uploads and a restart
-check, follow [Notes staging](docs/onboarding/notes.md). Its native acceptance
-runner uses Python and Docker, with no Node requirement for the backend.
-
-## Usage in 1 minute
-
-**1. Write a table and its policy in plain SQL.**
-
-```sql
--- migrations/V1__notes.sql  →  nelcota migrate
-CREATE TABLE public.notes (
-    id    bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    owner uuid NOT NULL DEFAULT auth.uid(),
-    body  text NOT NULL
-);
-ALTER TABLE public.notes ENABLE ROW LEVEL SECURITY;
-CREATE POLICY owner ON public.notes FOR ALL TO authenticated
-    USING (owner = auth.uid()) WITH CHECK (owner = auth.uid());
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.notes TO authenticated;
-```
-
-**2. Sign up and use the API.** Every request runs under RLS as that user.
-
-```sh
-# sign up → session; keep its access token and user id (requires jq)
-SESSION=$(curl -s -X POST https://api.yourdomain.com/auth/v1/signup \
-  -H 'content-type: application/json' -d '{"email":"ana@x.com","password":"strong-password-123"}')
-TOKEN=$(echo "$SESSION" | jq -r .access_token)
-USER_ID=$(echo "$SESSION" | jq -r .user.id)
-# With email confirmation on, sign-up returns no session: confirm the email, then sign in
-# with POST '/auth/v1/token?grant_type=password' and the same body to get one.
-
-# CRUD under RLS
-curl -X POST https://api.yourdomain.com/rest/v1/notes -H "authorization: Bearer $TOKEN" \
-  -H 'content-type: application/json' -H 'prefer: return=representation' -d '{"body":"hi"}'
-curl "https://api.yourdomain.com/rest/v1/notes?body=ilike.*hi*&order=id.desc" -H "authorization: Bearer $TOKEN"
-```
-
-**3. Store files under the same policies.** Each file is a row in
-`storage.objects`, its bytes on disk or in any S3 bucket
-([storage.md](docs/storage.md)).
-
-```sh
-curl -X POST "https://api.yourdomain.com/storage/v1/object/avatars/$USER_ID/me.png" \
-  -H "authorization: Bearer $TOKEN" -H 'content-type: image/png' --data-binary @me.png
-```
-
-> [!WARNING]
-> A JWT with `role: service_role` bypasses all RLS. Never expose it in the frontend.
-
-## Clients and types
-
-- **JavaScript / TypeScript:** [`@nelcota/client`](sdk/typescript/README.md),
-  with sessions, OAuth and storage. Start with its
-  [quickstart](docs/quickstart.md) (also in
-  [Portuguese](sdk/typescript/docs/quickstart.pt-BR.md)) and the runnable
-  browser/Node examples, which share [examples/notes.sql](examples/notes.sql).
-  Generated schema types are optional for JavaScript:
-  `nelcota types -o database.ts`.
-- **Rust:** [`nelcota-client`](sdk/rust/README.md), with Tokio, sessions, OAuth
-  and streaming storage. Generate models with
-  `nelcota types --lang rust -o database.rs`.
-- **Anything else:** plain HTTP, described by OpenAPI at `/rest/v1/`.
-
-## The panel
-
-Served at `/admin/` by the same binary. Light and dark, in English and
-Portuguese (picked from the browser, switchable in the account menu).
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/panel-table-dark.png">
-  <img src="docs/assets/panel-table-light.png" alt="The table editor in the Nelcota panel, showing a notes table protected by RLS">
-</picture>
-
-## Development
-
-Requirements: stable Rust and Docker.
-
-```sh
-cargo run -- dev            # Postgres 17 in a container + server at http://127.0.0.1:8000
-cargo test                  # integration tests start a real Postgres 17 (testcontainers)
-cargo clippy --all-targets -- -D warnings && cargo fmt --all --check
-cargo audit && cargo deny check
-./scripts/acceptance.sh --local   # init + up + HTTPS + migrate + backup/restore + rollback
-
-# panel (Svelte 5 + shadcn-svelte + Tailwind v4 + CodeMirror)
-cd crates/admin/ui && npm install && npm run dev
-```
-
-`dev` prints the panel URL and generated admin login; credentials persist in
-`.nelcota/dev.env`. Existing development environments are upgraded automatically.
-
-<details>
-<summary><b>Working on the panel</b></summary>
-
-<br>
-
-The panel build (`crates/admin/ui/dist`) is versioned: compiling the binary
-does not need Node. Running `nelcota dev` or `nelcota serve` serves the panel,
-API reference and all browser assets directly from Rust at `/admin/`.
-Node is only needed when rebuilding the panel or running its development tools;
-no Vite or Node server is needed to use the application.
-
-For hot reload, run the panel command in a second terminal and open
-`http://127.0.0.1:5173/admin/`. Vite proxies the API to `http://127.0.0.1:8000`;
-set `NELCOTA_API_URL` to use another server address.
-
-After changing panel wire types, run `npm run contracts` in `crates/admin/ui`.
-Rust generates TypeScript and JSON Schema; Node compiles browser validators
-without runtime `eval`. `cargo test` detects stale contracts. Run `npm run check`,
-`npm test`, `npx playwright install chromium`, `npm run test:e2e` and
-`npm run build` for panel changes. Browser regressions are also checked in CI.
-
-</details>
-
-<details>
-<summary><b>What the tests prove</b></summary>
-
-<br>
-
-Against a real Postgres: a user cannot read or change another user's data
-(with every verb), invalid, expired or unknown-role JWTs get 401, role and
-claims do not leak between pooled requests, malicious identifiers and values
-do not become SQL, and reusing a refresh token kills the session.
-
-</details>
-
-Contributions are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md) and, for
-vulnerabilities, [SECURITY.md](SECURITY.md).
+Realtime subscriptions, Edge Functions, MFA and image transformations are not
+implemented. Multiple isolated projects per Docker host are supported; shared
+database tenant management is not built in. Versions remain 0.x: review upgrade
+notes and test backup/restore before production changes. Measurements and their
+operating limits are in [bench](bench/README.md).
 
 ## Documentation
 
-| Getting started | Building | Operating | Design |
-| --- | --- | --- | --- |
-| [Quickstart](docs/quickstart.md) | [REST API](docs/api.md) | [Deploy](docs/deploy.md) | [Architecture](docs/architecture.md) |
-| [Troubleshooting](docs/troubleshooting.md) | [Storage](docs/storage.md) | [Backup](docs/backup.md) | [Decisions](docs/decisions.md) |
-| [Panel](docs/panel.md) | [JWT and roles](docs/jwt-and-roles.md) | [Leaving Nelcota](docs/leaving.md) | [Benchmark](bench/README.md) |
-| | [Auth schema](docs/schema-auth.md) | | |
+Use the [task-based index](docs/README.md), [configuration](docs/configuration.md),
+[CLI reference](docs/cli.md) and [security model](docs/security/README.md).
+For a complete private Notes/file installation, follow [Notes staging](docs/onboarding/notes.md).
 
-## Roadmap
+## Development
 
-Not in the MVP yet: realtime, Edge Functions, MFA, image transformations and
-multi-tenant. The architecture leaves room for them.
+Source builds use Rust **1.99.0**, pinned in `rust-toolchain.toml`. Node is
+needed for UI/TypeScript SDK development, not to run the Rust backend or panel.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, targeted suites, contracts and
+separate generated-panel commits. Read [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
+for community conduct and [SECURITY.md](SECURITY.md) for private vulnerability reporting.
 
 ## License
 

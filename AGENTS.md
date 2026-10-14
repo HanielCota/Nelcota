@@ -2,7 +2,8 @@
 
 ## Running tests
 
-This machine has 8 threads and heats up fast. Keep test runs small.
+Keep test runs small and respect the repository resource limits. Read
+[CONTRIBUTING.md](CONTRIBUTING.md) for setup, docs/translations and contracts.
 
 - Run only the tests related to what you changed, for example
   `cargo test -p nelcota-server --test rls` or one Vitest file. Don't run the
@@ -14,7 +15,7 @@ This machine has 8 threads and heats up fast. Keep test runs small.
 
   ```sh
   scripts/test.sh rust -p nelcota-server --test rls
-  scripts/test.sh ui src/lib/route-match.test.ts
+  scripts/test.sh ui src/lib/features/guides/content.test.ts
   scripts/test.sh all        # only when asked
   ```
 

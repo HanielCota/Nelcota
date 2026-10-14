@@ -29,3 +29,9 @@ and save the catalog.
 changes without matching translations. The reference localizes this prose and
 Scalar's interface only for display; the panel's download keeps the original
 OpenAPI JSON. User-authored database comments, schemas and examples stay intact.
+
+The English source is canonical for guide prose. Standalone pt-BR quickstarts
+must also track release/source distinctions; catalog validation alone cannot
+prove their factual accuracy. New repository references do not become panel
+guides until registered. Rebuild embedded assets after changing registered
+sources or catalogs, following the separate build-commit rule in CONTRIBUTING.md.

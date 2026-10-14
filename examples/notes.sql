@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS public.notes (
 
 ALTER TABLE public.notes ENABLE ROW LEVEL SECURITY;
 
--- anon gets no GRANT: without signing in, the table does not exist for it.
+-- anon gets no GRANT: without signing in, reads are denied.
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.notes TO authenticated;
 
 DROP POLICY IF EXISTS notes_owner ON public.notes;

@@ -1,68 +1,160 @@
 # Contributing
 
-Thanks for helping. Nelcota stays small on purpose: Postgres is the product,
-authorization belongs to RLS, and everything ships as one binary. Read
-[docs/decisions.md](docs/decisions.md) before proposing a larger change; an
-issue first saves both of us time when a change touches one of those
-decisions.
+Nelcota uses PostgreSQL grants/RLS for authorization and ships its backend as
+one Rust binary. Read [architecture](docs/architecture.md) and
+[decisions](docs/decisions.md) before proposing changes to those boundaries.
+Follow [the Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Setup
 
-Stable Rust and Docker (the integration tests start a real Postgres 17).
+Use Rust **1.99.0** from `rust-toolchain.toml`, Docker and Git. Python 3.11+
+is needed for native review/acceptance scripts (3.11.8+ for auth packaging).
+Node **24** and npm are used for repository UI/TypeScript tooling; SDK consumers
+support Node 22+, and the Rust SDK alone supports Rust 1.88. Neither Node nor
+Python is a production backend runtime dependency.
 
-```sh
-cargo run -- dev                      # Postgres in a container + server at :8000
-cargo test                            # unit and integration tests
-cargo clippy --all-targets -- -D warnings && cargo fmt --all --check
-cargo deny check && cargo audit
-cd crates/admin/ui && npm ci && npm run check && npm test   # panel
-```
-
-The panel build (`crates/admin/ui/dist`) is committed: after changing the
-panel, run `npm run build` and commit `dist` in its own commit.
-
-Without Docker, server integration tests can use an existing **disposable**
-Postgres 17 cluster with `pg_stat_statements` preloaded. Set
-`NELCOTA_TEST_DATABASE_URL` to its admin connection URL; each test creates an
-isolated database and initializes cluster-wide roles. Never point this variable
-at a development or production database. Docker-specific CLI and S3 tests still
-require their respective services.
-
-The upgrade regression requires Python 3.11+, Docker and Linux amd64. It
-downloads checksum-pinned published binaries and creates one disposable
-Postgres 17 cluster per run, because cluster-wide roles must start clean:
+From the repository root:
 
 ```sh
 cargo build --locked -p nelcota-server
-nice -n 19 ionice -c3 python3 scripts/test-upgrade.py  # 0.3.1 → this checkout
-nice -n 19 ionice -c3 python3 scripts/test-upgrade.py --published-target  # 0.3.1 → 0.4.0
+scripts/test.sh db
 ```
 
-Use `sg docker -c 'nice -n 19 ionice -c3 python3 scripts/test-upgrade.py'` if
-the current login has not picked up Docker group membership. The test compares
-existing rows, exact numeric values, sequences, schema objects, RLS and disk
-files, then exercises auth continuity, signed webhooks, rollback, retries,
-restart and pre-upgrade backup restore. It removes only its own container;
-diagnostics stay in `target/upgrade-tests/`. CI runs both scenarios, including
-the current checkout so a published-release check cannot hide a PR regression.
+Start development from a separate application directory using the absolute
+built binary path. The repository's root migrations are internal SQL: do not
+apply them as application migrations. Follow [quickstart](docs/quickstart.md)
+or [Notes staging](docs/onboarding/notes.md). Native Oxlint uses Python:
 
-## Pull requests
+```sh
+python3 scripts/install-oxlint.py
+python3 scripts/run-preset.py base
+python3 scripts/run-preset.py performance/imports
+```
 
-- One logical change per commit, with tests in the same commit as the code
-  they cover. Messages follow [Conventional Commits](https://www.conventionalcommits.org/)
-  (`feat(storage): ...`, `fix(cli): ...`), imperative, with a body saying why.
-- Code, comments, docs and commit messages are in English. Only the panel's
-  interface is translated (pt-BR and en, through the i18n catalogs).
-- Use guard clauses and early returns. Avoid `else` in executable source,
-  including Rust value expressions and `let ... else`; use `match` or `switch`
-  for alternatives. Svelte rendering uses explicit, mutually exclusive guards.
-  Check nullable input and reject non-finite numbers at input boundaries.
-- Security-sensitive code (auth, RLS, SQL building, storage) needs a test that
-  proves the boundary holds, e.g. that one user cannot reach another's data.
-- Migrations in `migrations/` are never edited once released: add a new one.
-- CI must pass: fmt, clippy, tests (including S3), cargo-deny, audit and the
-  panel checks.
+## Testing
+
+Run suites related to the change. Keep Rust tests, Vitest and cargo deny/audit
+sequential; use the resource limits in [AGENTS.md](AGENTS.md). From the root:
+
+```sh
+scripts/test.sh rust --locked -p nelcota-server --test rls
+scripts/test.sh rust --locked -p nelcota-client --test transport
+scripts/test.sh ui src/lib/features/guides/content.test.ts
+cargo fmt --all --check
+cargo clippy --locked --workspace --all-targets -- -D warnings
+cargo deny check
+cargo audit
+```
+
+Choose the appropriate server suite (`auth`, `oauth`, `storage`, `webhooks`,
+`sdk_rust`, `memory`, or feature modules under `tests/admin`). S3 tests are
+ignored without their disposable provider settings; CI provisions the provider
+and runs them explicitly. Check `.github/workflows/ci.yml` for the exact commands.
+Do not report ignored/unrun checks as passed.
+
+For a full requested validation, `scripts/test.sh all` runs Rust then panel
+Vitest; it does not replace SDK/browser/provider or supply-chain checks. The
+shared test container uses port 55432 by default and tmpfs. The script creates
+isolated databases and cleans them after each Rust suite. Never run simultaneous
+Rust suites against it. Never use development/production data as a test fixture.
+An existing disposable PostgreSQL 17 cluster needs `pg_stat_statements` preloaded
+and permission to create databases/cluster roles. Docker-specific tests still
+require Docker; agent execution follows the stricter shared-container rule.
+
+### Panel and contracts
+
+From `crates/admin/ui`:
+
+```sh
+npm ci
+npm run dev
+npm run contracts
+npm run check
+npx vitest run src/lib/features/guides --maxWorkers=2
+npm run test:memory
+npx playwright install chromium
+npm run test:e2e
+npm run build
+```
+
+Vite serves `/admin/` on port 5173 and proxies to `http://127.0.0.1:8000` by
+default; set `NELCOTA_API_URL` for another backend. Wire contracts come from Rust
+DTOs; regenerate TypeScript/schemas/validators, never hand-edit generated files.
+Use feature-local state/adapters/components and shared transport/contracts.
+
+`dist/` is tracked and embedded. Rebuild it after UI or bundled-guide changes,
+then rebuild the Rust binary to serve the new assets. Commit generated `dist`
+in its own build commit. CI checks it for drift. For targeted UI tests use
+`npx vitest run <path>` or `scripts/test.sh ui <path>`; appending a path to
+`npm test` still includes the script's full `src` selection.
+
+### SDKs
+
+From `sdk/typescript`, run `npm ci`, `npm run check`, `npm test`,
+`npm run test:types`, `npm run build`, `npm run size`, `npm run test:package`,
+`npm run test:memory` and `npm run test:runtime` as relevant. The real-server
+contract is `npm run test:contract -- --browser` after building the server and
+installing Playwright browsers. CI also covers Bun/Deno and all three browser
+engines; see [the SDK contract](sdk/typescript/docs/contract.md).
+
+Rust SDK checks include `cargo test --locked -p nelcota-client`, doctests/examples,
+server `sdk_rust` contracts and generated-model tests. Package/release procedures
+are in [Rust releasing](sdk/rust/docs/releasing.md) and
+[TypeScript releasing](sdk/typescript/docs/releasing.md). Do not publish as a side
+effect of a documentation or test change.
+
+### Acceptance, upgrades and stress
+
+```sh
+python3 scripts/test-onboarding.py --binary target/debug/nelcota
+python3 scripts/check-boundaries.py
+python3 scripts/test-auth-package.py --run
+nice -n 19 ionice -c3 python3 scripts/test-upgrade.py
+```
+
+Auth packaging requires built core/auth archives; follow
+[auth integration](docs/auth-integration.md). Upgrade tests require Linux amd64,
+Python and Docker; their disposable cluster starts with clean cluster roles.
+The default regression checks 0.3.1 → this checkout; `--published-target` checks
+0.3.1 → 0.4.0. It verifies existing data/schema/files, auth, rollback, retry and
+restore. Diagnostics remain in `target/upgrade-tests/`.
+
+[Bench campaigns](bench/README.md) include resource/load/stress/soak evidence
+and need dedicated CPUs/services. Do not run a long campaign alongside ordinary
+suites. Production update acceptance, systemd, real power loss and off-host
+restore are separate gates; local mocks do not complete them.
+
+## Documentation and translations
+
+English guides are canonical. Existing standalone pt-BR quickstarts and panel
+catalogs are maintained alongside them. After changing bundled prose, run
+`npm run guides:pending` and `npm run guides:check` from the UI directory;
+translate new fragments and remove obsolete ones, preserving inline code, URLs
+and source section identifiers. See [translation workflow](docs/i18n/README.md).
+
+Update the relevant reference and Unreleased changelog for behavior changes.
+Label historical evidence with its original artifact/date; do not rewrite old
+measurements as current validation. Check internal links/anchors, external links,
+examples and `git diff --check`. Report inaccessible destinations honestly.
+
+## Code, commits and pull requests
+
+- Use English in source, comments, primary docs, commits and PR descriptions.
+- Use guard clauses/early returns; avoid executable `else`, including Rust
+  value expressions and `let ... else`. Use `match`/`switch` and mutually exclusive
+  Svelte guards. Check nullable input and reject non-finite numbers at boundaries.
+- Preserve capability ownership. Keep transaction, cancellation and cleanup
+  with the operation; HTTP adapters translate inputs/results.
+- Never edit released migration SQL/checksums; add a new migration.
+- Security changes need a regression proving the boundary. Use targeted checks
+  for documentation and other changes; do not add tests that mirror implementation.
+- Make one logical change per commit, with relevant tests in the code commit.
+  Use Conventional Commits, an imperative subject and a body explaining why.
+- PR descriptions lead with the problem and resulting behavior, then relevant
+  verification and real limits. Link issues and identify generated assets.
+- CI must pass. Review applicable server/S3, panel, SDK, packaging, audit and
+  CodeQL jobs; a single green job is not the complete result.
 
 ## Reporting security issues
 
-Privately, as described in [SECURITY.md](SECURITY.md).
+Report privately through [SECURITY.md](SECURITY.md).

@@ -1,5 +1,8 @@
 blank_issues_enabled: false
 contact_links:
+  - name: Discussions
+    url: https://github.com/Nelcota/Nelcota/discussions
+    about: Ask usage questions or discuss an idea before opening an issue.
   - name: Security vulnerability
     url: https://github.com/Nelcota/Nelcota/security/advisories/new
     about: Report it privately (see SECURITY.md).

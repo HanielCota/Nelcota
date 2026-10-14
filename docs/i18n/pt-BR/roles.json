@@ -1,6 +1,8 @@
 {
   "JWT and roles": "JWT e papéis",
   "Public contract. The JWT format is ours and documented here; no library\ndictates it.": "Contrato público. O formato do JWT é nosso e está documentado aqui; nenhuma biblioteca o determina.",
+  "Prerequisites": "Pré-requisitos",
+  "You need an initialized private PostgreSQL database and a signing key or\ncompatible verifier. This page describes built-in token/role behavior; issuer\nand audience policy are not enforced by the built-in verifier.": "Você precisa de um banco PostgreSQL privado inicializado e uma chave de assinatura ou verificador compatível. Esta página descreve tokens/papéis nativos; o verificador nativo não exige uma política de emissor e audiência.",
   "Postgres roles": "Papéis do Postgres",
   "Role": "Papel",
   "Login": "Login",
@@ -26,7 +28,6 @@
   "Opens **one** transaction and runs, with parameters:": "Abre **uma** transação e executa, com parâmetros:",
   "Runs the query. Postgres RLS decides what the role sees.": "Executa a consulta. A RLS do Postgres decide o que o papel pode ver.",
   "COMMIT (or ROLLBACK on error). Role and claims die with the transaction.": "COMMIT (ou ROLLBACK em caso de erro). O papel e as claims terminam com a transação.",
-  "The API never implements permission rules of its own.": "A API nunca implementa regras de permissão próprias.",
   "Signing": "Assinatura",
   "**EdDSA (Ed25519)**, the default. Private key in `NELCOTA_JWT_PRIVATE_KEY`\n(PKCS#8 in PEM, or the one-line base64). The public key is published at\n`GET /auth/v1/.well-known/jwks.json` (`kty: OKP`, `crv: Ed25519`, `kid` =\nRFC 7638 thumbprint). Each token's header carries the `kid`.": "**EdDSA (Ed25519)**, o padrão. Chave privada em `NELCOTA_JWT_PRIVATE_KEY` (PKCS#8 em PEM ou base64 em uma única linha). A chave pública é publicada em `GET /auth/v1/.well-known/jwks.json` (`kty: OKP`, `crv: Ed25519`, `kid` = impressão digital RFC 7638). O cabeçalho de cada token contém o `kid`.",
   "**HS256**, the simple/legacy mode, with `NELCOTA_JWT_SECRET` (≥ 32\ncharacters). When there is an EdDSA key, the HS256 secret is only used to\n**verify** old tokens, which allows migrating without signing anyone out.": "**HS256**, o modo simples/legado, com `NELCOTA_JWT_SECRET` (≥ 32 caracteres). Quando há uma chave EdDSA, o segredo HS256 serve apenas para **verificar** tokens antigos, permitindo migrar sem encerrar a sessão de ninguém.",
@@ -54,5 +55,8 @@
   "`authenticated` without permission / policy violated on write": "`authenticated` sem permissão / violação de política na escrita",
   "Table does not exist": "A tabela não existe",
   "The body is the API's error JSON (`code`, `message` and, for database errors,\n`sqlstate`/`details`/`hint`/`constraint`); see [api.md](api.md#errors).": "O corpo é o JSON de erro da API (`code`, `message` e, para erros do banco, `sqlstate`/`details`/`hint`/`constraint`); veja [api.md](api.md#errors).",
-  "Every 401 carries `WWW-Authenticate`: `Bearer error=\"invalid_token\"` when a\ntoken was presented and rejected, plain `Bearer` when the request had no\ntoken (an `anon` request that needs to sign in).": "Toda resposta 401 inclui `WWW-Authenticate`: `Bearer error=\"invalid_token\"` quando um token foi apresentado e rejeitado, ou apenas `Bearer` quando a requisição não tinha token (uma requisição `anon` que precisa se autenticar)."
+  "Every 401 carries `WWW-Authenticate`: `Bearer error=\"invalid_token\"` when a\ntoken was presented and rejected, plain `Bearer` when the request had no\ntoken (an `anon` request that needs to sign in).": "Toda resposta 401 inclui `WWW-Authenticate`: `Bearer error=\"invalid_token\"` quando um token foi apresentado e rejeitado, ou apenas `Bearer` quando a requisição não tinha token (uma requisição `anon` que precisa se autenticar).",
+  "Related guides": "Guias relacionados",
+  "See [auth schema](schema-auth.md), [REST API](api.md) and [deploy](deploy.md).": "Veja [schema de autenticação](schema-auth.md), [API REST](api.md) e [deploy](deploy.md).",
+  "Application row access is determined by PostgreSQL GRANTs and RLS. The server\nalso validates authentication, query/path syntax and operation boundaries before\nexecuting the request.": "O acesso às linhas do aplicativo é determinado por GRANTs e RLS do PostgreSQL. O servidor também valida autenticação, sintaxe de consulta/caminho e fronteiras da operação antes de executar a requisição."
 }

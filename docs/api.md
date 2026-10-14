@@ -5,6 +5,13 @@ table, view and function in the schema becomes an endpoint, and **Postgres
 decides access**: GRANTs say which roles may use each object and RLS says which
 rows each user sees.
 
+## Prerequisites
+
+You need an initialized server, tables/functions in its exposed schema and
+GRANTs for the caller. Query examples use illustrative orders/products schemas;
+create your own matching SQL first. This reference describes current source;
+use release-tag documentation for older binaries.
+
 > New tables have no GRANT for `anon`/`authenticated`: until you grant it, the
 > API answers 401/403. This is intentional.
 >
@@ -228,7 +235,8 @@ also need explicit access controls.
 ## Catalog reload
 
 The API keeps the introspection in memory. An event trigger (migration V3)
-notifies the server on every DDL and the reload happens in ~100 ms. Without a
+notifies the server after DDL. Reloads are coalesced/serialized and failed
+refreshes retry with bounded backoff; there is no fixed completion guarantee. Without a
 superuser (some managed Postgres services), reload by hand:
 
 ```sql
@@ -290,3 +298,7 @@ Browsers can read the header (it is in `Access-Control-Expose-Headers`).
 
 Filtering parent rows by their embeds (PostgREST's `!inner`),
 self-referencing embeds, `GET` on `/rpc`, `Accept: application/vnd.pgrst.object+json`.
+
+## Related guides
+
+See [auth](schema-auth.md), [JWT/roles](jwt-and-roles.md), [storage](storage.md) and [troubleshooting](troubleshooting.md).

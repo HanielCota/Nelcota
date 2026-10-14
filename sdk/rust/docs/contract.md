@@ -51,3 +51,7 @@ serialization runs once without adding dependencies.
 Acceptance checks: SDK tests/doctests/examples, server HTTP contract tests,
 Rust generator snapshot and generated model compile/serialization tests,
 Clippy/rustfmt, docs, package verification and an external consumer smoke test.
+
+Published 0.1.2 and the current checkout share the core HTTP contract. Changes
+listed under Unreleased, including the refresh-margin correction, require a new
+client build/package. Server and SDK releases remain independent.

@@ -6,6 +6,13 @@ may upload, read, replace or delete it. The bytes live on the server's disk
 or in any S3-compatible bucket. The design and its reasons are D77–D80 in
 [decisions.md](decisions.md).
 
+## Prerequisites
+
+You need initialized storage metadata, an enabled disk/S3 backend and policies
+for your caller. Examples assume an authenticated user and explicit bucket setup.
+This page describes source behavior; check the matching release for published
+limits and fixes. Keep provider secrets in the private deployment configuration.
+
 ## Turning it on
 
 New projects (`nelcota init`) keep files on the project's disk:
@@ -222,3 +229,7 @@ S3 objects. To get them back under their names:
 SELECT bucket_id || '/' || version AS key, bucket_id || '/' || name AS name
   FROM storage.objects;
 ```
+
+## Related guides
+
+See [REST API](api.md), [backup](backup.md), [JWT/roles](jwt-and-roles.md) and [troubleshooting](troubleshooting.md).

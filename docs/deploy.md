@@ -1,6 +1,9 @@
 # Deploy
 
-**Fresh VPS → HTTPS in 3 commands.**
+Provision PostgreSQL, the Rust app and Caddy for HTTPS on a VPS. You need
+a supported Linux host, administrative access, DNS and open ports 80/443.
+Use an explicitly selected published CLI/image version; source-only features
+require their own release and acceptance. Node is not required.
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/Nelcota/Nelcota/main/scripts/install.sh | sh     # binary (with checksum) + Docker if missing
@@ -20,6 +23,10 @@ Without `curl | sh`: download `nelcota-<architecture>` and
 `nelcota-<architecture>.sha256` from the releases page, run `sha256sum -c` and
 copy it to `/usr/local/bin`. The [script](../scripts/install.sh) does just
 that.
+
+The built-in database connector uses private-network `NoTls`; an `sslmode`
+URL is not a TLS connector. Keep database ports private. Production secrets
+should be stable/private; do not use dev credentials or service tokens in apps.
 
 ## Host and projects
 
@@ -65,8 +72,9 @@ The project name comes from the domain (`api.shop.com` → `shop`), or from
 `--project`. It shows up in the panel's project switcher and in the commands'
 `-p`.
 
-Every argument is validated before anything is written, so a rejected `init`
-leaves no half-created host behind.
+Arguments are validated before provisioning. A package, filesystem or service
+failure during provisioning can still leave files/services behind; inspect the
+reported stage before retrying.
 
 ### `init` flags
 
@@ -135,6 +143,8 @@ the PostgreSQL project's apt repository (PGDG) and Caddy from its own, then:
 | Caddy | the `caddy` service, `/etc/caddy/Caddyfile` generated from the registry |
 | PITR settings | `/etc/pgbackrest/pgbackrest.conf` (with `pitr enable`) |
 
+- Install AWS CLI v2 on the host before using offsite dump/file backups.
+  Native package provisioning installs Postgres, pgBackRest and Caddy, not AWS CLI.
 - Every command works the same way (`up`, `down`, `status`, `logs`, `migrate`,
   `backup`, `restore`, `pitr`, `upgrade`, `remove`); they drive `systemctl`,
   `journalctl` and `runuser -u postgres` instead of `docker compose`.
@@ -181,11 +191,10 @@ Each later `init` only creates the project: its own secrets (Postgres,
 `authenticator`, Ed25519 key), a Postgres profile from the RAM split between
 projects, and the Caddy site (reloaded without taking the others down).
 
-| VPS | Small projects (estimate) |
-|---|---|
-| 1 GB | 2–3 |
-| 2 GB | 5–8 |
-| 4 GB | 12–20 |
+Project capacity depends on queries, data, hashing, uploads and PostgreSQL
+working sets. Select a profile, measure your workload and monitor headroom.
+The benchmark guide records specific fixtures; it does not establish a
+projects-per-GB guarantee.
 
 ## Migrations
 
@@ -241,7 +250,7 @@ with the project's `NELCOTA_VERSION` first:
 
 ```sh
 nelcota upgrade --all --dry-run
-nelcota -p shop upgrade --version 0.3.0
+nelcota -p shop upgrade --version 0.4.0  # published target; already-current projects are skipped
 ```
 
 ## Local development
@@ -278,5 +287,7 @@ between panels with a single-use token, switching to per-project login and
 back, `types`, backup → write → restore, automatic upgrade rollback without
 affecting the other project, and project removal with a backup in `archive/`.
 
-VM mode has not been run yet: it depends on the published repository and the
-first release.
+This dated local run is historical evidence. It does not validate a current
+VPS, public DNS/TLS, the native systemd runtime or controlled updates. Published
+releases now exist; run acceptance on your target host/version before relying
+on production behavior.

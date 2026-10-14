@@ -7,6 +7,13 @@ client ──HTTPS──▶ Caddy ──▶ nelcota (single binary) ──▶ Po
                               │ core: pool (authenticator) + transaction with role/claims
 ```
 
+## Prerequisites
+
+This page describes current source ownership and budgets. To build it, use the
+pinned Rust toolchain; PostgreSQL is required for runtime validation. Historical
+architecture choices belong to the decision log, and published artifacts can
+predate source-only capabilities.
+
 ## Crates
 
 | Crate | Responsibility |
@@ -18,10 +25,12 @@ client ──HTTPS──▶ Caddy ──▶ nelcota (single binary) ──▶ Po
 | `nelcota-webhooks` | transactional row events, persistent delivery leases, signing, safe HTTP dispatch, retries and retention |
 | `nelcota-admin` | panel at `/admin`: JSON API (`/admin/api`) + embedded Svelte SPA (`ui/dist`) |
 | `nelcota-cli`  | host with N projects (`init`, `up`, `projects`, `remove`, `migrate`, `backup`, `upgrade`, `panel-login`...). Modules: `host` (registry), `naming`, `scaffold`, `caddy`, `registry`, `panel_login`, `lifecycle`, `backup`, `upgrade` |
+| `nelcota-deployment` | release/protocol types, durable jobs, host leases and irreversible recovery decisions; CLI/admin adapt runtime effects and operator HTTP |
 | `nelcota-server` | the `nelcota` binary: dispatches the CLI or starts the server (trace, timeout, CORS, gzip) |
 
-Everything compiles into a single binary (~19 MB, static with musl in the
-Docker image).
+The backend compiles into one binary, static with musl in the Docker image.
+Artifact size depends on version/architecture and embedded assets; do not infer
+current size or deployment capacity from older builds.
 
 The query compiler separates the validated request representation (`query/mod.rs`),
 URL parsing (`query/parse.rs`) and SQL generation (`query/sql.rs`), behind the
@@ -121,7 +130,9 @@ The REST root composes routes. Its `http` adapter handles URLs, preferences,
 status codes and headers; `operations` compiles and executes CRUD/RPC under
 the caller's role, returning PostgreSQL-generated JSON and range metadata.
 Catalog internals separate `model`, `introspection`, `refresh` and `listener`
-without adding concepts to the public `CatalogHandle` interface.
+behind the public `CatalogHandle` interface. Keep the returned `ReloadListener`
+owner alive until shutdown; dropping it cancels the listener/driver. Dropping
+the final catalog owner cancels reconciliation, including pool waits.
 
 The SQL executor owns connection lifetime, concurrency, result budgets and
 cancellation behind `execute`; the route handles HTTP status and serialization.
@@ -223,3 +234,31 @@ in `nelcota.schema_migrations` (version, name, date, checksum). They can be
 applied by hand with `psql` if Nelcota no longer exists. The early ones
 (V1–V6) keep their original Portuguese names and comments: refinery checksums
 name and content, so editing them would break existing installs (D68).
+
+## Authentication flow
+
+```mermaid
+sequenceDiagram
+    participant App as Application client
+    participant Auth as /auth/v1
+    participant DB as Private PostgreSQL
+    App->>Auth: Signup or password sign-in
+    Auth->>DB: Validate credentials / create session
+    Auth-->>App: Access JWT and rotating refresh token
+    App->>Auth: Refresh token (serialize callers)
+    Auth->>DB: Atomic rotation / reuse detection
+    Auth-->>App: Replacement token pair
+    Note over App,DB: REST/storage use access JWT + transaction-local role/claims and RLS
+```
+
+The project panel has separate administrator sessions. Controlled updates add
+separate controller/worker processes using the same binary and a separately
+enrolled operator origin; they do not grant host authority to a project login.
+The controller remains source-only pending a new release and VPS acceptance.
+
+## Related guides
+
+See [decisions](decisions.md), [REST API](api.md), [auth](schema-auth.md),
+[webhooks](webhooks.md) and [deploy](deploy.md). Reusable-auth setup is in the
+repository-only guide at `docs/auth-integration.md`. Mermaid diagrams render
+on GitHub; the current embedded reader displays their source.

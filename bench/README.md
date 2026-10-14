@@ -1,18 +1,17 @@
 # Benchmark
 
-A simple read, reproducible with [k6](https://k6.io):
+The current supported measurement workflow is the release campaign below, using
+[k6](https://k6.io), Docker and dedicated Linux CPU slots. Historical results
+describe their original fixtures, not current VPS capacity.
+
+The older read-only fixture queried:
 `GET /rest/v1/bench_products?stock=eq.N&order=id&limit=20` over 100k rows
 (indexed filter, page of 20), as `anon`.
 
-```sh
-nelcota init --local --yes --profile 1gb && nelcota up
-VUS=32 DURATION=30s ./bench/run.sh .
-```
-
-`run.sh` creates the data (`setup.sql`), runs k6 in a container on the compose
-network pointing straight at the app (`http://app:8000`, without Caddy, to
-measure the API) and shows memory usage. To measure with Caddy and TLS in the
-path, use `BASE_URL=https://your-domain`.
+The legacy `bench/run.sh` assumes the former single-project Compose layout and
+`nelcota_web` network. Current hosts use per-project Compose files, `nelcota_edge`
+and project-specific app aliases, so that runner needs a separate tooling fix.
+Do not use it as current validation. Use `campaign.py` below instead.
 
 ## Measured result (2026-10-06)
 
@@ -39,9 +38,9 @@ repeat on your target machine before drawing conclusions.
 | caddy | 14 MiB | 13 MiB |
 | **Total** | ~56 MiB | **~88 MiB** |
 
-On a 1 GB VPS, more than 800 MB are left for the OS page cache, which is what
-actually serves Postgres reads. The 128 MB of `shared_buffers` in the `1gb`
-profile are only filled as pages are read.
+These laptop container readings do not establish available RAM on a VPS.
+Measure process/container usage, PostgreSQL buffers, page cache and OS overhead
+under your own workload before sizing a deployment.
 
 ### Automated tests
 
@@ -132,3 +131,12 @@ Resource evidence requires at least two successful samples and a maximum
 exceptions invalidate the campaign unless the observation crossed its explicit
 server-restart window; cross-restart observations are discarded. The sampler
 must finish before the final evidence gate, so a late failure cannot be hidden.
+
+## Troubleshooting and evidence
+
+Use a fresh output directory and inspect failed/skipped resource gates. A
+baseline failure cannot certify a candidate. Record binary hashes, CPU/memory
+budgets, provider/runtime versions and dataset before comparing runs. The legacy
+laptop table above has no current source/artifact identity and is historical.
+See [execution evidence](../docs/goals/execution-report.md) for saved campaign
+reports and practical limits; [contributing](../CONTRIBUTING.md) covers test isolation.

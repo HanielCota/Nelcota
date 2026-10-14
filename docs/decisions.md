@@ -1,6 +1,10 @@
 # Decision log
 
-Decisions made while building Nelcota, with the why. Newest at the end.
+Historical decisions made while building Nelcota, with the why. Newest at the
+end. Earlier milestones are snapshots: current server source requires Rust 1.99,
+the Rust SDK supports 1.88, and a bare CLI without server configuration prints
+help. Use current operating guides and release notes over superseded choices.
+Decision numbers and historical rationale remain intact.
 
 ## Milestone 1
 
@@ -943,7 +947,8 @@ admin crate owns HTTP/embedded UI. Both public-traffic commit and restarting a
 restored version are irreversible data boundaries. Candidate routes/background
 effects stay gated by an operation identity. Production installation starts
 disabled until exact-binary VPS fault/offsite evidence passes. See
-[the operating guide](panel-updates.md) and [G03](goals/panel-updates-and-recovery.md).
+the repository-only operating guide at `docs/panel-updates.md` and G03 at
+`docs/goals/panel-updates-and-recovery.md`. These are not registered panel guides.
 
 ### Known pending items
 

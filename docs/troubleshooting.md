@@ -98,13 +98,16 @@ cost more memory; responses also have an 8 MiB budget
 
 ## 429 `rate_limited`
 
-Auth endpoints (sign-up, sign-in and refresh, email links, OAuth) allow
-`NELCOTA_AUTH_RATE_LIMIT_PER_MINUTE` requests per minute per client IP (30 by
-default); password sign-in is also limited per email. Many clients behind one
-NAT, or a test suite signing in repeatedly, share that budget. The response carries `Retry-After`; the SDKs expose it as
-`error.retryAfter` (seconds) / `Error::retry_after()`. Behind a reverse proxy,
-set `NELCOTA_TRUST_PROXY=true` only if the proxy sets `X-Forwarded-For`;
-otherwise every visitor shares the proxy's IP and its budget.
+Password sign-in, signup, email links and provider sign-in use per-endpoint
+IP budgets based on `NELCOTA_AUTH_RATE_LIMIT_PER_MINUTE` (30 by default).
+Password login also has a per-email budget. Refresh and PKCE redemption share
+a separate per-IP budget of ten times that value (300 by default). Quotas are
+per process, not distributed across server instances. Clients behind a NAT can
+share an IP budget. The response carries `Retry-After`; SDKs expose it as
+`error.retryAfter` (seconds) / `Error::retry_after()`. Enable
+`NELCOTA_TRUST_PROXY=true` only behind a trusted forwarding proxy: the rightmost
+`X-Forwarded-For` value is used. Restrict direct API access and configure CDN/proxy
+hops deliberately; otherwise the quota may identify the proxy instead of a user.
 
 A 503 `unavailable` means the database could not be reached or is
 overloaded; it may also carry `Retry-After`. The SDKs retry reads on 429 and

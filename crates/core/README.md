@@ -14,3 +14,11 @@ Released migrations and their refinery checksums must remain unchanged.
 
 No Node runtime is required. This crate uses PostgreSQL 17 and Axum 0.8.
 See the repository integration guide for packaging and compatibility guarantees.
+
+## Version scope
+
+The standalone auth/core distribution is an unpublished source deliverable.
+The workspace version may still read 0.4.0; that does not prove a registry release.
+Use matched archives and Rust 1.99+ for this workflow. The complete
+[integration guide](https://github.com/Nelcota/Nelcota/blob/main/docs/auth-integration.md)
+explains promotion, role ownership, private database topology and shutdown.

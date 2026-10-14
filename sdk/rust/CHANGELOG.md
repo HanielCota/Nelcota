@@ -1,12 +1,25 @@
 # Changelog
 
+Package releases use Semantic Versioning and Keep a Changelog categories.
+Dates refer to published releases; Unreleased describes source changes.
+
 ## Unreleased
+
+### Fixed
+
+- Reject nested NaN/infinite write/RPC input before serialization can turn it
+  into null; preserve explicit null and omitted-field semantics.
+
+- Verify that cancelled refresh waiters and dropped auto-refresh handles release
+  their owned resources while accepted rotation remains shared.
 
 - Cap foreground and background refresh margins at half the token lifetime,
   avoiding unnecessary rotation of fresh short-lived sessions or sessions with
   oversized configured margins.
 
 ## 0.1.2 — 2026-10-11
+
+### Fixed
 
 - Bound HTTP error bodies to 64 KiB while preserving status and `Retry-After`.
 - Share one background refresh worker across concurrent callers. Cancelling
@@ -18,11 +31,15 @@
 
 ## 0.1.1 — 2026-10-11
 
+### Changed
+
 - Update repository and documentation links to `Nelcota/Nelcota` after the
   organization transfer. The client API and server compatibility are unchanged.
 - Publish from the organization with GitHub Actions trusted publishing (OIDC).
 
 ## 0.1.0 — 2026-10-10
+
+### Added
 
 - `AuthClient::update_user(UserUpdate)` for the new `PUT /auth/v1/user`:
   change the password (other sessions end) or merge `user_metadata`. Needs a
