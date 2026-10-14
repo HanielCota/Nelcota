@@ -41,6 +41,7 @@ export class SessionManager {
   readonly #listeners = new Set<AuthListener>();
   readonly #broadcast: Broadcast | undefined;
   readonly #native: BrowserSessionState | undefined;
+  readonly #pkce: BrowserSessionState | undefined;
   readonly #onBackgroundError: AuthOptions['onBackgroundError'];
   #session: Session | null | undefined;
   #dirty = false;
@@ -62,6 +63,7 @@ export class SessionManager {
       let factory: IDBFactory | undefined;
       try { factory = globalThis.indexedDB; } catch { /* Report unavailable storage on the first operation. */ }
       this.#native = new BrowserSessionState(this.key, factory);
+      this.#pkce = new BrowserSessionState(`${this.key}.pkce`, factory);
     }
     this.#margin = margin;
     this.#autoRefresh = options.autoRefresh ?? isBrowser();
@@ -99,13 +101,25 @@ export class SessionManager {
   }
   async #stored(allowPending: boolean): Promise<string | null> {
     if (!this.#native) return this.storage.getItem(this.key);
-    const snapshot = await this.#native.read(() => {
-      const value = this.storage.getItem(this.key);
-      if (value !== null && typeof value !== 'string') throw new Error('Native browser storage must be synchronous');
-      return value;
-    }, this.#dirty ? (this.#session ? encodeJson(this.#session) : null) : undefined, allowPending);
+    const snapshot = await this.#native.read(() => this.#nativeValue(this.key), this.#dirty ? (this.#session ? encodeJson(this.#session) : null) : undefined, allowPending);
     this.#dirty = snapshot.retainDirty;
     return snapshot.value;
+  }
+  #nativeValue(key: string): string | null {
+    const value = this.storage.getItem(key);
+    if (value !== null && typeof value !== 'string') throw new Error('Native browser storage must be synchronous');
+    return value;
+  }
+  async setVerifier(value: string): Promise<void> {
+    const key = `${this.key}.pkce`;
+    await this.#pkce?.write(value);
+    await this.storage.setItem(key, value);
+  }
+  async consumeVerifier(): Promise<string | null> {
+    const key = `${this.key}.pkce`;
+    const value = this.#pkce ? await this.#pkce.consume(() => this.#nativeValue(key)) : await this.storage.getItem(key);
+    await this.storage.removeItem(key);
+    return value;
   }
   current(): Promise<Session | null> { return this.#locked(() => this.#read()); }
   #marginFor(session: Session): number {
@@ -160,10 +174,16 @@ export class SessionManager {
   }
   set(session: Session): Promise<void> {
     if (!isSession(session)) throw new TypeError('Not a Nelcota session');
-    return this.#locked(() => this.#write(session, 'signed_in'));
+    return this.#locked(async () => {
+      if (this.#native) await this.#read(true, true);
+      await this.#write(session, 'signed_in');
+    });
   }
   authenticate<T>(request: () => Promise<Result<T>>, sessionOf: (data: T) => Session | null): Promise<Result<T>> {
     return this.#locked(async () => {
+      // Capture the receipt before HTTP: failed publication must retain an
+      // accepted sign-in until that exact receipt is superseded.
+      if (this.#native) await this.#read(true, true);
       const result = await request();
       if (!result.error) {
         const session = sessionOf(result.data);

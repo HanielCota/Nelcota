@@ -89,6 +89,11 @@ signOut; it never falls back to the potentially spent token in localStorage.
 A committed logout supersedes dirty state in other clients and late refresh
 responses cannot overwrite it. Broadcasts carry change notifications, not tokens.
 
+Each native publication has a unique revision. Explicit sign-in captures the
+prior receipt before HTTP; failed publication retains the local replacement
+or logout while that exact receipt remains current, even with a foreign owner.
+A later committed revision supersedes it even when the value is identical.
+
 The journal imports existing localStorage state once per storage key. Reload all
 tabs when upgrading to avoid mixing SDK coordination protocols. Use `signOut()`
 or clear all site data to remove sessions; editing only localStorage no longer
@@ -109,6 +114,13 @@ refresh, without aborting an operation shared by other callers. `signOut()` wait
 for a pending refresh and clears locally even when server revocation fails.
 `dispose()` stops timers, closes channels and clears listeners; it neither
 revokes the session nor aborts requests already in flight.
+
+Native PKCE verifiers use the same journal with a separate key. Consumption
+commits a tombstone atomically, preventing stale native views from exchanging
+with an older or already consumed verifier. Cancellation before consumption
+keeps the verifier; once consumption starts, cancellation ends the caller's
+wait while the bounded exchange finishes and persists an accepted session.
+Custom adapters keep their existing storage API and keyed-lock coordination.
 
 Failed session writes keep the newer state in memory: this client never reloads
 a spent refresh token or restores a signed-out session from stale storage.

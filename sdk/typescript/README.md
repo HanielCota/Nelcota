@@ -242,6 +242,11 @@ Reload all open tabs to avoid mixing old and new coordination protocols.
 Use `signOut()` or clear all site data to remove native sessions; editing
 only `localStorage` no longer changes authoritative session state.
 
+Failed sign-in/logout publication keeps the newer local state while the exact
+prior journal revision remains current, even if another client wrote that
+prior revision. A new committed revision supersedes it, including an explicit
+publication of the same value.
+
 If a refresh fails for a transient reason, the old token is still sent. The
 request then fails with 401 instead of silently running as a visitor.
 
@@ -261,6 +266,12 @@ Each storage key holds one pending OAuth verifier: starting another sign-in
 replaces the previous attempt. Verifier publication, navigation and callback
 consumption use the same lock so asynchronous work cannot reorder them. Use
 separate storage keys for independent login flows.
+
+Native PKCE publication and consumption also use the IndexedDB journal, so
+stale localStorage cannot supply an older verifier or reuse a consumed one.
+An already cancelled exchange keeps its verifier. Once consumption begins,
+the bounded exchange persists an accepted session even if its caller cancels
+the wait; the first exchange's timeout still applies.
 
 **Email links** arrive as `https://your.app/page#type=...&token=...`.
 `readEmailLink()` takes the token and removes it from the address bar and

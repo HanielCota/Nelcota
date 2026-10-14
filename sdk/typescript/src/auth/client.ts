@@ -4,6 +4,7 @@
  */
 
 import { NelcotaError, NelcotaUsageError, clientError, fail, ok, type Result } from '../core/errors.js';
+import { abortable } from '../core/cancellation.js';
 import type { HttpClient } from '../core/http.js';
 import { isBrowser } from '../core/jwt.js';
 import { SessionManager, type AuthListener, type AuthOptions, type AuthRequestOptions } from './manager.js';
@@ -120,7 +121,7 @@ export class AuthClient {
     return withLock(key, async () => {
       const verifier = createVerifier();
       const challenge = await challengeFor(verifier);
-      await this.#manager.storage.setItem(key, verifier);
+      await this.#manager.setVerifier(verifier);
       const query = new URLSearchParams({
         provider,
         redirect_to: redirectTo,
@@ -135,17 +136,19 @@ export class AuthClient {
 
   /** Trades the `code` from the OAuth redirect (and the stored verifier) for a session. */
   async exchangeCode(code: string, options: AuthRequestOptions = {}): Promise<Result<Session>> {
-    return this.#manager.authenticate(async () => {
+    if (options.signal?.aborted) return fail(clientError('aborted', 'The request was aborted'));
+    const operation = this.#manager.authenticate(async () => {
       const key = `${this.#manager.key}.pkce`;
       const verifier = await withLock(key, async () => {
-        const stored = await this.#manager.storage.getItem(key);
-        // Code consumption cannot erase a verifier concurrently being published.
-        await this.#manager.storage.removeItem(key);
-        return stored;
+        if (options.signal?.aborted) return null;
+        // Claim once before HTTP; the exchange then owns its bounded lifetime.
+        return this.#manager.consumeVerifier();
       });
+      if (!verifier && options.signal?.aborted) return fail(clientError('aborted', 'The request was aborted'));
       if (!verifier) return fail(clientError('pkce_missing', 'No sign-in was started in this browser (PKCE verifier missing)'));
-      return this.#token('pkce', { auth_code: code, code_verifier: verifier }, options);
+      return this.#token('pkce', { auth_code: code, code_verifier: verifier }, options.timeout === undefined ? {} : { timeout: options.timeout });
     }, session => session);
+    return abortable(operation, options.signal).then(result => result.error ? fail(result.error) : result.data);
   }
 
   /**

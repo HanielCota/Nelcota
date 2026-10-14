@@ -18,16 +18,89 @@ function browser() {
   vi.stubGlobal('BroadcastChannel', undefined);
   vi.stubGlobal('localStorage', storage);
   vi.stubGlobal('indexedDB', factory);
-  let queue: Promise<unknown> = Promise.resolve();
+  const queues = new Map<string, Promise<unknown>>();
   vi.stubGlobal('navigator', { locks: {
-    request: <T>(_name: string, callback: () => Promise<T>) => {
-      const result = queue.then(callback);
-      queue = result.then(() => undefined, () => undefined);
+    request: <T>(name: string, callback: () => Promise<T>) => {
+      const result = (queues.get(name) ?? Promise.resolve()).then(callback);
+      queues.set(name, result.then(() => undefined, () => undefined));
       return result;
     },
   } });
   return { storage, factory };
 }
+
+function pkceBrowser() {
+  browser();
+  const storage = {
+    getItem: (key: string) => key.endsWith('.pkce') ? 'stale-verifier' : JSON.stringify(session()),
+    setItem: vi.fn(), removeItem: vi.fn(),
+  };
+  vi.stubGlobal('localStorage', storage);
+  return storage;
+}
+
+it('exchanges OAuth with the committed verifier even when the native view is stale', async () => {
+  const storage = pkceBrowser();
+  const mock = mockFetch(json(session()));
+  const client = createClient('https://api.example.com', { fetch: mock.fetch, auth: { autoRefresh: false } });
+  try {
+    await client.auth.signInWithOAuth({ provider: 'github', redirectTo: 'https://app.example.com/auth', redirect: false });
+    const published = storage.setItem.mock.calls.find(([key]) => key === `${KEY}.pkce`)?.[1];
+    await client.auth.exchangeCode('authorization-code');
+    expect(JSON.parse(mock.calls[0]?.body ?? 'null')).toMatchObject({ code_verifier: published });
+  } finally { client.dispose(); }
+});
+
+it('does not exchange an OAuth code twice from stale native verifier snapshots', async () => {
+  pkceBrowser();
+  const mock = mockFetch(json(session()), json(session()));
+  const clients = [0, 1].map(() => createClient('https://api.example.com', { fetch: mock.fetch, auth: { autoRefresh: false } }));
+  try {
+    await clients[0]!.auth.signInWithOAuth({ provider: 'github', redirectTo: 'https://app.example.com/auth', redirect: false });
+    expect((await clients[0]!.auth.exchangeCode('authorization-code')).error).toBeNull();
+    expect((await clients[1]!.auth.exchangeCode('authorization-code')).error?.code).toBe('pkce_missing');
+    expect(mock.calls).toHaveLength(1);
+  } finally { clients.forEach(client => client.dispose()); }
+});
+
+it('does not consume a pending OAuth verifier for an already cancelled exchange', async () => {
+  const storage = pkceBrowser();
+  const mock = mockFetch(json(session()));
+  const client = createClient('https://api.example.com', { fetch: mock.fetch, auth: { autoRefresh: false } });
+  try {
+    await client.auth.signInWithOAuth({ provider: 'github', redirectTo: 'https://app.example.com/auth', redirect: false });
+    expect((await client.auth.exchangeCode('authorization-code', { signal: AbortSignal.abort() })).error?.code).toBe('aborted');
+    expect(storage.removeItem).not.toHaveBeenCalled();
+    expect((await client.auth.exchangeCode('authorization-code')).error).toBeNull();
+    expect(mock.calls).toHaveLength(1);
+  } finally { client.dispose(); }
+});
+
+it('persists a claimed OAuth exchange after its caller cancels the wait', async () => {
+  pkceBrowser();
+  let started!: () => void;
+  let release!: () => void;
+  const pending = new Promise<void>(resolve => { started = resolve; });
+  const response = new Promise<void>(resolve => { release = resolve; });
+  const mock = mockFetch(async () => {
+    started();
+    await response;
+    return json(session(900, 'accepted-oauth', 'accepted-access'));
+  });
+  const client = createClient('https://api.example.com', { fetch: mock.fetch, auth: { autoRefresh: false } });
+  try {
+    await client.auth.signInWithOAuth({ provider: 'github', redirectTo: 'https://app.example.com/auth', redirect: false });
+    const abort = new AbortController();
+    const exchanged = client.auth.exchangeCode('authorization-code', { signal: abort.signal });
+    await pending;
+    abort.abort();
+    expect((await exchanged).error?.code).toBe('aborted');
+    release();
+    expect((await client.auth.getSession()).data?.refresh_token).toBe('accepted-oauth');
+    expect((await client.auth.exchangeCode('authorization-code')).error?.code).toBe('pkce_missing');
+    expect(mock.calls).toHaveLength(1);
+  } finally { release(); client.dispose(); }
+});
 
 it('hands the committed replacement to a queued tab with a stale native snapshot', async () => {
   browser();
@@ -59,6 +132,111 @@ it('does not resurrect a signed-out session from a stale native mirror or a reop
     try { expect((await reopened.auth.getSession()).data).toBeNull(); }
     finally { reopened.dispose(); }
   } finally { first.dispose(); other.dispose(); }
+});
+
+it('keeps logout local when a foreign-owned receipt cannot be replaced', async () => {
+  const { factory } = browser();
+  const mock = mockFetch(() => {
+    vi.spyOn(factory, 'open').mockImplementationOnce(() => { throw new Error('logout commit failed'); });
+    return empty();
+  });
+  const clients = [0, 1].map(() => createClient('https://api.example.com', { fetch: mock.fetch, auth: { autoRefresh: false } }));
+  try {
+    await clients[0]!.auth.setSession(session());
+    await expect(clients[1]!.auth.signOut()).rejects.toThrow('logout commit failed');
+    expect((await clients[1]!.auth.getSession()).data).toBeNull();
+    expect(mock.calls).toHaveLength(1);
+  } finally { clients.forEach(client => client.dispose()); }
+});
+
+it('retains an accepted sign-in when replacing a foreign receipt fails', async () => {
+  const { factory } = browser();
+  const replacement = session(900, 'signed-in-replacement', 'new-access');
+  const mock = mockFetch(() => {
+    vi.spyOn(factory, 'open').mockImplementationOnce(() => { throw new Error('sign-in commit failed'); });
+    return json(replacement);
+  });
+  const clients = [0, 1].map(() => createClient('https://api.example.com', { fetch: mock.fetch, auth: { autoRefresh: false } }));
+  try {
+    await clients[0]!.auth.setSession(session());
+    await expect(clients[1]!.auth.signInWithPassword({ email: 'ana@example.com', password: 'example-password' })).rejects.toThrow('sign-in commit failed');
+    expect((await clients[1]!.auth.getSession()).data?.refresh_token).toBe('signed-in-replacement');
+    expect(mock.calls).toHaveLength(1);
+  } finally { clients.forEach(client => client.dispose()); }
+});
+
+it('lets a newer foreign logout supersede an accepted sign-in whose write failed', async () => {
+  const { factory } = browser();
+  const mock = mockFetch(() => {
+    vi.spyOn(factory, 'open').mockImplementationOnce(() => { throw new Error('commit failed'); });
+    return json(session(900, 'accepted', 'accepted-access'));
+  }, empty());
+  const clients = [0, 1].map(() => createClient('https://api.example.com', { fetch: mock.fetch, auth: { autoRefresh: false } }));
+  try {
+    await clients[0]!.auth.setSession(session());
+    await expect(clients[1]!.auth.signInWithPassword({ email: 'ana@example.com', password: 'example-password' })).rejects.toThrow('commit failed');
+    expect((await clients[1]!.auth.getSession()).data?.refresh_token).toBe('accepted');
+    await clients[0]!.auth.signOut();
+    expect((await clients[1]!.auth.getSession()).data).toBeNull();
+  } finally { clients.forEach(client => client.dispose()); }
+});
+
+it('detects a newer foreign commit even when it republishes the identical value', async () => {
+  const { factory } = browser();
+  const original = session();
+  const mock = mockFetch(() => {
+    vi.spyOn(factory, 'open').mockImplementationOnce(() => { throw new Error('commit failed'); });
+    return empty();
+  });
+  const clients = [0, 1].map(() => createClient('https://api.example.com', { fetch: mock.fetch, auth: { autoRefresh: false } }));
+  try {
+    await clients[0]!.auth.setSession(original);
+    await expect(clients[1]!.auth.signOut()).rejects.toThrow('commit failed');
+    expect((await clients[1]!.auth.getSession()).data).toBeNull();
+    // An explicit later session publication is a new decision, even if equal.
+    await clients[0]!.auth.setSession(original);
+    expect((await clients[1]!.auth.getSession()).data?.refresh_token).toBe(original.refresh_token);
+  } finally { clients.forEach(client => client.dispose()); }
+});
+
+it('retains an accepted sign-in over an unchanged foreign interrupted reservation', async () => {
+  const { factory } = browser();
+  const foreign = new BrowserSessionState(KEY, factory);
+  const original = session(5);
+  await foreign.read(() => JSON.stringify(original));
+  await foreign.reserve(original);
+  const mock = mockFetch(() => {
+    vi.spyOn(factory, 'open').mockImplementationOnce(() => { throw new Error('commit failed'); });
+    return json(session(900, 'accepted', 'accepted-access'));
+  });
+  const client = createClient('https://api.example.com', { fetch: mock.fetch, auth: { autoRefresh: false } });
+  try {
+    await expect(client.auth.signInWithPassword({ email: 'ana@example.com', password: 'example-password' })).rejects.toThrow('commit failed');
+    expect((await client.auth.getSession()).data?.refresh_token).toBe('accepted');
+    await foreign.write(null);
+    expect((await client.auth.getSession()).data).toBeNull();
+    expect(mock.calls).toHaveLength(1);
+  } finally { client.dispose(); }
+});
+
+it('upgrades the original receipt shape without losing its session', async () => {
+  const { factory } = browser();
+  const state = new BrowserSessionState(KEY, factory);
+  await state.read(() => null);
+  await new Promise<void>((resolve, reject) => {
+    const request = factory.open('nelcota.auth', 1);
+    request.onsuccess = () => {
+      const database = request.result;
+      const transaction = database.transaction('sessions', 'readwrite');
+      transaction.objectStore('sessions').put({ kind: 'ready', owner: 'previous-sdk', value: JSON.stringify(session()) }, KEY);
+      transaction.oncomplete = () => { database.close(); resolve(); };
+      transaction.onabort = () => { database.close(); reject(transaction.error); };
+    };
+    request.onerror = () => reject(request.error);
+  });
+  const client = createClient('https://api.example.com', { auth: { autoRefresh: false } });
+  try { expect((await client.auth.getSession()).data?.refresh_token).toBe('refresh-1'); }
+  finally { client.dispose(); }
 });
 
 it('retains a received replacement and blocks another owner after its commit fails', async () => {

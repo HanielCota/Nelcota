@@ -3,7 +3,7 @@ import { parseSession, type Session } from './session.js';
 import { encodeJson } from '../core/json.js';
 import { createVerifier } from './pkce.js';
 
-type Receipt = { kind: 'ready' | 'refreshing'; owner: string; value: string | null };
+type Receipt = { kind: 'ready' | 'refreshing'; owner: string; value: string | null; revision?: string };
 type Snapshot = { value: string | null; retainDirty: boolean };
 const DATABASE = 'nelcota.auth';
 const STORE = 'sessions';
@@ -17,11 +17,13 @@ function receipt(value: unknown): Receipt {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new Error('Invalid browser session receipt');
   const fields = value as Record<string, unknown>;
   if ((fields['kind'] !== 'ready' && fields['kind'] !== 'refreshing') || typeof fields['owner'] !== 'string' || fields['owner'].length === 0 || fields['owner'].length > 128 || !(fields['value'] === null || typeof fields['value'] === 'string')) throw new Error('Invalid browser session receipt');
+  if (fields['revision'] !== undefined && (typeof fields['revision'] !== 'string' || fields['revision'].length !== 64)) throw new Error('Invalid browser session revision');
   return value as Receipt;
 }
 
 export class BrowserSessionState {
   readonly #owner = createVerifier();
+  #observed: string | undefined;
   constructor(readonly key: string, private readonly factory: IDBFactory | undefined) {}
 
   async #open(): Promise<IDBDatabase> {
@@ -77,36 +79,65 @@ export class BrowserSessionState {
     });
   }
 
-  read(legacy: () => string | null, dirty?: string | null, allowPending = false): Promise<Snapshot> {
-    return this.#transaction((store, previous) => {
-      if (previous === undefined) {
-        const value = dirty !== undefined ? dirty : legacy();
-        store.put({ kind: 'ready', owner: this.#owner, value } satisfies Receipt, this.key);
-        return { value, retainDirty: dirty !== undefined };
-      }
-      const state = receipt(previous);
-      const owned = state.owner === this.#owner;
-      if (state.kind === 'refreshing' && !owned && !allowPending) throw new Error('Browser session refresh was interrupted; sign in again');
-      return { value: owned && dirty !== undefined ? dirty : state.value, retainDirty: owned && dirty !== undefined };
-    });
+  #record(kind: Receipt['kind'], value: string | null): Receipt {
+    return { kind, owner: this.#owner, value, revision: createVerifier() };
   }
 
-  reserve(session: Session): Promise<void> {
-    return this.#transaction((store, previous) => {
+  async read(legacy: () => string | null, dirty?: string | null, allowPending = false): Promise<Snapshot> {
+    const result = await this.#transaction((store, previous) => {
+      if (previous === undefined) {
+        const value = dirty !== undefined ? dirty : legacy();
+        const state = this.#record('ready', value);
+        store.put(state, this.key);
+        return { value, retainDirty: dirty !== undefined, revision: state.revision };
+      }
+      const state = receipt(previous);
+      // Upgrade the original receipt format in the same committed transaction.
+      if (state.revision === undefined) {
+        state.revision = createVerifier();
+        store.put(state, this.key);
+      }
+      const owned = state.owner === this.#owner;
+      const retainDirty = dirty !== undefined && (owned || state.revision === this.#observed);
+      if (state.kind === 'refreshing' && !owned && !allowPending && !retainDirty) throw new Error('Browser session refresh was interrupted; sign in again');
+      return { value: retainDirty ? dirty : state.value, retainDirty, revision: state.revision };
+    });
+    this.#observed = result.revision;
+    return { value: result.value, retainDirty: result.retainDirty };
+  }
+
+  async reserve(session: Session): Promise<void> {
+    const next = this.#record('refreshing', encodeJson(session));
+    await this.#transaction((store, previous) => {
       const state = receipt(previous);
       if (state.kind === 'refreshing' && state.owner !== this.#owner) throw new Error('Browser session refresh was interrupted; sign in again');
       if (state.kind === 'ready' && parseSession(state.value)?.refresh_token !== session.refresh_token) throw new Error('Browser session changed before refresh');
-      store.put({ kind: 'refreshing', owner: this.#owner, value: encodeJson(session) } satisfies Receipt, this.key);
+      store.put(next, this.key);
     });
+    this.#observed = next.revision;
   }
 
-  write(value: string | null, completingRefresh = false): Promise<void> {
-    return this.#transaction((store, previous) => {
+  async write(value: string | null, completingRefresh = false): Promise<void> {
+    const next = this.#record('ready', value);
+    await this.#transaction((store, previous) => {
       if (completingRefresh) {
         const state = receipt(previous);
         if (state.kind !== 'refreshing' || state.owner !== this.#owner) throw new BrowserSessionConflictError();
       }
-      store.put({ kind: 'ready', owner: this.#owner, value } satisfies Receipt, this.key);
+      store.put(next, this.key);
     });
+    this.#observed = next.revision;
+  }
+
+  async consume(legacy: () => string | null): Promise<string | null> {
+    const next = this.#record('ready', null);
+    const value = await this.#transaction((store, previous) => {
+      const state = previous === undefined ? this.#record('ready', legacy()) : receipt(previous);
+      if (state.kind !== 'ready') throw new Error('Browser verification state is unavailable');
+      store.put(next, this.key);
+      return state.value;
+    });
+    this.#observed = next.revision;
+    return value;
   }
 }
