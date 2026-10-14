@@ -3,6 +3,12 @@
 Public contract. The JWT format is ours and documented here; no library
 dictates it.
 
+## Prerequisites
+
+You need an initialized private PostgreSQL database and a signing key or
+compatible verifier. This page describes built-in token/role behavior; issuer
+and audience policy are not enforced by the built-in verifier.
+
 ## Postgres roles
 
 | Role            | Login | Used by                            | RLS        |
@@ -34,7 +40,9 @@ member of the other roles and assumes one of them in each request.
 3. Runs the query. Postgres RLS decides what the role sees.
 4. COMMIT (or ROLLBACK on error). Role and claims die with the transaction.
 
-The API never implements permission rules of its own.
+Application row access is determined by PostgreSQL GRANTs and RLS. The server
+also validates authentication, query/path syntax and operation boundaries before
+executing the request.
 
 ## Signing
 
@@ -115,3 +123,7 @@ The body is the API's error JSON (`code`, `message` and, for database errors,
 Every 401 carries `WWW-Authenticate`: `Bearer error="invalid_token"` when a
 token was presented and rejected, plain `Bearer` when the request had no
 token (an `anon` request that needs to sign in).
+
+## Related guides
+
+See [auth schema](schema-auth.md), [REST API](api.md) and [deploy](deploy.md).

@@ -1,5 +1,13 @@
 # Backup and restore
 
+Capture and restore a database together with its disk-file snapshot. You need
+a selected initialized host/project, PostgreSQL tools through its runtime,
+sufficient disk space and a private offsite destination when configured.
+
+Source fixes after 0.4.0 are unpublished: use matching release guidance and
+verify the actual artifact. Take a compatible verified pair before destructive
+recovery; database PITR has different guarantees from a dump restore.
+
 ## Backup
 
 ```sh
@@ -60,8 +68,10 @@ NELCOTA_BACKUP_S3_SECRET_KEY=...
 NELCOTA_BACKUP_S3_REGION=us-west-002
 ```
 
-Uploads use the official `amazon/aws-cli` image (nothing to install on the
-host). Configure whatever retention (lifecycle) you want on the bucket.
+Docker uploads use the `amazon/aws-cli` image. Systemd hosts execute native
+AWS CLI v2, which you must install separately. Set private bucket access and
+explicit remote lifecycle rules for both dumps and file snapshots. Test readback
+and off-host restore; a successful upload alone does not prove recoverability.
 
 > **Keep `host.env` and each project's `.env` somewhere safe, apart from the
 > bucket.** They are not in the backup (they hold secrets). Without the
@@ -106,8 +116,14 @@ nelcota init api.shop.com --yes
 cp /safe/place/shop.env projects/shop/.env   # optional: keeps the JWT key
 nelcota up
 aws s3 cp s3://my-backups/shop/nelcota-shop-....dump projects/shop/backups/ --endpoint-url ...
-nelcota -p shop restore projects/shop/backups/nelcota-shop-....dump --yes
+nelcota -p shop restore projects/shop/backups/nelcota-shop-....dump --files --yes
 ```
+
+This restores the matching disk snapshot too; fetch its directory/manifest or
+configure the host backup bucket so the CLI can fetch it. Omit `--files` only
+for an intentional database-only restore. Preserve and reconcile the private
+project/host configuration, including credentials and SSO settings. The direct
+`aws` download above requires an installed AWS CLI and configured private access.
 
 The acceptance test (`scripts/acceptance.sh --local`) takes a backup, writes
 more data, restores and checks that the state went back to the backup's.
@@ -129,6 +145,7 @@ back to **any second** the archive covers: just before a bad migration or a
 ```sh
 nelcota -p shop pitr enable                                    # archiving + first full backup
 nelcota -p shop pitr status                                    # backups and the range covered
+nelcota -p shop pitr backup                                    # base backup now (full Sunday, otherwise differential)
 nelcota -p shop pitr restore --time "2026-10-07 14:30:00+00"   # back to that moment
 nelcota -p shop pitr restore                                   # up to the last archived write
 nelcota -p shop pitr disable                                   # stops archiving (keeps what is in S3)
@@ -140,8 +157,10 @@ nelcota -p shop pitr disable                                   # stops archiving
   `s3://<bucket>/<project>/pitr/`, beside the dumps.
 - It needs the S3 settings in `host.env` (the same ones the backup upload uses).
   pgBackRest only talks to S3 over HTTPS. For your own MinIO/SeaweedFS with a
-  self-signed certificate, add `NELCOTA_BACKUP_S3_VERIFY_TLS=false`; for
-  storage that needs path-style URLs, `NELCOTA_BACKUP_S3_URI_STYLE=path`.
+  private certificate authority, install its trusted CA for the runtime.
+  `NELCOTA_BACKUP_S3_VERIFY_TLS=false` disables verification and should not
+  be used for production recovery. For providers requiring path-style URLs,
+  set `NELCOTA_BACKUP_S3_URI_STYLE=path`.
 - `enable` writes `pgbackrest.env` in the project folder (mode 600, it holds
   the S3 keys). After changing the S3 settings in `host.env`, run `enable`
   again to regenerate it.
@@ -149,13 +168,20 @@ nelcota -p shop pitr disable                                   # stops archiving
   full on Sundays, differential on the other days. Two full backups are kept,
   so the window reaches back one to two weeks. Fewer WAL segments to replay
   means a faster restore.
+- PITR restores PostgreSQL only. It does not rewind disk/S3 object bytes.
+  Older metadata can refer to versions already deleted; maintain provider
+  versioning/history or a separately verified file-recovery plan. Paired
+  dump/file snapshots are a different recovery mechanism.
 - `restore` stops the project, rewrites the data directory from the closest
   base backup, replays the WAL up to the target and starts everything again.
   It discards every write after the target, so it asks for confirmation
   (`--yes` skips it). Then it takes a new full backup, because the restored
   database continues on a new timeline that older backups cannot serve.
-- A target the archive does not cover is refused by pgBackRest before any
-  change, and the project starts again as it was.
+- Recovery is destructive. Some configuration/archive problems are rejected
+  early, but an unreachable target can be detected during WAL replay after
+  files were restored. PostgreSQL may remain stopped or in recovery; inspect
+  status/logs and retry with a covered target. Do not assume the old database
+  is unchanged or automatically restored.
 - Projects created before PITR are updated by `enable`: Postgres switches to
   the image built from `postgres/Dockerfile` and gets an `egress` network to
   reach S3 (the `internal` network has no way out). If `docker-compose.yml`
@@ -163,3 +189,14 @@ nelcota -p shop pitr disable                                   # stops archiving
 
 The acceptance test (`scripts/acceptance-pitr.sh`) runs the whole cycle
 against a local S3 server with TLS.
+
+## Troubleshooting
+
+A missing offsite destination fails `--upload`; a partially configured bucket
+also fails rather than silently skipping transfer. Check available space,
+provider permissions/TLS and the full dump/files pair. On failed recovery, keep
+maintenance and private diagnostics intact and inspect the selected runtime;
+do not discard the safety backup. Use a disposable host to rehearse recovery.
+
+Related: [deploy](deploy.md), [storage](storage.md), [leaving](leaving.md). Controlled-update recovery has a separate repository
+guide at `docs/panel-updates.md`.

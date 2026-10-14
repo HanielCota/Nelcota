@@ -3,5 +3,7 @@
 
 ## Test plan
 <!-- How it was verified: tests added, commands run, screenshots for the panel. -->
-- [ ] `cargo test`, clippy and fmt
-- [ ] Docs (`docs/`) and a decision in `docs/decisions.md` if behavior or design changed
+- [ ] Relevant checks passed; list commands and skipped/unrun coverage above.
+- [ ] Docs/release notes match behavior; pt-BR guide catalogs updated when affected.
+- [ ] Generated panel assets rebuilt and committed separately when affected.
+- [ ] Released SQL/checksums preserved; design decisions recorded when needed.

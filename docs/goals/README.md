@@ -34,3 +34,10 @@ extending these completed goals. Keep findings distinct from
 proposals; each confirmed defect needs a reproducer and an appropriate fix.
 Publishing packages or opening another repository is a separate release step
 from proving reuse in a consumer outside the workspace.
+
+## Reading historical evidence
+
+Execution reports and JSON measurements retain their original commit, artifact,
+date and failed/skipped/unrun checks. Completed code reviews do not certify all
+future builds or production deployment. Current behavior belongs in the operating
+references; public security context is in [the review summary](../security/review-summary.md).

@@ -10,6 +10,12 @@ else English); the choice in the account menu (Language) is remembered in that
 browser. Server messages and error texts are English; the panel shows errors
 in the chosen language by their error code.
 
+## Prerequisites
+
+Use an initialized project with panel credentials and access to its API origin.
+The project administrator can run privileged SQL; this is not an end-user token
+or an enrolled update-operator login. This reference describes current source.
+
 ## Several projects
 
 Each project has its own panel, on its own domain, showing only its data. At
@@ -72,7 +78,7 @@ without policies) and red (table exposed without RLS).
 | Delete several rows | tick the boxes and "Delete N" (a single transaction) |
 | Sort | click the column header (asc → desc → unsorted) |
 | Filter | "Filter" in the grid: equals, not equal, contains, greater/less, is/is not NULL. Filters live in the URL in the REST API format (`/admin/tables/orders?status=eq.paid`). Page, page size and sort use `_page`, `_size`, `_sort` and `_desc`; the complete view survives switching between Data and Structure, refresh and browser navigation |
-| Export a table | "Export" → CSV or JSON, with the grid's order and filters. The server streams the read (no row limit, nothing loaded fully into memory); the CSV has a BOM so Excel recognizes accents |
+| Export a table | "Export" → CSV or JSON, with the grid's order and filters. The server streams with bounded buffers and no collection row cap; exports have a two-minute lifetime and can fail on timeout/cancellation. CSV has a BOM for Excel accents |
 | Follow a foreign key | the arrow in an FK cell opens the referenced row in the other table; the header shows `→ table` |
 | Run SQL | Ctrl+Enter; table and column autocomplete; templates and history |
 | Save queries | Ctrl+S or "Save"; they show in the editor's sidebar and in the palette. Each query has its own draft; opening another query, template or new query keeps previous work. Saved queries and drafts are stored in this browser, per project |
@@ -136,8 +142,9 @@ Use JSON export when you need the original text without this neutralization.
 ## Guides and references
 
 The book icon in the top bar opens **Guides and references** at `/admin/guides`.
-The reader includes the project documentation, JavaScript/TypeScript and Rust
-SDK references, SQL examples and server recipes. Search matches the full text,
+The reader includes its registered project guides, JavaScript/TypeScript and
+Rust SDK references, SQL examples and server recipes. Repository-only references
+and historical reports are not automatically added to the reader. Search matches the full text,
 code blocks have copy buttons, and a table of contents links to each section.
 On phones, a guide selector replaces the sidebar. Guides and references follow
 the panel language, with Portuguese translations of the English sources. Code
@@ -148,8 +155,10 @@ changes flow straight from the source without requiring a translation update.
 
 SDK help on the API page and the S3 guide on the Storage page open in this
 reader. Links between repository documents stay in the panel, including
-section links that can be shared and survive a reload. Sources and images are
-bundled into the panel build, so reading them needs no GitHub access.
+section links that can be shared and survive a reload. Registered sources and images are bundled, so reading those needs no GitHub
+access. The longer Notes staging guide opens on GitHub. Some unregistered
+repository links are not supported by the current reader; consult the repository
+for them.
 
 **API → OpenAPI documentation**, also available from the command palette,
 opens the live reference inside the panel. It fetches `/rest/v1/` as `anon`,
@@ -208,16 +217,22 @@ because of the `$`), followed by `docker compose up -d --force-recreate app`.
 
 ```sh
 cd crates/admin/ui
-npm install
-npm run dev        # Vite with hot reload; /admin/api is proxied to nelcota at https://localhost
+npm ci
+npm run dev        # http://127.0.0.1:5173/admin/; proxy: http://127.0.0.1:8000
 npm run check      # types (svelte-check)
 npm run build      # generates dist/ (versioned and embedded in the binary)
 ```
 
-After `npm run build`, rebuild the binary (`cargo build`) and commit `dist/`
-together with the code. CI checks that `dist` is up to date.
+After bundled guide/UI changes, run `npm run build` and rebuild the binary
+(`cargo build --locked -p nelcota-server`). Commit generated `dist/` in its own
+build commit. CI checks it for drift. Set `NELCOTA_API_URL` when Vite should
+proxy another backend.
 
 Interface texts live in `src/lib/i18n/messages/<area>.ts`, with a Portuguese
 (`pt-BR`) and an English (`en`) object; the English one is typed against the
 Portuguese one, so a missing key fails `npm run check`. Never hardcode a
 user-facing string in a component.
+
+## Related guides
+
+See [deploy](deploy.md), [auth](schema-auth.md), [storage](storage.md) and [troubleshooting](troubleshooting.md).

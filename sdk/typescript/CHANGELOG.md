@@ -1,6 +1,14 @@
 # Changelog
 
+Package releases use Semantic Versioning and Keep a Changelog categories.
+Dates refer to published releases; Unreleased describes source changes.
+
 ## Unreleased
+
+### Fixed
+
+- Release cancelled shared-operation waiters immediately while accepted rotation
+  finishes and persists its result; prevent retained AbortSignal/listener graphs.
 
 - Coordinate native browser sessions through committed IndexedDB receipts,
   preventing queued tabs from rotating a token from a stale localStorage view.
@@ -21,6 +29,8 @@
 
 ## 0.1.2 — 2026-10-11
 
+### Fixed
+
 - Bound HTTP error bodies to 64 KiB while preserving status and `Retry-After`.
 - Preserve newer in-memory sessions when storage writes or removal fail; stale
   storage and cross-tab reloads cannot restore a spent token or signed-out state.
@@ -34,11 +44,15 @@
 
 ## 0.1.1 — 2026-10-11
 
+### Changed
+
 - Update repository and documentation links to `Nelcota/Nelcota` after the
   organization transfer. The client API and server compatibility are unchanged.
 - Publish from the organization with GitHub Actions trusted publishing (OIDC).
 
 ## 0.1.0 — 2026-10-10
+
+### Added
 
 First npm release. Changes since the release candidate:
 
@@ -88,3 +102,6 @@ First npm release. Changes since the release candidate:
 - Runnable browser, Node and per-request server examples; Portuguese quickstart.
 
 The candidate becomes a public release only after a successful npm publish.
+
+Release notes describe the package version, not the server. Unreleased entries
+are absent from registry 0.1.2 until a new package version is published.

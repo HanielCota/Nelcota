@@ -6,17 +6,21 @@ com os recursos descritos na [matriz de compatibilidade](../README.md#compatibil
 ## 1. Instale
 
 ```sh
-npm install @nelcota/client
+npm install @nelcota/client@0.1.2
 ```
 
-Para experimentar uma versão ainda não publicada, direto deste repositório:
+O pacote publicado é 0.1.2. O README do checkout descreve também mudanças
+não publicadas; atualizar o servidor não atualiza seu SDK. Para experimentar
+a versão de fonte, execute da raiz deste repositório:
 
 ```sh
 cd sdk/typescript
 npm ci
-npm pack
-# No projeto consumidor, instale o .tgz pelo caminho em que foi gerado.
-npm install /caminho/nelcota-client-0.1.0.tgz
+NELCOTA_SDK_TARBALL="$(pwd)/$(npm pack --silent)"
+mkdir -p ../../.nelcota/sdk-consumer
+cd ../../.nelcota/sdk-consumer
+npm init -y
+npm install "$NELCOTA_SDK_TARBALL"
 ```
 
 ## 2. Prepare os dados
@@ -108,8 +112,11 @@ os exports locais. O servidor do exemplo de navegador fornece um import map.
 
 ## Sessões e erros
 
-No navegador, a sessão usa localStorage e o refresh é coordenado entre abas
-com Web Locks. Em ambientes sem Web Locks, passe
+No pacote publicado 0.1.2, a sessão do navegador usa localStorage. Na fonte
+atual, um registro transacional IndexedDB mantém o estado oficial da sessão e
+do PKCE; localStorage é um espelho. Esse comportamento exige um novo build/pacote
+e IndexedDB disponível. A renovação é coordenada entre abas com Web Locks.
+Em ambientes sem Web Locks, passe
 `auth: { storage: sessionStorage }` para manter cada sessão na sua aba.
 No servidor, use um cliente por requisição e encaminhe o token do usuário.
 Um `service_role` deve permanecer apenas no servidor, pois ignora RLS.

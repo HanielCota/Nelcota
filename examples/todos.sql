@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS public.todos (
 
 ALTER TABLE public.todos ENABLE ROW LEVEL SECURITY;
 
--- anon gets no GRANT: without a login it does not even see the table.
+-- anon gets no GRANT: without a login, reads are denied.
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.todos TO authenticated, service_role;
 
 DROP POLICY IF EXISTS todos_owner_select ON public.todos;

@@ -4,8 +4,8 @@ SPA in Svelte 5 + shadcn-svelte + Tailwind v4 + CodeMirror 6, built with Vite.
 `dist/` is committed and embedded in the binary by the `nelcota-admin` crate.
 
 ```sh
-npm install
-npm run dev     # http://localhost:5173/admin/ (API proxied to https://localhost)
+npm ci
+npm run dev     # http://127.0.0.1:5173/admin/ (API: http://127.0.0.1:8000)
 npm run check
 npm run build   # updates dist/: commit changed output in a separate commit
 ```
@@ -24,3 +24,9 @@ handles browser persistence; `features/storage` owns server files).
 Wire types and validators in `src/lib/generated` come from Rust DTOs. Import
 the generated types through `$lib/types` rather than declaring another copy.
 Panel texts live in `src/lib/i18n/messages` (pt-BR and English).
+
+Use Node 24 for repository tooling and start the native backend first. Override
+Vite's target with `NELCOTA_API_URL`. Regenerate wire types with `npm run contracts`;
+check guide catalogs with `npm run guides:check`. After UI or bundled-doc changes,
+build, commit `dist` separately and rebuild the Rust binary. See the repository's
+CONTRIBUTING.md for targeted unit/browser and cancellation/GC checks.

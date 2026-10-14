@@ -1,6 +1,8 @@
 {
   "Client contract": "Contrato do cliente",
   "`@nelcota/client` 0.1.x targets the Nelcota HTTP protocol implemented by this\nrepository. The package has its own version; server compatibility is determined\nby the endpoints and features below, not by matching package version numbers.": "`@nelcota/client` 0.1.x tem como alvo o protocolo HTTP do Nelcota implementado neste repositório. O pacote tem sua própria versão; a compatibilidade com o servidor é determinada pelos endpoints e recursos abaixo, sem depender de números de versão iguais.",
+  "Version scope": "Escopo de versão",
+  "This is the current source contract. Published 0.1.2 predates native IndexedDB\njournaling and exact numeric preservation below; consult its bundled package\ndocs for that release. Unreleased client behavior requires a rebuilt/new client\npackage, independently of a server update.": "Este é o contrato da fonte atual. O pacote publicado 0.1.2 é anterior ao registro transacional nativo no IndexedDB e à preservação numérica exata descritos abaixo; consulte a documentação incluída no pacote para essa versão. Comportamento não publicado do cliente exige novo build/pacote, independentemente de atualizar o servidor.",
   "Interface": "Interface",
   "Module": "Módulo",
   "Methods": "Métodos",

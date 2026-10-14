@@ -6,6 +6,10 @@ dependency is `nelcota-auth`; `nelcota-core` is the only internal transitive
 dependency. Server, CLI, REST, panel, storage and webhooks are absent from its
 dependency graph. No Node runtime is required.
 
+This archive/facade workflow describes unpublished source after server 0.4.0.
+A workspace version does not establish registry availability; use matched
+candidate archives until core/auth receive a separately reviewed release.
+
 ## Build and distribution
 
 From the repository:
@@ -33,7 +37,7 @@ Do not publish these two packages independently with mismatched migration plans.
 
 ## Constructing and starting the host
 
-The example reads four required environment variables:
+The example reads three required variables and one optional listener setting:
 
 | Variable | Meaning |
 |---|---|
@@ -147,7 +151,7 @@ connector integration; it is not demonstrated by this example.
 
 ## Compatibility and operation
 
-Auth/core versions travel together. The first packaged public contract is 0.4;
+Auth/core versions travel together. The current candidate manifests use 0.4;
 subsequent compatible fixes preserve constructors, routes, error vocabulary,
 claims and additive database history. Breaking Rust changes during 0.x require
 a new minor version and a migration/upgrade note. After 1.0, breaking public

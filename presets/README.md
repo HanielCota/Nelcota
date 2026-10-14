@@ -5,10 +5,10 @@ Oxlint 1.87.0 runs as a native executable. The runner and installer use Python
 global tool installation. This tooling does not change Nelcota's single-binary
 distribution or its committed panel assets.
 
-The project uses Svelte 5, TypeScript and npm, with no existing ESLint config and
-no React/JSX sources. No ESLint migration was needed. The requested npm dependency
-and JavaScript runner were replaced with the native/Python option approved for
-this project; no package.json or lockfile was changed.
+The project uses Svelte 5 and TypeScript. Native presets inspect script blocks
+and TS/JS; Svelte template/type/accessibility coverage remains with svelte-check.
+React/JSX presets are not applicable. Optional scanners and type-aware coverage
+have explicit availability states.
 
 ## Install and inspect
 
@@ -128,8 +128,8 @@ statuses before treating a group as fully checked.
 
 ## Automatic fixes
 
-No automatic fixes were applied during setup or baseline validation. For a later,
-explicitly requested fix:
+Automatic source edits are opt-in. Request a fix explicitly and review the
+changed-file list and remaining diagnostics:
 
 ```sh
 python3 scripts/run-preset.py limpeza/consistencia --fix

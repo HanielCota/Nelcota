@@ -1,7 +1,13 @@
 # Leaving Nelcota (no lock-in)
 
-The acid test: **in 10 minutes you can leave and take everything with you.**
-Everything that matters lives in Postgres, as ordinary SQL.
+Export your schema, policies, identities and files to another backend. You need
+owner access, PostgreSQL tools and a verified destination. Database metadata is
+SQL; file bytes and deployment secrets must be exported separately. Completion
+time depends on dataset size and destination compatibility.
+
+For the Docker commands below, enter `projects/<name>/` inside your host folder
+so Compose selects that project. Systemd hosts use native PostgreSQL tools.
+Keep dumps, user/password-hash exports, file mappings and configuration private.
 
 ## 1. The whole database (schema, data, policies, functions, users)
 

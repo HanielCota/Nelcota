@@ -8,6 +8,13 @@ the internal role `nelcota_auth`, which no JWT can assume. `anon`,
 `authenticated` and `service_role` have no GRANT on them (there is a test for
 that).
 
+## Prerequisites
+
+You need a running initialized server. Password login is available by default;
+SMTP/link pages and OAuth providers are optional configuration groups. Schema
+and endpoint examples describe current source, with release differences tracked
+in the server changelog. Never expose database password hashes or link tokens.
+
 ## `auth.users`
 
 | Column | Type | Notes |
@@ -232,7 +239,7 @@ three together:
 
 ```sh
 NELCOTA_SMTP_URL=smtps://user:password@smtp.example.com:465   # or smtp://...:587?tls=required
-NELCOTA_SMTP_FROM=Shop <no-reply@shop.com>
+NELCOTA_SMTP_FROM='Shop <no-reply@shop.com>'
 NELCOTA_PASSWORD_RECOVERY_URL=https://app.shop.com/new-password
 ```
 
@@ -373,3 +380,7 @@ Guarantees: `redirect_to` must sit under one of `NELCOTA_OAUTH_REDIRECT_URLS`
 code in the app's URL works once, for 5 minutes, and only with the verifier
 the app kept. Nelcota uses its own PKCE and `state` toward the provider and
 talks to it only server to server.
+
+## Related guides
+
+See [JWT/roles](jwt-and-roles.md), [REST API](api.md) and [troubleshooting](troubleshooting.md).

@@ -1,6 +1,6 @@
 # @nelcota/client
 
-JavaScript and TypeScript client for [Nelcota](https://github.com/Nelcota/Nelcota): the
+JavaScript and TypeScript client for [Nelcota](https://github.com/Nelcota/Nelcota/): the
 REST API under RLS, auth and storage.
 
 Start with the [quickstart](https://github.com/Nelcota/Nelcota/blob/main/docs/quickstart.md)
@@ -25,7 +25,7 @@ or the [client contract](docs/contract.md). Empty results, 401/403 or a
   a browser.
 
 ```sh
-npm install @nelcota/client
+npm install @nelcota/client@0.1.2
 nelcota types -o src/database.ts
 ```
 
@@ -42,6 +42,15 @@ In plain JavaScript, omit the generated type and generic parameter:
 import { createClient } from '@nelcota/client';
 const nelcota = createClient('https://api.example.com');
 ```
+
+## Version scope
+
+The installation above selects published 0.1.2. This reference describes current
+source, including Unreleased changes. Native IndexedDB session/PKCE journaling,
+exact numeric preservation and the latest cancellation ownership fixes are not
+in published 0.1.2. Read that package's bundled README for its release contract;
+use a locally built package to try source changes. Updating the server does not
+update installed clients. Node is SDK tooling/runtime, not a backend requirement.
 
 ## Independent modules
 
@@ -290,12 +299,16 @@ await nelcota.auth.resendConfirmation(email);
 **On a server**, forward the caller's token instead of keeping a session:
 
 ```ts
-const nelcota = createClient<Database>(url, { accessToken: () => request.headers.authorization?.slice(7) ?? null });
+// Validate the header in middleware before constructing the client.
+const nelcota = createClient<Database>(url, { accessToken: () => validatedCallerToken });
 ```
 
-Create this client per request; the runnable [server example](examples/server.mjs)
-validates the Bearer header and forwards it to RLS. `accessToken` disables
-automatic session refresh; explicitly called auth methods still store sessions.
+Create this client per request. `validatedCallerToken` is a token or null from
+middleware that validates Bearer syntax and returns 401 for malformed headers.
+Only an absent header means anonymous; do not turn malformed auth into a visitor.
+The runnable [server example](examples/server.mjs) demonstrates validation and
+forwarding to RLS. `accessToken` disables automatic session refresh; explicitly
+called auth methods still store sessions.
 
 Auth HTTP methods take `{ signal, timeout }` as their last argument. Concurrent
 refresh calls share the first caller's timeout; each caller can cancel its own
@@ -354,37 +367,48 @@ Who may read or write which file is up to the policies on
 
 ### Polling for changes
 
-There is no realtime channel. To keep a list fresh, poll for rows newer than
-the last one seen; it is one indexed query per interval:
+There is no realtime channel. For a UI showing the latest 100 notes, refresh a
+bounded snapshot. This example assumes an initialized `nelcota` client and a
+`render` function that replaces the displayed list:
 
 ```ts
-let since = new Date(0).toISOString();
-
 async function poll(signal: AbortSignal) {
-  const { data, error } = await nelcota
-    .from('notes').select('id,body,created_at')
-    .gt('created_at', since).order('created_at').abortSignal(signal);
-  if (error) return error.retryAfter ?? 30;       // back off on 429/503
-  if (data.length > 0) {
-    since = data.at(-1)!.created_at;
-    render(data);
-  }
-  return 5;                                        // seconds until the next poll
+  const { data, error } = await nelcota.from('notes')
+    .select('id,body,created_at').order('id', { ascending: false })
+    .limit(100).abortSignal(signal);
+  if (error) return error.retryAfter ?? 30;
+  render(data);
+  return 5;
+}
+
+function delay(seconds: number, signal: AbortSignal): Promise<void> {
+  if (signal.aborted) return Promise.resolve();
+  return new Promise((resolve) => {
+    const finish = () => {
+      clearTimeout(timer);
+      signal.removeEventListener('abort', finish);
+      resolve();
+    };
+    const timer = setTimeout(finish, seconds * 1000);
+    signal.addEventListener('abort', finish, { once: true });
+  });
 }
 
 const controller = new AbortController();
-(async () => {
+const finished = (async () => {
   while (!controller.signal.aborted) {
     const wait = document.hidden ? 60 : await poll(controller.signal);
-    await new Promise((resolve) => setTimeout(resolve, wait * 1000));
+    await delay(wait, controller.signal);
   }
 })();
+// On page/component teardown: controller.abort(); await finished; nelcota.dispose();
 ```
 
-Index the column you poll on (`created_at`). To see edits, poll an
-`updated_at` column kept by a trigger; to see deletions, mark rows deleted
-instead of removing them. Rows inserted in the same instant may share a
-timestamp, so for exactly-once delivery poll on an increasing `id` instead.
+This refreshes visible UI state; it is not durable event delivery or a complete
+history export. Do not infer exactly-once delivery from timestamps or increasing
+IDs: equal timestamps, page caps and transaction commit order can skip rows in
+cursor recipes. Use stable ordering for pagination. For committed changes, use
+the server's webhook contract with durable receiver deduplication.
 
 ### Server-side rendering with cookies
 
@@ -403,7 +427,8 @@ interface CookieJar {
 }
 
 export function cookieStorage(jar: CookieJar): SessionStorage {
-  // Storage keys contain dots and colons; cookie names may not.
+  // Normalize this application's chosen key into a cookie name.
+  // Use distinct fixed storageKey values; this mapping is not collision-free.
   const name = (key: string) => key.replace(/[^\w-]/g, '_');
   return {
     getItem: (key) => {
@@ -425,11 +450,17 @@ const nelcota = createClient<Database>(process.env.NELCOTA_URL!, {
 const { data: notes } = await nelcota.from('notes').select('id,body');
 ```
 
-`httpOnly` keeps the tokens away from page scripts. A session is around
-1–2 KB, within the 4 KB cookie limit. The server ends a session whose refresh
-token is used twice, so avoid refreshing the same session in parallel
-requests: refresh in one place, such as a middleware that runs once per
-navigation, and let the handlers after it reuse the session it stored.
+`httpOnly` keeps tokens away from page scripts. This adapter is illustrative:
+user metadata can make a session exceed the browser's cookie-size limit, and
+percent encoding increases its size. Use bounded sessions or a server-side store
+with an opaque cookie identifier; handle decoding and storage failures. Framework
+handlers must be allowed to write/delete cookies with matching path/domain flags.
+Protect state-changing routes from CSRF. Never authorize from cached user metadata
+alone; the server must verify the caller's token.
+
+Refreshes from separate requests need shared coordination. An in-process lock
+cannot serialize several server instances; centralize rotation in a shared
+coordinator and let handlers reuse the accepted replacement.
 `autoRefresh: false` (already the default outside browsers) keeps background
 timers out of a request-scoped client; a token about to expire is still
 refreshed before a request.

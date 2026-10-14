@@ -2,6 +2,12 @@
 
 Send committed database changes to an HTTP endpoint. Configuration, signing keys and delivery history are under **Events** in the panel. The same Rust binary dispatches deliveries; Postgres stores the queue, so a restart does not lose pending work.
 
+## Prerequisites
+
+Use server 0.4.0+ with administrator access and a trusted receiver. The receiver
+needs bounded raw-body signature verification and durable event-ID deduplication.
+Source-only scheduler/lifecycle changes are listed in Unreleased.
+
 ## Create a webhook
 
 1. Open **Events → New webhook**.
@@ -93,3 +99,7 @@ Public destinations require HTTPS with certificate verification. Credentials, qu
 For local development only, set `NELCOTA_WEBHOOKS_ALLOW_LOOPBACK=true` and restart. This permits HTTP or HTTPS to `localhost`, `127.0.0.1` and `::1`; it never opens private networks or metadata addresses. Inside Docker, loopback refers to the Nelcota container, not the host. Use a public HTTPS development tunnel when the receiver runs outside that container.
 
 No Redis, HTTP extension, extra server or Node process is required for dispatch. The queue worker uses a small pool separate from API and panel connections. A graceful shutdown stops claiming work and gives started deliveries time to finish; unfinished leases remain recoverable after startup.
+
+## Related guides
+
+See [REST API](api.md), [panel](panel.md), [backup](backup.md) and [architecture](architecture.md).

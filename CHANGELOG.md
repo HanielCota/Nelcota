@@ -1,9 +1,12 @@
 # Changelog
 
+This history uses Keep a Changelog categories and Semantic Versioning.
+Dates are published release dates in UTC.
+
 Server releases are listed here. The [TypeScript SDK](sdk/typescript/CHANGELOG.md)
 and [Rust SDK](sdk/rust/CHANGELOG.md) have independent package versions.
 
-## Unreleased
+## [Unreleased]
 
 ### Added
 
@@ -19,6 +22,9 @@ and [Rust SDK](sdk/rust/CHANGELOG.md) have independent package versions.
 
 ### Fixed
 
+- Release catalog retry/listener owners and cancelled client/read waiters; clear
+  closed upload/preview resources while accepted shared operations finish.
+
 - Prevent privileged backup reads and restores from following application-owned
   bucket/object symlinks outside the project's storage directory.
 - Allow installation into a writable user-owned `PREFIX` without sudo while
@@ -29,6 +35,11 @@ and [Rust SDK](sdk/rust/CHANGELOG.md) have independent package versions.
   persisting tokens.
 - Index user and storage directory listings, cap panel pagination inputs and
   remove cyclic imports in the embedded panel.
+
+### Security
+
+- Update rustls to 0.23.46 for RUSTSEC-2026-0346, 0347, 0348 and 0349.
+  Published 0.4.0 predates this source correction.
 
 ### Upgrade notes
 
@@ -42,7 +53,7 @@ and [Rust SDK](sdk/rust/CHANGELOG.md) have independent package versions.
 - This section describes an unpublished candidate. The published `0.4.0`
   binaries and image do not contain these changes.
 
-## 0.4.0 — 2026-10-11
+## [0.4.0] — 2026-10-11
 
 ### Added
 
@@ -87,10 +98,55 @@ and [Rust SDK](sdk/rust/CHANGELOG.md) have independent package versions.
 - The corrected SDK packages are `@nelcota/client` 0.1.2 and `nelcota-client`
   0.1.2. Their package versions remain independent of the server version.
 
-## 0.3.1 — 2026-10-11
+## [0.3.1] — 2026-10-11
+
+### Changed
 
 - Publish server binaries and images from the Nelcota organization, using
   `ghcr.io/nelcota/nelcota-server` for generated Docker deployments.
 - Update repository, documentation and installer links to `Nelcota/Nelcota`.
 - Include embedded English/Portuguese guides, anonymous OpenAPI fixes and
   maintained dependency updates. SDK 0.1.1 releases update organization metadata.
+
+## [0.3.0] — 2026-10-10
+
+### Added
+
+- Google/GitHub OAuth PKCE, independent TypeScript/Rust SDKs and generated Rust models.
+- Signed-in user password/metadata updates and exposed relationship types.
+- JSON errors/request IDs and database error details, with transient errors mapped to 503.
+- Separate refresh/PKCE budgets, ten-second retry grace and REST body configuration.
+
+### Changed
+
+- Redesign panel navigation/access guidance and improve SQL/grid/account workflows.
+
+## [0.2.0] — 2026-10-08
+
+### Added
+
+- Disk/S3 file storage under RLS, buckets, signed URLs, quotas and panel file management.
+- Signup email confirmation, resend and magic-link sign-in.
+- Release build provenance and private vulnerability reporting.
+
+### Fixed
+
+- Keep development credentials private; improve panel drafts/uploads, streamed SQL
+  budgets and Rust-generated wire validation.
+
+## [0.1.0] — 2026-10-07
+
+### Added
+
+- Initial public server: schema-derived REST/RPC/OpenAPI, Ed25519/HS256 auth,
+  password login, rotating refresh tokens and email recovery.
+- Embedded administrator panel and Docker/systemd deployment CLI with
+  project isolation, backups, upgrades and database PITR.
+- Application storage and OAuth/magic links were not part of this release.
+
+[Unreleased]: https://github.com/Nelcota/Nelcota/compare/v0.4.0...main
+[0.4.0]: https://github.com/Nelcota/Nelcota/compare/v0.3.1...v0.4.0
+[0.3.1]: https://github.com/Nelcota/Nelcota/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/Nelcota/Nelcota/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/Nelcota/Nelcota/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/Nelcota/Nelcota/tree/v0.1.0
