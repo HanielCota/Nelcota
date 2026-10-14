@@ -8,6 +8,8 @@ G03 is implemented with local validation and corrective reviews recorded in
 blocked pending verified releases and exact-binary VPS acceptance evidence.
 G04 completed three project reviews with an evolving finding ledger; its
 evidence is recorded in [the review execution record](triple-review-execution.md).
+A focused [memory lifecycle review](memory-review-execution.md) records subsequent
+ownership/cancellation corrections and their release-of-resource evidence.
 
 | Goal | Outcome |
 |---|---|

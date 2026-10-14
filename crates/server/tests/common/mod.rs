@@ -182,6 +182,7 @@ pub struct TestApp {
     pub storage_dir: std::path::PathBuf,
     _container: Option<ContainerAsync<Postgres>>,
     _external_database: Option<postgres::ExternalDatabase>,
+    _reload_listener: nelcota_api::ReloadListener,
 }
 
 pub struct Reply {
@@ -265,7 +266,7 @@ impl TestApp {
         );
         let pool = db::api_pool(&admin, AUTHENTICATOR_PASSWORD, options.pool_size);
         let catalog = load_catalog(&pool, "public").await.unwrap();
-        spawn_reload_listener(
+        let reload_listener = spawn_reload_listener(
             catalog.clone(),
             pool.clone(),
             db::authenticator_config(&admin, AUTHENTICATOR_PASSWORD),
@@ -396,6 +397,7 @@ impl TestApp {
             outbox,
             _container: container,
             _external_database: external_database,
+            _reload_listener: reload_listener,
         }
     }
 

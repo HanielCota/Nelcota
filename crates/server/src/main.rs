@@ -52,7 +52,7 @@ async fn serve(config: Config) -> anyhow::Result<()> {
         config.db_pool_size,
     );
     let catalog = load_catalog(&pool, &config.db_schema).await?;
-    spawn_reload_listener(
+    let reload_listener = spawn_reload_listener(
         catalog.clone(),
         pool.clone(),
         db::authenticator_config(&admin, config.authenticator_password.expose()),
@@ -272,6 +272,7 @@ async fn serve(config: Config) -> anyhow::Result<()> {
     if let Ok(worker) = effects.await {
         worker.shutdown().await;
     }
+    reload_listener.shutdown().await;
     result?;
     Ok(())
 }

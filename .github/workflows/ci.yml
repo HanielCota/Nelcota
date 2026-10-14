@@ -142,6 +142,7 @@ jobs:
         run: git diff --exit-code -- src/lib/generated
       - run: npm run check
       - run: npm test
+      - run: npm run test:memory
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
       - run: npm run build
