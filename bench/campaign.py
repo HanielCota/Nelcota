@@ -721,6 +721,7 @@ def campaign(arguments):
                 "container_log_profile":LOG_PROFILE,
                 "pressure_rest_seconds":15,
                 "final_idle_seconds":arguments.final_idle_seconds,
+                "write_steady_rate":arguments.write_steady_rate,
                 "client_initialization":{"maximum_sessions_per_project":128,"bootstrap_concurrency":4,"setup_timeout_seconds":120,"fully_preallocated_arrival_VUs":True,"mix_schedule":"global scenario arrival ordinal","bootstrap_excluded_from_nominal_metrics":True},
                 "metrics_backend": "native Prometheus histogram; k6 raw TrendSink disabled",
                 "metrics_memory_mb": 512,
@@ -1160,6 +1161,9 @@ def campaign(arguments):
             plans("analyzed")
             results = []
             for workload in arguments.workloads:
+                steady_rate = arguments.steady_rate
+                if workload == 'write' and arguments.write_steady_rate:
+                    steady_rate = arguments.write_steady_rate
                 for iteration in range(1, 4):
                     results.append(
                         (
@@ -1169,7 +1173,7 @@ def campaign(arguments):
                                 workload,
                                 arguments.steady,
                                 16,
-                                arguments.steady_rate,
+                                steady_rate,
                             ),
                         )
                     )
@@ -1513,6 +1517,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--soak-seconds", type=int, default=1800)
     parser.add_argument('--final-idle-seconds',type=int,default=30,help='Bounded post-load owner/cache reclamation observation; excluded from load time')
+    parser.add_argument('--write-steady-rate',type=int,default=0,help='Optional declared open-loop rate for the three pure-write samples; zero retains the general steady profile')
     parser.add_argument("--fixture-disk-mib", type=int, default=512)
     parser.add_argument('--wal-mib',type=int,choices=[64,128,256,512],default=64)
     parser.add_argument('--soak-fraction',type=float,choices=[.7,.75,.8],default=.8)
@@ -1558,6 +1563,8 @@ if __name__ == "__main__":
         parser.error("Capacity steps must be 5 through 300 seconds")
     if not 0 <= arguments.steady_rate <= 10000:
         parser.error("Steady rate is outside the request budget")
+    if not 0<=arguments.write_steady_rate<=10000:
+        parser.error('Write steady rate is outside the request budget')
     if not 0<=arguments.calibration_ceiling<=10000:
         parser.error('Calibration ceiling must be 0..10000 iterations/second')
     if not 0 <= arguments.soak_rate <= 10000:

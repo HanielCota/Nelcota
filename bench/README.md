@@ -300,6 +300,12 @@ this observation protocol must match across compared campaigns.
 provider allocator's idle reclamation window. The bounded 30..300-second value
 is frozen in the profile and must match in comparisons. Idle/drain observation
 is reported separately and never added to effective load or four-hour endurance.
+Include `write` explicitly in `--workloads` for three pure REST-write samples.
+`--write-steady-rate 50` predeclares their separate open-loop rate while mixed
+capacity is independently qualified. The rate is bounded by the same traffic
+ceiling, preserves all SLO/delivery gates and must match across comparisons.
+Include `write` in the comparator's `--workloads` as well; legacy defaults stay
+compatible with existing release campaigns.
 
 Use `--rows 1000000` for the separate million-row investigation and
 `--object-bytes 1048576` for 1-MiB transfers. These profiles need separate
