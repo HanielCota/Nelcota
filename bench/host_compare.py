@@ -11,6 +11,7 @@ OPERATIONS=['read','rls','panel','storage','login','refresh','write']
 FIELDS.append('resource_protocol')
 FIELDS.append('container_log_profile')
 FIELDS.append('harness_js_sha256')
+FIELDS.append('client_initialization')
 
 
 def positive(value):

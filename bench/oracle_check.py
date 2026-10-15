@@ -11,6 +11,7 @@ import subprocess
 import sys
 import threading
 import time
+import uuid
 
 from campaign import K6,docker
 from ownership import OwnedDocker
@@ -41,12 +42,26 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path.startswith('/rest/v1/bench_private'):
-            self.respond(401,b'{}')
+            if self.headers.get('Authorization')=='Bearer '+self.server.fixture['invalid_access']:
+                self.respond(401,b'{}')
+                return
+            self.server.operations['rls']+=1
+            self.respond(200,json.dumps([{'user_id':self.server.fixture['user']}]).encode())
+            return
+        if self.path.startswith('/rest/v1/bench_products'):
+            self.server.runtime_started=True
+            self.server.operations['read']+=1
+            self.respond(200,b'[]')
+            return
+        if self.path.startswith('/admin/api/tables/bench_products'):
+            self.server.operations['panel']+=1
+            self.respond(200,b'{}')
             return
         if self.path!='/storage/v1/object/public/bench/fixture.txt':
             self.respond(404,b'{}')
             return
         self.server.reads+=1
+        self.server.operations['storage']+=1
         body=b'"benchmark payload"'
         if self.server.mode=='corrupt':body=b'!'*len(body)
         if self.server.mode=='truncated':body=body[:10]
@@ -57,11 +72,30 @@ class Handler(BaseHTTPRequestHandler):
         if not 0<=size<=1024:
             self.respond(413,b'{}')
             return
-        self.rfile.read(size)
+        body=self.rfile.read(size)
+        if self.path.startswith('/auth/v1/token'):
+            value=json.loads(body)
+            if 'grant_type=password' in self.path:
+                if value.get('email')!=self.server.fixture['email'] or value.get('password')!=self.server.fixture['password']:
+                    self.respond(401,b'{}')
+                    return
+                if not self.server.runtime_started:
+                    self.server.bootstrap_logins+=1
+                if self.server.runtime_started:self.server.operations['login']+=1
+            if 'grant_type=refresh_token' in self.path:self.server.operations['refresh']+=1
+            self.respond(200,json.dumps({'access_token':secrets.token_urlsafe(32),'refresh_token':secrets.token_urlsafe(32),'expires_in':3600,'user':{'id':self.server.fixture['user']}}).encode())
+            return
+        self.server.runtime_started=True
+        self.server.operations['storage']+=1
         self.respond(200,b'{}')
 
     do_POST=write_request
     do_PUT=write_request
+
+    def do_PATCH(self):
+        self.rfile.read(int(self.headers.get('Content-Length','0')))
+        self.server.operations['write']+=1
+        self.respond(204,b'')
 
 
 def run(output,baseline=None):
@@ -76,7 +110,7 @@ def run(output,baseline=None):
     if host_reserves(output):raise RuntimeError('Host reserves do not allow the oracle check')
     identity='nelcota-oracle-'+secrets.token_hex(16)
     owned=OwnedDocker(identity,docker)
-    cases=[('candidate-valid','valid',0),('candidate-corrupt','corrupt',108),('candidate-truncated','truncated',108)]
+    cases=[('candidate-valid','valid',0),('candidate-corrupt','corrupt',108),('candidate-truncated','truncated',108),('candidate-mixed','mixed',0)]
     if baseline is not None:cases.append(('baseline-corrupt','corrupt',0))
     began=time.monotonic()
     observed=began
@@ -100,7 +134,8 @@ def run(output,baseline=None):
     try:
         current=output/'candidate.js'
         shutil.copyfile(Path(__file__).with_name('campaign.js'),current)
-        fixture={'base':'http://127.0.0.1:'+str(server.server_port),'object_bytes':17,'service':secrets.token_urlsafe(32),'invalid_access':secrets.token_urlsafe(32),'user':secrets.token_hex(16)}
+        fixture={'base':'http://127.0.0.1:'+str(server.server_port),'object_bytes':17,'service':secrets.token_urlsafe(32),'invalid_access':secrets.token_urlsafe(32),'user':str(uuid.uuid4()),'email':'oracle@example.test','password':secrets.token_urlsafe(32),'cookie':'fixture='+secrets.token_urlsafe(32)}
+        server.fixture=fixture
         for label,mode,expected in cases:
             phase='preparation'
             source=current
@@ -108,8 +143,12 @@ def run(output,baseline=None):
                 source=output/'baseline.js'
                 shutil.copyfile(baseline,source)
             server.mode=mode;server.reads=0;server.counts={}
+            server.bootstrap_logins=0;server.runtime_started=False
+            server.operations={key:0 for key in ['read','rls','panel','storage','login','refresh','write']}
             name=identity+'-'+label
-            owned('run','-d','--name',name,'--label',LABEL+'='+identity,'--network','host','--cpus','.25','--cpuset-cpus',str(sorted(os.sched_getaffinity(0))[-1]),'--memory','128m','--memory-swap','128m','--pids-limit','64','--user',str(os.getuid())+':'+str(os.getgid()),'-v',str(source)+':/campaign.js:ro','-e','FIXTURE','-e','WORKLOAD=storage','-e','DURATION=2s','-e','VUS=1',K6,'run','--quiet','--summary-mode=disabled','--no-thresholds','/campaign.js',env={'FIXTURE':json.dumps(fixture)})
+            workload='storage'
+            if mode=='mixed':workload='mixed'
+            owned('run','-d','--name',name,'--label',LABEL+'='+identity,'--network','host','--cpus','.25','--cpuset-cpus',str(sorted(os.sched_getaffinity(0))[-1]),'--memory','128m','--memory-swap','128m','--pids-limit','64','--user',str(os.getuid())+':'+str(os.getgid()),'-v',str(source)+':/campaign.js:ro','-e','FIXTURE','-e','WORKLOAD='+workload,'-e','DURATION=2s','-e','VUS=1',K6,'run','--quiet','--summary-mode=disabled','--no-thresholds','/campaign.js',env={'FIXTURE':json.dumps(fixture)})
             deadline=time.monotonic()+15
             phase='oracle'
             while True:
@@ -122,6 +161,14 @@ def run(output,baseline=None):
             (output/(label+'.log')).write_text(logs)
             result={'case':label,'mode':mode,'expected_exit_code':expected,'actual_exit_code':state['ExitCode'],'positive_object_reads':server.reads,'responses':dict(server.counts),'oom_killed':state['OOMKilled'],'script_sha256':hashlib.sha256(source.read_bytes()).hexdigest()}
             result['passed']=state['ExitCode']==expected and server.reads>0 and not state['OOMKilled']
+            if mode=='mixed':
+                result['operations']=dict(server.operations)
+                result['bootstrap_logins']=server.bootstrap_logins
+                iterations=sum(server.operations.values())
+                shares={'read':.5,'rls':.2,'panel':.1,'storage':.05,'login':.05,'refresh':.05,'write':.05}
+                prefix_bounds={'read':5,'rls':3,'panel':2,'storage':1,'login':1,'refresh':1,'write':1}
+                result['mix_preserved']=all(abs(server.operations[key]-iterations*share)<=prefix_bounds[key] for key,share in shares.items())
+                result['passed']=state['ExitCode']==0 and server.bootstrap_logins==1 and all(server.operations.values()) and result['mix_preserved'] and not state['OOMKilled']
             reports.append(result)
             atomic_json(output/'oracle-results.json',{'scope':'native k6 oracle regression against a controlled HTTP fixture; no product or endurance certification','cases':reports})
             if not result['passed']:raise RuntimeError('Native byte-oracle control failed: '+label)

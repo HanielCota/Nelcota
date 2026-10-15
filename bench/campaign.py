@@ -719,6 +719,7 @@ def campaign(arguments):
                 "soak_fraction":arguments.soak_fraction,
                 "container_log_profile":LOG_PROFILE,
                 "pressure_rest_seconds":15,
+                "client_initialization":{"maximum_sessions_per_project":128,"bootstrap_concurrency":4,"setup_timeout_seconds":120,"fully_preallocated_arrival_VUs":True,"mix_schedule":"global scenario arrival ordinal","bootstrap_excluded_from_nominal_metrics":True},
                 "metrics_backend": "native Prometheus histogram; k6 raw TrendSink disabled",
                 "metrics_memory_mb": 512,
                 "metrics_cpus": 0.25,

@@ -247,6 +247,12 @@ Allocated-disk measurements retain totals and count children removed during
 concurrent overwrite/GC. Missing roots, ambiguous totals, permission/I/O errors
 and unknown diagnostics still abort. These observations are non-atomic; the
 host reserve guard and independent metadata/byte invariants remain required.
+Arrival clients are fully preallocated and obtain separate real sessions before
+the timed scenario, with at most four concurrent bootstrap logins. A global
+arrival ordinal preserves the declared operation mix; initializing a new VU
+cannot silently add hashing to nominal traffic. Bootstrap uses its own metric
+project tag and is excluded from nominal throughput/latency and effective load
+duration. The preparation profile and exact JavaScript hash must match.
 
 Use `--rows 1000000` for the separate million-row investigation and
 `--object-bytes 1048576` for 1-MiB transfers. These profiles need separate
@@ -282,6 +288,13 @@ Filesystem setup copies bounded immutable bytes through `docker exec` into the
 actual tmpfs mount, then verifies reads before exhaustion. Byte reservation
 rejects a full device with `507 storage_full`; failed inode allocation uses the
 existing `500 internal` contract. Other errors and loss of existing bytes fail.
+The mutation workload drops 5% of connections before a reply and discards 5% of
+actual upstream commit replies through a private HTTP socketpair intermediary.
+The backend still receives real project HTTP requests. The downstream client
+receives no success; ordered receipts and the durable operation ledger must
+prove at least one committed reply loss and zero missing commits. No generic
+mutation retry or exactly-once contract is inferred. Each admitted operation
+owns and joins its intermediary and closes both sockets.
 
 Public bundles contain bounded structured outcomes and hashes. Raw logs,
 credential fixtures, database dumps and free-form diagnostics stay private.

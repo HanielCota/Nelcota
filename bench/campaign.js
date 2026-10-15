@@ -18,15 +18,16 @@ let base = fixture.base;
 let projectIndex = 0;
 const fleet = __ENV.FLEET === 'true';
 const sessionCanary = __ENV.SESSION_CANARY === 'true';
+if (!Array.isArray(projects) || projects.length<1 || projects.length>10) { throw new Error('Invalid bounded project fixture'); }
 function scenarios() {
   if (fleet) {
     const rates = (__ENV.PROJECT_RATES || '').split(',').map(Number);
     if (projects.length < 1 || projects.length > 10 || rates.length !== projects.length || rates.some(value => !Number.isSafeInteger(value) || value < 1) || rates.reduce((a,b) => a+b,0) > 10000) { throw new Error('Invalid bounded fleet rates'); }
-    return Object.fromEntries(projects.map((project,index) => ['project-'+index, { executor:'constant-arrival-rate', rate:rates[index], timeUnit:'1s', duration, preAllocatedVUs:2, maxVUs:Math.floor(128/projects.length), exec:'project'+index }]));
+    return Object.fromEntries(projects.map((project,index) => ['project-'+index, { executor:'constant-arrival-rate', rate:rates[index], timeUnit:'1s', duration, preAllocatedVUs:Math.floor(128/projects.length), maxVUs:Math.floor(128/projects.length), exec:'project'+index }]));
   }
   if (rate > 0) {
-    if (sessionCanary) { return { traffic:{ executor:'constant-arrival-rate',rate,timeUnit:'1s',duration,preAllocatedVUs:vus,maxVUs:127 }, 'session-canary':{executor:'constant-vus',vus:1,duration,exec:'sessionProbe'} }; }
-    return { traffic:{ executor:'constant-arrival-rate',rate,timeUnit:'1s',duration,preAllocatedVUs:vus,maxVUs:128 } };
+    if (sessionCanary) { return { traffic:{ executor:'constant-arrival-rate',rate,timeUnit:'1s',duration,preAllocatedVUs:127,maxVUs:127 }, 'session-canary':{executor:'constant-vus',vus:1,duration,exec:'sessionProbe'} }; }
+    return { traffic:{ executor:'constant-arrival-rate',rate,timeUnit:'1s',duration,preAllocatedVUs:128,maxVUs:128 } };
   }
   return { traffic:{ executor:'constant-vus',vus,duration } };
 }
@@ -39,6 +40,7 @@ if (!Number.isSafeInteger(vus) || vus < 1 || vus > 128 || !Number.isSafeInteger(
 const duration = __ENV.DURATION || '30s';
 export const options = {
   scenarios: scenarios(),
+  setupTimeout: '120s',
   systemTags: ['status', 'method', 'group', 'check', 'error_code', 'scenario'],
   tags: { run_id: __ENV.RUN_ID || 'standalone', project:'single' },
   summaryTrendStats: ['avg', 'p(50)', 'p(95)', 'p(99)', 'max'],
@@ -55,6 +57,7 @@ const assertionsFailed = new Counter('assertions_failed');
 const expectedRejections = new Counter('expected_rejections');
 const overloadRejections = new Counter('overload_rejections');
 const invariantFailures = new Counter('invariant_failures');
+const bootstrapSessions = new Counter('bootstrap_sessions');
 function fail(reason = 'assertion', workload = 'invariant', status = 0) {
   assertionsFailed.add(1);
   unexpected.add(true);
@@ -66,6 +69,48 @@ const timings = Object.fromEntries(['read','rls','panel','storage','login','refr
 let refreshToken;
 let accessToken;
 let accessExpiresAt = 0;
+const clientSessions = new Map();
+
+export function setup() {
+  if (!fleet && !['mixed','rls','refresh'].includes(kind) && !sessionCanary) { return null; }
+  let slots=vus;
+  if (fleet || rate>0 || sessionCanary) { slots=128; }
+  const sessions=projects.map(() => Array(slots));
+  const jobs=[];
+  for (let slot=0;slot<slots;slot++) {
+    for (let project=0;project<projects.length;project++) { jobs.push({project,slot}); }
+  }
+  for (let offset=0;offset<jobs.length;offset+=4) {
+    const batch=jobs.slice(offset,offset+4);
+    const responses=http.batch(batch.map(job => {
+      const project=projects[job.project];
+      return {method:'POST',url:project.base+'/auth/v1/token?grant_type=password',body:JSON.stringify({email:project.email,password:project.password}),params:{headers:{'Content-Type':'application/json'},responseType:'text',timeout:'12s',tags:{project:'bootstrap',workload:'client_bootstrap'}}};
+    }));
+    for (let index=0;index<batch.length;index++) {
+      const job=batch[index];
+      const response=responses[index];
+      if (response.status!==200 || response.error_code!==0) { fail('client_bootstrap_status','bootstrap',response.status); }
+      let value;
+      try { value=response.json(); } catch { fail('client_bootstrap_json','bootstrap',response.status); }
+      if (!value || typeof value.access_token!=='string' || !value.access_token || typeof value.refresh_token!=='string' || !value.refresh_token || !Number.isFinite(value.expires_in) || value.expires_in<=0 || value.user?.id!==projects[job.project].user) { fail('client_bootstrap_contract','bootstrap',response.status); }
+      sessions[job.project][job.slot]=[value.access_token,value.refresh_token,Date.now()+value.expires_in*1000];
+      bootstrapSessions.add(1,{project:'bootstrap'});
+    }
+  }
+  return {sessions};
+}
+
+function hydrateSession(data) {
+  if (!data?.sessions) { return; }
+  let state=clientSessions.get(projectIndex);
+  if (!state) {
+    const prepared=data.sessions[projectIndex]?.[__VU-1];
+    if (!Array.isArray(prepared) || prepared.length!==3 || typeof prepared[0]!=='string' || !prepared[0] || typeof prepared[1]!=='string' || !prepared[1] || !Number.isFinite(prepared[2]) || prepared[2]<=0) { fail('missing_bootstrap_session','bootstrap'); }
+    state={access:prepared[0],refresh:prepared[1],expires:prepared[2]};
+    clientSessions.set(projectIndex,state);
+  }
+  accessToken=state.access;refreshToken=state.refresh;accessExpiresAt=state.expires;
+}
 
 function request(name, method, path, { body = null, token, cookie } = {}) {
   const headers = { 'Content-Type': 'application/json' };
@@ -147,6 +192,7 @@ function installSession(result) {
   accessToken = value.access_token;
   refreshToken = value.refresh_token;
   accessExpiresAt = Date.now() + value.expires_in * 1000;
+  clientSessions.set(projectIndex,{access:accessToken,refresh:refreshToken,expires:accessExpiresAt});
   return true;
 }
 function login() {
@@ -177,7 +223,8 @@ function rejectInvalidCredential() {
   assertionsPassed.add(1);
   expectedRejections.add(1);
 }
-export default function runCurrent() {
+export default function runCurrent(data) {
+  hydrateSession(data);
   rejectInvalidCredential();
   if (fleet && (__ITER + __VU) % 10 === 0 && projects.length > 1) {
     const foreign = projects[(projectIndex+1)%projects.length];
@@ -190,9 +237,9 @@ export default function runCurrent() {
     operations[kind]();
     return;
   }
-  // Deterministic per-VU cycle: 50% read, 20% RLS, 10% panel, 5% storage,
+  // A global arrival cycle: 50% read, 20% RLS, 10% panel, 5% storage,
   // 5% hashing, 5% rotation and 5% signed webhook-producing writes.
-  const step = (__ITER + __VU) % 20;
+  const step = execution.scenario.iterationInTest % 20;
   if (step < 10) { read(); return; }
   if (step < 14) { rls(); return; }
   if (step < 16) { panel(); return; }
@@ -210,15 +257,15 @@ function selectProject(index) {
   }
   execution.vu.metrics.tags.project = fixture.label;
 }
-export function project0() { selectProject(0); runCurrent(); }
-export function project1() { selectProject(1); runCurrent(); }
-export function project2() { selectProject(2); runCurrent(); }
-export function project3() { selectProject(3); runCurrent(); }
-export function project4() { selectProject(4); runCurrent(); }
-export function project5() { selectProject(5); runCurrent(); }
-export function project6() { selectProject(6); runCurrent(); }
-export function project7() { selectProject(7); runCurrent(); }
-export function project8() { selectProject(8); runCurrent(); }
-export function project9() { selectProject(9); runCurrent(); }
+export function project0(data) { selectProject(0); runCurrent(data); }
+export function project1(data) { selectProject(1); runCurrent(data); }
+export function project2(data) { selectProject(2); runCurrent(data); }
+export function project3(data) { selectProject(3); runCurrent(data); }
+export function project4(data) { selectProject(4); runCurrent(data); }
+export function project5(data) { selectProject(5); runCurrent(data); }
+export function project6(data) { selectProject(6); runCurrent(data); }
+export function project7(data) { selectProject(7); runCurrent(data); }
+export function project8(data) { selectProject(8); runCurrent(data); }
+export function project9(data) { selectProject(9); runCurrent(data); }
 
-export function sessionProbe() { rejectInvalidCredential(); rls(); sleep(1); }
+export function sessionProbe(data) { hydrateSession(data); rejectInvalidCredential(); rls(); sleep(1); }
