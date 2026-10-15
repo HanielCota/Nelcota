@@ -67,14 +67,18 @@ def prepare(destination, sdk):
             names[:] = sorted(name for name in names if name not in exclusions and not (Path(directory)/name).is_symlink())
             for name in sorted(files):
                 item = Path(directory)/name
-                if name.endswith(('.pyc', '.pyo')) or item.is_symlink():
+                if name in exclusions or name.endswith(('.pyc', '.pyo')) or item.is_symlink():
                     continue
                 copy(item, target/item.relative_to(source))
     tree(chrome, destination/'chrome')
     copy(executable, destination/'python/bin/python3')
     stdlib = Path(sysconfig.get_path('stdlib'))
+    # This headless Chromium profile does not import Python's separate Tcl/Tk
+    # GUI toolkit. Some development Python installs retain its extension while
+    # Tcl/Tk itself is absent. All staged mandatory extensions still need ldd.
+    unused_extensions = {item.name for item in stdlib.glob('lib-dynload/_tkinter.*')}
     tree(stdlib, destination/'python/lib'/stdlib.name,
-         ('site-packages', '__pycache__', 'test', 'tests', 'idlelib', 'ensurepip', 'turtledemo'))
+         ('site-packages', '__pycache__', 'test', 'tests', 'idlelib', 'ensurepip', 'turtledemo', 'tkinter', *unused_extensions))
     site = destination/'python/lib'/stdlib.name/'site-packages'
     for package in ['playwright', 'pyee', 'greenlet', 'typing_extensions']:
         spec = importlib.util.find_spec(package)
@@ -97,7 +101,7 @@ def prepare(destination, sdk):
             raise ValueError('SDK runtime cannot follow external asset links')
         copy(item, destination/'sdk'/item.relative_to(sdk))
     binaries = [chrome/'chromium', executable, Path(shutil.which('certutil') or '/missing-certutil'),
-                *stdlib.glob('lib-dynload/*.so'),
+                *[item for item in stdlib.glob('lib-dynload/*.so') if item.name not in unused_extensions],
                 *[Path(shutil.which(name) or '/missing-tool') for name in ['sh', 'cat', 'ls', 'wc', 'du']]]
     binaries.extend((destination/'python').rglob('node'))
     libraries = set()
@@ -132,6 +136,7 @@ def prepare(destination, sdk):
     profile = {'kind':'owned development browser tooling, not a production dependency',
                'bytes':copied, 'maximum_bytes':MAXIMUM_BYTES, 'files':len(records),
                'python_version':sys.version.split()[0], 'playwright_version':importlib.metadata.version('playwright'),
+               'excluded_optional_Python_GUI_modules':['tkinter', '_tkinter'],
                'sdk_assets':len(list((destination/'sdk').rglob('*.js')))}
     manifest = json.dumps({'profile':profile, 'files':records}, sort_keys=True, indent=2)+'\n'
     (destination/'runtime-manifest.json').write_text(manifest)
