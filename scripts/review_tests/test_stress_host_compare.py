@@ -62,3 +62,26 @@ class HostComparison(unittest.TestCase):
         path.write_text(json.dumps(value))
         with self.assertRaises(ValueError):
             host_compare.compare(self.before,self.after)
+
+    def test_nonfinite_counts_and_durations_cannot_hide_underdelivery(self):
+        path=self.after/'balanced-1.json'
+        original=path.read_text()
+        for count in [math.nan,math.inf,-1,True]:
+            value=json.loads(original)
+            value['project-0']['metrics']['dropped_iterations']['count']=count
+            path.write_text(json.dumps(value))
+            with self.assertRaises(ValueError):host_compare.compare(self.before,self.after)
+        path.write_text(original)
+        ledger=self.after/'traffic-ledger.jsonl'
+        records=[json.loads(line) for line in ledger.read_text().splitlines()]
+        records[0]['elapsed_seconds']=math.nan
+        ledger.write_text(''.join(json.dumps(item)+'\n' for item in records))
+        with self.assertRaises(ValueError):host_compare.compare(self.before,self.after)
+
+    def test_matching_bad_p99_cannot_certify_from_an_empty_gate_file(self):
+        for root in [self.before,self.after]:
+            path=root/'balanced-1.json'
+            value=json.loads(path.read_text())
+            value['project-0']['metrics']['latency_read']['p(99)']=501
+            path.write_text(json.dumps(value))
+        with self.assertRaises(ValueError):host_compare.compare(self.before,self.after)

@@ -4,6 +4,7 @@ import json
 import math
 from pathlib import Path
 import statistics
+from campaign import NOMINAL_SLOS
 
 FIELDS=['schema','scope','projects','rows_per_project','shared_user_id','cpu_effective','cpu_affinity','metrics_cpu_affinity','app_aggregate_cpus','postgres_aggregate_cpus','generator_cpus','metrics_cpus','app_memory_mib_each','postgres_memory_mib_each','generator_memory_mib','metrics_memory_mib','max_connections_each','pool_each','fixture_disk_mib','storage_filesystem','seconds_per_step','capacity_qualification','provisional_rate_per_project','nominal_rate_per_project','images']
 OPERATIONS=['read','rls','panel','storage','login','refresh','write']
@@ -15,6 +16,12 @@ def positive(value):
     return value
 
 
+def nonnegative(value):
+    if isinstance(value,bool) or not isinstance(value,(int,float)) or not math.isfinite(value) or value<0:
+        raise ValueError('Missing, non-finite or negative count evidence')
+    return value
+
+
 def read_run(root):
     profile=json.loads((root/'manifest.json').read_text())
     completion=json.loads((root/'completion.json').read_text())
@@ -23,7 +30,7 @@ def read_run(root):
     if completion.get('status')!='passed' or completion.get('cleanup_confirmed') is not True or cleanup.get('confirmed') is not True or violations:
         raise ValueError('Failed or incomplete run cannot certify host regressions')
     projects=profile.get('projects')
-    if isinstance(projects,bool) or not isinstance(projects,int) or projects not in (1,5,10) or profile.get('seconds_per_step',0)<300 or profile.get('certifies_five_minute_steps') is not True or any(field not in profile for field in FIELDS):
+    if isinstance(projects,bool) or not isinstance(projects,int) or projects not in (1,5,10) or positive(profile.get('seconds_per_step'))<300 or profile.get('certifies_five_minute_steps') is not True or any(field not in profile for field in FIELDS):
         raise ValueError('Missing equivalent profile or full-duration evidence')
     positive(profile['nominal_rate_per_project'])
     ledger=[json.loads(line) for line in (root/'traffic-ledger.jsonl').read_text().splitlines()]
@@ -33,19 +40,22 @@ def read_run(root):
         report=json.loads((root/('balanced-'+str(index)+'.json')).read_text())
         gates=json.loads((root/('balanced-'+str(index)+'-gates.json')).read_text())
         intervals=[item for item in ledger if item.get('phase')=='balanced-'+str(index)]
-        if len(intervals)!=1 or intervals[0].get('completed') is not True or intervals[0].get('requested_seconds')!=profile['seconds_per_step'] or intervals[0].get('elapsed_seconds',0)<profile['seconds_per_step']:
+        if len(intervals)!=1 or intervals[0].get('completed') is not True or intervals[0].get('requested_seconds')!=profile['seconds_per_step'] or positive(intervals[0].get('elapsed_seconds'))<profile['seconds_per_step']:
             raise ValueError('Missing completed five-minute traffic interval')
         if set(report)!=labels or gates:
             raise ValueError('Balanced samples are missing, failed or use another topology')
         for value in report.values():
             metrics=value['metrics']
-            if value.get('schema')!=2 or metrics['unexpected']['value']!=0 or metrics['checks']['fails'] or metrics['overload_rejections']['count']:
+            if value.get('schema')!=2 or nonnegative(metrics['unexpected']['value'])!=0 or nonnegative(metrics['checks']['fails'])!=0 or nonnegative(metrics['overload_rejections']['count'])!=0:
                 raise ValueError('Unexpected or overloaded traffic cannot certify a nominal baseline')
             expected=profile['nominal_rate_per_project']*profile['seconds_per_step']
-            if positive(metrics['iterations']['count'])<expected*.99 or metrics['dropped_iterations']['count']>expected*.01:
+            if positive(metrics['iterations']['count'])<expected*.99 or nonnegative(metrics['dropped_iterations']['count'])>expected*.01:
                 raise ValueError('Under-delivered arrivals cannot certify regressions')
             for operation in OPERATIONS:
-                positive(metrics['latency_'+operation]['p(95)'])
+                latency=metrics['latency_'+operation]
+                p95,p99=positive(latency['p(95)']),positive(latency['p(99)'])
+                if p95>p99 or p95>NOMINAL_SLOS[operation][0] or p99>NOMINAL_SLOS[operation][1]:
+                    raise ValueError('Invalid quantiles or absolute nominal SLO violation')
                 positive(metrics['throughput_'+operation]['rate'])
         reports.append(report)
     return profile,reports
