@@ -13,6 +13,7 @@ FIELDS.append('container_log_profile')
 FIELDS.append('harness_js_sha256')
 FIELDS.append('client_initialization')
 FIELDS.append('webhooks')
+FIELDS.append('ingress')
 
 
 def positive(value):

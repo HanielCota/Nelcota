@@ -272,3 +272,23 @@ o cenário real de 1/5/10 projetos, que ainda precisa executar. A campanha S3
 ativa permanece no snapshot congelado `6d77010`; a extensão do host não muda
 o binário nem o JavaScript medido por ela. Nenhum endurance está aprovado neste
 checkpoint.
+
+## Início do endurance S3 às 11:40 UTC e preparação de ingress
+
+`s3-pass-1-002` concluiu 3.495 segundos de carga antes do endurance. A repetição
+de capacidade a 100/200/300/400 iterações/s passou, sem descartes nem rejeições.
+Na amostra a 400, p95 de leitura/login/storage foi 11,9/68,8/44,0 ms. Os pontos
+de sobrecarga a 600 e 800 mostraram descartes e maior latência; não são taxas
+nominais aprovadas. Os cinco ciclos de pico/recuperação foram concluídos antes
+do início do intervalo contínuo de 14.400 segundos, a 280 iterações/s.
+O resultado do endurance e sua conciliação final ainda estão pendentes.
+
+Foi preparado um perfil opcional `--caddy` para o executor de host. Ele mantém
+o Caddy real em container próprio, com quotas de 0,25 CPU/128 MiB, orçamento de
+64 MiB em disco, endpoints HTTPS locais e uma CA interna nova. O cliente verifica
+o certificado; um controle adicional exige rejeição sem essa CA. A imagem é
+executada pelo ID imutável observado. A exceção de compressão para storage e os
+headers seguem o template de deployment. A preparação passou na descoberta
+Python com 131 testes em 5,940 segundos. Nenhuma campanha nativa com esse perfil
+foi executada neste checkpoint. DNS público, ACME, controller, falhas de proxy
+e limites de clientes lentos continuam sem aprovação por esse perfil.

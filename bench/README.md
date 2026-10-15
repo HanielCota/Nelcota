@@ -184,6 +184,19 @@ public webhook destination policy. Request owners are joined before closing
 their ledgers. Comparisons reject different webhook profiles. A run without
 this option does not cover noisy webhook workers.
 
+`--caddy` routes each project through a real shared Caddy container and a distinct
+unprivileged loopback HTTPS port. Pull `caddy:2-alpine` before the campaign; the
+fixture records its digest and runs that immutable image ID. It reserves another
+0.25 CPU on affinity slot four, 128 MiB RAM and 64 MiB fixture disk. This profile
+requires five affinity slots and four effective CPUs including reserves. TLS
+uses a fresh internal CA added to the generator's trusted bundle; the fixture
+also proves that a client without that CA rejects the certificate. Storage
+compression exclusions and security headers follow the deployment template.
+The admin endpoint is an owned Unix socket. No public port, DNS enrollment or
+ACME request is used. This local ingress rehearsal does not certify public
+deployment, controller operations, proxy failure recovery or slow-client limits.
+Comparisons reject direct HTTP versus Caddy HTTPS profiles.
+
 The manual workflow supports separate disk/S3 four-hour endurance jobs with a
 seven-hour job budget including the build. The internal campaign limit remains
 six hours. Ordinary pull-request jobs do not launch endurance.

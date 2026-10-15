@@ -29,6 +29,7 @@ from host_resources import snapshot as host_snapshot, owned_cgroup_snapshot, req
 from ownership import LOG_PROFILE,OwnedDocker
 from disk_usage import container as container_disk_usage
 from fleet_webhooks import FleetWebhooks
+from ingress import Ingress
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -81,6 +82,8 @@ def campaign(args):
     cpus = sorted(os.sched_getaffinity(0))
     if len(cpus) < 4 or effective_cpus(cpus) < 3.5 or host_reserves(output):
         raise RuntimeError('Host cannot cover the declared CPU, memory and disk reserves')
+    if args.caddy and (len(cpus) < 5 or effective_cpus(cpus) < 4):
+        raise RuntimeError('Real Caddy profile requires five affinity slots and four effective CPUs including reserves')
     validate_disk_headroom(output,args.disk_mib,startup_mib=args.projects*400+512)
     identity = 'nelcota-fleet-' + secrets.token_hex(16)
     owned=OwnedDocker(identity,docker)
@@ -93,6 +96,9 @@ def campaign(args):
     for project in projects:
         project.webhooks_enabled = args.webhooks
     webhooks = FleetWebhooks(output)
+    ingress = None
+    if args.caddy:
+        ingress = Ingress(identity, directory, owned, cpus[3])
     began = time.monotonic()
     phase = 'preparation'
     resource_at = began
@@ -105,6 +111,8 @@ def campaign(args):
     heartbeat_thread = sampler = watchdog = None
     status = 'failed'
     manifest = {'identity': identity, 'output': str(output), 'reserve_path': str(output), 'pid': os.getpid(), 'process_identity': process_identity(os.getpid()), 'started_monotonic': began, 'maximum_seconds': 7200, 'preparation_seconds': 900, 'containers': [telemetry, generator, *[item.app for item in projects], *[item.pg for item in projects]], 'volumes': [telemetry_volume, *[item.volume for item in projects]]}
+    if ingress is not None:
+        manifest['containers'].append(ingress.name)
     atomic_json(output/'ownership.json', manifest)
     previous = signal.getsignal(signal.SIGTERM)
 
@@ -130,6 +138,10 @@ def campaign(args):
             for project in projects:
                 webhooks.attach(project)
         profile=json.loads((output/'manifest.json').read_text())
+        profile['ingress'] = {'kind': 'direct loopback HTTP'}
+        if ingress is not None:
+            profile['scope'] = 'local independent app/PG clusters with verified local Caddy, no public DNS/controller'
+            profile['ingress'] = ingress.start(projects, output)
         profile['webhooks'] = {'enabled': args.webhooks, 'receiver': 'owned loopback, verified signatures and durable event identities', 'evidence_limit_mib': 128, 'drain_seconds': 30}
         profile['resource_protocol']='component cgroup v2 plus host/process owners; allocated du totals count only disappearing child entries'
         profile['container_log_profile']=LOG_PROFILE
@@ -160,6 +172,8 @@ def campaign(args):
         metrics = NativeMetrics(metrics_url)
         metrics.value('vector(1)')
         observed_containers = [item.app for item in projects]+[item.pg for item in projects]+[telemetry]
+        if ingress is not None:
+            observed_containers.append(ingress.name)
         states = json.loads(owned('inspect', *observed_containers))
         process_ids = {state['Name']: state['State']['Pid'] for state in states}
         resource_began = time.monotonic()
@@ -203,13 +217,16 @@ def campaign(args):
                     if disk_bytes > args.disk_mib*1024*1024:
                         raise RuntimeError('Aggregate database disk budget exceeded')
                     webhook_observation = webhooks.observe()
+                    ingress_observation = None
+                    if ingress is not None:
+                        ingress_observation = ingress.observe()
                     generation = generator_observation(active_generator, lambda: active_generator)
                     if generation and generation.get('host_pid') and generation.get('pid_starttime'):
                         atomic_json(output/'generator-process.json',{'identity':identity,'pid':generation['host_pid'],'process_identity':generation['pid_starttime'],'container_id':generation['container_id']})
                     resource_at = time.monotonic()
                     coverage.observe(resource_at-resource_began)
                     with (output/'resources.jsonl').open('a') as target:
-                        target.write(json.dumps({'monotonic': resource_at, 'phase': phase, 'containers': stats, 'databases': databases, 'generator': generation,'host':host_snapshot(cpus),'memory_events':memory_events,'component_cgroups':cgroups,'webhooks':webhook_observation})+'\n')
+                        target.write(json.dumps({'monotonic': resource_at, 'phase': phase, 'containers': stats, 'databases': databases, 'generator': generation,'host':host_snapshot(cpus),'memory_events':memory_events,'component_cgroups':cgroups,'webhooks':webhook_observation,'ingress':ingress_observation})+'\n')
                     atomic_json(output/'checkpoint.json', {'phase': phase, 'monotonic': resource_at, 'load_seconds_completed': load_seconds, 'resource_observations': coverage.count})
                 except Exception as error:
                     violations.append({'phase': phase, 'reason': str(error)[-600:], 'type': type(error).__name__})
@@ -229,6 +246,9 @@ def campaign(args):
                 raise RuntimeError('Fleet resource guard stopped traffic')
             phase = label
             command = ['docker', 'run', '--rm', '--name', generator, '--label', LABEL+'='+identity, '--pids-limit', '128', '--network', 'host', '--cpus', '1', '--cpuset-cpus', str(cpus[2]), '--memory', '512m', '--memory-swap', '512m', '--user', f'{os.getuid()}:{os.getgid()}', '-v', str(ROOT/'bench/campaign.js')+':/campaign.js:ro', '-e', 'FIXTURE', '-e', 'FLEET=true', '-e', 'PROJECT_RATES='+','.join(map(str,rates)), '-e', 'WORKLOAD=mixed', '-e', 'HOT_WORKLOAD='+hot, '-e', 'DURATION='+str(seconds)+'s', '-e', 'RUN_ID='+label, '-e', 'OVERLOAD='+str(bool(hot) or overload).lower(), '-e', 'GOMEMLIMIT=448MiB', '-e', 'K6_PROMETHEUS_RW_SERVER_URL='+metrics_url+'/api/v1/write', '-e', 'K6_PROMETHEUS_RW_TREND_AS_NATIVE_HISTOGRAM=true', '-e', 'K6_PROMETHEUS_RW_PUSH_INTERVAL=2s', K6, 'run', '--quiet', '--summary-mode=disabled', '--no-thresholds', '--out=experimental-prometheus-rw', '/campaign.js']
+            if ingress is not None:
+                position = command.index(K6)
+                command[position:position] = ['-v', str(ingress.bundle)+':/verified-ca.pem:ro', '-e', 'SSL_CERT_FILE=/verified-ca.pem']
             print('Running', label, rates, hot, flush=True)
             start = time.monotonic()
             with (output/(label+'.log')).open('w') as target:
@@ -364,6 +384,7 @@ def main():
     parser.add_argument('--rate',type=int,default=8)
     parser.add_argument('--capacity',action='store_true')
     parser.add_argument('--webhooks',action='store_true',help='Enable real signed webhook workers in every independent project, including the noisy write phase')
+    parser.add_argument('--caddy',action='store_true',help='Use an owned real Caddy with verified local HTTPS; requires a pre-pulled caddy:2-alpine image')
     parser.add_argument('--provisional-rate',type=int,default=32)
     parser.add_argument('--disk-mib',type=int,default=2048)
     args = parser.parse_args()

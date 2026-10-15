@@ -56,6 +56,15 @@ class HostComparison(unittest.TestCase):
             path.write_text(json.dumps(value))
         self.assertFalse(host_compare.compare(self.before,self.after)['gate_passed'])
 
+    def test_direct_http_cannot_certify_a_verified_proxy_profile(self):
+        path=self.after/'manifest.json'
+        value=json.loads(path.read_text())
+        value['ingress']={'kind':'real Caddy with verified internal CA on loopback'}
+        path.write_text(json.dumps(value))
+        result=host_compare.compare(self.before,self.after)
+        self.assertFalse(result['gate_passed'])
+        self.assertIn('ingress',result['fixture_differences'])
+
     def test_failed_or_missing_interval_cannot_certify(self):
         (self.after/'traffic-ledger.jsonl').write_text('')
         with self.assertRaises(ValueError):
