@@ -369,3 +369,32 @@ Fleet preflight includes image storage-driver costs independently from database
 data. VFS reserves two full container-layer copies plus a margin per project;
 unknown drivers or invalid image sizes require an explicit supported profile.
 An insufficient reserve blocks preparation before containers are created.
+
+## Live browser profile (native validation in progress)
+
+`browser_campaign.py` adds a separately owned Chromium/TypeScript-SDK profile.
+It is not a completed G05 result until its native controls, data oracles and
+cleanup pass. Run it between backend campaigns, after rebuilding the SDK from
+the reviewed source; runtime preparation copies public development tools and
+can use up to 1.5 GiB of additional disk. Production keeps its Rust-only runtime.
+
+```sh
+npm --prefix sdk/typescript run build
+python3 bench/launch.py --run-id browser-pass-1 --kind browser --binary target/release/nelcota --sdk "$PWD/sdk/typescript/dist" --session-seconds 1080
+```
+
+This x86_64/UID-1000 profile uses two real application/auth consumers sharing
+one project's database, three browser tabs, verified local HTTPS with separate
+untrusted/trusted NSS controls, five navigation/rest cycles, CDP memory/owner
+observations, real multi-tab SDK refresh and actual credential expiry. The
+normal logout contract remains: refresh stops; issued access lasts until expiry.
+No BaaS responses are mocked. Only the built SDK's test assets are served by
+the browser harness. External page requests are blocked before transmission.
+
+The browser runs in an owned nonroot container with a private PID namespace,
+all capabilities dropped, a read-only root and no-new-privileges. Chromium's
+inner OS sandbox is disabled inside that container, as in normal Playwright
+development runs; certificate and browser origin checks remain enabled. No real
+home or global certificate store is mounted or changed. CPU, RAM, PIDs,
+API-request rate/count, decoded bytes and duration budgets are recorded before
+traffic. Killing its PID-1 generator also stops its namespace's browser children.

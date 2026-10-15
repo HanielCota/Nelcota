@@ -16,7 +16,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--run-id', required=True)
     parser.add_argument('--binary', type=Path, required=True)
-    parser.add_argument('--kind', choices=['single', 'host', 'fault'], default='single')
+    parser.add_argument('--kind', choices=['single', 'host', 'fault', 'browser'], default='single')
     args, extra = parser.parse_known_args()
     if not re.fullmatch(r'[a-z][a-z0-9-]{0,79}', args.run_id):
         parser.error('Run ID must be a bounded lowercase label')
@@ -41,6 +41,8 @@ def main():
         entrypoint = 'host_campaign.py'
     if args.kind == 'fault':
         entrypoint = 'fault_campaign.py'
+    if args.kind == 'browser':
+        entrypoint = 'browser_campaign.py'
     child=None
     pending_signal=None
     previous=signal.getsignal(signal.SIGTERM)
