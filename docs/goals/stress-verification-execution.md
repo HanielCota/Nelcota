@@ -308,3 +308,21 @@ ele executa a limpeza explícita e verifica nova escrita/entrega, preservando as
 A formatação do novo teste foi verificada. Sua execução Rust local e no CI ainda
 está pendente neste registro; preparar o caso não equivale a aprová-lo. O
 endurance S3 permanece no artefato congelado, sem compilação local concorrente.
+
+## Fronteiras de journal e inventário
+
+Os 18 checks do commit `9f9a0eb` passaram, incluindo `cargo test --all`, o ciclo
+de host com Docker e os testes explícitos de S3 real. Isso fornece evidência
+funcional do teste de histórico cheio nesse commit; não substitui o endurance
+do binário release ou a qualificação de múltiplos projetos.
+
+Foram preparados dois casos adicionais de fronteira. O journal cria 255 recibos
+válidos, preserva os arquivos byte a byte e verifica 16 leitores/tentativas
+concorrentes: retries mantêm a identidade e novas operações recebem o bloqueio
+de capacidade, inclusive após reabrir o journal. Outro operador não pode usar
+a chave de um recibo existente. O teste de lifecycle com root isolado também
+preenche 256 identidades retiradas em diretório próprio, exige rejeição da 257ª
+sem exclusão ou reescrita das anteriores, e confirma que atualizar uma identidade
+existente não autoriza um runtime ausente. O inventário de fixture é separado
+dos projetos usados no lifecycle. A formatação passou; a execução desses dois
+novos casos ainda está pendente neste checkpoint.
