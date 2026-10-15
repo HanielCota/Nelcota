@@ -93,6 +93,15 @@ def prepare(destination, sdk):
         for entry in distribution.files or []:
             if '.dist-info/' in str(entry) and distribution.locate_file(entry).is_file():
                 copy(distribution.locate_file(entry), site/entry)
+    # Managed Python packages can link this one public executable to the
+    # installed Node runtime. Keep generic tree symlinks excluded; stage the
+    # known Playwright entrypoint explicitly as immutable bytes.
+    node_source = Path(importlib.util.find_spec('playwright').origin).parent/'driver/node'
+    node_target = site/'playwright/driver/node'
+    if not node_target.is_file():
+        copy(node_source, node_target)
+    if not os.access(node_target, os.X_OK):
+        raise RuntimeError('The staged Playwright driver has no executable entrypoint')
     for item in python.joinpath('lib').glob('libpython*.so*'):
         if item.is_file() and not item.is_symlink():
             copy(item, destination/'python/lib'/item.name)
