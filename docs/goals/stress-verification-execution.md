@@ -372,3 +372,32 @@ O resumo está em
 contagens globais de testes Rust não foram extraídas dos logs; o relatório não
 inventa esses números. O mínimo de oito horas e os dois passes completos
 continuam sem aprovação neste checkpoint.
+
+
+### 2026-10-15 14:40 UTC — interrupção preventiva e validação semântica
+
+A execução `s3-pass-1-003` foi interrompida às 14:40:45 UTC, após cerca de
+26 minutos da etapa contínua iniciada às 14:14:39. Os 3.495 segundos das
+etapas anteriores foram concluídos e 803 observações foram preservadas; a
+limpeza foi confirmada. Essa tentativa não concluiu endurance nem a
+reconciliação final. O novo contador de renovação foi observado em operação,
+mas o requisito final de três renovações ainda não havia sido atingido.
+
+A revisão independente identificou respostas aceitas sem conferir integralmente
+os dados retornados: leitura, painel, listagem, recibo de upload, identidade de
+login, validade numérica da sessão e representação da escrita. O painel usava
+`limit=20`, embora seu contrato seja `size=20`; por isso consultava o tamanho
+padrão de 50 linhas. As novas verificações validam status específicos,
+quantidade, filtro, ordenação, identidade, paginação, campos da fixture e
+recibos com tamanho e SHA-256. Escritas usam `Prefer: return=representation`.
+
+O controle nativo com k6 demonstrou onze falsos positivos no executor anterior
+e a rejeição dos doze casos semânticos negativos no candidato; o caso de RLS
+vazio já era rejeitado. Controles válidos, bytes corrompidos/truncados e a
+distribuição do tráfego também mantiveram seus resultados esperados: 28/28
+controles, limpeza confirmada. Os 136 testes Python passaram em 5,626 s e os
+presets nativos base e performance/imports do Oxlint registraram zero achados.
+A [evidência estruturada](results/stress/semantic-oracle-before-after.json)
+certifica apenas os oráculos controlados. A validação contra o backend real
+precede a retomada das campanhas longas. Nenhum endurance de quatro horas
+está aprovado nesta atualização.

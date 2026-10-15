@@ -1,6 +1,7 @@
 // Native k6 runner: the backend and benchmark runner require no Node runtime.
 import http from 'k6/http';
 import execution from 'k6/execution';
+import { sha256 } from 'k6/crypto';
 import { check, sleep } from 'k6';
 import { Trend, Rate, Counter } from 'k6/metrics';
 
@@ -92,7 +93,7 @@ export function setup() {
       if (response.status!==200 || response.error_code!==0) { fail('client_bootstrap_status','bootstrap',response.status); }
       let value;
       try { value=response.json(); } catch { fail('client_bootstrap_json','bootstrap',response.status); }
-      if (!value || typeof value.access_token!=='string' || !value.access_token || typeof value.refresh_token!=='string' || !value.refresh_token || !Number.isFinite(value.expires_in) || value.expires_in<=0 || value.user?.id!==projects[job.project].user) { fail('client_bootstrap_contract','bootstrap',response.status); }
+      if (!value || typeof value.access_token!=='string' || !value.access_token || typeof value.refresh_token!=='string' || !value.refresh_token || !Number.isSafeInteger(value.expires_in) || value.expires_in<=0 || !Number.isSafeInteger(Date.now()+value.expires_in*1000) || value.user?.id!==projects[job.project].user) { fail('client_bootstrap_contract','bootstrap',response.status); }
       sessions[job.project][job.slot]=[value.access_token,value.refresh_token,Date.now()+value.expires_in*1000];
       bootstrapSessions.add(1,{project:'bootstrap'});
     }
@@ -112,15 +113,17 @@ function hydrateSession(data) {
   accessToken=state.access;refreshToken=state.refresh;accessExpiresAt=state.expires;
 }
 
-function request(name, method, path, { body = null, token, cookie } = {}) {
+function request(name, method, path, { body = null, token, cookie, prefer } = {}) {
   const headers = { 'Content-Type': 'application/json' };
   if (token) { headers.Authorization = `Bearer ${token}`; }
   if (cookie) { headers.Cookie = cookie; }
-  let responseType = 'none';
-  if (['rls','login','refresh'].includes(name) || (name === 'storage' && method === 'GET') || (fixture.marker && name === 'read')) { responseType = 'text'; }
-  const response = http.request(method, base + path, body, { headers, responseType, timeout: '12s', tags: { workload: name } });
+  if (prefer) { headers.Prefer = prefer; }
+  const response = http.request(method, base + path, body, { headers, responseType:'text', timeout: '12s', tags: { workload: name } });
   const successStatus = response.status >= 200 && response.status < 300;
-  const ok = successStatus && response.error_code === 0;
+  const allowedStatuses = [200];
+  if (name === 'storage' && method === 'PUT') { allowedStatuses.push(201); }
+  if (successStatus && !allowedStatuses.includes(response.status)) { fail('unexpected_success_status', name, response.status); return response; }
+  const ok = allowedStatuses.includes(response.status) && response.error_code === 0;
   if (ok) {
     timings[name].add(response.timings.duration);
     successfulOperations.add(1, { workload: name });
@@ -138,34 +141,58 @@ function request(name, method, path, { body = null, token, cookie } = {}) {
   return response;
 }
 
+function jsonResponse(result, name) {
+  try { return result.json(); } catch { fail('malformed_'+name, name, result.status); return null; }
+}
+function record(value) { return value !== null && typeof value === 'object' && !Array.isArray(value); }
+function productName(value) {
+  if (typeof value !== 'string' || !value) { return false; }
+  if (fixture.marker) { return value.startsWith(fixture.marker); }
+  return value.startsWith('product ');
+}
+function uuid(value) { return typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value); }
 function read() {
-  const result = request('read','GET',`/rest/v1/bench_products?stock=eq.${__ITER % 50}&order=id&limit=20`);
-  if (fixture.marker && result.status === 200) {
-    let rows;
-    try { rows = result.json(); } catch { fail('malformed_read', 'read', result.status); return; }
-    if (!Array.isArray(rows) || !rows.length || !rows.every(row => row && typeof row.name === 'string' && row.name.startsWith(fixture.marker))) { fail('project_read_boundary', 'read', result.status); }
-    assertionsPassed.add(1);
-  }
+  const stock=__ITER % 50;
+  const result = request('read','GET',`/rest/v1/bench_products?stock=eq.${stock}&order=id&limit=20`);
+  if (result.status !== 200) { return; }
+  const rows=jsonResponse(result,'read');
+  let first=stock;
+  if (first===0) { first=50; }
+  if (!Array.isArray(rows) || rows.length!==20 || !rows.every((row,index) => record(row) && row.id===first+index*50 && row.stock===stock && productName(row.name))) { fail('read_predicate_order_or_identity', 'read', result.status); return; }
+  if (!fixture.marker && !rows.every(row => Number.isFinite(row.price) && row.price===Number(String(row.id%500)+'.99') && typeof row.created_at==='string' && Number.isFinite(Date.parse(row.created_at)))) { fail('read_fixture_values','read',result.status); return; }
+  assertionsPassed.add(1);
 }
 function rls() {
   if (!ensureAccess()) { return; }
   const result = request('rls','GET','/rest/v1/bench_private?order=id&limit=20',{token:accessToken});
   if (result.status === 200) {
-    let rows;
-    try { rows = result.json(); } catch { fail('malformed_rls', 'rls', result.status); return; }
-    const isolated = Array.isArray(rows) && rows.length > 0 && rows.every(row => row !== null && typeof row === 'object' && row.user_id === fixture.user && (!fixture.marker || row.body === fixture.label));
-    if (!isolated) { fail('rls_boundary', 'rls', result.status); }
+    const rows=jsonResponse(result,'rls');
+    let expectedBody='x'.repeat(128);
+    if (fixture.marker) { expectedBody=fixture.label; }
+    const isolated = Array.isArray(rows) && rows.length === 20 && rows.every((row,index) => record(row) && row.id===2*(index+1) && row.user_id === fixture.user && row.body===expectedBody);
+    if (!isolated) { fail('rls_boundary', 'rls', result.status); return; }
     assertionsPassed.add(1);
     check(result, { 'RLS preserves ownership': () => isolated });
   }
 }
 function panel() {
-  request('panel','GET','/admin/api/tables/bench_products?limit=20',{cookie:fixture.cookie});
+  const result=request('panel','GET','/admin/api/tables/bench_products?size=20',{cookie:fixture.cookie});
+  if (result.status !== 200) { return; }
+  const value=jsonResponse(result,'panel');
+  if (!record(value) || !record(value.table) || value.table.name!=='bench_products' || value.page!==0 || value.size!==20 || value.has_next!==true || !Array.isArray(value.rows) || value.rows.length!==20 || !value.rows.every((row,index) => record(row) && row.id===String(index+1) && row.stock===String((index+1)%50) && productName(row.name))) { fail('panel_page_contract','panel',result.status); return; }
+  if (!fixture.marker && !value.rows.every(row => row.price===String(Number(row.id)%500)+'.99' && typeof row.created_at==='string' && row.created_at.length>0)) { fail('panel_fixture_values','panel',result.status); return; }
+  assertionsPassed.add(1);
 }
 function storage() {
   const operation = __ITER % 3;
   if (operation === 0) {
-    request('storage','POST','/storage/v1/object/list/bench',{body:JSON.stringify({prefix:'',limit:20,offset:0}),token:fixture.service});
+    const result=request('storage','POST','/storage/v1/object/list/bench',{body:JSON.stringify({prefix:'',limit:20,offset:0}),token:fixture.service});
+    if (result.status!==200) { return; }
+    const value=jsonResponse(result,'storage_list');
+    if (!record(value) || !Array.isArray(value.folders) || value.folders.length!==0 || !Array.isArray(value.objects) || value.objects.length<1 || value.objects.length>20 || !value.objects.every(item => record(item) && uuid(item.id) && typeof item.name==='string' && Number.isSafeInteger(item.size) && item.size>=0 && typeof item.etag==='string' && /^[0-9a-f]{64}$/.test(item.etag))) { fail('storage_listing_contract','storage',result.status); return; }
+    if (!fixture.marker && (value.objects.length!==20 || !value.objects.every((item,index) => item.name===String(index+1).padStart(8,'0')+'.txt' && item.size===0 && item.etag===sha256('','hex')))) { fail('storage_listing_fixture','storage',result.status); return; }
+    if (fixture.marker && !value.objects.every(item => item.name==='fixture.txt' || /^probe-[0-9]+\.txt$/.test(item.name))) { fail('storage_listing_project','storage',result.status); return; }
+    assertionsPassed.add(1);
     return;
   }
   if (operation === 1) {
@@ -179,13 +206,19 @@ function storage() {
     }
     return;
   }
-  request('storage','PUT',`/storage/v1/object/bench/probe-${__VU}.txt`,{body:payload(),token:fixture.service});
+  const name=`probe-${__VU}.txt`;
+  const body=payload();
+  const result=request('storage','PUT',`/storage/v1/object/bench/${name}`,{body,token:fixture.service});
+  if (result.status<200 || result.status>=300) { return; }
+  const value=jsonResponse(result,'storage_upload');
+  if (!record(value) || !uuid(value.id) || value.bucket!=='bench' || value.name!==name || value.size!==body.length || value.etag!==sha256(body,'hex')) { fail('storage_upload_receipt','storage',result.status); return; }
+  assertionsPassed.add(1);
 }
 function installSession(result) {
   if (result.status !== 200) { return false; }
   let value;
   try { value = result.json(); } catch { fail('malformed_session', 'auth', result.status); return false; }
-  if (!value || typeof value.access_token !== 'string' || !value.access_token || typeof value.refresh_token !== 'string' || !value.refresh_token || !Number.isFinite(value.expires_in) || value.expires_in <= 0) {
+  if (!value || typeof value.access_token !== 'string' || !value.access_token || typeof value.refresh_token !== 'string' || !value.refresh_token || !Number.isSafeInteger(value.expires_in) || value.expires_in <= 0 || !Number.isSafeInteger(Date.now()+value.expires_in*1000) || value.user?.id!==fixture.user) {
     fail('invalid_session_contract', 'auth', result.status);
     return false;
   }
@@ -212,8 +245,14 @@ function ensureAccess() {
   return login();
 }
 function write() {
-  const name = fixture.marker ? `${fixture.marker}${__ITER % 1000}` : `product ${__ITER % 1000}`;
-  request('write','PATCH',`/rest/v1/bench_products?id=eq.${(__ITER % 1000) + 1}`,{body:JSON.stringify({name}),token:fixture.service});
+  let name=`product ${__ITER % 1000}`;
+  if (fixture.marker) { name=`${fixture.marker}${__ITER % 1000}`; }
+  const id=(__ITER%1000)+1;
+  const result=request('write','PATCH',`/rest/v1/bench_products?id=eq.${id}`,{body:JSON.stringify({name}),token:fixture.service,prefer:'return=representation'});
+  if (result.status!==200) { return; }
+  const rows=jsonResponse(result,'write');
+  if (!Array.isArray(rows) || rows.length!==1 || !record(rows[0]) || rows[0].id!==id || rows[0].name!==name || rows[0].stock!==id%50) { fail('write_representation','write',result.status); return; }
+  assertionsPassed.add(1);
 }
 const operations = {read,rls,panel,storage,login,refresh,write};
 function rejectInvalidCredential() {
