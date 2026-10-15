@@ -720,6 +720,7 @@ def campaign(arguments):
                 "soak_fraction":arguments.soak_fraction,
                 "container_log_profile":LOG_PROFILE,
                 "pressure_rest_seconds":15,
+                "final_idle_seconds":arguments.final_idle_seconds,
                 "client_initialization":{"maximum_sessions_per_project":128,"bootstrap_concurrency":4,"setup_timeout_seconds":120,"fully_preallocated_arrival_VUs":True,"mix_schedule":"global scenario arrival ordinal","bootstrap_excluded_from_nominal_metrics":True},
                 "metrics_backend": "native Prometheus histogram; k6 raw TrendSink disabled",
                 "metrics_memory_mb": 512,
@@ -1273,7 +1274,7 @@ def campaign(arguments):
             run("recovery-after-restart", "mixed", "20s", 4)
             if arguments.soak_seconds:
                 run("soak", "mixed", str(arguments.soak_seconds) + "s", 16, soak_rate)
-            idle('post-load-idle',30)
+            idle('post-load-idle',arguments.final_idle_seconds)
             deadline = time.monotonic() + 30
             while True:
                 pending = int(
@@ -1511,6 +1512,7 @@ if __name__ == "__main__":
         help="Open-loop nominal iterations/second; zero uses closed-loop VUs",
     )
     parser.add_argument("--soak-seconds", type=int, default=1800)
+    parser.add_argument('--final-idle-seconds',type=int,default=30,help='Bounded post-load owner/cache reclamation observation; excluded from load time')
     parser.add_argument("--fixture-disk-mib", type=int, default=512)
     parser.add_argument('--wal-mib',type=int,choices=[64,128,256,512],default=64)
     parser.add_argument('--soak-fraction',type=float,choices=[.7,.75,.8],default=.8)
@@ -1544,6 +1546,8 @@ if __name__ == "__main__":
     arguments = parser.parse_args()
     if not arguments.binary.is_file() or not 0 <= arguments.soak_seconds <= 14400:
         parser.error("Invalid binary or soak budget")
+    if not 30<=arguments.final_idle_seconds<=300:
+        parser.error('Final idle observation must be 30..300 seconds')
     if not 512 <= arguments.fixture_disk_mib <= 4096:
         parser.error("Fixture disk budget must be 512 through 4096 MiB")
     if arguments.fixture_disk_mib<arguments.wal_mib*3:

@@ -296,6 +296,10 @@ counters only when events happen, so an instant query can miss valid renewals
 after the default five-minute lookback. Missing/non-finite range evidence still
 fails. The continuous-client iteration and minimum-renewal gates remain in force;
 this observation protocol must match across compared campaigns.
+`--final-idle-seconds 180` extends the final resource observation beyond the
+provider allocator's idle reclamation window. The bounded 30..300-second value
+is frozen in the profile and must match in comparisons. Idle/drain observation
+is reported separately and never added to effective load or four-hour endurance.
 
 Use `--rows 1000000` for the separate million-row investigation and
 `--object-bytes 1048576` for 1-MiB transfers. These profiles need separate
