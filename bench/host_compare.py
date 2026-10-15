@@ -1,0 +1,86 @@
+"""Compare three valid steady samples from equivalent independent topologies."""
+import argparse
+import json
+import math
+from pathlib import Path
+import statistics
+
+FIELDS=['schema','scope','projects','rows_per_project','shared_user_id','cpu_effective','cpu_affinity','metrics_cpu_affinity','app_aggregate_cpus','postgres_aggregate_cpus','generator_cpus','metrics_cpus','app_memory_mib_each','postgres_memory_mib_each','generator_memory_mib','metrics_memory_mib','max_connections_each','pool_each','fixture_disk_mib','storage_filesystem','seconds_per_step','capacity_qualification','provisional_rate_per_project','nominal_rate_per_project','images']
+OPERATIONS=['read','rls','panel','storage','login','refresh','write']
+
+
+def positive(value):
+    if isinstance(value,bool) or not isinstance(value,(int,float)) or not math.isfinite(value) or value<=0:
+        raise ValueError('Missing, non-finite or non-positive performance evidence')
+    return value
+
+
+def read_run(root):
+    profile=json.loads((root/'manifest.json').read_text())
+    completion=json.loads((root/'completion.json').read_text())
+    cleanup=json.loads((root/'cleanup.json').read_text())
+    violations=json.loads((root/'resource-violations.json').read_text())
+    if completion.get('status')!='passed' or completion.get('cleanup_confirmed') is not True or cleanup.get('confirmed') is not True or violations:
+        raise ValueError('Failed or incomplete run cannot certify host regressions')
+    projects=profile.get('projects')
+    if isinstance(projects,bool) or not isinstance(projects,int) or projects not in (1,5,10) or profile.get('seconds_per_step',0)<300 or profile.get('certifies_five_minute_steps') is not True or any(field not in profile for field in FIELDS):
+        raise ValueError('Missing equivalent profile or full-duration evidence')
+    positive(profile['nominal_rate_per_project'])
+    ledger=[json.loads(line) for line in (root/'traffic-ledger.jsonl').read_text().splitlines()]
+    labels={'project-'+str(index) for index in range(profile['projects'])}
+    reports=[]
+    for index in range(1,4):
+        report=json.loads((root/('balanced-'+str(index)+'.json')).read_text())
+        gates=json.loads((root/('balanced-'+str(index)+'-gates.json')).read_text())
+        intervals=[item for item in ledger if item.get('phase')=='balanced-'+str(index)]
+        if len(intervals)!=1 or intervals[0].get('completed') is not True or intervals[0].get('requested_seconds')!=profile['seconds_per_step'] or intervals[0].get('elapsed_seconds',0)<profile['seconds_per_step']:
+            raise ValueError('Missing completed five-minute traffic interval')
+        if set(report)!=labels or gates:
+            raise ValueError('Balanced samples are missing, failed or use another topology')
+        for value in report.values():
+            metrics=value['metrics']
+            if value.get('schema')!=2 or metrics['unexpected']['value']!=0 or metrics['checks']['fails'] or metrics['overload_rejections']['count']:
+                raise ValueError('Unexpected or overloaded traffic cannot certify a nominal baseline')
+            expected=profile['nominal_rate_per_project']*profile['seconds_per_step']
+            if positive(metrics['iterations']['count'])<expected*.99 or metrics['dropped_iterations']['count']>expected*.01:
+                raise ValueError('Under-delivered arrivals cannot certify regressions')
+            for operation in OPERATIONS:
+                positive(metrics['latency_'+operation]['p(95)'])
+                positive(metrics['throughput_'+operation]['rate'])
+        reports.append(report)
+    return profile,reports
+
+
+def compare(baseline,candidate):
+    before,left=read_run(baseline)
+    after,right=read_run(candidate)
+    differences=[field for field in FIELDS if before[field]!=after[field]]
+    rows=[]
+    for label in left[0]:
+        for operation in OPERATIONS:
+            latencies=[statistics.median(sample[label]['metrics']['latency_'+operation]['p(95)'] for sample in samples) for samples in [left,right]]
+            rates=[statistics.median(sample[label]['metrics']['throughput_'+operation]['rate'] for sample in samples) for samples in [left,right]]
+            latency_ratio=latencies[1]/latencies[0]
+            throughput_ratio=rates[1]/rates[0]
+            rows.append({'project':label,'operation':operation,'baseline_p95_ms':latencies[0],'candidate_p95_ms':latencies[1],'baseline_successful_operations_per_second':rates[0],'candidate_successful_operations_per_second':rates[1],'p95_ratio':latency_ratio,'throughput_ratio':throughput_ratio,'gate_passed':not differences and latency_ratio<=1.1 and throughput_ratio>=.9})
+    return {'kind':'independent-project steady regression','fixture_differences':differences,'rows':rows,'gate_passed':bool(rows) and all(row['gate_passed'] for row in rows)}
+
+
+def main():
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('baseline',type=Path)
+    parser.add_argument('candidate',type=Path)
+    parser.add_argument('--output',type=Path,required=True)
+    args=parser.parse_args()
+    try:
+        result=compare(args.baseline,args.candidate)
+    except (OSError,ValueError,KeyError,TypeError) as error:
+        result={'gate_passed':False,'invalid_evidence':type(error).__name__,'reason':str(error)[-600:]}
+    args.output.parent.mkdir(parents=True,exist_ok=True)
+    args.output.write_text(json.dumps(result,indent=2,allow_nan=False)+'\n')
+    if not result['gate_passed']:
+        raise SystemExit('Host regression envelope was not established')
+
+
+if __name__=='__main__':
+    main()

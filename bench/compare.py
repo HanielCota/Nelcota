@@ -42,7 +42,21 @@ metadata = [
     json.loads((directory / "metadata.json").read_text())
     for directory in [args.baseline, args.candidate]
 ]
-for field in ["steady_duration", "workloads", "s3", "schema", "metrics_backend", "metrics_memory_mb", "metrics_cpus", "metrics_cpu_affinity", "effective_cpu_quota", "offered_rate_unit", "nominal_slos_ms", "auth_rate_limit_per_minute", "autovacuum", "webhook_history_maintenance", "storage_filesystem"]:
+throughput_metric='http_reqs'
+if any(value.get('schema')==2 or 'metrics_backend' in value for value in metadata):
+    throughput_metric='successful_operations'
+campaign_validity=[]
+for directory in [args.baseline,args.candidate]:
+    valid=True
+    if throughput_metric=='successful_operations':
+        try:
+            completion=json.loads((directory/'completion.json').read_text())
+            cleanup=json.loads((directory/'cleanup.json').read_text())
+            valid=completion.get('status')=='passed' and completion.get('cleanup_confirmed') is True and cleanup.get('containers')==[] and cleanup.get('volumes')==[] and cleanup.get('directory_removed') is True
+        except (OSError,ValueError,TypeError):
+            valid=False
+    campaign_validity.append(valid)
+for field in ["steady_duration", "workloads", "s3", "schema", "metrics_backend", "metrics_memory_mb", "metrics_cpus", "metrics_cpu_affinity", "effective_cpu_quota", "offered_rate_unit", "nominal_slos_ms", "auth_rate_limit_per_minute", "autovacuum", "webhook_history_maintenance", "storage_filesystem", "physical_seeded_objects", "object_payload_bytes", "max_storage_fixture_disk_mib"]:
     if any(field in value for value in metadata):
         fixture_fields.append(field)
 fixture_differences = [
@@ -58,13 +72,18 @@ def valid_metrics(metrics):
         values = [
             metrics["http_req_duration"][key] for key in ["p(50)", "p(95)", "p(99)"]
         ]
-        rate = metrics["http_reqs"]["rate"]
-        count = metrics["http_reqs"]["count"]
+        if throughput_metric=='http_reqs' and 'successful_operations' in metrics:
+            return False  # An undeclared protocol cannot certify useful work.
+        rate = metrics[throughput_metric]["rate"]
+        count = metrics[throughput_metric]["count"]
+        http_rate=metrics['http_reqs']['rate']
+        http_count=metrics['http_reqs']['count']
+        failures=[metrics['unexpected']['value'],metrics['checks']['fails']]
         if not all(
             isinstance(value, (int, float))
             and not isinstance(value, bool)
             and math.isfinite(value)
-            for value in [*values, rate, count]
+            for value in [*values, rate, count,http_rate,http_count,*failures]
         ):
             return False
         return (
@@ -74,6 +93,8 @@ def valid_metrics(metrics):
             and values[1] > 0
             and rate > 0
             and count > 0
+            and http_rate>0
+            and http_count>=count
         )
     except (KeyError, TypeError):
         return False
@@ -101,10 +122,10 @@ for workload in args.workloads:
                     metrics["http_req_duration"][key] for metrics in valid
                 )
             measurement["rps"] = statistics.median(
-                metrics["http_reqs"]["rate"] for metrics in valid
+                metrics[throughput_metric]["rate"] for metrics in valid
             )
             measurement["duration_seconds"] = statistics.median(
-                metrics["http_reqs"]["count"] / metrics["http_reqs"]["rate"]
+                metrics[throughput_metric]["count"] / metrics[throughput_metric]["rate"]
                 for metrics in valid
             )
         measurements.append(measurement)
@@ -113,6 +134,7 @@ for workload in args.workloads:
         baseline["successful_runs"] == 3
         and candidate["successful_runs"] == 3
         and not fixture_differences
+        and all(campaign_validity)
     )
     if (
         comparable
@@ -135,6 +157,9 @@ for workload in args.workloads:
         failed.append(workload)
     rows.append(row)
 report = {
+    "throughput_metric":throughput_metric,
+    "useful_throughput_verified":throughput_metric=='successful_operations',
+    "campaign_evidence_valid":campaign_validity,
     "p95_limit": 1.10,
     "rps_minimum": 0.90,
     "fixture_differences": fixture_differences,

@@ -90,6 +90,46 @@ class Comparison(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertTrue(report["rows"][0]["gate_passed"])
 
+    def useful_fixture(self,candidate_rate):
+        for directory in [self.baseline,self.candidate]:
+            path=directory/'metadata.json'
+            metadata=json.loads(path.read_text());metadata['schema']=2
+            path.write_text(json.dumps(metadata))
+            (directory/'completion.json').write_text(json.dumps({'status':'passed','cleanup_confirmed':True}))
+            (directory/'cleanup.json').write_text(json.dumps({'containers':[],'volumes':[],'directory_removed':True}))
+            rate=100
+            if directory==self.candidate:
+                rate=candidate_rate
+            for index in range(1,4):
+                self.change_sample(directory,index,lambda metrics:metrics.update(successful_operations={'rate':rate,'count':rate*30}))
+
+    def test_rejected_requests_cannot_mask_twenty_percent_loss_of_useful_work(self):
+        self.useful_fixture(80)
+        code,report=self.compare()
+        self.assertNotEqual(code,0)
+        self.assertTrue(report['useful_throughput_verified'])
+        self.assertAlmostEqual(report['rows'][0]['rps_ratio'],.8)
+
+    def test_missing_useful_counter_cannot_fall_back_to_http_requests(self):
+        self.useful_fixture(100)
+        self.change_sample(self.candidate,1,lambda metrics:metrics.pop('successful_operations'))
+        code,report=self.compare()
+        self.assertNotEqual(code,0)
+        self.assertFalse(report['rows'][0]['comparable'])
+
+    def test_later_campaign_failure_cannot_be_hidden_by_good_steady_samples(self):
+        self.useful_fixture(100)
+        (self.baseline/'completion.json').write_text(json.dumps({'status':'failed','cleanup_confirmed':True}))
+        code,report=self.compare()
+        self.assertNotEqual(code,0)
+        self.assertFalse(report['rows'][0]['comparable'])
+
+    def test_completed_equivalent_useful_protocol_passes(self):
+        self.useful_fixture(100)
+        code,report=self.compare()
+        self.assertEqual(code,0)
+        self.assertTrue(report['rows'][0]['gate_passed'])
+
     def test_failed_baseline_cannot_certify_candidate(self):
         self.change_sample(
             self.baseline, 1, lambda value: value["unexpected"].update(value=1)

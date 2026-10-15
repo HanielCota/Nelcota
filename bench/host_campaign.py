@@ -24,7 +24,9 @@ from campaign import K6, ResourceCoverage, docker, effective_cpus, free_port, no
 from metrics import NativeMetrics, PROMETHEUS
 from observations import generator_observation
 from projects import Project
-from watchdog import LABEL, atomic_json, cleanup, host_reserves, process_identity
+from watchdog import LABEL, atomic_json, cleanup, host_reserves, process_identity, stop_generator
+from host_resources import snapshot as host_snapshot, container_memory_events, parse_counters, require_no_oom
+from ownership import OwnedDocker
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -78,7 +80,8 @@ def campaign(args):
     if len(cpus) < 4 or effective_cpus(cpus) < 3.5 or host_reserves(output):
         raise RuntimeError('Host cannot cover the declared CPU, memory and disk reserves')
     validate_disk_headroom(output,args.disk_mib,startup_mib=args.projects*400+512)
-    identity = 'nelcota-fleet-' + secrets.token_hex(4)
+    identity = 'nelcota-fleet-' + secrets.token_hex(16)
+    owned=OwnedDocker(identity,docker)
     telemetry, generator = identity + '-metrics', identity + '-load'
     telemetry_volume = identity + '-metrics-data'
     directory = Path(tempfile.mkdtemp(prefix='fixture-', dir=output))
@@ -102,6 +105,7 @@ def campaign(args):
 
     def terminate(signum, frame):
         critical.set()
+        stop_generator(manifest)
         raise RuntimeError('Fleet terminated by watchdog or owner')
 
     def heartbeat():
@@ -117,6 +121,9 @@ def campaign(args):
         watchdog = subprocess.Popen([sys.executable, str(ROOT/'bench/watchdog.py'), str(output/'ownership.json')], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
         atomic_json(output/'manifest.json', {'schema': 1, 'scope': 'local independent app/PG clusters, no proxy/controller', 'projects': args.projects, 'rows_per_project': 1000, 'shared_user_id': '00000000-0000-4000-8000-000000000001', 'binary_sha256': hashlib.file_digest(args.binary.open('rb'), 'sha256').hexdigest(), 'cpu_effective': effective_cpus(cpus), 'app_aggregate_cpus': 1, 'postgres_aggregate_cpus': 1, 'generator_cpus': 1, 'metrics_cpus': .25, 'app_memory_mib_each': 128, 'postgres_memory_mib_each': 256, 'max_arrival_rate': 10000, 'fixture_disk_mib': args.disk_mib, 'storage_filesystem': filesystem, 'seconds_per_step': args.seconds, 'certifies_five_minute_steps': args.seconds >= 300, 'base_rate_per_project': args.rate, 'SLOs': 'G05 unchanged'})
         fixtures = [project.create() for project in projects]
+        profile=json.loads((output/'manifest.json').read_text())
+        profile.update({'schema':2,'cpu_affinity':cpus[:3],'metrics_cpu_affinity':cpus[-1],'capacity_qualification':args.capacity,'provisional_rate_per_project':args.provisional_rate,'max_connections_each':32,'pool_each':4,'generator_memory_mib':512,'metrics_memory_mib':512,'images':{image:json.loads(owned('image','inspect',image))[0]['RepoDigests'] for image in ['ubuntu:24.04','postgres:17-alpine',K6,PROMETHEUS]}})
+        atomic_json(output/'manifest.json',profile)
         for project in projects:
             for foreign in fixtures:
                 if foreign['label'] != project.label:
@@ -127,11 +134,11 @@ def campaign(args):
         config = directory/'prometheus.yml'
         config.write_text('global:\n  scrape_interval: 15s\nscrape_configs: []\n')
         config.chmod(0o444)
-        docker('volume', 'create', '--label', LABEL+'='+identity, telemetry_volume)
-        docker('run', '-d', '--name', telemetry, '--label', LABEL+'='+identity, '--pids-limit', '128', '--network', 'host', '--cpus', '.25', '--cpuset-cpus', str(cpus[-1]), '--memory', '512m', '--memory-swap', '512m', '--user', '65534:65534', '--cap-drop', 'ALL', '--read-only', '--security-opt', 'no-new-privileges', '--mount', f'type=volume,source={telemetry_volume},destination=/prometheus', '-v', str(config)+':/etc/prometheus/prometheus.yml:ro', PROMETHEUS, '--config.file=/etc/prometheus/prometheus.yml', '--web.listen-address=127.0.0.1:'+str(metrics_port), '--web.enable-remote-write-receiver', '--enable-feature=native-histograms', '--storage.tsdb.retention.time=1h', '--storage.tsdb.retention.size=128MB', '--storage.tsdb.wal-segment-size=16MB', '--storage.tsdb.min-block-duration=15m', '--storage.tsdb.max-block-duration=15m')
+        owned('volume', 'create', '--label', LABEL+'='+identity, telemetry_volume)
+        owned('run', '-d', '--name', telemetry, '--label', LABEL+'='+identity, '--pids-limit', '128', '--network', 'host', '--cpus', '.25', '--cpuset-cpus', str(cpus[-1]), '--memory', '512m', '--memory-swap', '512m', '--user', '65534:65534', '--cap-drop', 'ALL', '--read-only', '--security-opt', 'no-new-privileges', '--mount', f'type=volume,source={telemetry_volume},destination=/prometheus', '-v', str(config)+':/etc/prometheus/prometheus.yml:ro', PROMETHEUS, '--config.file=/etc/prometheus/prometheus.yml', '--web.listen-address=127.0.0.1:'+str(metrics_port), '--web.enable-remote-write-receiver', '--enable-feature=native-histograms', '--storage.tsdb.retention.time=1h', '--storage.tsdb.retention.size=128MB', '--storage.tsdb.wal-segment-size=16MB', '--storage.tsdb.min-block-duration=15m', '--storage.tsdb.max-block-duration=15m')
         for _ in range(120):
             try:
-                if owns_listener(telemetry, metrics_port):
+                if owns_listener(owned.require(telemetry), metrics_port):
                     with urllib.request.urlopen(metrics_url+'/-/ready', timeout=2):
                         break
             except (OSError, RuntimeError):
@@ -140,7 +147,7 @@ def campaign(args):
         metrics = NativeMetrics(metrics_url)
         metrics.value('vector(1)')
         observed_containers = [item.app for item in projects]+[item.pg for item in projects]+[telemetry]
-        states = json.loads(docker('inspect', *observed_containers))
+        states = json.loads(owned('inspect', *observed_containers))
         process_ids = {state['Name']: state['State']['Pid'] for state in states}
         resource_began = time.monotonic()
         resource_at = resource_began
@@ -153,10 +160,21 @@ def campaign(args):
                     reason = host_reserves(output)
                     if reason:
                         raise RuntimeError(reason)
-                    states = json.loads(docker('inspect', *observed_containers))
+                    states = json.loads(owned('inspect', *observed_containers))
                     if any(not state['State']['Running'] or state['State']['OOMKilled'] or state['RestartCount'] or state['State']['Pid'] != process_ids[state['Name']] for state in states):
                         raise RuntimeError('Fixture unexpectedly restarted or OOMed')
-                    stats = [json.loads(line) for line in docker('stats', '--no-stream', '--format', '{{json .}}', *observed_containers).splitlines()]
+                    memory_events={}
+                    for state in states:
+                        events=container_memory_events(state['State']['Pid'])
+                        if events is None:
+                            events=parse_counters(owned('exec',state['Name'],'cat','/sys/fs/cgroup/memory.events'))
+                        memory_events[state['Name']]=events
+                        try:
+                            require_no_oom(events)
+                        except (ValueError,RuntimeError):
+                            atomic_json(output/'memory-events-violation.json',memory_events)
+                            raise
+                    stats = [json.loads(line) for line in owned('stats', '--no-stream', '--format', '{{json .}}', *observed_containers).splitlines()]
                     if len(stats) != len(observed_containers):
                         raise RuntimeError('Incomplete resource observation')
                     databases = {}
@@ -165,16 +183,18 @@ def campaign(args):
                         values = json.loads(project.sql("SELECT json_build_object('connections',count(*),'idle_in_transaction',count(*) FILTER(WHERE state='idle in transaction'),'stuck_idle_transactions',count(*) FILTER(WHERE state='idle in transaction' AND now()-state_change>interval '5 seconds')) FROM pg_stat_activity WHERE backend_type='client backend';"))
                         if values['connections'] > 32 or values['stuck_idle_transactions']:
                             raise RuntimeError('Connection or transaction ownership violation')
-                        values['disk_bytes'] = int(docker('exec', project.pg, 'du', '-sk', '/var/lib/postgresql/data').split()[0])*1024
+                        values['disk_bytes'] = int(owned('exec', project.pg, 'du', '-sk', '/var/lib/postgresql/data').split()[0])*1024
                         disk_bytes += values['disk_bytes']
                         databases[project.label] = values
                     if disk_bytes > args.disk_mib*1024*1024:
                         raise RuntimeError('Aggregate database disk budget exceeded')
                     generation = generator_observation(active_generator, lambda: active_generator)
+                    if generation and generation.get('host_pid') and generation.get('pid_starttime'):
+                        atomic_json(output/'generator-process.json',{'identity':identity,'pid':generation['host_pid'],'process_identity':generation['pid_starttime'],'container_id':generation['container_id']})
                     resource_at = time.monotonic()
                     coverage.observe(resource_at-resource_began)
                     with (output/'resources.jsonl').open('a') as target:
-                        target.write(json.dumps({'monotonic': resource_at, 'phase': phase, 'containers': stats, 'databases': databases, 'generator': generation})+'\n')
+                        target.write(json.dumps({'monotonic': resource_at, 'phase': phase, 'containers': stats, 'databases': databases, 'generator': generation,'host':host_snapshot(cpus),'memory_events':memory_events})+'\n')
                     atomic_json(output/'checkpoint.json', {'phase': phase, 'monotonic': resource_at, 'load_seconds_completed': load_seconds, 'resource_observations': coverage.count})
                 except Exception as error:
                     violations.append({'phase': phase, 'reason': str(error)[-600:], 'type': type(error).__name__})
@@ -202,6 +222,7 @@ def campaign(args):
                 try:
                     while process.poll() is None:
                         if critical.wait(.25) or watchdog.poll() is not None or time.monotonic()-start > seconds+120:
+                            stop_generator(manifest)
                             raise RuntimeError('Fleet observation, watchdog or duration gate stopped traffic')
                 finally:
                     elapsed = time.monotonic()-start
@@ -209,7 +230,7 @@ def campaign(args):
                         target.write(json.dumps({'phase':label, 'requested_seconds':seconds, 'elapsed_seconds':elapsed, 'completed':process.returncode==0, 'exit_code':process.returncode, 'started_monotonic':start, 'ended_monotonic':time.monotonic()})+'\n')
                     active_generator = None
                     if process.poll() is None:
-                        docker('rm', '-f', generator)
+                        owned('rm', '-f', generator)
                         process.wait(timeout=20)
                     atomic_json(output/(label+'-metrics-raw.json'), metrics.snapshot(label))
             if process.returncode or elapsed < seconds:
@@ -246,6 +267,8 @@ def campaign(args):
             for percent in [125,150,200]:
                 run('overload-'+str(percent),[max(1,qualified*percent//100)]*args.projects,overload=True,seconds=30)
         balanced_samples = []
+        profile['nominal_rate_per_project']=nominal_rate
+        atomic_json(output/'manifest.json',profile)
         for index in range(1,4):
             reports = run('balanced-'+str(index), [nominal_rate]*args.projects)
             failures = []
@@ -290,8 +313,8 @@ def campaign(args):
             sampler.join(timeout=30)
         atomic_json(output/'resource-violations.json', violations)
         cleanup(manifest)
-        remaining_containers = docker('ps','-aq','--filter','label='+LABEL+'='+identity)
-        remaining_volumes = docker('volume','ls','-q','--filter','label='+LABEL+'='+identity)
+        remaining_containers = owned('ps','-aq','--filter','label='+LABEL+'='+identity)
+        remaining_volumes = owned('volume','ls','-q','--filter','label='+LABEL+'='+identity)
         shutil.rmtree(directory)
         clean = not remaining_containers and not remaining_volumes and not directory.exists()
         atomic_json(output/'cleanup.json', {'confirmed':clean,'containers':remaining_containers.splitlines(),'volumes':remaining_volumes.splitlines(),'directory_removed':not directory.exists()})
