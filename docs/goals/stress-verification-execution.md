@@ -354,3 +354,21 @@ de carga concluída e cleanup confirmado. O endurance parcial, de aproximadament
 houve conciliação final de toda a campanha. O primeiro ciclo de auth/eventos/GC
 físico foi observado completo e a continuidade de processos foi verificada,
 mas essas evidências parciais não aprovam o requisito de endurance.
+
+## Nova tentativa contínua às 14:14 UTC
+
+`s3-pass-1-003` usa o snapshot congelado `1d53a67`, o mesmo binário imutável e
+os mesmos budgets de WAL, memória, tráfego e SLOs. Ela repetiu a qualificação
+inicial, as quatro etapas de capacidade de cinco minutos, overloads, concorrência,
+cinco picos/recuperações e reinício antes do endurance, concluindo 3.495 segundos
+de carga. O novo intervalo contínuo de 14.400 segundos começou às 14:14 UTC,
+a 280 iterações/s. O encerramento e sua conciliação ainda estão pendentes.
+
+Os 18 checks de `1d53a67` passaram. O inventário agora registra 14 subconjuntos
+funcionais verificados no CI, com os links dos jobs e seus limites explícitos.
+Nenhuma linha da matriz de stress foi promovida apenas por esses subconjuntos.
+O resumo está em
+[ci-functional-subsets.json](results/stress/ci-functional-subsets.json). As
+contagens globais de testes Rust não foram extraídas dos logs; o relatório não
+inventa esses números. O mínimo de oito horas e os dois passes completos
+continuam sem aprovação neste checkpoint.

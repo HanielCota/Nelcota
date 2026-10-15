@@ -8,70 +8,200 @@
       "area": "Authentication and independent consumers",
       "entrypoints": "crates/server/tests/auth.rs; concurrency.rs; scripts/test-auth-package.py",
       "status": "not run",
-      "scope_or_limit": "Real login/refresh traffic is active; ordinary regressions and independent consumers still pending."
+      "scope_or_limit": "Real login/refresh traffic is active; ordinary regressions and independent consumers still pending.",
+      "functional_subset": {
+        "status": "passed",
+        "source_commit": "1d53a676da7e1ac468c025dee2882ea3a7334497",
+        "check_names": [
+          "check"
+        ],
+        "evidence": [
+          "https://github.com/Nelcota/Nelcota/actions/runs/38740577768/job/116440912394"
+        ],
+        "scope": "Existing real-PostgreSQL auth, independent consumers, rotation/revocation, recovery links and bounded password-worker cancellation; release-load endurance still pending.",
+        "test_count": null
+      }
     },
     {
       "id": "rest",
       "area": "REST, RPC, RLS and statistics",
       "entrypoints": "bench/campaign.py; crates/server/tests/api.rs; rls.rs; hardening.rs",
       "status": "not run",
-      "scope_or_limit": "100k fixtures active; 1M fixture and dedicated RPC/concurrency checks pending."
+      "scope_or_limit": "100k fixtures active; 1M fixture and dedicated RPC/concurrency checks pending.",
+      "functional_subset": {
+        "status": "passed",
+        "source_commit": "1d53a676da7e1ac468c025dee2882ea3a7334497",
+        "check_names": [
+          "check"
+        ],
+        "evidence": [
+          "https://github.com/Nelcota/Nelcota/actions/runs/38740577768/job/116440912394"
+        ],
+        "scope": "Existing REST/RPC/RLS, paging, admission and catalog regressions on real PostgreSQL; native million-row load profile still pending.",
+        "test_count": null
+      }
     },
     {
       "id": "mutations",
       "area": "Concurrent mutations and ambiguous replies",
       "entrypoints": "bench/fault_campaign.py; crates/server/tests/concurrency.rs",
       "status": "not run",
-      "scope_or_limit": "Persisted operation ledger, disconnects and duplicate explicit primary keys prepared; live run pending."
+      "scope_or_limit": "Persisted operation ledger, disconnects and duplicate explicit primary keys prepared; live run pending.",
+      "functional_subset": {
+        "status": "passed",
+        "source_commit": "1d53a676da7e1ac468c025dee2882ea3a7334497",
+        "check_names": [
+          "check"
+        ],
+        "evidence": [
+          "https://github.com/Nelcota/Nelcota/actions/runs/38740577768/job/116440912394"
+        ],
+        "scope": "Existing concurrent password/account/storage mutations and rollback regressions. The new native discarded post-COMMIT reply campaign is not certified by this subset.",
+        "test_count": null
+      }
     },
     {
       "id": "catalog",
       "area": "Catalog, DDL and refresh recovery",
       "entrypoints": "crates/server/tests/architecture.rs; admin/migrations.rs",
       "status": "not run",
-      "scope_or_limit": "Existing real-service tests must run on this candidate."
+      "scope_or_limit": "Existing real-service tests must run on this candidate.",
+      "functional_subset": {
+        "status": "passed",
+        "source_commit": "1d53a676da7e1ac468c025dee2882ea3a7334497",
+        "check_names": [
+          "check"
+        ],
+        "evidence": [
+          "https://github.com/Nelcota/Nelcota/actions/runs/38740577768/job/116440912394"
+        ],
+        "scope": "Existing committed DDL, failed catalog refresh, concurrent migration export and cancellation regressions.",
+        "test_count": null
+      }
     },
     {
       "id": "disk",
       "area": "Disk bytes, quotas, collisions and paths",
       "entrypoints": "bench/campaign.py; bench/fault_campaign.py; crates/server/tests/storage.rs; concurrency.rs",
       "status": "not run",
-      "scope_or_limit": "Real overlay endurance active; owned quota/inode cases and regression suites pending."
+      "scope_or_limit": "Real overlay endurance active; owned quota/inode cases and regression suites pending.",
+      "functional_subset": {
+        "status": "passed",
+        "source_commit": "1d53a676da7e1ac468c025dee2882ea3a7334497",
+        "check_names": [
+          "check"
+        ],
+        "evidence": [
+          "https://github.com/Nelcota/Nelcota/actions/runs/38740577768/job/116440912394"
+        ],
+        "scope": "Existing real-file storage API, paths, listings, quotas, concurrent replacements and cancellation cases; continuous disk endurance still pending.",
+        "test_count": null
+      }
     },
     {
       "id": "s3",
       "area": "Real S3-compatible storage and multipart",
       "entrypoints": "bench/campaign.py; crates/server/tests/storage_s3.rs",
       "status": "not run",
-      "scope_or_limit": "RustFS available; short real smoke passed earlier; continuous four-hour run and final inventory pending."
+      "scope_or_limit": "RustFS available; short real smoke passed earlier; continuous four-hour run and final inventory pending.",
+      "functional_subset": {
+        "status": "passed",
+        "source_commit": "1d53a676da7e1ac468c025dee2882ea3a7334497",
+        "check_names": [
+          "check"
+        ],
+        "evidence": [
+          "https://github.com/Nelcota/Nelcota/actions/runs/38740577768/job/116440912394"
+        ],
+        "scope": "Explicit storage_s3 ignored tests were run against real RustFS, including multipart, grant expiry, timeout/cancel cleanup. A continuous four-hour release campaign is a separate gate.",
+        "test_count": null
+      }
     },
     {
       "id": "webhooks",
       "area": "Signatures, committed identities, queue and retries",
       "entrypoints": "bench/campaign.py; crates/server/tests/webhooks",
       "status": "not run",
-      "scope_or_limit": "Signed positive traffic and identity ledger active; competing workers/retries and cap boundaries pending."
+      "scope_or_limit": "Signed positive traffic and identity ledger active; competing workers/retries and cap boundaries pending.",
+      "functional_subset": {
+        "status": "passed",
+        "source_commit": "1d53a676da7e1ac468c025dee2882ea3a7334497",
+        "check_names": [
+          "check"
+        ],
+        "evidence": [
+          "https://github.com/Nelcota/Nelcota/actions/runs/38740577768/job/116440912394"
+        ],
+        "scope": "Existing real HTTP receivers, signatures/retries/leases/workers and the full 100000-event retained-history boundary. 99999 history fixtures are explicitly cancelled, not claimed network deliveries.",
+        "test_count": null
+      }
     },
     {
       "id": "admin",
       "area": "SQL/export admission and cancellation",
       "entrypoints": "crates/server/tests/architecture.rs; admin/sql.rs; hardening.rs",
       "status": "not run",
-      "scope_or_limit": "Existing real-service cancellation/budget suites pending."
+      "scope_or_limit": "Existing real-service cancellation/budget suites pending.",
+      "functional_subset": {
+        "status": "passed",
+        "source_commit": "1d53a676da7e1ac468c025dee2882ea3a7334497",
+        "check_names": [
+          "check"
+        ],
+        "evidence": [
+          "https://github.com/Nelcota/Nelcota/actions/runs/38740577768/job/116440912394"
+        ],
+        "scope": "Existing real-PostgreSQL SQL/export limits, slow/unpolled consumer cancellation, deadlines and role/connection recovery.",
+        "test_count": null
+      }
     },
     {
       "id": "browser",
       "area": "Panel tabs, request lifetime and retained resources",
       "entrypoints": "crates/admin/ui/e2e; src/lib/query-client.test.ts",
       "status": "not run",
-      "scope_or_limit": "Browser and memory suites pending; server panel HTTP latency does not certify visual feedback."
+      "scope_or_limit": "Browser and memory suites pending; server panel HTTP latency does not certify visual feedback.",
+      "functional_subset": {
+        "status": "passed",
+        "source_commit": "1d53a676da7e1ac468c025dee2882ea3a7334497",
+        "check_names": [
+          "admin-ui"
+        ],
+        "evidence": [
+          "https://github.com/Nelcota/Nelcota/actions/runs/38740577768/job/116440912780"
+        ],
+        "scope": "Existing Vite browser suites and memory regressions with explicit endpoint/response doubles. This is not a measured release-panel visual p95 under native traffic.",
+        "test_count": null
+      }
     },
     {
       "id": "sdks",
       "area": "TypeScript/Rust SDK runtime, cancellation and refresh",
       "entrypoints": "sdk/typescript; sdk/rust; crates/server/tests/sdk_rust.rs",
       "status": "not run",
-      "scope_or_limit": "Existing runtime/contract/memory suites pending."
+      "scope_or_limit": "Existing runtime/contract/memory suites pending.",
+      "functional_subset": {
+        "status": "passed",
+        "source_commit": "1d53a676da7e1ac468c025dee2882ea3a7334497",
+        "check_names": [
+          "sdk / sdk",
+          "sdk / sdk-node (22)",
+          "sdk / sdk-node (26)",
+          "sdk-rust (ubuntu-latest)",
+          "sdk-rust (macos-latest)",
+          "sdk-rust (windows-latest)"
+        ],
+        "evidence": [
+          "https://github.com/Nelcota/Nelcota/actions/runs/38740577768/job/116440912525",
+          "https://github.com/Nelcota/Nelcota/actions/runs/38740577768/job/116440912878",
+          "https://github.com/Nelcota/Nelcota/actions/runs/38740577768/job/116440912759",
+          "https://github.com/Nelcota/Nelcota/actions/runs/38740578097/job/116440913553",
+          "https://github.com/Nelcota/Nelcota/actions/runs/38740578097/job/116440914090",
+          "https://github.com/Nelcota/Nelcota/actions/runs/38740578097/job/116440913606"
+        ],
+        "scope": "Existing TypeScript/Rust package, runtime, memory and server/browser contracts on documented CI runtimes; no VPS load envelope follows from these functional checks.",
+        "test_count": null
+      }
     },
     {
       "id": "topologies",
@@ -85,28 +215,76 @@
       "area": "Concurrent host management, durable receipts and limits",
       "entrypoints": "scripts/test-host-management.py; crates/cli/src/updates/management",
       "status": "not run",
-      "scope_or_limit": "Owned Docker acceptance available; DNS/provenance/public TLS/proxy doubles remain explicit."
+      "scope_or_limit": "Owned Docker acceptance available; DNS/provenance/public TLS/proxy doubles remain explicit.",
+      "functional_subset": {
+        "status": "passed",
+        "source_commit": "1d53a676da7e1ac468c025dee2882ea3a7334497",
+        "check_names": [
+          "check"
+        ],
+        "evidence": [
+          "https://github.com/Nelcota/Nelcota/actions/runs/38740577768/job/116440912394"
+        ],
+        "scope": "Isolated root Docker lifecycle, paired backup/restore and recovery with explicit provenance/DNS/TLS/proxy doubles, plus actual 255-receipt and 256-identity boundaries.",
+        "test_count": null
+      }
     },
     {
       "id": "updates",
       "area": "Update activation, interruption and compatibility",
       "entrypoints": "scripts/test-upgrade.py; crates/cli/src/updates",
       "status": "not run",
-      "scope_or_limit": "Existing safe acceptance/regression cases pending; no production activation."
+      "scope_or_limit": "Existing safe acceptance/regression cases pending; no production activation.",
+      "functional_subset": {
+        "status": "passed",
+        "source_commit": "1d53a676da7e1ac468c025dee2882ea3a7334497",
+        "check_names": [
+          "upgrade"
+        ],
+        "evidence": [
+          "https://github.com/Nelcota/Nelcota/actions/runs/38740577768/job/116440912361"
+        ],
+        "scope": "Existing upgrade/rollback acceptance against published v0.3.1 and v0.4.0 and the checkout. Public deployment/power-loss acceptance remains separate.",
+        "test_count": null
+      }
     },
     {
       "id": "backup",
       "area": "Local paired snapshots and restored integrity",
       "entrypoints": "bench/fault_campaign.py; scripts/test-host-management.py",
       "status": "not run",
-      "scope_or_limit": "Local live-writer snapshot and real CLI restore fixtures available; execution pending."
+      "scope_or_limit": "Local live-writer snapshot and real CLI restore fixtures available; execution pending.",
+      "functional_subset": {
+        "status": "passed",
+        "source_commit": "1d53a676da7e1ac468c025dee2882ea3a7334497",
+        "check_names": [
+          "check"
+        ],
+        "evidence": [
+          "https://github.com/Nelcota/Nelcota/actions/runs/38740577768/job/116440912394"
+        ],
+        "scope": "Existing owned Docker paired snapshots and restored files/database integrity. Off-host/PITR and power loss are not established.",
+        "test_count": null
+      }
     },
     {
       "id": "hostile",
       "area": "Malformed inputs, churn and ingress policy",
       "entrypoints": "crates/server/tests/hardening.rs; storage.rs; webhooks",
       "status": "not run",
-      "scope_or_limit": "Native-router tests available; actual public ingress acceptance is separate."
+      "scope_or_limit": "Native-router tests available; actual public ingress acceptance is separate.",
+      "functional_subset": {
+        "status": "passed",
+        "source_commit": "1d53a676da7e1ac468c025dee2882ea3a7334497",
+        "check_names": [
+          "check"
+        ],
+        "evidence": [
+          "https://github.com/Nelcota/Nelcota/actions/runs/38740577768/job/116440912394"
+        ],
+        "scope": "Existing malformed input, bounded API/storage/admin admission, peer identity, webhook destination/redirect and signature regressions; public ingress stress remains separate.",
+        "test_count": null
+      }
     },
     {
       "id": "deployment",
@@ -129,5 +307,6 @@
       "status": "blocked",
       "scope_or_limit": "This measured host is x86_64; no isolated ARM64 load target is configured."
     }
-  ]
+  ],
+  "scope_note": "Row verdicts remain incomplete until their required stress scenarios pass; a passed functional subset cannot promote the row or G05."
 }
