@@ -30,6 +30,20 @@ def runtime_library(source, roots):
     return resolved
 
 
+def runtime_dependencies(binaries, roots):
+    """Include native dependencies of dlopen modules as well as executables."""
+    libraries = set()
+    for binary in binaries:
+        result = subprocess.run(['ldd', str(binary)], capture_output=True, text=True, timeout=10)
+        if result.returncode or 'not found' in result.stdout:
+            raise RuntimeError('Native browser dependency closure is incomplete: '+binary.name)
+        for name in re.findall(r'(/[^\s()]+)', result.stdout):
+            source = Path(name)
+            runtime_library(source, roots)
+            libraries.add(source)
+    return libraries
+
+
 def prepare(destination, sdk):
     if platform.machine() != 'x86_64':
         raise RuntimeError('The native browser runtime profile is validated only on x86_64')
@@ -113,17 +127,10 @@ def prepare(destination, sdk):
                 *[item for item in stdlib.glob('lib-dynload/*.so') if item.name not in unused_extensions],
                 *[Path(shutil.which(name) or '/missing-tool') for name in ['sh', 'cat', 'ls', 'wc', 'du']]]
     binaries.extend((destination/'python').rglob('node'))
-    libraries = set()
-    for binary in binaries:
-        result = subprocess.run(['ldd', str(binary)], capture_output=True, text=True, timeout=10)
-        if result.returncode or 'not found' in result.stdout:
-            raise RuntimeError('Native browser dependency closure is incomplete: '+binary.name)
-        for name in re.findall(r'(/[^\s()]+)', result.stdout):
-            source = Path(name)
-            runtime_library(source, [Path('/lib'), Path('/usr/lib'), python, destination])
-            libraries.add(source)
+    modules = set()
     for pattern in ['libnss*.so*', 'libsoftokn*.so*', 'libfreebl*.so*']:
-        libraries.update(Path('/usr/lib/x86_64-linux-gnu').glob(pattern))
+        modules.update(Path('/usr/lib/x86_64-linux-gnu').glob(pattern))
+    libraries = modules | runtime_dependencies([*binaries, *sorted(modules)], [Path('/lib'), Path('/usr/lib'), python, destination])
     names = {}
     for library in sorted(libraries):
         resolved = library.resolve(strict=True)
