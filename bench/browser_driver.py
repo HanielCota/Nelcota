@@ -87,6 +87,8 @@ async def main():
         await request.continue_()
     async def navigate(page, table, marker):
         start = await page.evaluate('performance.now()')
+        await page.bring_to_front()
+        require(await page.evaluate('document.visibilityState==="visible"'), 'visual_feedback_requires_foreground_tab')
         await page.evaluate('(table) => {history.pushState(null,"","/admin/tables/"+table); dispatchEvent(new PopStateEvent("popstate"));}', table)
         await page.wait_for_function('(marker) => document.querySelector(\'[data-cell="0:1"]\')?.textContent?.includes(marker)', arg=marker, timeout=10000)
         await page.evaluate('() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))')
@@ -360,6 +362,10 @@ async def main():
                 for page in pages:
                     require(await page.evaluate('window.g05Disposed.length===20&&window.g05Disposed.every(value=>value.deref()===undefined)'), 'disposed_SDK_client_retained')
                 save(output/'browser-checkpoint.json', {**state, 'completed_cycles':cycle+1})
+            timings.sort()
+            p95 = timings[max(0,math.ceil(len(timings)*.95)-1)]
+            save(output/'browser-feedback.json', {'samples':len(timings), 'p95_ms':p95, 'SLO_ms':1000, 'foreground_tabs_required':True, 'passed':p95<=1000})
+            require(p95<=1000, 'browser_visual_feedback_SLO')
             state['phase'] = 'real-credential-expiry'
             renewals = grants['refresh_token']
             reads = 0
@@ -397,8 +403,6 @@ async def main():
                 final = plateaus[-1]['pages'][index]
                 require(final['heap_bytes'] <= baseline['heap_bytes']+8*1024*1024, 'browser_heap_growth_budget')
                 require(final['nodes'] <= baseline['nodes']+250 and final['listeners'] <= baseline['listeners']+32, 'browser_owner_growth_budget')
-            timings.sort()
-            p95 = timings[max(0,math.ceil(len(timings)*.95)-1)]
             require(p95 <= 1000 and not state['external_requests_blocked'] and not state['page_errors'], 'browser_visual_or_external_traffic_gate')
             result = {'status':'passed', 'scope':'real local HTTPS panel and built TypeScript SDK, not public WAN capacity',
                       'browser_version':browser.version, 'tabs':3, 'pressure_rest_cycles':5, 'navigation_samples':len(timings),
