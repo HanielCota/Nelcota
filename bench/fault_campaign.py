@@ -39,6 +39,7 @@ from postgres_evidence import retain_failure
 from http_boundary import opener
 from fixture_copy import copy_to_tmpfs
 from disk_usage import container as container_disk_usage
+from lost_reply import discard_reply
 
 ROOT = Path(__file__).resolve().parents[1]
 MUTATION_PATH='/rest/v1/rpc/stress_transfer'
@@ -180,6 +181,7 @@ def run(args):
         source.create()
         scope=json.loads((output/'manifest.json').read_text())
         scope['focus']=args.focus
+        scope['dropped_replies']={'pre_response_percent':5,'after_upstream_commit_reply_percent':5,'maximum_intermediary_tasks':8,'downstream':'owned private HTTP socketpair','upstream':'real project HTTP','automatic_retries':0}
         atomic_json(output/'manifest.json',scope)
         initialized.append(source)
         source.sql(MUTATION_FIXTURE)
@@ -278,7 +280,21 @@ def run(args):
                     ledger.write(json.dumps({'event':'attempt','id':operation_id,'digest':digest,'delta':delta,'phase':label})+'\n')
             post_ms=None
             try:
-                if index%10==9:
+                if index%20==19:
+                    with attempt_lock:
+                        attempts[operation_id]['ambiguous']=True
+                    observation=discard_reply(lambda:raw(source,'POST',MUTATION_PATH,mutation),MUTATION_PATH,json.dumps(mutation).encode(),'Bearer '+source.fixture['service'])
+                    code=observation.pop('status')
+                    body=observation.pop('body')
+                    with attempt_lock:
+                        attempts[operation_id]['reply_lost_after_commit']=observation['commit_response_observed']
+                        with (output/'operation-ledger.jsonl').open('a') as ledger:
+                            ledger.write(json.dumps({'event':'discarded-upstream-reply','id':operation_id,'server_status':code,**observation})+'\n')
+                    if 200<=code<300:return 'deliberately-lost-committed-reply',0,None
+                    if allow_unavailable and code in (503,504) and json.loads(body).get('code') in ('unavailable','db_error','request_timeout'):
+                        return str(code),0,None
+                    raise RuntimeError('Unexpected upstream result before reply loss: '+str(code))
+                if index%20==9:
                     parsed=urllib.parse.urlsplit(source.base)
                     connection=http.client.HTTPConnection(parsed.hostname,parsed.port,timeout=5)
                     try:
@@ -428,7 +444,7 @@ def run(args):
             if not qualified:
                 raise RuntimeError('No ledger workload rate qualified for faults')
             args.rate=max(1,int(qualified*.8))
-            atomic_json(output/'capacity.json',{'qualified_lower_bound_iterations_per_second':qualified,'fault_rate':args.rate,'ratio':args.rate/qualified,'workload':'90% acknowledged atomic-transfer RPC plus negative JWT probe, 10% deliberately disconnected RPC; ambiguous outcomes reconciled without retries'})
+            atomic_json(output/'capacity.json',{'qualified_lower_bound_iterations_per_second':qualified,'fault_rate':args.rate,'ratio':args.rate/qualified,'workload':'90% acknowledged atomic-transfer RPC plus negative JWT probe, 5% pre-response disconnects, 5% discarded real upstream commit replies; ambiguous outcomes reconciled without retries'})
         def database_stop():
             fault_window.set({'name':'database-unavailable','container':source.pg,'expires':time.monotonic()+20})
             try:
@@ -770,6 +786,11 @@ def run(args):
         phase='reconciliation'
         rows=json.loads(source.sql("SELECT coalesce(json_object_agg(id,digest),'{}'::json) FROM public.stress_operations"))
         missing=[key for key,value in attempts.items() if value['acknowledged'] and rows.get(key)!=value['digest']]
+        committed_reply_losses=[key for key,value in attempts.items() if value.get('reply_lost_after_commit')]
+        lost_commit_missing=[key for key in committed_reply_losses if rows.get(key)!=attempts[key]['digest']]
+        atomic_json(output/'lost-commit-replies.json',{'confirmed_backend_commit_replies_discarded':len(committed_reply_losses),'lost_commits_missing_or_corrupt':len(lost_commit_missing),'downstream_transport':'owned HTTP socketpair','upstream':'real project HTTP','automatic_retries':0})
+        if not committed_reply_losses or lost_commit_missing:
+            raise RuntimeError('A real lost post-COMMIT reply was not durably reconciled')
         extra=[key for key,value in rows.items() if key not in attempts or attempts[key]['digest']!=value]
         ambiguous={key:value for key,value in attempts.items() if value['ambiguous']}
         acknowledged=[key for key,value in attempts.items() if value['acknowledged']]

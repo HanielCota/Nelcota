@@ -12,6 +12,7 @@ SENSITIVE=re.compile(r'(?:password|secret|cookie|authorization|access_token|refr
 STATIC.add('memory-events-violation.json')
 STATIC.add('failure-diagnostics.json')
 STATIC.add('resource-plateaus.json')
+STATIC.add('lost-commit-replies.json')
 FREEFORM={'message','diagnostic','error','stack','traceback','sql','payload','body'}
 
 
