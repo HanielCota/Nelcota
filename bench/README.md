@@ -283,6 +283,13 @@ it does not waive any SLO/delivery gate or certify the observed median as stable
 Retain failed higher-rate investigations separately. `--s3-memory-mib 512|1024`
 names the provider memory budget; different budgets require fresh measurements.
 
+The endurance session-renewal counter uses the last regular Prometheus sample
+within one retained hour and rejects observed counter resets. k6 emits sparse
+counters only when events happen, so an instant query can miss valid renewals
+after the default five-minute lookback. Missing/non-finite range evidence still
+fails. The continuous-client iteration and minimum-renewal gates remain in force;
+this observation protocol must match across compared campaigns.
+
 Use `--rows 1000000` for the separate million-row investigation and
 `--object-bytes 1048576` for 1-MiB transfers. These profiles need separate
 baselines. `--metadata-only-seed` is explicitly a listing investigation and

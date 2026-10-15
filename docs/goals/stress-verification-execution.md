@@ -326,3 +326,31 @@ sem exclusão ou reescrita das anteriores, e confirma que atualizar uma identida
 existente não autoriza um runtime ausente. O inventário de fixture é separado
 dos projetos usados no lifecycle. A formatação passou; a execução desses dois
 novos casos ainda está pendente neste checkpoint.
+
+## Reprovação do oráculo de contador esparso às 13:05 UTC
+
+Os 18 checks de `c38ce90` passaram, incluindo as fronteiras de journal e inventário.
+Uma inspeção da janela móvel de cinco minutos do S3 também encontrou 280,01
+operações úteis/s, zero descartes e todos os SLOs dentro dos limites. Porém, ela
+reproduziu um defeito no encerramento do benchmark: a consulta instantânea do
+contador de renovações retornou evidência ausente, enquanto a série temporal
+preservava cinco renovações e cinco refreshes positivos do mesmo canário, com
+5.081 iterações. O k6 só emite esse contador quando ocorre o evento; ele pode
+sumir da consulta instantânea após o lookback padrão de cinco minutos do Prometheus.
+
+A correção lê a última amostra regular dentro da hora retida e recusa resets,
+evidência ausente ou não finita. Ela retornou as cinco renovações contra o
+Prometheus real da mesma tentativa antes da interrupção. O mínimo de três
+renovações e a exigência de iterações contínuas foram preservados. A reprodução
+antes/depois foi registrada em
+[sparse-counter-before-after.json](results/stress/sparse-counter-before-after.json).
+A descoberta Python passou com 136 testes em 5,785 segundos, incluindo casos
+para ausência de amostra, reset, NaN e seletor/janela inválidos.
+
+`s3-pass-1-002` foi interrompido de forma controlada para corrigir e repetir o
+intervalo afetado com fixture nova. O resultado ficou `failed`, com 3.495 segundos
+de carga concluída e cleanup confirmado. O endurance parcial, de aproximadamente
+85 minutos de processo gerador, não conta como quatro horas aprovadas; tampouco
+houve conciliação final de toda a campanha. O primeiro ciclo de auth/eventos/GC
+físico foi observado completo e a continuidade de processos foi verificada,
+mas essas evidências parciais não aprovam o requisito de endurance.

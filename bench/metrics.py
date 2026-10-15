@@ -32,6 +32,24 @@ class NativeMetrics:
             raise ValueError('Non-finite or negative metric evidence')
         return value
 
+    def sparse_counter(self, name, phase, scenario, lookback_seconds=3600):
+        """Read the last actual counter sample, including between sparse events.
+
+        k6 emits a counter only when it receives samples. An instant query can
+        lose an otherwise continuous client's refresh counter after Prometheus's
+        five-minute lookback. A missing range, non-finite value or observed reset
+        still fails; a zero is never invented for absent evidence.
+        """
+        if not all(isinstance(value, str) and re.fullmatch(r'[a-z][a-z0-9_-]{0,79}', value) for value in [name, phase, scenario]):
+            raise ValueError('Invalid sparse counter selector')
+        if isinstance(lookback_seconds, bool) or not isinstance(lookback_seconds, int) or not 60 <= lookback_seconds <= 3600:
+            raise ValueError('Sparse counter lookback must fit retained telemetry')
+        metric = 'k6_' + name + '_total{run_id="' + phase + '",scenario="' + scenario + '"}'
+        interval = '[' + str(lookback_seconds) + 's]'
+        if self.value('sum(resets(' + metric + interval + '))') != 0:
+            raise ValueError('Sparse counter reset invalidates its continuous evidence')
+        return self.value('sum(last_over_time(' + metric + interval + '))')
+
     def snapshot(self, phase):
         if not phase or any(c not in 'abcdefghijklmnopqrstuvwxyz0123456789-' for c in phase):
             raise ValueError('Invalid metrics phase')

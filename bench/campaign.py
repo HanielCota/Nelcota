@@ -730,6 +730,7 @@ def campaign(arguments):
                 "autovacuum": "enabled after fresh-statistics phase",
                 "service_fixture_ttl_seconds": 21900,
                 "retention_probe": "two safely aged fixture cohorts during long endurance",
+                "session_canary_observation": "last regular counter sample within 3600 seconds; reject observed resets; require continuous iterations and existing renewal count gate",
                 "webhook_history_maintenance": "explicit admin clear at 5000 terminal records; committed identities retained by fixture audit trigger",
                 "postgres_version": sql("SELECT version();"),
                 "images": {
@@ -1096,9 +1097,9 @@ def campaign(arguments):
                     verify_continuity(soak_processes,final_processes)
                     if arguments.soak_seconds>=7200:
                         selector='{run_id="soak",scenario="session-canary"}'
-                        renewals=native_metrics.value('sum(k6_access_renewals_total'+selector+')')
+                        renewals=native_metrics.sparse_counter('access_renewals','soak','session-canary')
                         canary_iterations=native_metrics.value('sum(k6_iterations_total'+selector+')')
-                        atomic_json(output/'session-canary.json',{'access_renewals':renewals,'iterations':canary_iterations,'minimum_renewals':max(1,arguments.soak_seconds//3600-1),'scope':'one continuous VU reuses its session and renews near actual access-token expiry'})
+                        atomic_json(output/'session-canary.json',{'access_renewals':renewals,'iterations':canary_iterations,'minimum_renewals':max(1,arguments.soak_seconds//3600-1),'counter_observation':'last regular sample within retained 3600 seconds, no observed reset','scope':'one continuous VU reuses its session and renews near actual access-token expiry'})
                         if renewals<max(1,arguments.soak_seconds//3600-1) or canary_iterations<arguments.soak_seconds*.8:
                             raise RuntimeError('Continuous session did not demonstrate supported expiry renewal')
 
