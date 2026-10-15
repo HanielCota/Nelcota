@@ -32,7 +32,7 @@ async def main():
     require(900 <= fixture['session_seconds'] <= 1500, 'invalid_browser_session_budget')
     state = {'phase':'startup', 'api_requests':0, 'decoded_network_bytes':0,
              'external_requests_blocked':0, 'page_errors':0}
-    paths, grants, consumers = Counter(), Counter(), Counter()
+    paths, grants, consumers, uploads = Counter(), Counter(), Counter(), Counter()
     arrivals = deque()
     def fatal(reason):
         save(output/'browser-critical.json', {'reason':reason, **state})
@@ -64,6 +64,9 @@ async def main():
             fatal('browser_traffic_byte_budget')
     def response_seen(response):
         parsed = urllib.parse.urlsplit(response.url)
+        if parsed.path == '/admin/api/storage/buckets/bench/upload':
+            replacing = urllib.parse.parse_qs(parsed.query).get('replace', ['false'])[0]
+            uploads[str(response.status)+'-'+replacing] += 1
         if parsed.path.startswith(('/auth/', '/rest/')):
             upstream = response.headers.get('x-g05-upstream')
             if upstream not in fixture['upstreams']:
@@ -253,6 +256,57 @@ async def main():
                 require(outcome['code']=='aborted' and not outcome['hasData'] and time.monotonic()-began < 1, 'live_SDK_cancellation_not_prompt')
             await hold_actual_response(base+'/rest/v1/bench_private?*', cancellable_read, abort_read)
             await sdk_read(pages[0])
+            state['phase'] = 'real-upload-conflict-ownership'
+            await pages[0].evaluate('''() => {history.pushState(null,'','/admin/storage/bench');dispatchEvent(new PopStateEvent('popstate'));}''')
+            dropzone = pages[0].get_by_role('button', name='Arraste arquivos para cá ou clique para selecionar', exact=True)
+            await dropzone.wait_for()
+            for action in ['Cancelar', 'Substituir']:
+                for cycle in range(3):
+                    before_upload = sum(uploads.values())
+                    files = await pages[0].evaluate_handle('''() => {
+                      const data=new DataTransfer();
+                      const file=new File(['g05-stress-file\\n'+'x'.repeat(1048576-16)],'fixture.txt',{type:'text/plain'});
+                      window.g05File=new WeakRef(file);data.items.add(file);return data;
+                    }''')
+                    try:
+                        await dropzone.dispatch_event('drop', {'dataTransfer':files})
+                    finally:
+                        await files.dispose()
+                    dialog = pages[0].get_by_role('alertdialog')
+                    await dialog.wait_for()
+                    require(await pages[0].evaluate('window.g05File.deref()!==undefined'), 'live_conflict_did_not_own_its_File')
+                    await dialog.get_by_role('button', name=action, exact=True).click()
+                    await dialog.wait_for(state='hidden')
+                    collect_deadline = time.monotonic()+10
+                    collected = False
+                    while time.monotonic() < collect_deadline:
+                        await profilers[0].send('HeapProfiler.collectGarbage')
+                        collected = await pages[0].evaluate('window.g05File.deref()===undefined')
+                        if collected:
+                            break
+                        await asyncio.sleep(.2)
+                    require(collected and sum(uploads.values())>before_upload, 'real_upload_File_owner_not_released')
+            require(dict(uploads)=={'409-false':6, '200-true':3}, 'real_upload_conflict_or_replace_HTTP_contract')
+            file_integrity = await pages[0].evaluate('''async () => {
+              const response=await fetch('/admin/api/storage/buckets/bench/file?name=fixture.txt');
+              const bytes=await response.arrayBuffer();const text=new TextDecoder().decode(bytes);
+              const valid=response.status===200&&bytes.byteLength===1048576&&text==='g05-stress-file\\n'+'x'.repeat(1048576-16);
+              const digest=await crypto.subtle.digest('SHA-256',bytes);
+              return {valid,size:bytes.byteLength,sha256:Array.from(new Uint8Array(digest)).map(value=>value.toString(16).padStart(2,'0')).join('')};
+            }''')
+            require(file_integrity['valid'], 'real_browser_uploaded_bytes_corrupt')
+            state['phase'] = 'real-file-preview-lifetimes'
+            preview_seconds = []
+            for cycle in range(5):
+                preview_began = time.monotonic()
+                await pages[0].get_by_role('button', name='fixture.txt', exact=True).click()
+                dialog = pages[0].get_by_role('dialog')
+                await dialog.wait_for()
+                await pages[0].wait_for_function('''() => document.querySelector('[role="dialog"] pre')?.textContent?.startsWith('g05-stress-file')''', timeout=10000)
+                preview_seconds.append(time.monotonic()-preview_began)
+                await dialog.get_by_role('button', name='Fechar', exact=True).click()
+                await dialog.wait_for(state='hidden')
+            await navigate(pages[0], 'bench_products', 'project-0:')
             async def sample(label):
                 values = []
                 for profiler in profilers:
@@ -340,6 +394,9 @@ async def main():
                       'sdk_RLS_reads':reads, 'cross_tab_refresh_coalesced':True, 'actual_credential_renewal':True,
                       'offline_reconnect':True, 'offline_read_error':disconnected['code'],
                       'actual_server_response_controls':delayed, 'late_response_view_preserved':True, 'inflight_SDK_cancellation':True,
+                      'upload_conflict_File_ownership_cycles':6, 'real_upload_HTTP_status_counts':dict(uploads),
+                      'uploaded_file_integrity':file_integrity, 'real_file_preview_cycles':5,
+                      'file_preview_completion_seconds':preview_seconds,
                       'actual_expired_access_status':expired,
                       'actual_expires_in_seconds':signin['expires'], 'auth_observation_seconds':time.monotonic()-auth_started,
                       'logout_refresh_status':revoked, 'access_logout_contract':'Existing access remains valid until its expiry; no immediate access revocation claim',

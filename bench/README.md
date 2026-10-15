@@ -392,6 +392,9 @@ It also declares offline/reconnect, a cancelled SDK read and navigation away
 from a delayed real server response. CDP pauses actual verified HTTPS response
 headers for at most five seconds; it never supplies a substitute BaaS body.
 Those controls still require a successful native campaign before acceptance.
+Six real 1-MiB upload conflicts exercise cancel/replace File ownership with GC
+and byte read-back; five text-preview cycles record completion separately from
+the table feedback SLO. No upload response is replaced by the harness.
 No BaaS responses are mocked. Only the built SDK's test assets are served by
 the browser harness. External page requests are blocked before transmission.
 
