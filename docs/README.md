@@ -25,6 +25,7 @@ published version is specified; server and SDK packages have separate versions.
 - [Backup](backup.md): paired snapshots, offsite copies and database PITR.
 - [Controlled updates](panel-updates.md): unpublished controller and required VPS acceptance.
 - [Panel](panel.md): administrative UI and its authority.
+- [Host project management](host-management.md): isolated project creation, confirmed backup/restore/removal and persistent recovery.
 - [Security model](security/README.md): protections and deployer responsibilities.
 - [Release handoff](onboarding/release.md) and [leaving](leaving.md): upgrades and exports.
 

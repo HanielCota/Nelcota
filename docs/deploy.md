@@ -291,3 +291,11 @@ This dated local run is historical evidence. It does not validate a current
 VPS, public DNS/TLS, the native systemd runtime or controlled updates. Published
 releases now exist; run acceptance on your target host/version before relying
 on production behavior.
+
+## Optional host management
+
+The Unreleased controller can provision and manage isolated Docker projects
+after explicit SSH enrollment. Approve an official image, domain scope and VPS
+addresses before enabling creation; inspect operation reviews and retain
+recovery access. See `docs/host-management.md` for supported layouts and
+production acceptance.

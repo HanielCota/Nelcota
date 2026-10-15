@@ -262,3 +262,12 @@ See [decisions](decisions.md), [REST API](api.md), [auth](schema-auth.md),
 [webhooks](webhooks.md) and [deploy](deploy.md). Reusable-auth setup is in the
 repository-only guide at `docs/auth-integration.md`. Mermaid diagrams render
 on GitHub; the current embedded reader displays their source.
+
+## Host controller boundaries
+
+Host project management keeps pure commands, bounded DTOs and durable receipts
+in `nelcota-deployment`; root effects, policy and recovery live in `nelcota-cli`. `nelcota-admin` is an unprivileged HTTP adapter. The separately
+authenticated UI requests plans and confirmed operations through the worker;
+project credentials never grant host authority. Updates, CLI mutations and host
+jobs share one lease and refuse unresolved work. See `docs/host-management.md`
+for the Unreleased feature’s enrollment, recovery and validation limits.

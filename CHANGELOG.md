@@ -10,6 +10,11 @@ and [Rust SDK](sdk/rust/CHANGELOG.md) have independent package versions.
 
 ### Added
 
+- Add explicitly enrolled host project management with visual operation review,
+  typed confirmation and reauthentication, durable idempotent jobs, bounded
+  project status/logs, Docker namespace collision checks, paired backups and
+  guarded restore/removal recovery, including partial recreation and missing
+  safety-backup protection.
 - Opt-in native panel update management with a separate operator origin, scoped
   host authorization, verified release readiness, durable jobs and SSH recovery.
   Production activation requires the exact-binary VPS acceptance gates in

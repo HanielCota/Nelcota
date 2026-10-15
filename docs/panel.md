@@ -236,3 +236,11 @@ user-facing string in a component.
 ## Related guides
 
 See [deploy](deploy.md), [auth](schema-auth.md), [storage](storage.md) and [troubleshooting](troubleshooting.md).
+
+## Host projects in the controller
+
+The Unreleased host controller adds project creation, paired backups, restore
+and removal with visual review, typed confirmation, operator reauthentication
+and durable recovery. It uses a separate HTTPS origin and SSH-granted host
+authority. The Projects page links to this controller when enrolled.
+Deployment, supported layouts and activation are described in `docs/host-management.md`.
