@@ -14,10 +14,55 @@ def parse_counters(text):
     values={}
     for line in text.splitlines():
         key,value=line.split()
+        if key in values:
+            raise ValueError('Duplicate kernel counter evidence')
         values[key]=int(value)
         if values[key]<0:
             raise ValueError('Negative kernel counter evidence')
     return values
+
+
+CONTAINER_FIELDS=('memory.current','memory.max','memory.peak','memory.events','memory.stat','cpu.max','cpu.stat','pids.current','pids.max')
+CONTAINER_COMMAND='set -eu; for field in '+ ' '.join(CONTAINER_FIELDS)+'; do printf "[%s]\\n" "$field"; cat "/sys/fs/cgroup/$field"; done'
+
+
+def owned_cgroup_snapshot(owned,name):
+    """Read the component namespace when its cgroup is outside our mount."""
+    raw=owned('exec',name,'sh','-c',CONTAINER_COMMAND)
+    sections={}
+    current=None
+    for line in raw.splitlines():
+        if line.startswith('[') and line.endswith(']'):
+            current=line[1:-1]
+            if current not in CONTAINER_FIELDS or current in sections:
+                raise ValueError('Unknown or duplicate component cgroup section')
+            sections[current]=[]
+            continue
+        if current is None:
+            raise ValueError('Component cgroup observation has no section')
+        sections[current].append(line)
+    if set(sections)!=set(CONTAINER_FIELDS) or any(not values for values in sections.values()):
+        raise ValueError('Incomplete component cgroup evidence')
+    result={name:parse_counters('\n'.join(sections[name])) for name in ['memory.events','memory.stat','cpu.stat']}
+    for name in ['memory.current','memory.max','memory.peak','pids.current','pids.max']:
+        value='\n'.join(sections[name])
+        result[name]=None
+        if value!='max':
+            result[name]=int(value)
+            if result[name]<0:
+                raise ValueError('Negative component cgroup gauge')
+    if any(result[name] is None for name in ['memory.current','memory.peak','pids.current']):
+        raise ValueError('Missing finite component memory or task gauge')
+    quota,period=' '.join(sections['cpu.max']).split()
+    result['cpu.max']={'quota_usec':None,'period_usec':int(period)}
+    if quota!='max':result['cpu.max']['quota_usec']=int(quota)
+    if result['cpu.max']['period_usec']<=0 or (quota!='max' and result['cpu.max']['quota_usec']<=0):
+        raise ValueError('Invalid component CPU quota')
+    if any(key not in result['cpu.stat'] for key in ['usage_usec','nr_periods','nr_throttled','throttled_usec']):
+        raise ValueError('Incomplete component CPU throttle evidence')
+    if any(key not in result['memory.stat'] for key in ['anon','file','shmem']):
+        raise ValueError('Incomplete component cache/working-set evidence')
+    return result
 
 
 def snapshot(cpus):

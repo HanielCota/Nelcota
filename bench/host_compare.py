@@ -8,6 +8,7 @@ from campaign import NOMINAL_SLOS
 
 FIELDS=['schema','scope','projects','rows_per_project','shared_user_id','cpu_effective','cpu_affinity','metrics_cpu_affinity','app_aggregate_cpus','postgres_aggregate_cpus','generator_cpus','metrics_cpus','app_memory_mib_each','postgres_memory_mib_each','generator_memory_mib','metrics_memory_mib','max_connections_each','pool_each','fixture_disk_mib','storage_filesystem','seconds_per_step','capacity_qualification','provisional_rate_per_project','nominal_rate_per_project','images']
 OPERATIONS=['read','rls','panel','storage','login','refresh','write']
+FIELDS.append('resource_protocol')
 
 
 def positive(value):

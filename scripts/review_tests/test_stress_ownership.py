@@ -102,6 +102,23 @@ class EmergencyTrafficStop(unittest.TestCase):
 
 
 class HostMemoryEvidence(unittest.TestCase):
+    def test_component_cgroup_observation_keeps_peaks_cpu_throttling_and_cache_separate(self):
+        from host_resources import owned_cgroup_snapshot,parse_counters
+        fields={'memory.current':'100','memory.max':'1000','memory.peak':'150','memory.events':'oom 0\noom_kill 0','memory.stat':'anon 30\nfile 50\nshmem 0','cpu.max':'50000 100000','cpu.stat':'usage_usec 100\nnr_periods 10\nnr_throttled 4\nthrottled_usec 20','pids.current':'8','pids.max':'128'}
+        def encoded(values):
+            return ''.join('['+key+']\n'+value+'\n' for key,value in values.items())
+        owned=mock.Mock(return_value=encoded(fields))
+        observed=owned_cgroup_snapshot(owned,'owned-component')
+        self.assertEqual(observed['memory.peak'],150)
+        self.assertEqual(observed['memory.stat']['file'],50)
+        self.assertEqual(observed['cpu.stat']['nr_throttled'],4)
+        self.assertEqual(observed['cpu.max']['quota_usec'],50000)
+        self.assertEqual(owned.call_args.args[:2],('exec','owned-component'))
+        for key,value in [('memory.current','NaN'),('memory.peak','max'),('cpu.max','-1 100000'),('memory.events','oom 0\noom 0')]:
+            owned.return_value=encoded({**fields,key:value})
+            with self.assertRaises(ValueError):owned_cgroup_snapshot(owned,'owned-component')
+        with self.assertRaises(ValueError):parse_counters('oom 0\noom 0')
+
     def test_clean_page_cache_is_reclaimable_but_tmpfs_is_not(self):
         import host_resources
         with tempfile.TemporaryDirectory() as directory:

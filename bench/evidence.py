@@ -9,6 +9,7 @@ import re
 STATIC={'ownership.json','metadata.json','manifest.json','launch-manifest.json','completion.json','cleanup.json','capacity.json','capacity-probes.json','invariants.json','resource-violations.json','watchdog-stop.json','retention.json','checkpoint.json','snapshot.json','restore.json','filesystem-exhaustion.json','declared-oom.json','cross-project-preflight.json','error.json','soak-processes-before.json','soak-processes-after.json','generator-emergency-stop.json','session-canary.json','mutation-boundaries.json','deadlock.json'}
 PHASE=re.compile(r'^(?:fresh-|read-|rls-|panel-|storage-|login-|refresh-|mixed-|write-|balanced-|noisy-|capacity-|calibrate-|stress-|overload-|spike-|recovery-|database-|app-|oom-|container-|filesystem-|snapshot-|provider-|baseline|soak)[a-z0-9-]*\.json$')
 SENSITIVE=re.compile(r'(?:password|secret|cookie|authorization|access_token|refresh_token|signed_url|token_hash|jwt)$',re.I)
+STATIC.add('memory-events-violation.json')
 FREEFORM={'message','diagnostic','error','stack','traceback','sql','payload','body'}
 
 

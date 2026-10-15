@@ -25,7 +25,7 @@ from metrics import NativeMetrics, PROMETHEUS
 from observations import generator_observation
 from projects import Project
 from watchdog import LABEL, atomic_json, cleanup, host_reserves, process_identity, stop_generator
-from host_resources import snapshot as host_snapshot, container_memory_events, parse_counters, require_no_oom
+from host_resources import snapshot as host_snapshot, owned_cgroup_snapshot, require_no_oom
 from ownership import OwnedDocker
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -122,6 +122,7 @@ def campaign(args):
         atomic_json(output/'manifest.json', {'schema': 1, 'scope': 'local independent app/PG clusters, no proxy/controller', 'projects': args.projects, 'rows_per_project': 1000, 'shared_user_id': '00000000-0000-4000-8000-000000000001', 'binary_sha256': hashlib.file_digest(args.binary.open('rb'), 'sha256').hexdigest(), 'cpu_effective': effective_cpus(cpus), 'app_aggregate_cpus': 1, 'postgres_aggregate_cpus': 1, 'generator_cpus': 1, 'metrics_cpus': .25, 'app_memory_mib_each': 128, 'postgres_memory_mib_each': 256, 'max_arrival_rate': 10000, 'fixture_disk_mib': args.disk_mib, 'storage_filesystem': filesystem, 'seconds_per_step': args.seconds, 'certifies_five_minute_steps': args.seconds >= 300, 'base_rate_per_project': args.rate, 'SLOs': 'G05 unchanged'})
         fixtures = [project.create() for project in projects]
         profile=json.loads((output/'manifest.json').read_text())
+        profile['resource_protocol']='component cgroup v2 current/peak/stat/events/cpu/pids plus host and process owners'
         profile.update({'schema':2,'cpu_affinity':cpus[:3],'metrics_cpu_affinity':cpus[-1],'capacity_qualification':args.capacity,'provisional_rate_per_project':args.provisional_rate,'max_connections_each':32,'pool_each':4,'generator_memory_mib':512,'metrics_memory_mib':512,'images':{image:json.loads(owned('image','inspect',image))[0]['RepoDigests'] for image in ['ubuntu:24.04','postgres:17-alpine',K6,PROMETHEUS]}})
         atomic_json(output/'manifest.json',profile)
         for project in projects:
@@ -164,10 +165,10 @@ def campaign(args):
                     if any(not state['State']['Running'] or state['State']['OOMKilled'] or state['RestartCount'] or state['State']['Pid'] != process_ids[state['Name']] for state in states):
                         raise RuntimeError('Fixture unexpectedly restarted or OOMed')
                     memory_events={}
+                    cgroups={}
                     for state in states:
-                        events=container_memory_events(state['State']['Pid'])
-                        if events is None:
-                            events=parse_counters(owned('exec',state['Name'],'cat','/sys/fs/cgroup/memory.events'))
+                        cgroups[state['Name']]=owned_cgroup_snapshot(owned,state['Name'])
+                        events=cgroups[state['Name']]['memory.events']
                         memory_events[state['Name']]=events
                         try:
                             require_no_oom(events)
@@ -194,7 +195,7 @@ def campaign(args):
                     resource_at = time.monotonic()
                     coverage.observe(resource_at-resource_began)
                     with (output/'resources.jsonl').open('a') as target:
-                        target.write(json.dumps({'monotonic': resource_at, 'phase': phase, 'containers': stats, 'databases': databases, 'generator': generation,'host':host_snapshot(cpus),'memory_events':memory_events})+'\n')
+                        target.write(json.dumps({'monotonic': resource_at, 'phase': phase, 'containers': stats, 'databases': databases, 'generator': generation,'host':host_snapshot(cpus),'memory_events':memory_events,'component_cgroups':cgroups})+'\n')
                     atomic_json(output/'checkpoint.json', {'phase': phase, 'monotonic': resource_at, 'load_seconds_completed': load_seconds, 'resource_observations': coverage.count})
                 except Exception as error:
                     violations.append({'phase': phase, 'reason': str(error)[-600:], 'type': type(error).__name__})

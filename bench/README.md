@@ -213,6 +213,9 @@ Its separate scenario cannot mask dropped nominal arrivals; combined admission
 remains 128 VUs. Two aged cohorts exercise auth, webhook and physical-object GC.
 PID/container/StartedAt checks preserve process continuity. Per-container cgroup
 counters include PostgreSQL child OOMs; controller counters describe the controller.
+Component cgroup observations also retain memory current/peak, anonymous/file
+cache counters, CPU quota/throttling and task gauges. The manifest identifies
+this observation protocol so comparisons cannot silently mix instrumentation.
 
 Use `--rows 1000000` for the separate million-row investigation and
 `--object-bytes 1048576` for 1-MiB transfers. These profiles need separate

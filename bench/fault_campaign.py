@@ -31,7 +31,7 @@ from campaign import ResourceCoverage, docker, effective_cpus, redacted_diagnost
 from observations import ObservationEpoch, inspect_container
 from projects import Project
 from watchdog import LABEL, atomic_json, cleanup, host_reserves, process_identity
-from host_resources import snapshot as host_snapshot, container_memory_events, parse_counters, require_no_oom
+from host_resources import snapshot as host_snapshot, owned_cgroup_snapshot, require_no_oom
 from ownership import OwnedDocker
 from objects import S3Inventory
 
@@ -187,6 +187,7 @@ def run(args):
                     states={}
                     running=[]
                     disks={}
+                    cgroups={}
                     for project in list(initialized):
                         for name in [project.app,project.pg]:
                             state=inspect_container(name)
@@ -199,9 +200,8 @@ def run(args):
                             if state is not None and state['RestartCount']:
                                 raise RuntimeError('Unexpected automatic container restart')
                             if state is not None and state['State']['Running'] and not allowed:
-                                events=container_memory_events(state['State']['Pid'])
-                                if events is None:
-                                    events=parse_counters(owned('exec',name,'cat','/sys/fs/cgroup/memory.events'))
+                                cgroups[name]=owned_cgroup_snapshot(owned,name)
+                                events=cgroups[name]['memory.events']
                                 require_no_oom(events)
                                 running.append(name)
                         if project.pg in running:
@@ -217,7 +217,8 @@ def run(args):
                         if (state is None or not state['State']['Running'] or state['State']['OOMKilled']) and not allowed:
                             raise RuntimeError('Unexpected real provider stop or OOM')
                         if state is not None and state['State']['Running'] and not allowed:
-                            events=parse_counters(owned('exec',provider,'cat','/sys/fs/cgroup/memory.events'))
+                            cgroups[provider]=owned_cgroup_snapshot(owned,provider)
+                            events=cgroups[provider]['memory.events']
                             require_no_oom(events)
                             if int(owned('exec',provider,'du','-sm','/data').split()[0])>512:
                                 raise RuntimeError('Owned S3 fault provider exceeded its 512-MiB disk budget')
@@ -230,7 +231,7 @@ def run(args):
                     resource_at=time.monotonic()
                     coverage.observe(resource_at-observations_started)
                     with (output/'resources.jsonl').open('a') as target_file:
-                        target_file.write(json.dumps({'monotonic':resource_at,'phase':phase,'states':states,'containers':stats,'database_disk_mib':disks,'fault':fault,'host':host_snapshot(cpus),'parent_rss_kib':parent_rss})+'\n')
+                        target_file.write(json.dumps({'monotonic':resource_at,'phase':phase,'states':states,'containers':stats,'database_disk_mib':disks,'fault':fault,'host':host_snapshot(cpus),'parent_rss_kib':parent_rss,'component_cgroups':cgroups})+'\n')
                     atomic_json(output/'checkpoint.json',{'phase':phase,'monotonic':resource_at,'load_seconds_completed':load_seconds,'resource_observations':coverage.count})
                 except Exception as error:
                     if fault_window.changed(epoch):

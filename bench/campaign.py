@@ -39,7 +39,7 @@ from metrics import NativeMetrics, PROMETHEUS
 from receiver import EventLedger
 from observations import generator_observation
 from objects import S3Inventory, disk_inventory, reconcile
-from host_resources import snapshot as host_snapshot, container_memory_events, parse_counters, require_no_oom
+from host_resources import snapshot as host_snapshot, owned_cgroup_snapshot, require_no_oom
 from ownership import OwnedDocker
 
 K6 = "grafana/k6:1.6.1@sha256:a5ad6bc089a08d77c3ec49f3db8c6fa7a148e4073efcac44c675dbaf3568d8e1"
@@ -703,6 +703,7 @@ def campaign(arguments):
                 "soak_seconds": arguments.soak_seconds,
                 "maximum_campaign_seconds": 21600,
                 "resource_sample_seconds": 5,
+                "resource_protocol":"component cgroup v2 current/peak/stat/events/cpu/pids plus host and process owners",
                 "metrics_backend": "native Prometheus histogram; k6 raw TrendSink disabled",
                 "metrics_memory_mb": 512,
                 "metrics_cpus": 0.25,
@@ -795,10 +796,10 @@ def campaign(arguments):
                         if any(not state["Running"] or state["OOMKilled"] for state in states):
                             raise RuntimeError("Unexpected fixture stop or OOM")
                         memory_events={}
+                        cgroups={}
                         for name,value in inspected.items():
-                            events=container_memory_events(value['State']['Pid'])
-                            if events is None:
-                                events=parse_counters(owned('exec',name,'cat','/sys/fs/cgroup/memory.events'))
+                            cgroups[name]=owned_cgroup_snapshot(owned,name)
+                            events=cgroups[name]['memory.events']
                             memory_events[name]=events
                             try:
                                 require_no_oom(events)
@@ -862,6 +863,7 @@ def campaign(arguments):
                                 "metrics_disk_mib": metrics_disk,
                                 "storage_disk_mib":storage_disk,
                                 "memory_events":memory_events,
+                                "component_cgroups":cgroups,
                                 "containers": [
                                     json.loads(line) for line in stats.splitlines()
                                 ],
