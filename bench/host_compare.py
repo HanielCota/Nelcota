@@ -12,6 +12,7 @@ FIELDS.append('resource_protocol')
 FIELDS.append('container_log_profile')
 FIELDS.append('harness_js_sha256')
 FIELDS.append('client_initialization')
+FIELDS.append('webhooks')
 
 
 def positive(value):

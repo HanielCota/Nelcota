@@ -253,3 +253,22 @@ as rejeições, os SLOs e a exigência de entrega. O teto é um limite conservad
 para obter um ponto operacional repetível, não uma alegação de capacidade
 máxima. Os overloads continuam acima da taxa que efetivamente qualificar.
 O endurance só contará depois de iniciado e aprovado integralmente.
+
+## Extensão de isolamento com webhooks
+
+A revisão encontrou uma lacuna no executor de múltiplos projetos: a etapa de
+escrita não configurava endpoints, portanto não exercitava workers, assinaturas
+ou filas de webhooks. O perfil opcional `--webhooks` agora configura um receiver
+local próprio por projeto antes do baseline. A escrita ruidosa também produz
+entregas reais, com ledger persistente de IDs gravados no PostgreSQL e recebidos.
+Ausência de tráfego positivo, assinatura inválida, identidade ausente/estranha,
+fila sem drenar em 30 segundos ou evidência acima de 128 MiB reprova a campanha.
+Duplicatas preservam sua identidade e são contadas separadamente. O comparador
+recusa perfis com configuração de webhooks diferente.
+
+O teste de oráculos passou com oito casos; a descoberta Python completa passou
+com 126 testes em 5,448 segundos. Esses testes validam a extensão e não aprovam
+o cenário real de 1/5/10 projetos, que ainda precisa executar. A campanha S3
+ativa permanece no snapshot congelado `6d77010`; a extensão do host não muda
+o binário nem o JavaScript medido por ela. Nenhum endurance está aprovado neste
+checkpoint.

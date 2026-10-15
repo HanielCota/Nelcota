@@ -28,6 +28,7 @@ from watchdog import LABEL, atomic_json, cleanup, host_reserves, process_identit
 from host_resources import snapshot as host_snapshot, owned_cgroup_snapshot, require_no_oom
 from ownership import LOG_PROFILE,OwnedDocker
 from disk_usage import container as container_disk_usage
+from fleet_webhooks import FleetWebhooks
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -89,6 +90,9 @@ def campaign(args):
     filesystem = subprocess.check_output(['stat', '-f', '-c', '%T', str(directory)], text=True).strip()
     validate_storage_filesystem('disk', filesystem)
     projects = [Project(identity, index, args.projects, args.binary.resolve(), directory, cpus) for index in range(args.projects)]
+    for project in projects:
+        project.webhooks_enabled = args.webhooks
+    webhooks = FleetWebhooks(output)
     began = time.monotonic()
     phase = 'preparation'
     resource_at = began
@@ -122,7 +126,11 @@ def campaign(args):
         watchdog = subprocess.Popen([sys.executable, str(ROOT/'bench/watchdog.py'), str(output/'ownership.json')], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
         atomic_json(output/'manifest.json', {'schema': 1, 'scope': 'local independent app/PG clusters, no proxy/controller', 'projects': args.projects, 'rows_per_project': 1000, 'shared_user_id': '00000000-0000-4000-8000-000000000001', 'binary_sha256': hashlib.file_digest(args.binary.open('rb'), 'sha256').hexdigest(), 'cpu_effective': effective_cpus(cpus), 'app_aggregate_cpus': 1, 'postgres_aggregate_cpus': 1, 'generator_cpus': 1, 'metrics_cpus': .25, 'app_memory_mib_each': 128, 'postgres_memory_mib_each': 256, 'max_arrival_rate': 10000, 'fixture_disk_mib': args.disk_mib, 'storage_filesystem': filesystem, 'seconds_per_step': args.seconds, 'certifies_five_minute_steps': args.seconds >= 300, 'base_rate_per_project': args.rate, 'SLOs': 'G05 unchanged'})
         fixtures = [project.create() for project in projects]
+        if args.webhooks:
+            for project in projects:
+                webhooks.attach(project)
         profile=json.loads((output/'manifest.json').read_text())
+        profile['webhooks'] = {'enabled': args.webhooks, 'receiver': 'owned loopback, verified signatures and durable event identities', 'evidence_limit_mib': 128, 'drain_seconds': 30}
         profile['resource_protocol']='component cgroup v2 plus host/process owners; allocated du totals count only disappearing child entries'
         profile['container_log_profile']=LOG_PROFILE
         profile['harness_js_sha256']=hashlib.file_digest((ROOT/'bench/campaign.js').open('rb'),'sha256').hexdigest()
@@ -185,7 +193,7 @@ def campaign(args):
                     databases = {}
                     disk_bytes = 0
                     for project in projects:
-                        values = json.loads(project.sql("SELECT json_build_object('connections',count(*),'idle_in_transaction',count(*) FILTER(WHERE state='idle in transaction'),'stuck_idle_transactions',count(*) FILTER(WHERE state='idle in transaction' AND now()-state_change>interval '5 seconds')) FROM pg_stat_activity WHERE backend_type='client backend';"))
+                        values = json.loads(project.sql("SELECT json_build_object('connections',count(*),'idle_in_transaction',count(*) FILTER(WHERE state='idle in transaction'),'stuck_idle_transactions',count(*) FILTER(WHERE state='idle in transaction' AND now()-state_change>interval '5 seconds'),'waiting_locks',count(*) FILTER(WHERE wait_event_type='Lock'),'webhook_queue',(SELECT json_build_object('outstanding',outstanding,'retained',retained) FROM nelcota.webhook_queue_usage WHERE singleton),'webhook_work',(SELECT json_build_object('processing',count(*) FILTER(WHERE status='processing'),'oldest_pending_seconds',coalesce(extract(epoch FROM clock_timestamp()-min(created_at)),0)) FROM nelcota.webhook_deliveries WHERE status IN ('pending','processing'))) FROM pg_stat_activity WHERE backend_type='client backend';"))
                         if values['connections'] > 32 or values['stuck_idle_transactions']:
                             raise RuntimeError('Connection or transaction ownership violation')
                         values['disk_observation']=container_disk_usage(owned,project.pg,'/var/lib/postgresql/data',unit='k')
@@ -194,13 +202,14 @@ def campaign(args):
                         databases[project.label] = values
                     if disk_bytes > args.disk_mib*1024*1024:
                         raise RuntimeError('Aggregate database disk budget exceeded')
+                    webhook_observation = webhooks.observe()
                     generation = generator_observation(active_generator, lambda: active_generator)
                     if generation and generation.get('host_pid') and generation.get('pid_starttime'):
                         atomic_json(output/'generator-process.json',{'identity':identity,'pid':generation['host_pid'],'process_identity':generation['pid_starttime'],'container_id':generation['container_id']})
                     resource_at = time.monotonic()
                     coverage.observe(resource_at-resource_began)
                     with (output/'resources.jsonl').open('a') as target:
-                        target.write(json.dumps({'monotonic': resource_at, 'phase': phase, 'containers': stats, 'databases': databases, 'generator': generation,'host':host_snapshot(cpus),'memory_events':memory_events,'component_cgroups':cgroups})+'\n')
+                        target.write(json.dumps({'monotonic': resource_at, 'phase': phase, 'containers': stats, 'databases': databases, 'generator': generation,'host':host_snapshot(cpus),'memory_events':memory_events,'component_cgroups':cgroups,'webhooks':webhook_observation})+'\n')
                     atomic_json(output/'checkpoint.json', {'phase': phase, 'monotonic': resource_at, 'load_seconds_completed': load_seconds, 'resource_observations': coverage.count})
                 except Exception as error:
                     violations.append({'phase': phase, 'reason': str(error)[-600:], 'type': type(error).__name__})
@@ -296,6 +305,9 @@ def campaign(args):
                 atomic_json(output/('noisy-'+hot+'-gates.json'), failures)
                 if failures:
                     raise RuntimeError('Healthy-project fairness failed: '+hot)
+        if args.webhooks:
+            phase = 'webhook-drain'
+            atomic_json(output/'webhook-invariants.json', webhooks.reconcile())
         for project in projects:
             for foreign in fixtures:
                 if project.label != foreign['label']:
@@ -319,14 +331,19 @@ def campaign(args):
             sampler.join(timeout=30)
         atomic_json(output/'resource-violations.json', violations)
         cleanup(manifest)
+        webhook_cleanup = webhooks.close()
+        atomic_json(output/'webhook-cleanup.json', {'errors': webhook_cleanup})
+        if webhook_cleanup:
+            status = 'failed'
         remaining_containers = owned('ps','-aq','--filter','label='+LABEL+'='+identity)
         remaining_volumes = owned('volume','ls','-q','--filter','label='+LABEL+'='+identity)
         shutil.rmtree(directory)
-        clean = not remaining_containers and not remaining_volumes and not directory.exists()
+        owned_clean = not remaining_containers and not remaining_volumes and not directory.exists()
+        clean = owned_clean and not webhook_cleanup
         atomic_json(output/'cleanup.json', {'confirmed':clean,'containers':remaining_containers.splitlines(),'volumes':remaining_volumes.splitlines(),'directory_removed':not directory.exists()})
         if not clean:
             status = 'failed'
-        if clean:
+        if owned_clean:
             (output/'watchdog-disarmed').touch()
         if heartbeat_thread is not None:
             heartbeat_thread.join(timeout=5)
@@ -346,6 +363,7 @@ def main():
     parser.add_argument('--seconds',type=int,default=300)
     parser.add_argument('--rate',type=int,default=8)
     parser.add_argument('--capacity',action='store_true')
+    parser.add_argument('--webhooks',action='store_true',help='Enable real signed webhook workers in every independent project, including the noisy write phase')
     parser.add_argument('--provisional-rate',type=int,default=32)
     parser.add_argument('--disk-mib',type=int,default=2048)
     args = parser.parse_args()

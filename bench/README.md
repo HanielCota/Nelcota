@@ -135,7 +135,7 @@ python3 bench/launch.py --run-id disk-pass-1 --binary target/release/nelcota \
 python3 bench/launch.py --run-id s3-pass-1 --binary target/release/nelcota \
   --backend s3 --soak-seconds 14400 --fixture-disk-mib 2048 --capacity --spikes
 python3 bench/launch.py --run-id host-ten-pass-1 --kind host \
-  --binary target/release/nelcota --projects 10 --seconds 300 --rate 8
+  --binary target/release/nelcota --projects 10 --seconds 300 --capacity --webhooks
 ```
 
 Run these sequentially on this profile. The single-project watchdog has a
@@ -171,6 +171,18 @@ zero, checking absolute SLOs and the 90%-throughput/120%-p95 fairness gates.
 `--seconds 30` is a functional smoke and does not certify five-minute steps.
 This 1,000-row topology measures local application/database isolation; it does
 not certify the host controller, Caddy/public TLS, larger datasets or VPS sizing.
+
+`--webhooks` enables an owned loopback receiver and a real signed webhook worker
+in every project before the balanced baseline. The noisy write phase then also
+pressures the hot project's webhook queue. Receiver evidence has a 128-MiB
+aggregate budget and a 2,048-event memory window per project, with persisted
+identities for reconciliation. All projects must deliver positive traffic with
+valid signatures, drain within 30 seconds and match committed event IDs.
+Documented duplicate deliveries are counted; lost or foreign IDs fail. This
+profile uses the existing staging-only loopback exception, without weakening
+public webhook destination policy. Request owners are joined before closing
+their ledgers. Comparisons reject different webhook profiles. A run without
+this option does not cover noisy webhook workers.
 
 The manual workflow supports separate disk/S3 four-hour endurance jobs with a
 seven-hour job budget including the build. The internal campaign limit remains

@@ -13,6 +13,7 @@ STATIC.add('memory-events-violation.json')
 STATIC.add('failure-diagnostics.json')
 STATIC.add('resource-plateaus.json')
 STATIC.add('lost-commit-replies.json')
+STATIC.update({'webhook-invariants.json', 'webhook-cleanup.json'})
 FREEFORM={'message','diagnostic','error','stack','traceback','sql','payload','body'}
 
 

@@ -37,6 +37,7 @@ class Project:
         self.ephemeral_storage_mib = None
         self.ephemeral_storage_inodes = None
         self.extra_labels = {}
+        self.webhooks_enabled = False
 
     def sql(self, statement):
         return self.docker('exec', '-i', '-e', 'PGOPTIONS=-cstatement_timeout=15000', self.pg, 'psql', '-Atq', '-U', 'postgres', '-v', 'ON_ERROR_STOP=1', stdin=statement)
@@ -91,6 +92,8 @@ class Project:
                 raise RuntimeError('Owned project database readiness deadline')
             time.sleep(.25)
         self.environment = {'TOKIO_WORKER_THREADS':'2', 'RUST_LOG':'warn', 'NELCOTA_DATABASE_URL':f'postgres://postgres:{password}@127.0.0.1:{port}/postgres', 'NELCOTA_AUTHENTICATOR_PASSWORD':secrets.token_urlsafe(32), 'NELCOTA_JWT_SECRET':self.jwt, 'NELCOTA_LISTEN':self.base.removeprefix('http://'), 'NELCOTA_DB_POOL_SIZE':'4', 'NELCOTA_AUTH_RATE_LIMIT_PER_MINUTE':'100000', 'NELCOTA_REQUEST_TIMEOUT_SECS':'5', 'NELCOTA_STATEMENT_TIMEOUT_SECS':'3', 'NELCOTA_STORAGE_BACKEND':'disk', 'NELCOTA_STORAGE_DIR':'/storage', 'NELCOTA_STORAGE_MIN_FREE_BYTES':'0'}
+        if self.webhooks_enabled:
+            self.environment['NELCOTA_WEBHOOKS_ALLOW_LOOPBACK'] = 'true'
         self.start_app()
         request(self.base, '/auth/v1/signup', {'email':self.admin_email,'password':self.password})
         self.environment['NELCOTA_ADMIN_EMAIL'] = self.admin_email

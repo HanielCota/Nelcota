@@ -39,6 +39,15 @@ class HostComparison(unittest.TestCase):
     def test_equivalent_three_samples_pass(self):
         self.assertTrue(host_compare.compare(self.before,self.after)['gate_passed'])
 
+    def test_webhook_workers_cannot_be_silently_absent_on_one_side(self):
+        path=self.after/'manifest.json'
+        value=json.loads(path.read_text())
+        value['webhooks']={'enabled':False}
+        path.write_text(json.dumps(value))
+        result=host_compare.compare(self.before,self.after)
+        self.assertFalse(result['gate_passed'])
+        self.assertIn('webhooks',result['fixture_differences'])
+
     def test_one_operation_regression_cannot_hide_in_total_throughput(self):
         for index in range(1,4):
             path=self.after/('balanced-'+str(index)+'.json')
