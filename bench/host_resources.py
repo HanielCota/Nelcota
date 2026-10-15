@@ -57,6 +57,15 @@ def container_memory_events(pid):
     return None
 
 
+def require_no_oom(events):
+    if not isinstance(events,dict) or any(name not in events for name in ['oom','oom_kill']):
+        raise ValueError('Missing per-container OOM evidence')
+    if any(isinstance(value,bool) or not isinstance(value,int) or value<0 for value in events.values()):
+        raise ValueError('Invalid per-container OOM evidence')
+    if events['oom'] or events['oom_kill']:
+        raise RuntimeError('A component or PostgreSQL child reached OOM')
+
+
 def memory_reserve_breached():
     maximum=CGROUP/'memory.max'
     stat=counters(CGROUP/'memory.stat')

@@ -60,6 +60,7 @@ class ExistingDefects(unittest.TestCase):
         self.assertTrue(module.nominal_violations({'metrics': {}}, 'rls'))
         self.assertTrue(module.nominal_violations({'metrics': {'latency_rls': {'p(95)': math.nan, 'p(99)': 1}}}, 'rls'))
         self.assertTrue(module.nominal_violations({'metrics': {'latency_rls': {'p(95)': 201, 'p(99)': 500}}}, 'rls'))
+        self.assertTrue(module.nominal_violations({'metrics': {'latency_rls': {'p(95)': 0, 'p(99)': 0}}}, 'rls'))
 
     def test_disk_campaign_rejects_memory_filesystems(self):
         module = campaign_module()
@@ -238,7 +239,8 @@ class PhysicalStorageEvidence(unittest.TestCase):
 
     def test_incomplete_s3_inventory_cannot_certify(self):
         from xml.etree import ElementTree as ET
-        reader=self.module.S3Inventory('http://127.0.0.1:9000','fixture','fixture','bucket')
+        import secrets
+        reader=self.module.S3Inventory('http://127.0.0.1:9000',secrets.token_urlsafe(24),secrets.token_urlsafe(32),'bucket')
         for xml in ['<ListBucketResult/>','<ListBucketResult><IsTruncated>true</IsTruncated></ListBucketResult>']:
             with mock.patch.object(reader,'query',return_value=ET.fromstring(xml)):
                 with self.assertRaises(RuntimeError): reader.inventory()
@@ -254,9 +256,13 @@ class PhysicalStorageEvidence(unittest.TestCase):
 
     def test_recent_version_is_reported_separately_from_documented_gc_grace(self):
         key='bench/0199dc00-0000-7000-8000-000000000001'
-        result=self.module.reconcile({'keys':[key],'bytes':17,'multipart_uploads':0},[])
+        import uuid
+        created=(uuid.UUID(key.split('/')[1]).int>>80)/1000
+        result=self.module.reconcile({'keys':[key],'bytes':17,'multipart_uploads':0},[],now=created+100)
         self.assertEqual(result['unreferenced_keys'],[key])
         self.assertEqual(result['gc_grace_seconds'],86400)
+        with self.assertRaises(RuntimeError):
+            self.module.reconcile({'keys':[key],'bytes':17,'multipart_uploads':0},[],now=created+86400+3601)
 
 
 class WatchdogClocks(unittest.TestCase):
@@ -271,6 +277,31 @@ class WatchdogClocks(unittest.TestCase):
                 self.assertIsNotNone(heartbeat_failure(manifest,{**valid,key:value},100))
         for value in [None,'180',False,math.nan,1000]:
             self.assertEqual(heartbeat_failure({**manifest,'preparation_seconds':value},valid,100),'invalid_preparation_budget')
+
+
+class ProcessContinuityEvidence(unittest.TestCase):
+    def test_restart_with_reused_pid_cannot_certify_continuous_endurance(self):
+        module=campaign_module()
+        expected={'app':{'container_id':'owned','pid':42,'started_at':'first'}}
+        module.verify_continuity(expected,expected.copy())
+        for changed in [{'container_id':'owned','pid':42,'started_at':'second'}, {'container_id':'replacement','pid':42,'started_at':'first'}]:
+            with self.assertRaises(RuntimeError):
+                module.verify_continuity(expected,{'app':changed})
+        with self.assertRaises(RuntimeError):module.verify_continuity({}, {})
+
+
+
+
+
+
+
+
+class PhysicalInventoryCompleteness(unittest.TestCase):
+    def test_empty_physical_inventory_cannot_certify_published_objects(self):
+        campaign_module()
+        from objects import reconcile
+        with self.assertRaisesRegex(RuntimeError,'missing'):
+            reconcile({'keys':[],'bytes':0,'multipart_uploads':0},[],required=['bench/required'])
 
 
 if __name__ == '__main__':

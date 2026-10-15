@@ -8,6 +8,7 @@ Diagnostics contain metrics and redacted application logs, not credentials.
 import argparse
 import base64
 import datetime
+from concurrent.futures import ThreadPoolExecutor
 from collections import deque
 import hashlib
 import hmac
@@ -33,11 +34,13 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts/upgrade"))
 from support import Receiver
 sys.path.insert(0, str(ROOT / "bench"))
-from watchdog import LABEL, atomic_json, host_reserves, process_identity
+from watchdog import LABEL, atomic_json, host_reserves, process_identity, stop_generator
 from metrics import NativeMetrics, PROMETHEUS
 from receiver import EventLedger
 from observations import generator_observation
 from objects import S3Inventory, disk_inventory, reconcile
+from host_resources import snapshot as host_snapshot, container_memory_events, parse_counters, require_no_oom
+from ownership import OwnedDocker
 
 K6 = "grafana/k6:1.6.1@sha256:a5ad6bc089a08d77c3ec49f3db8c6fa7a148e4073efcac44c675dbaf3568d8e1"
 NOMINAL_SLOS = {"read": (200, 500), "rls": (200, 500), "refresh": (200, 500), "login": (750, 1500), "storage": (500, 2000), "panel": (500, 2000), "write": (500, 1500)}
@@ -55,7 +58,7 @@ def nominal_violations(report, workload):
             continue
         for key, maximum in zip(["p(95)", "p(99)"], NOMINAL_SLOS[name]):
             value = metric.get(key)
-            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0 or value > maximum:
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0 or value > maximum:
                 violations.append({"workload": name, "metric": key, "observed": str(value), "maximum_ms": maximum})
     return violations
 
@@ -131,6 +134,24 @@ def redacted_diagnostic(error, values):
         if isinstance(value, str) and len(value) > 8:
             message = message.replace(value, '<redacted>')
     return message[-1200:]
+
+
+def component_identity(value):
+    state=value['State']
+    if not state['Running'] or state['OOMKilled'] or isinstance(state['Pid'],bool) or not isinstance(state['Pid'],int) or state['Pid']<=0 or not value.get('Id') or not state.get('StartedAt'):
+        raise RuntimeError('Component has no valid live process identity')
+    return {'container_id':value['Id'],'pid':state['Pid'],'started_at':state['StartedAt']}
+
+
+def verify_continuity(expected,current):
+    if not expected or expected!=current:
+        raise RuntimeError('Endurance component process identity changed')
+
+
+def aged_storage_key():
+    milliseconds=int((time.time()-8*86400)*1000)
+    bits=(milliseconds<<80)|(7<<76)|(secrets.randbits(76)&~(3<<62))|(2<<62)
+    return 'bench/'+str(uuid.UUID(int=bits))
 
 
 class ResourceCoverage:
@@ -217,8 +238,9 @@ def campaign(arguments):
     output.mkdir(parents=True, exist_ok=True)
     if host_reserves(output):
         raise RuntimeError("Host resource reserves do not permit a campaign")
-    validate_disk_headroom(output, arguments.fixture_disk_mib)
-    identity = "nelcota-bench-" + secrets.token_hex(4)
+    validate_disk_headroom(output, arguments.fixture_disk_mib+arguments.storage_fixture_disk_mib)
+    identity = "nelcota-bench-" + secrets.token_hex(16)
+    owned=OwnedDocker(identity,docker)
     cpus = sorted(os.sched_getaffinity(0))
     if len(cpus) < 4:
         raise RuntimeError(
@@ -239,6 +261,7 @@ def campaign(arguments):
     generator = identity + "-load"
     telemetry = identity + "-metrics"
     telemetry_volume = identity + "-metrics-data"
+    s3_volume=identity+'-s3-data'
     receiver = Receiver()
     event_ledger = EventLedger(output / "event-identities.sqlite")
     receiver.requests = event_ledger
@@ -262,6 +285,7 @@ def campaign(arguments):
     soak_started = None
     retention = []
     active_generator = None
+    soak_processes = None
     js_snapshot = output / "campaign.js"
     shutil.copyfile(ROOT / "bench/campaign.js", js_snapshot)
     labels = ["--label", LABEL + "=" + identity, "--pids-limit", "256"]
@@ -269,6 +293,7 @@ def campaign(arguments):
 
     def terminate(signum, frame):
         critical.set()
+        stop_generator({'identity':identity,'output':str(output)})
         raise RuntimeError("Campaign stopped by independent watchdog or termination")
 
     signal.signal(signal.SIGTERM, terminate)
@@ -280,7 +305,7 @@ def campaign(arguments):
         storage_filesystem = subprocess.check_output(["stat", "-f", "-c", "%T", str(storage)], text=True).strip()
         validate_storage_filesystem(arguments.backend, storage_filesystem)
         try:
-            manifest = {"identity": identity, "output": str(output), "reserve_path": str(output), "pid": os.getpid(), "process_identity": process_identity(os.getpid()), "started_monotonic": time.monotonic(), "maximum_seconds": 21600, "containers": [generator, app, pg, s3, telemetry], "volumes": [volume, telemetry_volume]}
+            manifest = {"identity": identity, "output": str(output), "reserve_path": str(output), "pid": os.getpid(), "process_identity": process_identity(os.getpid()), "started_monotonic": time.monotonic(), "maximum_seconds": 21600, "preparation_seconds":900,"containers": [generator, app, pg, s3, telemetry], "volumes": [volume, telemetry_volume,s3_volume]}
             atomic_json(output / "ownership.json", manifest)
 
             def heartbeat():
@@ -297,12 +322,12 @@ def campaign(arguments):
             config = directory / "prometheus.yml"
             config.write_text("global:\n  scrape_interval: 15s\nscrape_configs: []\n")
             config.chmod(0o444)
-            docker("volume", "create", "--label", LABEL + "=" + identity, telemetry_volume)
-            docker("run", "-d", *labels, "--name", telemetry, "--network", "host", "--cpus", "0.25", "--cpuset-cpus", str(cpus[-1]), "--memory", "512m", "--memory-swap", "512m", "--user", "65534:65534", "--cap-drop", "ALL", "--read-only", "--security-opt", "no-new-privileges", "--mount", f"type=volume,source={telemetry_volume},destination=/prometheus", "-v", str(config) + ":/etc/prometheus/prometheus.yml:ro", PROMETHEUS, "--config.file=/etc/prometheus/prometheus.yml", "--web.listen-address=127.0.0.1:" + str(metrics_port), "--web.enable-remote-write-receiver", "--enable-feature=native-histograms", "--storage.tsdb.retention.time=1h", "--storage.tsdb.retention.size=128MB", "--storage.tsdb.wal-segment-size=16MB", "--storage.tsdb.min-block-duration=15m", "--storage.tsdb.max-block-duration=15m")
+            owned("volume", "create", "--label", LABEL + "=" + identity, telemetry_volume)
+            owned("run", "-d", *labels, "--name", telemetry, "--network", "host", "--cpus", "0.25", "--cpuset-cpus", str(cpus[-1]), "--memory", "512m", "--memory-swap", "512m", "--user", "65534:65534", "--cap-drop", "ALL", "--read-only", "--security-opt", "no-new-privileges", "--mount", f"type=volume,source={telemetry_volume},destination=/prometheus", "-v", str(config) + ":/etc/prometheus/prometheus.yml:ro", PROMETHEUS, "--config.file=/etc/prometheus/prometheus.yml", "--web.listen-address=127.0.0.1:" + str(metrics_port), "--web.enable-remote-write-receiver", "--enable-feature=native-histograms", "--storage.tsdb.retention.time=1h", "--storage.tsdb.retention.size=128MB", "--storage.tsdb.wal-segment-size=16MB", "--storage.tsdb.min-block-duration=15m", "--storage.tsdb.max-block-duration=15m")
             metrics_ready = False
             for attempt in range(100):
                 try:
-                    if not owns_listener(telemetry, metrics_port):
+                    if not owns_listener(owned.require(telemetry), metrics_port):
                         time.sleep(.1)
                         continue
                     with urllib.request.urlopen(metrics_url + '/-/ready', timeout=2):
@@ -319,8 +344,8 @@ def campaign(arguments):
             authenticator = secrets.token_urlsafe(32)
             jwt = secrets.token_urlsafe(48)
             password = secrets.token_urlsafe(32)
-            docker("volume", "create", "--label", LABEL + "=" + identity, volume)
-            docker(
+            owned("volume", "create", "--label", LABEL + "=" + identity, volume)
+            owned(
                 "run",
                 "-d",
                 *labels,
@@ -355,7 +380,7 @@ def campaign(arguments):
                 env={"POSTGRES_PASSWORD": pg_password},
             )
             port = int(
-                json.loads(docker("inspect", pg))[0]["NetworkSettings"]["Ports"][
+                json.loads(owned("inspect", pg))[0]["NetworkSettings"]["Ports"][
                     "5432/tcp"
                 ][0]["HostPort"]
             )
@@ -396,7 +421,8 @@ def campaign(arguments):
             }
             if arguments.backend == "s3":
                 access, secret = secrets.token_hex(16), secrets.token_hex(32)
-                docker(
+                owned('volume','create','--label',LABEL+'='+identity,s3_volume)
+                owned(
                     "run",
                     "-d",
                     *labels,
@@ -410,6 +436,8 @@ def campaign(arguments):
                     "512m",
                     "--memory-swap",
                     "512m",
+                    '--mount',
+                    f'type=volume,source={s3_volume},destination=/data',
                     "-e",
                     "RUSTFS_ACCESS_KEY",
                     "-e",
@@ -420,7 +448,7 @@ def campaign(arguments):
                     env={"RUSTFS_ACCESS_KEY": access, "RUSTFS_SECRET_KEY": secret},
                 )
                 s3_port = int(
-                    json.loads(docker("inspect", s3))[0]["NetworkSettings"]["Ports"][
+                    json.loads(owned("inspect", s3))[0]["NetworkSettings"]["Ports"][
                         "9000/tcp"
                     ][0]["HostPort"]
                 )
@@ -470,7 +498,7 @@ def campaign(arguments):
                 )
 
             def sql(statement):
-                return docker(
+                return owned(
                     "exec",
                     "-i",
                     pg,
@@ -521,10 +549,10 @@ def campaign(arguments):
                 for key in env:
                     command.extend(["-e", key])
                 command.extend(["ubuntu:24.04", "/usr/local/bin/nelcota", "serve"])
-                docker(*command, env=env)
+                created=owned(*command, env=env)
                 for _ in range(100):
                     try:
-                        if not owns_listener(app, app_port):
+                        if not owns_listener(created, app_port):
                             time.sleep(.1)
                             continue
                         request(base, "/auth/v1/.well-known/jwks.json")
@@ -543,7 +571,7 @@ def campaign(arguments):
             env["NELCOTA_ADMIN_PASSWORD_HASH"] = sql(
                 "SELECT encrypted_password FROM auth.users LIMIT 1"
             )
-            docker("rm", "-f", app)
+            owned("rm", "-f", app)
             start()
             _, headers = request(
                 base,
@@ -559,27 +587,47 @@ def campaign(arguments):
                 (ROOT / "bench/setup.sql")
                 .read_text()
                 .replace("ANALYZE public.bench_products;", "")
+                .replace('100000',str(arguments.rows))
             )
             sql(
                 "CREATE TABLE public.bench_private (id integer PRIMARY KEY,user_id uuid NOT NULL,body text);"
                 + "INSERT INTO public.bench_private SELECT i, CASE WHEN i%2=0 THEN '"
                 + user
-                + "'::uuid WHEN i%2=1 THEN gen_random_uuid() END,repeat('x',128) FROM generate_series(1,100000) i;"
+                + "'::uuid WHEN i%2=1 THEN gen_random_uuid() END,repeat('x',128) FROM generate_series(1,"+str(arguments.rows)+") i;"
                 + "CREATE INDEX ON public.bench_private(user_id,id); ALTER TABLE public.bench_private ENABLE ROW LEVEL SECURITY;"
                 + "CREATE POLICY own ON public.bench_private TO authenticated USING(user_id=auth.uid());GRANT SELECT ON public.bench_private TO authenticated;"
                 + "GRANT SELECT,UPDATE ON public.bench_products TO service_role;"
                 + "INSERT INTO storage.buckets(id,public) VALUES('bench',true);"
-                + "INSERT INTO storage.objects(bucket_id,name,version,size,mime_type,etag) SELECT 'bench',lpad(i::text,8,'0') || '.txt',gen_random_uuid(),0,'text/plain','' FROM generate_series(1,10000) i;"
+                + "INSERT INTO storage.objects(bucket_id,name,version,size,mime_type,etag) SELECT 'bench',lpad(i::text,8,'0') || '.txt',gen_random_uuid(),0,'text/plain','"+hashlib.sha256(b'').hexdigest()+"' FROM generate_series(1,10000) i;"
                 + "ALTER TABLE public.bench_products SET(autovacuum_enabled=false); ALTER TABLE public.bench_private SET(autovacuum_enabled=false); ALTER TABLE storage.objects SET(autovacuum_enabled=false); NOTIFY nelcota,'reload schema';"
             )
+            seeded_keys=sql("SELECT bucket_id||'/'||version::text FROM storage.objects WHERE bucket_id='bench' ORDER BY version").splitlines()
+            if not arguments.metadata_only_seed:
+                if len(seeded_keys)!=10000:
+                    raise RuntimeError('Physical fixture seed is incomplete')
+                if arguments.backend=='disk':
+                    (storage/'bench').mkdir(exist_ok=True)
+                    for key in seeded_keys:
+                        (storage/key).write_bytes(b'')
+                if arguments.backend=='s3':
+                    inventory_client=S3Inventory(endpoint,access,secret,'benchmark-files')
+                    def seed_object(key):
+                        inventory_client.write_key(key,body=b'')
+                    with ThreadPoolExecutor(max_workers=8) as workers:
+                        for offset in range(0,len(seeded_keys),32):
+                            list(workers.map(seed_object,seeded_keys[offset:offset+32]))
+                            atomic_json(output/'storage-seed-progress.json',{'completed':min(offset+32,len(seeded_keys)),'required':10000,'preparation':True})
+                            if offset%1024==0 and int(owned('exec',s3,'du','-sm','/data').split()[0])>arguments.storage_fixture_disk_mib:
+                                raise RuntimeError('S3 physical seed exceeded its declared disk budget')
             time.sleep(1)
-            request(
-                base,
-                "/storage/v1/object/bench/fixture.txt",
-                "benchmark payload",
-                {"Authorization": "Bearer " + service},
-                method="PUT",
-            )
+            object_payload=b'benchmark payload'
+            fixture_payload=b'"benchmark payload"'
+            if arguments.object_bytes!=17:
+                object_payload=b'x'*arguments.object_bytes
+                fixture_payload=object_payload
+            upload=urllib.request.Request(base+'/storage/v1/object/bench/fixture.txt',data=fixture_payload,headers={'Authorization':'Bearer '+service,'Content-Type':'text/plain'},method='PUT')
+            with urllib.request.urlopen(upload,timeout=15) as response:
+                json.load(response)
             hook, _ = request(
                 base,
                 "/admin/api/webhooks",
@@ -614,6 +662,7 @@ def campaign(arguments):
                 "invalid_access": token(secrets.token_urlsafe(48), {"role": "authenticated", "sub": user, "exp": int(time.time()) + 21900}),
                 "service": service,
                 "cookie": cookie,
+                "object_bytes":arguments.object_bytes,
             }
             metadata = {
                 "binary_sha256": hashlib.file_digest(
@@ -642,6 +691,9 @@ def campaign(arguments):
                 "k6": K6,
                 "storage_backend": arguments.backend,
                 "storage_filesystem": storage_filesystem,
+                "physical_seeded_objects":10000*int(not arguments.metadata_only_seed),
+                "object_payload_bytes":arguments.object_bytes,
+                "max_storage_fixture_disk_mib":arguments.storage_fixture_disk_mib,
                 "steady_rate": arguments.steady_rate,
                 "steady_duration": arguments.steady,
                 "workloads": arguments.workloads,
@@ -663,13 +715,13 @@ def campaign(arguments):
                 "webhook_history_maintenance": "explicit admin clear at 5000 terminal records; committed identities retained by fixture audit trigger",
                 "postgres_version": sql("SELECT version();"),
                 "images": {
-                    image: json.loads(docker("image", "inspect", image))[0][
+                    image: json.loads(owned("image", "inspect", image))[0][
                         "RepoDigests"
                     ]
                     for image in ["ubuntu:24.04", "postgres:17-alpine", K6, PROMETHEUS]
                     + ["rustfs/rustfs:1.0.1"] * (arguments.backend == "s3")
                 },
-                "dataset": {"products": 100000, "private": 100000, "objects": 10000},
+                "dataset": {"products": arguments.rows, "private": arguments.rows, "objects": 10000},
                 "started_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             }
             if arguments.backend == "s3":
@@ -696,12 +748,14 @@ def campaign(arguments):
                         names = [app, pg, telemetry]
                         if arguments.backend == "s3":
                             names.append(s3)
-                        stats = docker("stats", "--no-stream", "--format", "{{json .}}", *names)
+                        stats = owned("stats", "--no-stream", "--format", "{{json .}}", *names)
                         generator_stats = None
                         sample_step = "generator_stats"
                         generator_stats = generator_observation(active_generator, lambda: active_generator)
+                        if generator_stats and generator_stats.get('host_pid') and generator_stats.get('pid_starttime'):
+                            atomic_json(output/'generator-process.json',{'identity':identity,'pid':generator_stats['host_pid'],'process_identity':generator_stats['pid_starttime'],'container_id':generator_stats['container_id']})
                         sample_step = "process_ownership"
-                        status = docker("exec", app, "cat", "/proc/1/status")
+                        status = owned("exec", app, "cat", "/proc/1/status")
                         rss = next(
                             int(line.split()[1])
                             for line in status.splitlines()
@@ -717,11 +771,18 @@ def campaign(arguments):
                         )
                         sample_step = "disk_budget"
                         disk = int(
-                            docker(
+                            owned(
                                 "exec", pg, "du", "-sm", "/var/lib/postgresql/data"
                             ).split()[0]
                         )
-                        metrics_disk = int(docker("exec", telemetry, "du", "-sm", "/prometheus").split()[0])
+                        metrics_disk = int(owned("exec", telemetry, "du", "-sm", "/prometheus").split()[0])
+                        storage_disk=0
+                        if arguments.backend=='disk':
+                            storage_disk=int(subprocess.check_output(['du','-sm',str(storage)],text=True,timeout=10).split()[0])
+                        if arguments.backend=='s3':
+                            storage_disk=int(owned('exec',s3,'du','-sm','/data').split()[0])
+                        if storage_disk>arguments.storage_fixture_disk_mib:
+                            raise RuntimeError('Storage fixture exceeded its declared disk budget')
                         if metrics_disk > 512:
                             raise RuntimeError("Metrics fixture exceeded its 512-MiB disk budget")
                         if disk > arguments.fixture_disk_mib:
@@ -729,9 +790,23 @@ def campaign(arguments):
                             raise RuntimeError(
                                 "Fixture exceeded its declared disk budget"
                             )
-                        states = [json.loads(docker("inspect", name))[0]["State"] for name in names]
+                        inspected = {name:json.loads(owned("inspect", name))[0] for name in names}
+                        states = [value['State'] for value in inspected.values()]
                         if any(not state["Running"] or state["OOMKilled"] for state in states):
                             raise RuntimeError("Unexpected fixture stop or OOM")
+                        memory_events={}
+                        for name,value in inspected.items():
+                            events=container_memory_events(value['State']['Pid'])
+                            if events is None:
+                                events=parse_counters(owned('exec',name,'cat','/sys/fs/cgroup/memory.events'))
+                            memory_events[name]=events
+                            try:
+                                require_no_oom(events)
+                            except (ValueError,RuntimeError):
+                                atomic_json(output/'memory-events-violation.json',memory_events)
+                                raise
+                        if phase=='soak' and soak_processes is not None:
+                            verify_continuity(soak_processes,{name:component_identity(inspected[name]) for name in [app,pg]})
                         if receiver.errors:
                             raise RuntimeError("Webhook signature invariant failed")
                         reserve = host_reserves(output)
@@ -748,16 +823,27 @@ def campaign(arguments):
                                 session_id = str(uuid.uuid4())
                                 digest = hashlib.sha256(secrets.token_bytes(32)).hexdigest()
                                 identities = [str(uuid.UUID(item)) for item in sql("SELECT event_id::text FROM nelcota.webhook_deliveries WHERE status='succeeded' AND finished_at>clock_timestamp()-interval '1 day' ORDER BY id DESC LIMIT 8").splitlines()]
+                                if len(identities)<8:
+                                    continue
                                 event_ledger.preserve_expected(identities)
                                 ids = ','.join("'" + item + "'" for item in identities)
                                 sql("BEGIN; INSERT INTO auth.sessions(id,user_id,revoked_at) VALUES('" + session_id + "','" + user + "',clock_timestamp()-interval '8 days'); INSERT INTO auth.refresh_tokens(session_id,token_hash,expires_at) VALUES('" + session_id + "',decode('" + digest + "','hex'),clock_timestamp()-interval '2 days'); UPDATE nelcota.webhook_deliveries SET finished_at=clock_timestamp()-interval '8 days' WHERE event_id=ANY(ARRAY[" + ids + "]::uuid[]); COMMIT;")
-                                retention.append({"cohort": cohort, "session_id": session_id, "events": identities, "seeded_elapsed": age, "auth_pruned": False, "events_pruned": False})
+                                storage_key=aged_storage_key()
+                                if arguments.backend=='disk':
+                                    (storage/storage_key).write_bytes(b'gc-owned-probe')
+                                if arguments.backend=='s3':
+                                    S3Inventory(endpoint,access,secret,'benchmark-files').write_key(storage_key)
+                                retention.append({"cohort": cohort, "session_id": session_id, "events": identities, "storage_key":storage_key,"seeded_elapsed": age, "auth_pruned": False, "events_pruned": False,"storage_pruned":False})
                             for item in retention:
-                                if item["auth_pruned"] and item["events_pruned"]:
+                                if item["auth_pruned"] and item["events_pruned"] and item['storage_pruned']:
                                     continue
                                 item["auth_pruned"] = sql("SELECT count(*) FROM auth.sessions WHERE id='" + item["session_id"] + "'") == "0"
                                 ids = ','.join("'" + event + "'" for event in item["events"])
                                 item["events_pruned"] = sql("SELECT count(*) FROM nelcota.webhook_deliveries WHERE event_id=ANY(ARRAY[" + ids + "]::uuid[])") == "0"
+                                if arguments.backend=='disk':
+                                    item['storage_pruned']=not (storage/item['storage_key']).exists()
+                                if arguments.backend=='s3':
+                                    item['storage_pruned']=not S3Inventory(endpoint,access,secret,'benchmark-files').contains(item['storage_key'])
                                 item["observed_elapsed"] = age
                             atomic_json(output / "retention.json", retention)
                         if json.loads(queue)["retained"] >= 5000 and all(item["events_pruned"] for item in retention):
@@ -767,13 +853,15 @@ def campaign(arguments):
                                 target.write(json.dumps({"elapsed": time.monotonic() - started, "deleted": cleared["deleted"], "phase": phase}) + "\n")
                         elapsed = round(time.monotonic() - started, 1)
                         coverage.observe(elapsed)
-                        ownership = docker("exec", app, "sh", "-c", "printf 'fds '; ls /proc/1/fd | wc -l; printf 'tasks '; ls /proc/1/task | wc -l; printf 'sockets '; ls -l /proc/1/fd | grep -c 'socket:'")
+                        ownership = owned("exec", app, "sh", "-c", "printf 'fds '; ls /proc/1/fd | wc -l; printf 'tasks '; ls /proc/1/task | wc -l; printf 'sockets '; ls -l /proc/1/fd | grep -c 'socket:'")
                         samples.append(
                             {
                                 "elapsed": elapsed,
                                 "app_rss_kib": rss,
                                 "pg_disk_mib": disk,
                                 "metrics_disk_mib": metrics_disk,
+                                "storage_disk_mib":storage_disk,
+                                "memory_events":memory_events,
                                 "containers": [
                                     json.loads(line) for line in stats.splitlines()
                                 ],
@@ -783,6 +871,7 @@ def campaign(arguments):
                                 "signature_errors": len(receiver.errors),
                                 "ownership": ownership,
                                 "phase": phase,
+                                "host": host_snapshot(cpus),
                             }
                         )
                         # Stream diagnostics: a long campaign does not retain unbounded samples.
@@ -820,7 +909,7 @@ def campaign(arguments):
                 fixture["cookie"] = headers["Set-Cookie"].split(";", 1)[0]
 
             def run(label, workload, duration, vus=16, rate=0, overload=False):
-                nonlocal phase, load_seconds, soak_started, active_generator
+                nonlocal phase, load_seconds, soak_started, active_generator, soak_processes
                 if critical.is_set():
                     raise RuntimeError("Campaign resource guard stopped traffic")
                 phase = label
@@ -854,6 +943,8 @@ def campaign(arguments):
                     "-e",
                     "WORKLOAD=" + workload,
                     "-e",
+                    "SESSION_CANARY="+str(label=="soak" and arguments.soak_seconds>=7200).lower(),
+                    "-e",
                     "DURATION=" + duration,
                     "-e",
                     "VUS=" + str(vus),
@@ -881,6 +972,8 @@ def campaign(arguments):
                 load_started = time.monotonic()
                 if label == "soak":
                     soak_started = load_started
+                    soak_processes={name:component_identity(json.loads(owned('inspect',name))[0]) for name in [app,pg]}
+                    atomic_json(output/'soak-processes-before.json',soak_processes)
                 with (output / (label + ".log")).open("w") as target:
                     result = subprocess.Popen(
                         command,
@@ -895,6 +988,7 @@ def campaign(arguments):
                             if watchdog.poll() is not None:
                                 raise RuntimeError("Independent watchdog exited unexpectedly")
                             if critical.wait(0.25):
+                                stop_generator(manifest)
                                 raise RuntimeError("Resource guard aborted generator: " + label)
                             if time.monotonic() - load_started > generator_deadline(duration):
                                 raise RuntimeError("Generator exceeded its deadline: " + label)
@@ -905,7 +999,7 @@ def campaign(arguments):
                             ledger.write(json.dumps({"phase": label, "workload": workload, "requested_seconds": int(duration[:-1]), "elapsed_seconds": elapsed, "completed": result.returncode == 0, "exit_code": result.returncode, "started_monotonic": load_started, "ended_monotonic": time.monotonic()}) + "\n")
                         if result.poll() is None:
                             result.terminate()
-                            docker("rm", "-f", generator)
+                            owned("rm", "-f", generator)
                             result.wait(timeout=20)
                         if active_generator is generator_context:
                             active_generator = None
@@ -914,7 +1008,7 @@ def campaign(arguments):
                         except Exception as error:
                             atomic_json(output / (label + "-metrics-error.json"), {"error_type": type(error).__name__})
                 if result.returncode:
-                    state = json.loads(docker("inspect", app))[0]["State"]
+                    state = json.loads(owned("inspect", app))[0]["State"]
                     failures.append(
                         {
                             "label": label,
@@ -936,10 +1030,22 @@ def campaign(arguments):
                         state["OOMKilled"],
                         flush=True,
                     )
-                    docker("rm", "-f", app)
+                    owned("rm", "-f", app)
                     start()
                     relogin()
                 report = native_metrics.summary(label, int(duration[:-1]))
+                if label=='soak':
+                    final_processes={name:component_identity(json.loads(owned('inspect',name))[0]) for name in [app,pg]}
+                    atomic_json(output/'soak-processes-after.json',final_processes)
+                    verify_continuity(soak_processes,final_processes)
+                    if arguments.soak_seconds>=7200:
+                        selector='{run_id="soak",scenario="session-canary"}'
+                        renewals=native_metrics.value('sum(k6_access_renewals_total'+selector+')')
+                        canary_iterations=native_metrics.value('sum(k6_iterations_total'+selector+')')
+                        atomic_json(output/'session-canary.json',{'access_renewals':renewals,'iterations':canary_iterations,'minimum_renewals':max(1,arguments.soak_seconds//3600-1),'scope':'one continuous VU reuses its session and renews near actual access-token expiry'})
+                        if renewals<max(1,arguments.soak_seconds//3600-1) or canary_iterations<arguments.soak_seconds*.8:
+                            raise RuntimeError('Continuous session did not demonstrate supported expiry renewal')
+
                 atomic_json(output / (label + ".json"), report)
                 if result.returncode == 0:
                     metrics = report["metrics"]
@@ -1017,6 +1123,7 @@ def campaign(arguments):
                 for kind, report in results
                 if kind == capacity_workload
             )[1]
+            provisional_throughput=throughput
             qualification = []
             sustainable = 0
             lower, upper = 0, max(1, int(throughput))
@@ -1058,7 +1165,12 @@ def campaign(arguments):
             (output / "capacity.json").write_text(
                 json.dumps(
                     {
-                        "mixed_median_iterations_per_second": throughput,
+                        "provisional_median_iterations_per_second":provisional_throughput,
+                        "provisional_workload":capacity_workload,
+                        "qualified_lower_bound_iterations_per_second":throughput,
+                        "qualification_step_seconds":arguments.capacity_step_seconds,
+                        "five_minute_qualification":arguments.capacity_step_seconds>=300,
+                        "soak_iterations_per_second":soak_rate,
                         "soak_rps": soak_rate,
                         "p95_regression_gate": 1.10,
                         "throughput_regression_gate": 0.90,
@@ -1088,8 +1200,8 @@ def campaign(arguments):
             run("recovery-before-restart", "mixed", "20s", 4)
             restarting.set()
             sampling_epoch += 1
-            docker("stop", "-t", "10", app)
-            docker("rm", app)
+            owned("stop", "-t", "10", app)
+            owned("rm", app)
             start()
             relogin()
             sampling_epoch += 1
@@ -1118,7 +1230,7 @@ def campaign(arguments):
                     break
                 time.sleep(0.5)
             time.sleep(2)
-            file_integrity = {"verified_objects": 0, "maximum_object_bytes": 64}
+            file_integrity = {"verified_objects": 0, "maximum_object_bytes": max(64,arguments.object_bytes+2)}
             objects = [
                 "fixture.txt",
                 *sql(
@@ -1135,10 +1247,10 @@ def campaign(arguments):
                     headers={"Authorization": "Bearer " + service},
                 )
                 with urllib.request.urlopen(read, timeout=5) as response:
-                    expected = b"benchmark payload"
+                    expected = object_payload
                     if name == "fixture.txt":
-                        expected = b'"benchmark payload"'
-                    if response.read(64) != expected:
+                        expected = fixture_payload
+                    if response.read(file_integrity['maximum_object_bytes']+1) != expected:
                         raise RuntimeError(
                             "Stored bytes failed their post-load integrity check"
                         )
@@ -1148,12 +1260,27 @@ def campaign(arguments):
                 inventory = disk_inventory(storage)
             if arguments.backend == 's3':
                 inventory = S3Inventory(endpoint,access,secret,'benchmark-files').inventory()
-            known = sql("SELECT bucket_id||'/'||version::text FROM storage.objects ORDER BY bucket_id,version LIMIT 20001").splitlines()
+            known_rows=json.loads(sql("SELECT json_agg(t) FROM (SELECT bucket_id||'/'||version::text AS key,name,size,etag FROM storage.objects ORDER BY bucket_id,version LIMIT 20001)t"))
+            known={row['key']:row['size'] for row in known_rows}
             if len(known)>20000:
                 raise RuntimeError('Metadata inventory exceeded its evidence budget')
-            file_integrity['physical_inventory'] = reconcile(inventory,known)
+            required=sql("SELECT bucket_id||'/'||version::text FROM storage.objects WHERE bucket_id='bench' AND (name='fixture.txt' OR name LIKE 'probe-%') ORDER BY version").splitlines()
+            if len(required)!=len(objects):
+                raise RuntimeError('Verified object metadata evidence is incomplete')
+            for row in known_rows:
+                if row['name']=='fixture.txt' or row['name'].startswith('probe-'):
+                    expected_payload=object_payload
+                    if row['name']=='fixture.txt':
+                        expected_payload=fixture_payload
+                    if row['size']!=len(expected_payload) or row['etag']!=hashlib.sha256(expected_payload).hexdigest():
+                        raise RuntimeError('Acknowledged object metadata differs from its verified bytes')
+                if re.fullmatch(r'[0-9]{8}\.txt',row['name']) and (row['size']!=0 or row['etag']!=hashlib.sha256(b'').hexdigest()):
+                    raise RuntimeError('Seeded empty object metadata is corrupt')
+            if not arguments.metadata_only_seed:
+                required=list(known)
+            file_integrity['physical_inventory'] = reconcile(inventory,known,required=required)
             states = {
-                name: json.loads(docker("inspect", name))[0]["State"]
+                name: json.loads(owned("inspect", name))[0]["State"]
                 for name in [app, pg]
             }
             if any(
@@ -1187,7 +1314,7 @@ def campaign(arguments):
                         "file_integrity": file_integrity,
                         "event_identities": event_evidence,
                         "pg_state": states[pg],
-                        "container_state": json.loads(docker("inspect", app))[0][
+                        "container_state": json.loads(owned("inspect", app))[0][
                             "State"
                         ],
                     },
@@ -1219,17 +1346,19 @@ def campaign(arguments):
                     flush=True,
                 )
                 return
-            if arguments.soak_seconds >= 7200 and (len(retention) != 2 or not all(item["auth_pruned"] and item["events_pruned"] and item["events"] for item in retention)):
+            if arguments.soak_seconds >= 7200 and (len(retention) != 2 or not all(item["auth_pruned"] and item["events_pruned"] and item['storage_pruned'] and item["events"] for item in retention)):
                 raise RuntimeError("Two real retention cycles were not demonstrated")
             validated = True
         finally:
             phase = "teardown"
+            if critical.is_set():
+                stop_generator(manifest)
             signal.signal(signal.SIGTERM, previous_handler)
             stop.set()
             if sampler:
                 sampler.join(timeout=50)
             try:
-                docker("rm", "-f", generator)
+                owned("rm", "-f", generator)
             except (RuntimeError, subprocess.TimeoutExpired):
                 pass
             names = [app, pg, telemetry]
@@ -1239,34 +1368,38 @@ def campaign(arguments):
                 try:
                     (output / (name.rsplit("-", 1)[-1] + "-state.json")).write_text(
                         json.dumps(
-                            json.loads(docker("inspect", name))[0]["State"], indent=2
+                            json.loads(owned("inspect", name))[0]["State"], indent=2
                         )
                     )
                     (output / (name.rsplit("-", 1)[-1] + ".log")).write_text(
-                        docker("logs", name, include_stderr=True)
+                        owned("logs", name, include_stderr=True)
                     )
                 except (RuntimeError, subprocess.TimeoutExpired, OSError, ValueError):
                     pass
                 finally:
                     # Diagnostics must never prevent teardown of owned fixtures.
                     try:
-                        docker("rm", "-fv", name)
+                        owned("rm", "-fv", name)
                     except (RuntimeError, subprocess.TimeoutExpired):
                         pass
             receiver.close()
             event_ledger.close()
             try:
-                docker("volume", "rm", volume)
+                owned("volume", "rm", volume)
             except (RuntimeError, subprocess.TimeoutExpired):
                 pass
             try:
-                docker("volume", "rm", telemetry_volume)
+                owned("volume", "rm", telemetry_volume)
             except (RuntimeError, subprocess.TimeoutExpired):
+                pass
+            try:
+                owned('volume','rm',s3_volume)
+            except (RuntimeError,subprocess.TimeoutExpired):
                 pass
             cleanup = {"containers": None, "volumes": None}
             try:
-                cleanup["containers"] = docker("ps", "-a", "--filter", "label=" + LABEL + "=" + identity, "--format", "{{.Names}}").splitlines()
-                cleanup["volumes"] = docker("volume", "ls", "--filter", "label=" + LABEL + "=" + identity, "--format", "{{.Name}}").splitlines()
+                cleanup["containers"] = owned("ps", "-a", "--filter", "label=" + LABEL + "=" + identity, "--format", "{{.Names}}").splitlines()
+                cleanup["volumes"] = owned("volume", "ls", "--filter", "label=" + LABEL + "=" + identity, "--format", "{{.Name}}").splitlines()
             except RuntimeError:
                 pass
             directory_clean = False
@@ -1310,10 +1443,14 @@ if __name__ == "__main__":
         "--steady-rate",
         type=int,
         default=0,
-        help="Open-loop nominal requests/second; zero uses closed-loop VUs",
+        help="Open-loop nominal iterations/second; zero uses closed-loop VUs",
     )
     parser.add_argument("--soak-seconds", type=int, default=1800)
     parser.add_argument("--fixture-disk-mib", type=int, default=512)
+    parser.add_argument('--storage-fixture-disk-mib',type=int,default=1024)
+    parser.add_argument('--rows',type=int,choices=[100000,1000000],default=100000)
+    parser.add_argument('--object-bytes',type=int,default=17)
+    parser.add_argument('--metadata-only-seed',action='store_true',help='Functional listing investigation only; does not certify full seeded-object integrity')
     parser.add_argument("--capacity", action="store_true")
     parser.add_argument("--capacity-step-seconds", type=int, default=300)
     parser.add_argument("--spikes", action="store_true")
@@ -1340,6 +1477,8 @@ if __name__ == "__main__":
         parser.error("Invalid binary or soak budget")
     if not 512 <= arguments.fixture_disk_mib <= 4096:
         parser.error("Fixture disk budget must be 512 through 4096 MiB")
+    if not 64<=arguments.storage_fixture_disk_mib<=4096 or not 1<=arguments.object_bytes<=1048576:
+        parser.error('Storage budget must be 64..4096 MiB; object bytes 1..1048576')
     if not 5 <= arguments.capacity_step_seconds <= 300:
         parser.error("Capacity steps must be 5 through 300 seconds")
     if not 0 <= arguments.steady_rate <= 10000:

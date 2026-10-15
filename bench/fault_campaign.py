@@ -31,7 +31,7 @@ from campaign import ResourceCoverage, docker, effective_cpus, redacted_diagnost
 from observations import ObservationEpoch, inspect_container
 from projects import Project
 from watchdog import LABEL, atomic_json, cleanup, host_reserves, process_identity
-from host_resources import snapshot as host_snapshot
+from host_resources import snapshot as host_snapshot, container_memory_events, parse_counters, require_no_oom
 from ownership import OwnedDocker
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -178,6 +178,10 @@ def run(args):
                             if state is not None and state['RestartCount']:
                                 raise RuntimeError('Unexpected automatic container restart')
                             if state is not None and state['State']['Running'] and not allowed:
+                                events=container_memory_events(state['State']['Pid'])
+                                if events is None:
+                                    events=parse_counters(owned('exec',name,'cat','/sys/fs/cgroup/memory.events'))
+                                require_no_oom(events)
                                 running.append(name)
                         if project.pg in running:
                             disks[project.label]=int(owned('exec',project.pg,'du','-sm','/var/lib/postgresql/data').split()[0])

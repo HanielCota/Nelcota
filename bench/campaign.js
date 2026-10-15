@@ -1,22 +1,33 @@
 // Native k6 runner: the backend and benchmark runner require no Node runtime.
 import http from 'k6/http';
 import execution from 'k6/execution';
-import { check } from 'k6';
+import { check, sleep } from 'k6';
 import { Trend, Rate, Counter } from 'k6/metrics';
 
 const configuration = JSON.parse(__ENV.FIXTURE);
 const projects = configuration.projects ?? [configuration];
 let fixture = projects[0];
+const objectBytes=fixture.object_bytes ?? 17;
+if (!Number.isSafeInteger(objectBytes) || objectBytes<1 || objectBytes>1048576) { throw new Error('Object payload exceeds its bounded fixture range'); }
+function payload() {
+  if (fixture.marker) { return fixture.marker+' payload'; }
+  if (objectBytes===17) { return 'benchmark payload'; }
+  return 'x'.repeat(objectBytes);
+}
 let base = fixture.base;
 let projectIndex = 0;
 const fleet = __ENV.FLEET === 'true';
+const sessionCanary = __ENV.SESSION_CANARY === 'true';
 function scenarios() {
   if (fleet) {
     const rates = (__ENV.PROJECT_RATES || '').split(',').map(Number);
     if (projects.length < 1 || projects.length > 10 || rates.length !== projects.length || rates.some(value => !Number.isSafeInteger(value) || value < 1) || rates.reduce((a,b) => a+b,0) > 10000) { throw new Error('Invalid bounded fleet rates'); }
     return Object.fromEntries(projects.map((project,index) => ['project-'+index, { executor:'constant-arrival-rate', rate:rates[index], timeUnit:'1s', duration, preAllocatedVUs:2, maxVUs:Math.floor(128/projects.length), exec:'project'+index }]));
   }
-  if (rate > 0) { return { traffic:{ executor:'constant-arrival-rate',rate,timeUnit:'1s',duration,preAllocatedVUs:vus,maxVUs:128 } }; }
+  if (rate > 0) {
+    if (sessionCanary) { return { traffic:{ executor:'constant-arrival-rate',rate,timeUnit:'1s',duration,preAllocatedVUs:vus,maxVUs:127 }, 'session-canary':{executor:'constant-vus',vus:1,duration,exec:'sessionProbe'} }; }
+    return { traffic:{ executor:'constant-arrival-rate',rate,timeUnit:'1s',duration,preAllocatedVUs:vus,maxVUs:128 } };
+  }
   return { traffic:{ executor:'constant-vus',vus,duration } };
 }
 const kind = __ENV.WORKLOAD || 'mixed';
@@ -37,6 +48,7 @@ export const options = {
 };
 const unexpected = new Rate('unexpected');
 const successfulOperations = new Counter('successful_operations');
+const accessRenewals=new Counter('access_renewals');
 const successfulDuration = new Trend('successful_duration', true);
 const assertionsPassed = new Counter('assertions_passed');
 const assertionsFailed = new Counter('assertions_failed');
@@ -91,7 +103,7 @@ function rls() {
   if (result.status === 200) {
     let rows;
     try { rows = result.json(); } catch { fail(); return; }
-    const isolated = Array.isArray(rows) && rows.length > 0 && rows.every(row => row !== null && typeof row === 'object' && row.user_id === fixture.user);
+    const isolated = Array.isArray(rows) && rows.length > 0 && rows.every(row => row !== null && typeof row === 'object' && row.user_id === fixture.user && (!fixture.marker || row.body === fixture.label));
     if (!isolated) { fail(); }
     assertionsPassed.add(1);
     check(result, { 'RLS preserves ownership': () => isolated });
@@ -111,9 +123,7 @@ function storage() {
     if (fixture.marker && result.status === 200 && result.body !== JSON.stringify(fixture.marker+' payload')) { fail(); }
     return;
   }
-  let payload = 'benchmark payload';
-  if (fixture.marker) { payload = fixture.marker+' payload'; }
-  request('storage','PUT',`/storage/v1/object/bench/probe-${__VU}.txt`,{body:payload,token:fixture.service});
+  request('storage','PUT',`/storage/v1/object/bench/probe-${__VU}.txt`,{body:payload(),token:fixture.service});
 }
 function installSession(result) {
   if (result.status !== 200) { return false; }
@@ -137,7 +147,11 @@ function refresh() {
 }
 function ensureAccess() {
   if (accessToken && Date.now() < accessExpiresAt - 30000) { return true; }
-  if (refreshToken) { return refresh(); }
+  if (refreshToken) {
+    const renewed=refresh();
+    if (renewed && sessionCanary && execution.scenario.name==='session-canary') { accessRenewals.add(1); }
+    return renewed;
+  }
   return login();
 }
 function write() {
@@ -160,7 +174,7 @@ export default function runCurrent() {
     if (result.status !== 401) { fail(); }
     assertionsPassed.add(1); expectedRejections.add(1);
   }
-  if (fleet && projectIndex === 0 && __ENV.HOT_WORKLOAD) { operations[__ENV.HOT_WORKLOAD](); return; }
+  if (fleet && projectIndex === 0 && __ENV.HOT_WORKLOAD && __ENV.HOT_WORKLOAD !== 'mixed') { operations[__ENV.HOT_WORKLOAD](); return; }
   if (kind !== 'mixed') {
     operations[kind]();
     return;
@@ -195,3 +209,5 @@ export function project6() { selectProject(6); runCurrent(); }
 export function project7() { selectProject(7); runCurrent(); }
 export function project8() { selectProject(8); runCurrent(); }
 export function project9() { selectProject(9); runCurrent(); }
+
+export function sessionProbe() { rejectInvalidCredential(); rls(); sleep(1); }

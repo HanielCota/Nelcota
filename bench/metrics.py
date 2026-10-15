@@ -46,7 +46,7 @@ class NativeMetrics:
         # Phases come from fixed runner labels, never from credentials or URLs.
         if not phase or any(c not in 'abcdefghijklmnopqrstuvwxyz0123456789-' for c in phase):
             raise ValueError('Invalid metrics phase')
-        selector = '{run_id="' + phase + '"}'
+        selector = '{run_id="' + phase + '",scenario="traffic"}'
         if project is not None:
             if not isinstance(project, str) or not re.fullmatch(r'project-[0-9]', project):
                 raise ValueError('Invalid project metrics selector')
@@ -62,10 +62,13 @@ class NativeMetrics:
         requests = count('http_reqs')
         iterations = count('iterations')
         successful = count('successful_operations')
+        received, sent = count('data_received'), count('data_sent')
         metrics = {
             'http_reqs': {'count': requests, 'rate': requests / duration},
             'iterations': {'count': iterations, 'rate': iterations / duration},
             'successful_operations': {'count': successful, 'rate': successful / duration},
+            'data_received': {'bytes':received,'bytes_per_second':received/duration},
+            'data_sent': {'bytes':sent,'bytes_per_second':sent/duration},
             'dropped_iterations': {'count': count('dropped_iterations', True)},
             'unexpected': {'value': self.value('max(k6_unexpected_rate' + selector + ')')},
             'checks': {'passes': count('assertions_passed'), 'fails': count('assertions_failed')},
@@ -77,4 +80,7 @@ class NativeMetrics:
             expression = 'sum(histogram_count(k6_latency_' + name + '_seconds' + selector + '))'
             if self.value(expression, True) > 0:
                 metrics['latency_' + name] = latency('latency_' + name)
+                operation_selector=selector[:-1]+',workload="'+name+'"}'
+                operations=self.value('sum(k6_successful_operations_total'+operation_selector+')')
+                metrics['throughput_'+name]={'count':operations,'rate':operations/duration}
         return {'metrics': metrics, 'schema': 2, 'latency_estimator': 'Prometheus native histogram', 'duration_seconds': duration}

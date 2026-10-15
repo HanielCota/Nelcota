@@ -17,6 +17,13 @@ sys.path.insert(0,str(ROOT/'bench'))
 
 
 class OwnershipBoundaries(unittest.TestCase):
+    def test_postgres_child_oom_cannot_hide_behind_a_running_postmaster(self):
+        from host_resources import require_no_oom
+        require_no_oom({'oom':0,'oom_kill':0})
+        for evidence in [{},{'oom':0},{'oom':False,'oom_kill':0}]:
+            with self.assertRaises(ValueError):require_no_oom(evidence)
+        with self.assertRaises(RuntimeError):require_no_oom({'oom':1,'oom_kill':1})
+
     def test_foreign_name_is_never_removed(self):
         from ownership import OwnedDocker
         raw=mock.Mock()
