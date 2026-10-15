@@ -27,13 +27,14 @@ import urllib.parse
 import urllib.request
 import uuid
 
-from campaign import ResourceCoverage, docker, effective_cpus, redacted_diagnostic, request, validate_disk_headroom
+from campaign import ResourceCoverage, docker, effective_cpus, free_port, redacted_diagnostic, request, validate_disk_headroom
 from observations import ObservationEpoch, inspect_container
 from projects import Project
 from watchdog import LABEL, atomic_json, cleanup, host_reserves, process_identity
 from host_resources import snapshot as host_snapshot, owned_cgroup_snapshot, require_no_oom
 from ownership import OwnedDocker
 from objects import S3Inventory
+from ports import published_port
 
 ROOT = Path(__file__).resolve().parents[1]
 MUTATION_PATH='/rest/v1/rpc/stress_transfer'
@@ -419,6 +420,7 @@ def run(args):
             finally:
                 recovery_began=time.monotonic()
                 owned('start',source.pg)
+                published_port(owned,source.pg,5432,source.pg_port)
             recover('database-recovery',recovery_began)
             fault_window.set(None)
         traffic('database-unavailable',20,database_stop,allow_unavailable=True)
@@ -580,11 +582,12 @@ def run(args):
         if args.s3_faults:
             phase='provider-preparation'
             access,secret=secrets.token_hex(16),secrets.token_hex(32)
+            provider_port=free_port()
             owned('volume','create','--label',LABEL+'='+identity,provider_volume)
-            owned('run','-d','--name',provider,'--label',LABEL+'='+identity,'--pids-limit','128','--cpus','.5','--cpuset-cpus',str(cpus[3]),'--memory','512m','--memory-swap','512m','-e','RUSTFS_ACCESS_KEY','-e','RUSTFS_SECRET_KEY','-p','127.0.0.1::9000','--mount',f'type=volume,source={provider_volume},destination=/data','rustfs/rustfs:1.0.1',env={'RUSTFS_ACCESS_KEY':access,'RUSTFS_SECRET_KEY':secret})
+            owned('run','-d','--name',provider,'--label',LABEL+'='+identity,'--pids-limit','128','--cpus','.5','--cpuset-cpus',str(cpus[3]),'--memory','512m','--memory-swap','512m','-e','RUSTFS_ACCESS_KEY','-e','RUSTFS_SECRET_KEY','-p',f'127.0.0.1:{provider_port}:9000','--mount',f'type=volume,source={provider_volume},destination=/data','rustfs/rustfs:1.0.1',env={'RUSTFS_ACCESS_KEY':access,'RUSTFS_SECRET_KEY':secret})
             provider_started=True
-            provider_port=json.loads(owned('inspect',provider))[0]['NetworkSettings']['Ports']['9000/tcp'][0]['HostPort']
-            endpoint='http://127.0.0.1:'+provider_port
+            published_port(owned,provider,9000,provider_port)
+            endpoint='http://127.0.0.1:'+str(provider_port)
             inventory_client=S3Inventory(endpoint,access,secret,'benchmark-files')
             ready_deadline=time.monotonic()+30
             while True:
@@ -671,6 +674,7 @@ def run(args):
                         recovery_began=time.monotonic()
                         if kind=='restart':
                             owned('start',provider)
+                            published_port(owned,provider,9000,provider_port)
                         if kind=='pause':
                             owned('unpause',provider)
                     code,payload,invalid=0,b'',0

@@ -17,6 +17,16 @@ sys.path.insert(0,str(ROOT/'bench'))
 
 
 class OwnershipBoundaries(unittest.TestCase):
+    def test_restarted_or_external_publication_cannot_impersonate_the_fixture(self):
+        from ports import published_port
+        def inspection(mappings):
+            return json.dumps([{'NetworkSettings':{'Ports':{'5432/tcp':mappings}}}])
+        owned=mock.Mock(return_value=inspection([{'HostIp':'127.0.0.1','HostPort':'32800'}]))
+        self.assertEqual(published_port(owned,'owned-db',5432,32800),32800)
+        for mappings in [None,[],[{'HostIp':'0.0.0.0','HostPort':'32800'}],[{'HostIp':'127.0.0.1','HostPort':'32801'}],[{'HostIp':'127.0.0.1','HostPort':'32800'},{'HostIp':'127.0.0.1','HostPort':'32800'}]]:
+            owned.return_value=inspection(mappings)
+            with self.assertRaises(RuntimeError):published_port(owned,'owned-db',5432,32800)
+
     def test_postgres_child_oom_cannot_hide_behind_a_running_postmaster(self):
         from host_resources import require_no_oom
         require_no_oom({'oom':0,'oom_kill':0})

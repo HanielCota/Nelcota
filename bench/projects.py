@@ -8,6 +8,7 @@ import urllib.error
 from campaign import docker, free_port, owns_listener, request, token
 from watchdog import LABEL
 from ownership import OwnedDocker
+from ports import published_port
 
 FIXED_USER = '00000000-0000-4000-8000-000000000001'
 
@@ -76,10 +77,10 @@ class Project:
 
     def create(self):
         password = secrets.token_urlsafe(32)
+        self.pg_port=free_port()
         self.docker('volume', 'create', '--label', LABEL+'='+self.identity, self.volume)
-        self.docker('run', '-d', '--name', self.pg, '--label', LABEL+'='+self.identity, '--pids-limit', '128', '--cpus', self.quota, '--cpuset-cpus', str(self.cpus[1]), '--memory', '256m', '--memory-swap', '256m', '-e', 'POSTGRES_PASSWORD', '-p', '127.0.0.1::5432', '--mount', f'type=volume,source={self.volume},destination=/var/lib/postgresql/data', 'postgres:17-alpine', 'postgres', '-c', 'max_connections=32', '-c', 'shared_buffers=32MB', '-c', 'max_wal_size=64MB', '-c', 'min_wal_size=32MB', env={'POSTGRES_PASSWORD': password})
-        import json
-        port = int(json.loads(self.docker('inspect', self.pg))[0]['NetworkSettings']['Ports']['5432/tcp'][0]['HostPort'])
+        self.docker('run', '-d', '--name', self.pg, '--label', LABEL+'='+self.identity, '--pids-limit', '128', '--cpus', self.quota, '--cpuset-cpus', str(self.cpus[1]), '--memory', '256m', '--memory-swap', '256m', '-e', 'POSTGRES_PASSWORD', '-p', f'127.0.0.1:{self.pg_port}:5432', '--mount', f'type=volume,source={self.volume},destination=/var/lib/postgresql/data', 'postgres:17-alpine', 'postgres', '-c', 'max_connections=32', '-c', 'shared_buffers=32MB', '-c', 'max_wal_size=64MB', '-c', 'min_wal_size=32MB', env={'POSTGRES_PASSWORD': password})
+        port = published_port(self.docker,self.pg,5432,self.pg_port)
         for attempt in range(120):
             try:
                 if self.sql('SELECT 1') == '1':
