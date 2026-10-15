@@ -99,6 +99,11 @@ def owns_listener(container, port):
     return False
 
 
+def validate_storage_filesystem(backend, filesystem):
+    if backend == "disk" and filesystem in ("tmpfs", "ramfs"):
+        raise RuntimeError("Real disk storage campaign cannot use a memory filesystem")
+
+
 class ResourceCoverage:
     """Constant-space coverage independent of the bounded diagnostic window."""
 
@@ -231,10 +236,13 @@ def campaign(arguments):
         raise RuntimeError("Campaign stopped by independent watchdog or termination")
 
     signal.signal(signal.SIGTERM, terminate)
-    with tempfile.TemporaryDirectory(prefix="nelcota-bench-") as temporary:
+    temporary_directory = tempfile.TemporaryDirectory(prefix="fixture-", dir=output)
+    with temporary_directory as temporary:
         directory = Path(temporary)
         storage = directory / "storage"
         storage.mkdir()
+        storage_filesystem = subprocess.check_output(["stat", "-f", "-c", "%T", str(storage)], text=True).strip()
+        validate_storage_filesystem(arguments.backend, storage_filesystem)
         try:
             manifest = {"identity": identity, "output": str(output), "reserve_path": str(output), "pid": os.getpid(), "process_identity": process_identity(os.getpid()), "started_monotonic": time.monotonic(), "maximum_seconds": 21600, "containers": [generator, app, pg, s3, telemetry], "volumes": [volume, telemetry_volume]}
             atomic_json(output / "ownership.json", manifest)
@@ -596,6 +604,7 @@ def campaign(arguments):
                 "max_connections": 40,
                 "k6": K6,
                 "storage_backend": arguments.backend,
+                "storage_filesystem": storage_filesystem,
                 "steady_rate": arguments.steady_rate,
                 "steady_duration": arguments.steady,
                 "workloads": arguments.workloads,
@@ -1203,10 +1212,17 @@ def campaign(arguments):
                 cleanup["volumes"] = docker("volume", "ls", "--filter", "label=" + LABEL + "=" + identity, "--format", "{{.Name}}").splitlines()
             except RuntimeError:
                 pass
+            directory_clean = False
+            try:
+                temporary_directory.cleanup()
+                directory_clean = True
+            except OSError:
+                pass
+            cleanup["directory_removed"] = directory_clean
             atomic_json(output / "cleanup.json", cleanup)
             if resource_violations:
                 atomic_json(output / "resource-violations.json", resource_violations)
-            clean = cleanup["containers"] == [] and cleanup["volumes"] == []
+            clean = cleanup["containers"] == [] and cleanup["volumes"] == [] and directory_clean
             if clean:
                 (output / "watchdog-disarmed").touch()
             heartbeat_stop.set()

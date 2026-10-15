@@ -64,6 +64,13 @@ reais. Limpeza manual do histórico aguarda a remoção desses eventos pelo prun
 - Watchdog com perda simulada do processo controlador: passou. O recurso com
   identidade correspondente foi removido; um recurso de teste com outro label
   sobreviveu. A fixture PostgreSQL anterior permaneceu com a mesma identidade.
+- `disk-pass-1-001` foi interrompida pelo agente antes do endurance: os arquivos
+  estavam no `/tmp` do host, que é tmpfs. Foram preservados 735 segundos de
+  intervalos concluídos, sem certificação de disco real; teardown confirmado.
+  Os smokes anteriores do adaptador local também usaram essa topologia e
+  demonstram funcionalidade, não desempenho de disco físico. A fixture foi
+  movida para o filesystem de disco; o gate rejeita tmpfs/ramfs e o comparador
+  considera o tipo de filesystem.
 
 Esses smokes não certificam capacidade máxima, oito horas de carga ou conclusão
 do G05. As evidências brutas e falhas ficam em `target/stress-g05/`.

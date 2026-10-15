@@ -61,6 +61,23 @@ class ExistingDefects(unittest.TestCase):
         self.assertTrue(module.nominal_violations({'metrics': {'latency_rls': {'p(95)': math.nan, 'p(99)': 1}}}, 'rls'))
         self.assertTrue(module.nominal_violations({'metrics': {'latency_rls': {'p(95)': 201, 'p(99)': 500}}}, 'rls'))
 
+    def test_disk_campaign_rejects_memory_filesystems(self):
+        module = campaign_module()
+        for filesystem in ['tmpfs', 'ramfs']:
+            with self.assertRaises(RuntimeError):
+                module.validate_storage_filesystem('disk', filesystem)
+        module.validate_storage_filesystem('disk', 'overlayfs')
+
+    def test_listener_from_another_process_does_not_authorize_target(self):
+        module = campaign_module()
+        owned = 'lrwx------ 1 user user 64 socket -> socket:[111]\n'
+        foreign = '0: 0100007F:1F90 00000000:0000 0A 0:0 0:0 0 1000 0 222\n'
+        with mock.patch.object(module, 'docker', return_value=owned+foreign):
+            self.assertFalse(module.owns_listener('fixture', 8080))
+        local = foreign.replace('222', '111')
+        with mock.patch.object(module, 'docker', return_value=owned+local):
+            self.assertTrue(module.owns_listener('fixture', 8080))
+
 
 class EvidenceOracles(unittest.TestCase):
     def setUp(self):
