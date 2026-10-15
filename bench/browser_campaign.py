@@ -115,6 +115,7 @@ def campaign(args):
                    'maximum_decoded_network_mib':128, 'feedback_p95_ms':1000,
                    'maximum_heap_growth_per_page_mib':8, 'maximum_node_growth_per_page':250, 'maximum_listener_growth_per_page':32,
                    'private_PID_namespace':True, 'browser_OS_sandbox':'outer owned nonroot container, all capabilities dropped, read-only root, no-new-privileges; Chromium sandbox disabled inside it',
+                   'maximum_private_driver_log_bytes':16777216,
                    'TLS_verification':True, 'real_home_mounted':False, 'container_log_profile':LOG_PROFILE,
                    'image_digests':image['RepoDigests'], 'certifies_g05':False}
         atomic_json(output/'manifest.json', profile)
@@ -209,7 +210,12 @@ def campaign(args):
                        '--mount', f'type=bind,source={evidence},target=/evidence',
                        '-e', 'XDG_CONFIG_HOME=/home/ubuntu/.config', '-e', 'XDG_CACHE_HOME=/home/ubuntu/.cache',
                        '-e', 'FONTCONFIG_FILE=/runtime/fonts.conf', '-e', 'LANG=C.UTF-8',
+                       '-e', 'DEBUG=pw:browser',
                        image['Id'], '/runtime/python/bin/python3', '-I', '/driver.py']
+            limiter = shutil.which('prlimit')
+            if limiter is None:
+                raise RuntimeError('Bounded private browser diagnostics require prlimit')
+            command = [limiter, '--fsize=16777216:16777216', '--', *command]
             started = time.monotonic()
             with (output/(label+'.log')).open('w') as log:
                 process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT)
