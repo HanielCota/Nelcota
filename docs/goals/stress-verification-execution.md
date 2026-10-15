@@ -577,3 +577,18 @@ houve apenas verificação sintática e três testes de proteção contra
 traversal/symlinks em metadados do runtime; nenhum resultado de stress
 em navegador é apresentado como aprovado. A execução fica para uma janela
 entre campanhas, evitando tráfego e cópias pesadas durante o endurance.
+
+### 2026-10-15 17:58 UTC — contabilidade conservadora do tempo efetivo
+
+O novo `bench/load_time.py` lê os intervalos de tráfego concluídos dos
+ledgers, valida os limites monotônicos e exclui preparação, warmup, repouso
+e intervalos interrompidos. Janelas de geradores sobrepostas contribuem apenas
+com sua maior duração de carga, evitando contagem dupla. O resultado é um
+limite inferior, não uma certificação de aprovação.
+
+O [checkpoint](results/stress/load-time-checkpoint-001.json) registra 24.119
+segundos (6,699722 horas), zero entradas inválidas e zero endurances concluídos.
+O trecho contínuo ativo de `disk-pass-1-005` ainda não recebe crédito. Os
+148 testes Python relacionados passaram em 5,128 segundos, incluindo cinco
+regressões para essa contabilidade. Os 18 checks de `a57fed1` passaram.
+Esse CI confirma subconjuntos funcionais; os gates de stress continuam abertos.

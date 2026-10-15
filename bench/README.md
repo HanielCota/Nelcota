@@ -398,3 +398,17 @@ development runs; certificate and browser origin checks remain enabled. No real
 home or global certificate store is mounted or changed. CPU, RAM, PIDs,
 API-request rate/count, decoded bytes and duration budgets are recorded before
 traffic. Killing its PID-1 generator also stops its namespace's browser children.
+
+## Effective load accounting
+
+```sh
+python3 bench/load_time.py target/stress-g05 --output target/stress-g05/artifacts/load-time-final.json
+```
+
+This report counts completed requested traffic intervals, excluding warmup,
+setup, preparation, drain/rest and failed partial intervals. It credits only
+the largest duration in connected overlapping driver windows, providing a
+conservative lower bound instead of double-counting concurrent tests. A recorded
+four-hour completion is listed separately. Neither reaching eight accumulated
+hours nor this report alone certifies G05; all mandatory correctness, continuous
+endurance, resource, regression and deployment evidence remains required.
