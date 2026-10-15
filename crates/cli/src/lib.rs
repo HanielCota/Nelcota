@@ -382,6 +382,7 @@ pub fn run(cli: Cli) -> anyhow::Result<Outcome> {
             | Command::AdminPassword,
         ) if cli.dir.join(host::MANIFEST).is_file() => {
             let lease = nelcota_deployment::HostLock::acquire(&cli.dir)?;
+            nelcota_deployment::management::ensure_idle(&cli.dir)?;
             let journal = nelcota_deployment::Journal::open(&cli.dir)?;
             if journal
                 .list()?

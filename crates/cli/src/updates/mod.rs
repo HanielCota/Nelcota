@@ -4,6 +4,8 @@ mod enroll;
 #[cfg(target_os = "linux")]
 pub(crate) use enroll::descriptor;
 #[cfg(target_os = "linux")]
+mod management;
+#[cfg(target_os = "linux")]
 mod policy;
 #[cfg(target_os = "linux")]
 mod probes;
@@ -42,6 +44,9 @@ pub enum Action {
         verifier: PathBuf,
         #[arg(long, required = true, value_delimiter = ',')]
         projects: Vec<String>,
+        /// Private root-owned JSON approving host management, image and DNS scope.
+        #[arg(long)]
+        host_management: Option<PathBuf>,
     },
     /// Unprivileged HTTP controller (normally managed by systemd).
     Serve {
@@ -75,6 +80,27 @@ pub enum Action {
         #[arg(long)]
         recover: bool,
     },
+    /// Resume a host-management receipt after inspecting the interrupted operation.
+    HostRecover {
+        #[arg(long,default_value=POLICY)]
+        policy: PathBuf,
+        #[arg(long)]
+        job: String,
+    },
+    /// Inspect host projects and durable management receipts over SSH.
+    HostStatus {
+        #[arg(long,default_value=POLICY)]
+        policy: PathBuf,
+    },
+    #[command(hide = true)]
+    HostExecute {
+        #[arg(long,default_value=POLICY)]
+        policy: PathBuf,
+        #[arg(long)]
+        job: String,
+        #[arg(long)]
+        recover: bool,
+    },
 }
 #[cfg(target_os = "linux")]
 pub fn run(root: &std::path::Path, args: UpdatesArgs) -> anyhow::Result<crate::Outcome> {
@@ -96,7 +122,32 @@ pub fn run(root: &std::path::Path, args: UpdatesArgs) -> anyhow::Result<crate::O
                     password_file,
                     verifier,
                     projects,
-                } => enroll::run(root, &origin, &email, &password_file, &verifier, &projects)?,
+                    host_management,
+                } => enroll::run(
+                    root,
+                    &origin,
+                    &email,
+                    &password_file,
+                    &verifier,
+                    &projects,
+                    host_management.as_deref(),
+                )?,
+                Action::HostRecover { policy, job } => {
+                    management::execute(&policy::Policy::load(&policy)?, &job, true)?
+                }
+                Action::HostStatus { policy } => {
+                    let policy = policy::Policy::load(&policy)?;
+                    let data = tokio::runtime::Builder::new_current_thread()
+                        .enable_all()
+                        .build()?
+                        .block_on(management::status(&policy))?;
+                    println!("{}", serde_json::to_string_pretty(&data)?);
+                }
+                Action::HostExecute {
+                    policy,
+                    job,
+                    recover,
+                } => management::execute(&policy::Policy::load(&policy)?, &job, recover)?,
                 Action::Worker { policy } => {
                     #[cfg(unix)]
                     tokio::runtime::Builder::new_multi_thread()

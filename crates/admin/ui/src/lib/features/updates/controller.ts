@@ -3,7 +3,7 @@ import { readBody } from '$lib/read-body'
 export const phases = ['preparing', 'pausing', 'capturing', 'backup_verified', 'activating', 'validating', 'committing', 'succeeded', 'recovering', 'resuming_previous', 'recovered', 'failed_before_change', 'needs_operator'] as const
 export type Phase = typeof phases[number]
 export type Job = { id: string; project: string; current: string; target: string; phase: Phase; sequence: number; updated_at: number; committed: boolean; error: string | null }
-export type Status = { email: string; projects: { name: string; version: string; update_available: boolean }[]; jobs: Job[]; release: { version: string } | null; enabled: boolean; checking: boolean; check_error: string | null }
+export type Status = { host_management?: boolean; host_busy?: boolean; email: string; projects: { name: string; version: string; update_available: boolean }[]; jobs: Job[]; release: { version: string } | null; enabled: boolean; checking: boolean; check_error: string | null }
 export type Plan = { id: string; project: string; current: string; target: string; digest: string; expires_at: number; blockers: string[] }
 export class ControllerError extends Error { constructor(public status: number, public code: string) { super(code) } }
 export const hash = (value: unknown): value is string => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value)
@@ -15,7 +15,7 @@ export function parseJob(value: unknown): Job {
   return value as Job
 }
 export function parseStatus(value: unknown): Status {
-  if (!record(value) || !text(value.email) || !Array.isArray(value.projects) || value.projects.length > 32 || value.projects.some(p => !record(p) || !text(p.name) || !text(p.version) || typeof p.update_available !== 'boolean') || !Array.isArray(value.jobs) || value.jobs.length > 32 || typeof value.enabled !== 'boolean' || typeof value.checking !== 'boolean' || !(value.check_error === null || text(value.check_error)) || !(value.release === null || (record(value.release) && text(value.release.version)))) throw new ControllerError(502, 'invalid_response')
+  if (!record(value) || !(value.host_management === undefined || typeof value.host_management === 'boolean') || !text(value.email) || !Array.isArray(value.projects) || value.projects.length > 32 || value.projects.some(p => !record(p) || !text(p.name) || !text(p.version) || typeof p.update_available !== 'boolean') || !Array.isArray(value.jobs) || value.jobs.length > 32 || typeof value.enabled !== 'boolean' || typeof value.checking !== 'boolean' || !(value.check_error === null || text(value.check_error)) || !(value.release === null || (record(value.release) && text(value.release.version)))) throw new ControllerError(502, 'invalid_response')
   return { ...value, jobs: value.jobs.map(parseJob) } as Status
 }
 export function parsePlan(value: unknown): Plan {

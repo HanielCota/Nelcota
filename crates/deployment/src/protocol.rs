@@ -14,6 +14,32 @@ pub struct ControllerConfig {
 #[derive(Deserialize, Serialize)]
 #[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
+    HostStatus {
+        token: String,
+        key: Option<String>,
+    },
+    HostPlan {
+        token: String,
+        operation: crate::management::Operation,
+    },
+    HostStart {
+        token: String,
+        plan: String,
+        key: String,
+        password: String,
+        confirmation: String,
+    },
+    HostRecover {
+        token: String,
+        job: String,
+        password: String,
+        confirmation: String,
+    },
+    HostLogs {
+        token: String,
+        project: String,
+        service: crate::management::LogService,
+    },
     Login {
         email: String,
         password: String,
@@ -57,6 +83,10 @@ pub struct UpdatePlan {
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Status {
+    #[serde(default)]
+    pub host_management: bool,
+    #[serde(default)]
+    pub host_busy: bool,
     pub email: String,
     pub projects: Vec<ProjectStatus>,
     pub jobs: Vec<PublicJob>,
@@ -75,12 +105,35 @@ pub struct ProjectStatus {
 #[derive(Deserialize, Serialize)]
 #[serde(tag = "result", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Response {
-    Session { token: String, email: String },
-    Status { data: Status },
-    Plan { data: UpdatePlan },
-    Job { data: PublicJob },
+    HostStatus {
+        data: crate::management::Status,
+    },
+    HostPlan {
+        data: crate::management::Plan,
+    },
+    HostJob {
+        data: crate::management::PublicJob,
+    },
+    HostLogs {
+        data: Vec<crate::management::LogEntry>,
+    },
+    Session {
+        token: String,
+        email: String,
+    },
+    Status {
+        data: Status,
+    },
+    Plan {
+        data: UpdatePlan,
+    },
+    Job {
+        data: PublicJob,
+    },
     Done,
-    Error { code: String },
+    Error {
+        code: String,
+    },
 }
 #[cfg(unix)]
 pub fn call(socket: &std::path::Path, request: &Request) -> anyhow::Result<Response> {

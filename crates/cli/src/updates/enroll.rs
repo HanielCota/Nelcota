@@ -58,6 +58,7 @@ pub fn run(
     password_file: &Path,
     verifier: &Path,
     projects: &[String],
+    host_management: Option<&Path>,
 ) -> anyhow::Result<()> {
     validate_origin(origin)?;
     let root = root.canonicalize()?;
@@ -73,6 +74,19 @@ pub fn run(
     let lease = nelcota_deployment::HostLock::acquire(&root)?;
     let host = crate::host::Host::new(&root);
     let manifest = host.require()?;
+    let management = match host_management {
+        Some(path) => {
+            super::policy::trusted_path(path)?;
+            let value: super::policy::Provisioning =
+                serde_json::from_slice(&read_private(path, 16384)?)?;
+            super::management::validate_policy(&value)?;
+            if manifest.runtime != crate::host::Runtime::Docker {
+                bail!("multi-project provisioning requires Docker");
+            }
+            Some(value)
+        }
+        None => None,
+    };
     if Path::new(POLICY).exists() || descriptor(&root)?.is_some() {
         bail!(
             "host already enrolled; change the root-owned policy over SSH and restart the worker"
@@ -199,6 +213,7 @@ pub fn run(
         project_ids.insert(name.clone(), id);
     }
     let policy = Policy {
+        host_management: management.clone(),
         schema: 1,
         root: root.clone(),
         origin: origin.into(),
@@ -206,6 +221,7 @@ pub fn run(
         controller_gid: gid,
         verifier: bin.join("gh"),
         operators: vec![Operator {
+            manage_host: management.is_some(),
             email: email.into(),
             password_hash: nelcota_auth::hash_password(password)
                 .context("password hashing failed")?,

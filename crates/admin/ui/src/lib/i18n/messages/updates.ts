@@ -1,7 +1,7 @@
 import type { Messages } from '../index.svelte'
 const ptBR = {
   title: 'Atualizações', subtitle: 'Versões verificadas, manutenção e recuperação do projeto.',
-  controller: 'Gerenciamento do host', authority: 'Entre com a conta de operador cadastrada na VPS. A conta do projeto não autoriza atualizações.',
+  controller: 'Gerenciamento do host', authority: 'Entre com a conta de operador cadastrada na VPS. A conta do projeto não autoriza operações no host.',
   open: 'Abrir gerenciamento de atualizações', unenrolled: 'Este host ainda não foi cadastrado para atualizações pelo painel.',
   current: 'Versão instalada', available: 'Versão disponível', check: 'Verificar atualizações', checking: 'Verificando a versão oficial…',
   disabled: 'A instalação está bloqueada até concluir a validação de atualização e recuperação da VPS.',
@@ -35,7 +35,7 @@ const ptBR = {
 }
 const en: Messages<typeof ptBR> = {
   title: 'Updates', subtitle: 'Verified versions, project maintenance and recovery.',
-  controller: 'Host management', authority: 'Sign in with the operator enrolled on the VPS. A project account cannot authorize updates.',
+  controller: 'Host management', authority: 'Sign in with the operator enrolled on the VPS. A project account cannot authorize host operations.',
   open: 'Open update management', unenrolled: 'This host has not been enrolled for panel updates.',
   current: 'Installed version', available: 'Available version', check: 'Check for updates', checking: 'Checking the official release…',
   disabled: 'Installation is blocked until VPS upgrade and recovery validation is complete.',

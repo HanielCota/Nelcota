@@ -211,6 +211,7 @@ fn project(policy: &Policy, name: &str) -> anyhow::Result<(Host, Project)> {
 }
 pub fn execute(policy: &Policy, id: &str, recover: bool) -> anyhow::Result<()> {
     let _lease = HostLock::acquire(&policy.root)?;
+    nelcota_deployment::management::ensure_idle(&policy.root)?;
     let journal = Journal::open(&policy.root)?;
     let mut job = journal
         .list()?

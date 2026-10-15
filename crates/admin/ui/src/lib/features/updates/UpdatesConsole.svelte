@@ -3,6 +3,8 @@
   import { Button } from '$lib/components/ui/button'
   import { Input } from '$lib/components/ui/input'
   import Logo from '$lib/shell/components/Logo.svelte'
+  import HostConsole from '../host/HostConsole.svelte'
+  let view = $state<'projects' | 'updates'>('projects')
   import { t, translate, i18n, setLocale } from '$lib/i18n/index.svelte'
   import { ControllerError, request, parseStatus, parsePlan, parseJob, mergeStatus, newKey, message, terminal, type Status, type Plan, type Job } from './controller'
   let status = $state<Status | null>(null)
@@ -23,7 +25,7 @@
   let timer: ReturnType<typeof setTimeout> | undefined
   let attempts = 0
   const requests = new Set<AbortController>()
-  const active = $derived(status?.jobs.some(job => !terminal(job.phase)) ?? false)
+  const active = $derived((status?.host_busy || status?.jobs.some(job => !terminal(job.phase))) ?? false)
   const selected = $derived(status?.projects.find(item => item.name === project))
   function clearApproval() { plan = null; recover = null; approval = ''; key = '' }
   async function call(body?: object) {
@@ -105,6 +107,9 @@
     {/if}
     {#if status}
       <p class="text-sm text-muted-foreground">{t('updates.session', { email: status.email })}</p>
+      <nav class="flex gap-2" aria-label={t('updates.controller')}>{#if status.host_management}<Button variant={view === 'projects' ? 'default' : 'outline'} onclick={() => { view = 'projects' }}>{t('host.projects')}</Button>{/if}<Button variant={view === 'updates' ? 'default' : 'outline'} onclick={() => { view = 'updates' }}>{t('host.updates')}</Button></nav>
+      {#if status.host_management && view === 'projects'}{#key status.email}<HostConsole email={status.email} expired={() => { generation++; signedOut = true; status = null; clearApproval(); clearTimeout(timer); for (const abort of requests) abort.abort() }} />{/key}{/if}
+      {#if !status.host_management || view === 'updates'}
       <section class="grid gap-4 rounded-3xl bg-card p-6" aria-labelledby="release-title">
         <h2 id="release-title" class="text-lg font-semibold">{t('updates.title')}</h2>
         {#if !status.enabled}<p class="rounded-2xl bg-well p-4 text-sm" role="status">{t('updates.disabled')}</p>{/if}
@@ -127,6 +132,7 @@
         </form>
       {/if}
       <section class="grid gap-4" aria-labelledby="history-title"><h2 id="history-title" class="text-lg font-semibold">{t('updates.history')}</h2>{#each status.jobs as job (job.id)}<article class="grid gap-3 rounded-3xl bg-card p-5"><p class="font-medium" translate="no">{job.project}: {job.current} → {job.target}</p><p role="status">{t(`updates.${job.phase}`)}</p>{#if progress[job.phase] !== undefined}<progress class="h-2 w-full" max="7" value={progress[job.phase]} aria-label={t(`updates.${job.phase}`)}></progress>{/if}<p class="break-all text-xs text-muted-foreground" translate="no">{job.id}</p>{#if job.phase === 'needs_operator'}<Button class="w-fit" variant="outline" disabled={busy || offline} onclick={() => { clearApproval(); recover = job }}>{t('updates.recover')}</Button>{/if}</article>{/each}</section>
+      {/if}
     {/if}
   </div>
 </main>
