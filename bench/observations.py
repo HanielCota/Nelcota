@@ -2,8 +2,30 @@
 import json
 import subprocess
 import time
+import threading
 
-from watchdog import LABEL
+from watchdog import LABEL, process_identity
+
+
+class ObservationEpoch:
+    """Remember transitions even when a short fault returns to the same state."""
+    def __init__(self):
+        self._lock=threading.Lock()
+        self._value=None
+        self._epoch=0
+
+    def set(self,value):
+        with self._lock:
+            self._value=value
+            self._epoch+=1
+
+    def capture(self):
+        with self._lock:
+            return self._epoch,self._value
+
+    def changed(self,epoch):
+        with self._lock:
+            return self._epoch!=epoch
 
 
 def inspect_container(name):
@@ -31,6 +53,9 @@ def generator_observation(context, current):
             raise RuntimeError('Generator ownership changed')
         container_id = state['Id']
         context['container_id'] = container_id
+        context['host_pid']=state['State'].get('Pid')
+        if isinstance(context['host_pid'],int) and context['host_pid']>0:
+            context['pid_starttime']=process_identity(context['host_pid'])
     result = subprocess.run(['docker', 'stats', '--no-stream', '--format', '{{json .}}', container_id], capture_output=True, text=True, timeout=10)
     if context is not current() or context['process'].poll() is not None:
         return None
@@ -43,4 +68,6 @@ def generator_observation(context, current):
     value = json.loads(result.stdout)
     value['phase'] = context['phase']
     value['container_id'] = container_id
+    value['host_pid']=context.get('host_pid')
+    value['pid_starttime']=context.get('pid_starttime')
     return value
