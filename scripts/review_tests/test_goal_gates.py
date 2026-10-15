@@ -122,6 +122,15 @@ class Comparison(unittest.TestCase):
         self.assertNotEqual(code, 0)
         self.assertFalse(report["rows"][0]["gate_passed"])
 
+    def test_different_metric_protocol_cannot_certify_candidate(self):
+        path = self.candidate / 'metadata.json'
+        metadata = json.loads(path.read_text())
+        metadata['metrics_backend'] = 'different estimator'
+        path.write_text(json.dumps(metadata))
+        code, report = self.compare()
+        self.assertNotEqual(code, 0)
+        self.assertIn('metrics_backend', report['fixture_differences'])
+
     def test_different_nominal_duration_is_incomparable(self):
         for iteration in range(1, 4):
             self.change_sample(
