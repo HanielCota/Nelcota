@@ -315,7 +315,7 @@ async def main():
                 await dialog.wait_for()
                 await pages[0].wait_for_function('''() => document.querySelector('[role="dialog"] pre')?.textContent?.startsWith('g05-stress-file')''', timeout=10000)
                 preview_seconds.append(time.monotonic()-preview_began)
-                await dialog.get_by_role('button', name='Fechar', exact=True).click()
+                await pages[0].keyboard.press('Escape')
                 await dialog.wait_for(state='hidden')
             await navigate(pages[0], 'bench_products', 'project-0:')
             async def sample(label):
