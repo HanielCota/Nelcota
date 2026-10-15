@@ -6,7 +6,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT/'bench'))
-from browser_runtime import runtime_target
+from browser_runtime import runtime_target, runtime_library
 
 
 class BrowserRuntimeOwnership(unittest.TestCase):
@@ -32,6 +32,37 @@ class BrowserRuntimeOwnership(unittest.TestCase):
             root.mkdir()
             target = root/'python/lib/site-packages/package.dist-info/METADATA'
             self.assertEqual(runtime_target(root, target), target)
+
+    def test_standard_loader_alias_resolves_into_a_trusted_library(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            trusted = root/'usr/lib'
+            trusted.mkdir(parents=True)
+            loader = trusted/'ld-linux.so'
+            loader.write_bytes(b'owned ELF fixture')
+            (root/'lib64').symlink_to(trusted, target_is_directory=True)
+            alias = root/'lib64/ld-linux.so'
+            self.assertFalse(alias.is_relative_to(trusted))
+            self.assertEqual(runtime_library(alias, [trusted]), loader)
+
+    def test_library_symlink_cannot_disclose_an_untrusted_file(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            trusted = root/'lib'
+            trusted.mkdir()
+            foreign = root/'private'
+            foreign.write_bytes(b'foreign data must not be staged')
+            alias = trusted/'libexample.so'
+            alias.symlink_to(foreign)
+            self.assertTrue(alias.is_relative_to(trusted))
+            with self.assertRaises(ValueError):
+                runtime_library(alias, [trusted])
+
+    def test_missing_native_dependency_cannot_be_approved(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            with self.assertRaises(FileNotFoundError):
+                runtime_library(root/'missing.so', [root])
 
 
 if __name__ == '__main__':

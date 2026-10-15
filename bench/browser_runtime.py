@@ -22,6 +22,14 @@ def runtime_target(destination, target):
     return path
 
 
+def runtime_library(source, roots):
+    """Validate the resolved library, including standard ELF loader aliases."""
+    resolved = Path(source).resolve(strict=True)
+    if not resolved.is_file() or not any(resolved.is_relative_to(Path(root).resolve(strict=True)) for root in roots):
+        raise ValueError('Unexpected resolved browser runtime dependency path')
+    return resolved
+
+
 def prepare(destination, sdk):
     if platform.machine() != 'x86_64':
         raise RuntimeError('The native browser runtime profile is validated only on x86_64')
@@ -99,8 +107,7 @@ def prepare(destination, sdk):
             raise RuntimeError('Native browser dependency closure is incomplete: '+binary.name)
         for name in re.findall(r'(/[^\s()]+)', result.stdout):
             source = Path(name)
-            if not any(source.is_relative_to(prefix) for prefix in [Path('/lib'), Path('/usr/lib'), python, destination]):
-                raise ValueError('Unexpected browser runtime dependency path')
+            runtime_library(source, [Path('/lib'), Path('/usr/lib'), python, destination])
             libraries.add(source)
     for pattern in ['libnss*.so*', 'libsoftokn*.so*', 'libfreebl*.so*']:
         libraries.update(Path('/usr/lib/x86_64-linux-gnu').glob(pattern))
