@@ -592,3 +592,77 @@ O trecho contínuo ativo de `disk-pass-1-005` ainda não recebe crédito. Os
 148 testes Python relacionados passaram em 5,128 segundos, incluindo cinco
 regressões para essa contabilidade. Os 18 checks de `a57fed1` passaram.
 Esse CI confirma subconjuntos funcionais; os gates de stress continuam abertos.
+
+### 2026-10-15 19:33 UTC — dois ciclos de retenção, endurance ainda ativo
+
+As duas coortes envelhecidas de sessões, eventos e arquivos foram podadas pelos
+loops reais durante a carga. O [checkpoint de 133 minutos](results/stress/disk-pass-1-checkpoint-133min.json)
+registra janelas de 15 minutos: medianas de RSS de 45,21 a 46,50 MiB e memória
+anônima de 26,92 a 28,20 MiB. As medianas de descritores/sockets continuam em
+156/150; as tarefas oscilaram de sete para oito. A inspeção encontrou workers
+Tokio adicionais; a recuperação desse pool ainda precisa do repouso final.
+Essas observações parciais não certificam ausência de vazamento.
+
+A reconexão do observador preservou aplicação e PostgreSQL, confirmados pelos
+mesmos CIDs/PIDs/horários de início e 1.152 amostras contínuas, com gap máximo
+de 7,3 segundos. Os 18 checks de `5208714` passaram. Os 148 testes Python
+relacionados passaram em 5,784 segundos. O código de produção continua igual
+ao baseline; o perfil novo de navegador permanece sem execução nativa.
+
+### 2026-10-15 21:22 UTC — primeiro endurance de quatro horas aprovado
+
+`disk-pass-1-005` passou com 17.985 segundos de carga: 3.585 nas fases prévias
+de testes e 14.400 ininterruptos de endurance. Preparação sem tráfego
+e os 180 segundos de repouso não entram nessa contagem. O mesmo executável,
+aplicação e PostgreSQL permaneceram durante as quatro horas. Foram 3.094
+amostras, 2.421 durante o endurance; gap máximo global de 12 segundos.
+
+A 280 iterações/s, foram observadas 4.031.806 operações úteis, zero chegadas
+descartadas, zero falhas inesperadas e zero rejeições por sobrecarga. Os p95/p99
+em ms foram: leitura 7,69/16,34; RLS 6,40/14,66; login 50,20/76,01;
+refresh 19,09/33,65; storage 17,96/31,66; escrita 15,03/28,29. São estimativas
+de histogramas nativos, sob as cotas e o perfil declarados; não capacidade máxima.
+O canário contínuo fez 16 renovações reais. As duas coortes de retenção passaram.
+
+A reconciliação encontrou 248.381 eventos, sem perdas, extras ou duplicatas;
+129 objetos com bytes conferidos, mais 10.000 objetos vazios físicos de seed,
+sem chaves órfãs. Fila final zero, sem transações ociosas nem locks esperando.
+O repouso voltou aos mesmos 24 descritores, quatro tarefas e 18 sockets das
+cinco recuperações anteriores. RSS máximo global 49,29 MiB; PostgreSQL chegou
+a 429 MiB em disco. Os componentes não tiveram OOM. Limpeza confirmada.
+[Evidência completa](results/stress/disk-pass-1.json).
+
+O [segundo checkpoint de tempo](results/stress/load-time-checkpoint-002.json)
+atingiu 38.519 segundos, **10h41m59s efetivas concluídas**, sem contar intervalos
+interrompidos. Isso cumpre o mínimo acumulado de oito horas, mas não conclui
+G05: faltam S3 contínuo, segunda passada e os demais cenários/bloqueios visíveis.
+A retenção de memória anônima precisa de comparação e evidência de alocação;
+recuperar os owners observáveis não prova ausência absoluta de vazamento.
+
+### 2026-10-15 21:37 UTC — validação nativa do perfil de navegador
+
+As primeiras tentativas foram preservadas, todas com limpeza confirmada.
+`001` rejeitou o alias ELF `/lib64`; a validação agora resolve a biblioteca e
+também impede symlinks que escapam das raízes aprovadas. `002` encontrou uma
+extensão Tcl/Tk opcional sem dependências instaladas; esse perfil headless
+exclui somente o toolkit não utilizado. `003` revelou que o executável público
+Node do Playwright era um symlink omitido pelo empacotamento; agora seus bytes
+são copiados explicitamente, mantendo links genéricos recusados.
+
+`004/005` abortaram no controle TLS. O diagnóstico nativo limitado confirmou
+`libsqlite3.so.0` ausente no módulo NSS carregado dinamicamente. A correção
+inclui suas dependências reais; o controle de CA não confiável passou em `006`.
+Os 152 testes relacionados passaram em 5,563 segundos, incluindo resolução
+segura de bibliotecas e o fechamento de dependências do módulo ELF NSS real.
+
+`006` também revelou um oráculo offline incorreto: o SDK documenta duas novas
+tentativas de leitura. O perfil fixa esse contrato, exige exatamente três
+tentativas GET, uma tentativa POST e ausência de commit/replay ao reconectar;
+não houve mudança do SDK. `007` passou desses controles, conflitos reais de
+arquivo e read-back, mas parou em um seletor de fechamento ambíguo. A prévia
+agora fecha por Escape, com confirmação de que o diálogo desapareceu.
+
+`008` é diagnóstico em andamento. A revisão adicional fortaleceu a próxima
+execução para conferir todos os 20 WeakRefs por aba/ciclo e alternar sempre a
+tabela, evitando medir dados já visíveis como uma nova resposta. Não há ainda
+aprovação do perfil completo de navegador nem do p95 visual final.

@@ -33,9 +33,14 @@
           "status": "passed",
           "scope": "150 seconds effective real-backend mixed diagnostic, not capacity or endurance certification",
           "evidence": "semantic-real-backend-smokes.json"
+        },
+        {
+          "run_id": "disk-pass-1-005",
+          "status": "passed",
+          "scope": "First complete 14400-second continuous disk pass plus 3585 completed prelude seconds; same processes, 3094 samples, 248381 events reconciled and cleanup confirmed. Second independent pass and remaining row scenarios are still pending.",
+          "evidence": "disk-pass-1.json"
         }
-      ],
-      "in_progress_run_id": "disk-pass-1-005"
+      ]
     },
     {
       "id": "rest",
@@ -67,9 +72,14 @@
           "status": "passed",
           "scope": "150 seconds effective real-backend mixed diagnostic, not capacity or endurance certification",
           "evidence": "semantic-real-backend-smokes.json"
+        },
+        {
+          "run_id": "disk-pass-1-005",
+          "status": "passed",
+          "scope": "First complete 14400-second continuous disk pass plus 3585 completed prelude seconds; same processes, 3094 samples, 248381 events reconciled and cleanup confirmed. Second independent pass and remaining row scenarios are still pending.",
+          "evidence": "disk-pass-1.json"
         }
-      ],
-      "in_progress_run_id": "disk-pass-1-005"
+      ]
     },
     {
       "id": "mutations",
@@ -122,7 +132,7 @@
       "area": "Disk bytes, quotas, collisions and paths",
       "entrypoints": "bench/campaign.py; bench/fault_campaign.py; crates/server/tests/storage.rs; concurrency.rs",
       "status": "not run",
-      "scope_or_limit": "Real 100k-row/physical-object smoke and prior focused quota/inode diagnostics exist; uninterrupted final-artifact four-hour endurance and two full passes are pending.",
+      "scope_or_limit": "First full continuous four-hour disk pass approved with final byte/metadata/event reconciliation and idle owner recovery. Second independent pass, comparable regression and broader storage matrix remain pending.",
       "functional_subset": {
         "status": "passed",
         "source_commit": "3203330cf3df2b9b7dd68efebc79412a8564e9fd",
@@ -147,9 +157,14 @@
           "status": "passed",
           "scope": "150 seconds effective real-backend mixed diagnostic, not capacity or endurance certification",
           "evidence": "semantic-real-backend-smokes.json"
+        },
+        {
+          "run_id": "disk-pass-1-005",
+          "status": "passed",
+          "scope": "First complete 14400-second continuous disk pass plus 3585 completed prelude seconds; same processes, 3094 samples, 248381 events reconciled and cleanup confirmed. Second independent pass and remaining row scenarios are still pending.",
+          "evidence": "disk-pass-1.json"
         }
-      ],
-      "in_progress_run_id": "disk-pass-1-005"
+      ]
     },
     {
       "id": "s3",
@@ -202,7 +217,14 @@
         "scope": "Existing real HTTP receivers, signatures/retries/leases/workers and the full 100000-event retained-history boundary. 99999 history fixtures are explicitly cancelled, not claimed network deliveries.",
         "test_count": null
       },
-      "in_progress_run_id": "disk-pass-1-005"
+      "native_diagnostics": [
+        {
+          "run_id": "disk-pass-1-005",
+          "status": "passed",
+          "scope": "First complete 14400-second continuous disk pass plus 3585 completed prelude seconds; same processes, 3094 samples, 248381 events reconciled and cleanup confirmed. Second independent pass and remaining row scenarios are still pending.",
+          "evidence": "disk-pass-1.json"
+        }
+      ]
     },
     {
       "id": "admin",
@@ -228,7 +250,7 @@
       "area": "Panel tabs, request lifetime and retained resources",
       "entrypoints": "crates/admin/ui/e2e; src/lib/query-client.test.ts",
       "status": "not run",
-      "scope_or_limit": "Native Chromium, certutil and Python Playwright are available. A separate owned-container live panel/SDK runner is under implementation and syntax review; no live-browser stress result is claimed yet.",
+      "scope_or_limit": "Live native browser profile implemented. Initial native preparation/startup failures are retained with cleanup confirmed; TLS control and full browser lifecycle remain unapproved while investigating the required native library closure.",
       "functional_subset": {
         "status": "passed",
         "source_commit": "3203330cf3df2b9b7dd68efebc79412a8564e9fd",
@@ -240,7 +262,29 @@
         ],
         "scope": "Existing Vite browser suites and memory regressions with explicit endpoint/response doubles. This is not a measured release-panel visual p95 under native traffic.",
         "test_count": null
-      }
+      },
+      "native_diagnostics": [
+        {
+          "run_id": "browser-pass-1-001",
+          "status": "failed",
+          "scope": "ELF loader alias rejected during preparation; zero traffic, cleanup confirmed"
+        },
+        {
+          "run_id": "browser-pass-1-002",
+          "status": "failed",
+          "scope": "Unused Tcl/Tk extension has unavailable libraries; zero traffic, cleanup confirmed"
+        },
+        {
+          "run_id": "browser-pass-1-003",
+          "status": "failed",
+          "scope": "Managed Playwright Node symlink was omitted; driver never started, cleanup confirmed"
+        },
+        {
+          "run_id": "browser-pass-1-004",
+          "status": "failed",
+          "scope": "Chromium closed during the untrusted TLS control; no approved browser result, cleanup confirmed"
+        }
+      ]
     },
     {
       "id": "sdks",
