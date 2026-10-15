@@ -419,3 +419,26 @@ conservative lower bound instead of double-counting concurrent tests. A recorded
 four-hour completion is listed separately. Neither reaching eight accumulated
 hours nor this report alone certifies G05; all mandatory correctness, continuous
 endurance, resource, regression and deployment evidence remains required.
+
+## Optional allocation ownership diagnostic
+
+On Linux glibc, build the bounded native observer separately:
+
+```sh
+python3 bench/allocation.py --build target/stress-g05/artifacts/allocator/libg05alloc.so
+python3 bench/launch.py --run-id allocation-disk-1 --binary target/release/nelcota --backend disk --workloads mixed --no-stress --soak-seconds 3600 --final-idle-seconds 180 --allocation-probe "$PWD/target/stress-g05/artifacts/allocator/libg05alloc.so"
+```
+
+This development-only preload observes glibc arenas and mapped allocations. It
+adds one detached thread, samples every five seconds and bounds each process's
+private numeric log to 1 MiB. Helpers inheriting the container environment do
+not start observers. A real 64-MiB malloc/free control and directory/period
+ownership controls validate the observer; they do not establish backend results.
+
+The driver verifies the library/source build identity, preserves bounded raw
+samples after the app stops and requires coverage of completed traffic. An
+instrumented run cannot certify the ordinary performance regression envelope.
+Correlate its current process and post-load idle samples with cgroup/RSS evidence:
+allocator-held free arenas and thread caches are not an application-object
+census or an absolute proof of leak absence. The production executable and its
+runtime requirements remain unchanged.

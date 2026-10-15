@@ -20,6 +20,7 @@ STATIC.add('proxy-reload-gates.json')
 STATIC.add('proxy-startup-failure.json')
 STATIC.add('native-guards.json')
 STATIC.add('preflight-budget.json')
+STATIC.add('allocation-summary.json')
 STATIC.update({'observer-reconnection.json', 'sparse-counter-before-after.json'})
 FREEFORM={'message','diagnostic','error','stack','traceback','sql','payload','body'}
 

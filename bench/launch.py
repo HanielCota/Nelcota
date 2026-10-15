@@ -26,7 +26,7 @@ def main():
     if output.exists() or snapshot.exists():
         parser.error('This run already exists; preserve it and use a new ID')
     snapshot.mkdir(parents=True)
-    sources = sorted((ROOT / 'bench').glob('*.py')) + [ROOT/'bench/campaign.js', ROOT/'bench/setup.sql', ROOT/'scripts/upgrade/support.py']
+    sources = sorted((ROOT / 'bench').glob('*.py')) + sorted((ROOT/'bench').glob('*.c')) + [ROOT/'bench/campaign.js', ROOT/'bench/setup.sql', ROOT/'scripts/upgrade/support.py']
     hashes = {}
     for source in sources:
         name = source.relative_to(ROOT)

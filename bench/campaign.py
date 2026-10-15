@@ -242,6 +242,12 @@ def campaign(arguments):
         raise RuntimeError("Host resource reserves do not permit a campaign")
     validate_disk_headroom(output, arguments.fixture_disk_mib+arguments.storage_fixture_disk_mib)
     identity = "nelcota-bench-" + secrets.token_hex(16)
+    allocation_profile = None
+    allocation_directory = None
+    allocation_error = None
+    if getattr(arguments, 'allocation_probe', None) is not None:
+        from allocation import validate_library
+        allocation_profile = validate_library(arguments.allocation_probe)
     owned=OwnedDocker(identity,docker)
     cpus = sorted(os.sched_getaffinity(0))
     if len(cpus) < 4:
@@ -504,6 +510,11 @@ def campaign(arguments):
                     }
                 )
 
+            if allocation_profile is not None:
+                allocation_directory = directory/'allocator'
+                allocation_directory.mkdir(mode=0o700)
+                env.update({'LD_PRELOAD':'/g05-probe.so','NELCOTA_G05_ALLOC_DIR':'/g05-alloc','NELCOTA_G05_ALLOC_PERIOD_MS':'5000'})
+
             def sql(statement):
                 return owned(
                     "exec",
@@ -542,6 +553,9 @@ def campaign(arguments):
                     "-v",
                     str(storage) + ":/storage",
                 ]
+                if allocation_profile is not None:
+                    command.extend(['--mount',f'type=bind,source={arguments.allocation_probe.resolve()},target=/g05-probe.so,readonly',
+                                    '--mount',f'type=bind,source={allocation_directory},target=/g05-alloc'])
                 if arguments.backend == "s3":
                     # The minimal Ubuntu fixture lacks ca-certificates. Keep
                     # TLS verification intact and supply the host trust bundle.
@@ -754,6 +768,8 @@ def campaign(arguments):
                         Path("/etc/ssl/certs/ca-certificates.crt").open("rb"), "sha256"
                     ).hexdigest(),
                 }
+            if allocation_profile is not None:
+                metadata['allocator_observer']=allocation_profile
             (output / "metadata.json").write_text(json.dumps(metadata, indent=2))
 
             def sample():
@@ -1472,6 +1488,13 @@ def campaign(arguments):
                 cleanup["volumes"] = owned("volume", "ls", "--filter", "label=" + LABEL + "=" + identity, "--format", "{{.Name}}").splitlines()
             except RuntimeError:
                 pass
+            if allocation_directory is not None:
+                try:
+                    from allocation import retain
+                    retain(allocation_directory, output/'allocator-diagnostics')
+                except (OSError, ValueError, TypeError) as error:
+                    allocation_error = type(error).__name__
+                    resource_violations.append({'allocation_observer':allocation_error})
             directory_clean = False
             try:
                 temporary_directory.cleanup()
@@ -1502,12 +1525,15 @@ def campaign(arguments):
                 print("Campaign passed; reports:", output, flush=True)
             if not clean and sys.exception() is None:
                 raise RuntimeError("Owned fixture cleanup could not be confirmed")
+            if allocation_error is not None and sys.exception() is None:
+                raise RuntimeError('Allocation observer evidence was incomplete')
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--binary", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument('--allocation-probe',type=Path,help='Optional built glibc diagnostic preload; instrumented runs cannot certify performance')
     parser.add_argument("--steady", default="30s")
     parser.add_argument(
         "--steady-rate",

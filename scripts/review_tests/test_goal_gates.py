@@ -130,6 +130,18 @@ class Comparison(unittest.TestCase):
         self.assertEqual(code,0)
         self.assertTrue(report['rows'][0]['gate_passed'])
 
+    def test_matching_instrumented_runs_cannot_certify_ordinary_performance(self):
+        self.useful_fixture(100)
+        for directory in [self.baseline,self.candidate]:
+            path=directory/'metadata.json'
+            metadata=json.loads(path.read_text())
+            metadata['allocator_observer']={}
+            path.write_text(json.dumps(metadata))
+        code,report=self.compare()
+        self.assertNotEqual(code,0)
+        self.assertEqual(report['campaign_evidence_valid'],[False,False])
+        self.assertFalse(report['rows'][0]['gate_passed'])
+
     def test_failed_baseline_cannot_certify_candidate(self):
         self.change_sample(
             self.baseline, 1, lambda value: value["unexpected"].update(value=1)
