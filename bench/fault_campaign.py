@@ -37,6 +37,7 @@ from objects import S3Inventory
 from ports import published_port
 from postgres_evidence import retain_failure
 from http_boundary import opener
+from fixture_copy import copy_to_tmpfs
 
 ROOT = Path(__file__).resolve().parents[1]
 MUTATION_PATH='/rest/v1/rpc/stress_transfer'
@@ -176,6 +177,9 @@ def run(args):
         watchdog=subprocess.Popen([sys.executable,str(ROOT/'bench/watchdog.py'),str(output/'ownership.json')],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,start_new_session=True)
         atomic_json(output/'manifest.json',{'scope':'local ledger mutations and negative JWT probes; no public proxy/controller acceptance','capacity_qualification':args.capacity,'real_s3_faults':args.s3_faults,'binary_sha256':hashlib.file_digest(args.binary.open('rb'),'sha256').hexdigest(),'initial_iterations_per_second':args.rate,'maximum_inflight':8,'maximum_attempts':100000,'parent_rss_limit_mib':512,'app_cpu_each':.5,'postgres_cpu_each':.5,'app_memory_mib_each':128,'postgres_memory_mib_each':256,'provider_cpu':.5,'provider_memory_mib':512,'owned_filesystem_exhaustion_mib':16,'recovery_deadline_seconds':35,'snapshot':'pg_dump snapshot under controlled database writers, immutable file fixture','storage':'disk, with explicitly temporary tmpfs ENOSPC scenarios and optional real RustFS faults'})
         source.create()
+        scope=json.loads((output/'manifest.json').read_text())
+        scope['focus']=args.focus
+        atomic_json(output/'manifest.json',scope)
         initialized.append(source)
         source.sql(MUTATION_FIXTURE)
         time.sleep(1)
@@ -432,8 +436,8 @@ def run(args):
                 published_port(owned,source.pg,5432,source.pg_port)
             recover('database-recovery',recovery_began)
             fault_window.set(None)
-        traffic('database-unavailable',20,database_stop,allow_unavailable=True)
-        traffic('database-recovered',20)
+        if args.focus=='all':traffic('database-unavailable',20,database_stop,allow_unavailable=True)
+        if args.focus=='all':traffic('database-recovered',20)
         def deadlock():
             before=int(source.sql("SELECT deadlocks FROM pg_stat_database WHERE datname=current_database()"))
             statement="BEGIN; SET LOCAL lock_timeout='10s'; SELECT id FROM public.stress_accounts WHERE id=2 FOR UPDATE; SELECT pg_sleep(2); SELECT id FROM public.stress_accounts WHERE id=1 FOR UPDATE; COMMIT;"
@@ -450,8 +454,8 @@ def run(args):
                     return
                 time.sleep(.2)
             raise RuntimeError('Controlled deadlock did not occur')
-        traffic('deadlock-under-writers',20,deadlock,allow_unavailable=True)
-        traffic('deadlock-recovered',20)
+        if args.focus=='all':traffic('deadlock-under-writers',20,deadlock,allow_unavailable=True)
+        if args.focus=='all':traffic('deadlock-recovered',20)
         def application_kill():
             fault_window.set({'name':'app-kill','container':source.app,'expires':time.monotonic()+30})
             recovery_began=time.monotonic()
@@ -462,8 +466,8 @@ def run(args):
                 recover('app-recovery',recovery_began)
             finally:
                 fault_window.set(None)
-        traffic('app-kill',20,application_kill,allow_unavailable=True)
-        traffic('app-recovered',20)
+        if args.focus=='all':traffic('app-kill',20,application_kill,allow_unavailable=True)
+        if args.focus=='all':traffic('app-recovered',20)
         def application_oom():
             fault_window.set({'name':'declared-container-oom','container':source.app,'expires':time.monotonic()+60})
             source.extra_labels={'io.nelcota.stress.fault':'oom'}
@@ -498,8 +502,8 @@ def run(args):
                 source.start_app()
             recover('oom-recovery',recovery_began)
             fault_window.set(None)
-        traffic('container-oom',30,application_oom,allow_unavailable=True)
-        traffic('oom-recovered',20)
+        if args.focus=='all':traffic('container-oom',30,application_oom,allow_unavailable=True)
+        if args.focus=='all':traffic('oom-recovered',20)
         phase='snapshot'
         # pg_dump obtains one consistent MVCC snapshot while writers continue.
         # Object bytes are immutable in this declared workload.
@@ -556,7 +560,11 @@ def run(args):
             try:
                 owned('rm','-f',source.app)
                 source.start_app()
-                owned('cp','-a',str(source.storage)+'/.',source.app+':/storage')
+                atomic_json(output/('filesystem-'+kind+'-fixture-copy.json'),copy_to_tmpfs(owned,source.storage,source.app))
+                before_status,before_bytes=raw(source,'GET','/storage/v1/object/bench/fixture.txt')
+                atomic_json(output/('filesystem-'+kind+'-fixture-before.json'),{'status':before_status,'bytes':len(before_bytes),'sha256':hashlib.sha256(before_bytes).hexdigest(),'physical_files':owned('exec',source.app,'find','/storage','-maxdepth','3','-type','f','-printf','%P %s %U %G %m\n')})
+                if before_status!=200 or before_bytes!=json.dumps(source.label+': payload').encode():
+                    raise RuntimeError('Copied fixture is unreadable before filesystem pressure')
                 committed_before=int(source.sql('SELECT count(*) FROM public.stress_operations'))
                 fill_command=['dd','if=/dev/zero','of=/storage/.g05-quota-fill','bs=1048576','count=17']
                 if kind=='inodes':
@@ -573,6 +581,7 @@ def run(args):
                 if source.sql("SELECT count(*) FROM storage.objects WHERE bucket_id='bench' AND name='fault-exhausted.txt'")!='0':
                     raise RuntimeError('Failed upload published metadata')
                 existing_status,existing_bytes=raw(source,'GET','/storage/v1/object/bench/fixture.txt')
+                atomic_json(output/('filesystem-'+kind+'-fixture-after.json'),{'status':existing_status,'bytes':len(existing_bytes),'sha256':hashlib.sha256(existing_bytes).hexdigest(),'physical_files':owned('exec',source.app,'find','/storage','-maxdepth','3','-type','f','-printf','%P %s %U %G %m\n')})
                 if existing_status!=200 or existing_bytes!=json.dumps(source.label+': payload').encode():
                     raise RuntimeError('Existing bytes changed during the owned quota fault')
                 time.sleep(2)
@@ -600,9 +609,9 @@ def run(args):
                 source.start_app()
                 fault_window.set(None)
         for kind in ['bytes','inodes']:
-            traffic('filesystem-'+kind+'-under-writers',30,lambda:filesystem_exhaustion(kind),allow_unavailable=True)
-        traffic('filesystem-recovered',20)
-        if args.s3_faults:
+            if args.focus in ('all','filesystem'):traffic('filesystem-'+kind+'-under-writers',30,lambda:filesystem_exhaustion(kind),allow_unavailable=True)
+        if args.focus in ('all','filesystem'):traffic('filesystem-recovered',20)
+        if args.s3_faults and args.focus!='filesystem':
             phase='provider-preparation'
             access,secret=secrets.token_hex(16),secrets.token_hex(32)
             provider_port=free_port()
@@ -816,11 +825,14 @@ def main():
     parser.add_argument('--capacity',action='store_true')
     parser.add_argument('--provisional-rate',type=int,default=64)
     parser.add_argument('--s3-faults',action='store_true')
+    parser.add_argument('--focus',choices=['all','filesystem','provider'],default='all',help='A named subset is diagnostic only and cannot certify the complete fault matrix')
     args=parser.parse_args()
     if not 1<=args.rate<=64 or not 4<=args.provisional_rate<=64:
         parser.error('Functional canary rate must be 1..64 iterations/second')
     if args.s3_faults and effective_cpus(sorted(os.sched_getaffinity(0)))<4:
         parser.error('S3 fault profile requires four effective CPUs')
+    if args.focus=='provider' and not args.s3_faults:
+        parser.error('Provider focus requires --s3-faults')
     run(args)
 
 

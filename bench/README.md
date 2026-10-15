@@ -261,6 +261,12 @@ three completed five-minute samples with equivalent budgets, images, dataset
 and rates. Per-operation p95 and useful-throughput limits remain 10%. Rejected
 HTTP requests cannot mask lost useful work; a later failed campaign cannot
 certify successful initial samples.
+`--focus filesystem` or `--focus provider --s3-faults` isolates an investigation;
+the manifest names the subset and cannot certify the complete fault matrix.
+Filesystem setup copies bounded immutable bytes through `docker exec` into the
+actual tmpfs mount, then verifies reads before exhaustion. Byte reservation
+rejects a full device with `507 storage_full`; failed inode allocation uses the
+existing `500 internal` contract. Other errors and loss of existing bytes fail.
 
 Public bundles contain bounded structured outcomes and hashes. Raw logs,
 credential fixtures, database dumps and free-form diagnostics stay private.
