@@ -38,6 +38,19 @@ class TransferAccounting(unittest.TestCase):
 
 
 class RecoveryBoundaries(unittest.TestCase):
+    def test_fault_cause_survives_a_simultaneous_generic_abort(self):
+        from fault_campaign import require_running
+        abort=mock.Mock()
+        abort.is_set.return_value=True
+        watchdog=mock.Mock()
+        watchdog.poll.return_value=None
+        cause=TimeoutError('named injected fault failed')
+        with self.assertRaises(TimeoutError) as caught:
+            require_running(abort,watchdog,[cause])
+        self.assertIs(caught.exception,cause)
+        with self.assertRaisesRegex(RuntimeError,'resource guard'):
+            require_running(abort,watchdog,[])
+
     def test_later_good_probe_cannot_hide_a_successful_cross_project_read(self):
         from fault_campaign import recovery_read_matches,require_unauthorized
         self.assertTrue(recovery_read_matches(200,b'[{"name":"project-0:1"}]','project-0:'))

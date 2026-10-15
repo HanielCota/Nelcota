@@ -97,6 +97,13 @@ def require_unauthorized(status):
         raise RuntimeError('Invalid credential received an unexpected authorization result')
 
 
+def require_running(critical,watchdog,action_errors):
+    if action_errors:
+        raise action_errors[0]
+    if critical.is_set() or watchdog.poll() is not None:
+        raise RuntimeError('Fault resource guard stopped traffic')
+
+
 def raw(project,method,path,value=None,token=None):
     body = None
     if value is not None:
@@ -322,13 +329,13 @@ def run(args):
                         action()
                     except Exception as error:
                         action_error.append(error)
+                        atomic_json(output/(label+'-action-error.json'),{'type':type(error).__name__,'diagnostic':redacted_diagnostic(error,[*source.environment.values(),*target.environment.values()])})
                         critical.set()
                 action_thread=threading.Thread(target=invoke,daemon=True)
                 action_thread.start()
             with ThreadPoolExecutor(max_workers=8) as workers:
                 for index in range(seconds*rate):
-                    if critical.is_set() or watchdog.poll() is not None:
-                        raise RuntimeError('Fault resource guard stopped traffic')
+                    require_running(critical,watchdog,action_error)
                     for future in list(in_flight):
                         if future.done():
                             outcome,ack,latency=future.result()
@@ -462,6 +469,7 @@ def run(args):
             try:
                 owned('rm','-f',source.app)
                 source.start_app()
+                atomic_json(output/'declared-oom-before.json',{'state':inspect_container(source.app)['State'],'cgroup':owned_cgroup_snapshot(owned,source.app)})
                 owned('update','--memory','8m','--memory-swap','8m',source.app)
                 deadline=time.monotonic()+10
                 while time.monotonic()<deadline:
@@ -471,6 +479,10 @@ def run(args):
                         break
                     time.sleep(.1)
                 if state is None or not state['State']['OOMKilled']:
+                    observed={'state':None}
+                    if state is not None:
+                        observed.update({'state':state['State'],'memory_limit_bytes':state['HostConfig']['Memory'],'memory_swap_bytes':state['HostConfig']['MemorySwap']})
+                    atomic_json(output/'declared-oom-unobserved.json',observed)
                     raise RuntimeError('The declared OOM did not occur')
                 recovery_began=time.monotonic()
             finally:
