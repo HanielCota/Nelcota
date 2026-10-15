@@ -165,6 +165,7 @@ async def main():
             auth_started = time.monotonic()
             initial = await pages[0].evaluate('''async () => {const value=await window.g05Client.auth.getSession();window.g05InitialAccess=value.data?.access_token;return !value.error&&Boolean(window.g05InitialAccess);}''')
             require(initial, 'browser_SDK_session_missing')
+            save(output/'browser-auth-controls.json', {'simultaneous_refresh_callers':48, 'actual_refresh_requests':grants['refresh_token']-before, 'shared_access_token_digest_matches':len(set(refreshed))==1, 'real_auth_consumers':dict(consumers)})
             state['phase'] = 'offline-and-reconnect'
             rest_path = '/rest/v1/bench_private'
             before_offline = paths[rest_path]
@@ -343,7 +344,7 @@ async def main():
                     started = time.monotonic()
                     page = pages[count%3]
                     table, marker = 'bench_products', 'project-0:'
-                    if count%2:
+                    if urllib.parse.urlsplit(page.url).path == '/admin/tables/bench_products':
                         table, marker = 'bench_alternate', 'alternate:'
                     timings.append(await navigate(page, table, marker))
                     require(not state['page_errors'], 'live_panel_page_error')
@@ -351,12 +352,13 @@ async def main():
                     await asyncio.sleep(max(0,.1-(time.monotonic()-started)))
                 for page in pages:
                     await page.evaluate('''async ({base,key}) => {
-                      for(let index=0;index<20;index++){const client=window.g05SDK.createClient(base,{auth:{storageKey:key}});await client.auth.getSession();client.dispose();window.g05Disposed=new WeakRef(client);}
+                      window.g05Disposed=[];
+                      for(let index=0;index<20;index++){const client=window.g05SDK.createClient(base,{auth:{storageKey:key}});await client.auth.getSession();client.dispose();window.g05Disposed.push(new WeakRef(client));}
                     }''', {'base':base, 'key':fixture['storage_key']})
                 await asyncio.sleep(15)
                 await sample('navigation-rest-'+str(cycle+1))
                 for page in pages:
-                    require(await page.evaluate('window.g05Disposed.deref()===undefined'), 'disposed_SDK_client_retained')
+                    require(await page.evaluate('window.g05Disposed.length===20&&window.g05Disposed.every(value=>value.deref()===undefined)'), 'disposed_SDK_client_retained')
                 save(output/'browser-checkpoint.json', {**state, 'completed_cycles':cycle+1})
             state['phase'] = 'real-credential-expiry'
             renewals = grants['refresh_token']
@@ -400,6 +402,7 @@ async def main():
             require(p95 <= 1000 and not state['external_requests_blocked'] and not state['page_errors'], 'browser_visual_or_external_traffic_gate')
             result = {'status':'passed', 'scope':'real local HTTPS panel and built TypeScript SDK, not public WAN capacity',
                       'browser_version':browser.version, 'tabs':3, 'pressure_rest_cycles':5, 'navigation_samples':len(timings),
+                      'temporary_clients_checked_per_tab_per_cycle':20, 'navigation_requires_different_table':True,
                       'authoritative_visual_feedback_p95_ms':p95, 'feedback_SLO_ms':1000, 'api_requests':state['api_requests'],
                       'decoded_network_bytes':state['decoded_network_bytes'], 'auth_grants':dict(grants), 'auth_consumers':dict(consumers),
                       'sdk_RLS_reads':reads, 'cross_tab_refresh_coalesced':True, 'actual_credential_renewal':True,
