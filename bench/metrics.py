@@ -5,6 +5,7 @@ that engine and use native histograms; correctness aborts remain in the script.
 """
 import json
 import math
+import re
 import urllib.parse
 import urllib.request
 
@@ -41,11 +42,15 @@ class NativeMetrics:
             raise ValueError('Metrics snapshot exceeded its evidence budget')
         return json.loads(body)
 
-    def summary(self, phase, duration):
+    def summary(self, phase, duration, project=None):
         # Phases come from fixed runner labels, never from credentials or URLs.
         if not phase or any(c not in 'abcdefghijklmnopqrstuvwxyz0123456789-' for c in phase):
             raise ValueError('Invalid metrics phase')
         selector = '{run_id="' + phase + '"}'
+        if project is not None:
+            if not isinstance(project, str) or not re.fullmatch(r'project-[0-9]', project):
+                raise ValueError('Invalid project metrics selector')
+            selector = '{run_id="' + phase + '",project="' + project + '"}'
 
         def count(name, optional=False):
             return self.value('sum(k6_' + name + '_total' + selector + ')', optional)

@@ -15,6 +15,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--run-id', required=True)
     parser.add_argument('--binary', type=Path, required=True)
+    parser.add_argument('--kind', choices=['single', 'host'], default='single')
     args, extra = parser.parse_known_args()
     if not re.fullmatch(r'[a-z][a-z0-9-]{0,79}', args.run_id):
         parser.error('Run ID must be a bounded lowercase label')
@@ -34,7 +35,10 @@ def main():
         target.chmod(0o444)
         hashes[str(name)] = hashlib.sha256(target.read_bytes()).hexdigest()
     (snapshot / 'launch.json').write_text(json.dumps({'run_id': args.run_id, 'git': subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(), 'binary_sha256': hashlib.file_digest(binary.open('rb'),'sha256').hexdigest(), 'harness_sources': hashes}, indent=2)+'\n')
-    result = subprocess.run([sys.executable, str(snapshot/'bench/campaign.py'), '--binary', str(binary), '--output', str(output), *extra], cwd=ROOT)
+    entrypoint = 'campaign.py'
+    if args.kind == 'host':
+        entrypoint = 'host_campaign.py'
+    result = subprocess.run([sys.executable, str(snapshot/'bench'/entrypoint), '--binary', str(binary), '--output', str(output), *extra], cwd=ROOT)
     raise SystemExit(result.returncode)
 
 

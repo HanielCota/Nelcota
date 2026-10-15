@@ -37,6 +37,7 @@ from watchdog import LABEL, atomic_json, host_reserves, process_identity
 from metrics import NativeMetrics, PROMETHEUS
 from receiver import EventLedger
 from observations import generator_observation
+from objects import S3Inventory, disk_inventory, reconcile
 
 K6 = "grafana/k6:1.6.1@sha256:a5ad6bc089a08d77c3ec49f3db8c6fa7a148e4073efcac44c675dbaf3568d8e1"
 NOMINAL_SLOS = {"read": (200, 500), "rls": (200, 500), "refresh": (200, 500), "login": (750, 1500), "storage": (500, 2000), "panel": (500, 2000), "write": (500, 1500)}
@@ -103,6 +104,15 @@ def owns_listener(container, port):
 def validate_storage_filesystem(backend, filesystem):
     if backend == "disk" and filesystem in ("tmpfs", "ramfs"):
         raise RuntimeError("Real disk storage campaign cannot use a memory filesystem")
+
+
+def validate_disk_headroom(path, fixture_mib, startup_mib=1536):
+    stats = os.statvfs(path)
+    reserved = stats.f_blocks * .15
+    available = (stats.f_bavail - reserved) * stats.f_frsize
+    required = (fixture_mib + startup_mib + 512) * 1024 * 1024
+    if available < required:
+        raise RuntimeError('Insufficient disk growth headroom above the 15% reserve')
 
 
 def effective_cpus(affinity):
@@ -207,6 +217,7 @@ def campaign(arguments):
     output.mkdir(parents=True, exist_ok=True)
     if host_reserves(output):
         raise RuntimeError("Host resource reserves do not permit a campaign")
+    validate_disk_headroom(output, arguments.fixture_disk_mib)
     identity = "nelcota-bench-" + secrets.token_hex(4)
     cpus = sorted(os.sched_getaffinity(0))
     if len(cpus) < 4:
@@ -1132,6 +1143,15 @@ def campaign(arguments):
                             "Stored bytes failed their post-load integrity check"
                         )
                 file_integrity["verified_objects"] += 1
+            inventory = None
+            if arguments.backend == 'disk':
+                inventory = disk_inventory(storage)
+            if arguments.backend == 's3':
+                inventory = S3Inventory(endpoint,access,secret,'benchmark-files').inventory()
+            known = sql("SELECT bucket_id||'/'||version::text FROM storage.objects ORDER BY bucket_id,version LIMIT 20001").splitlines()
+            if len(known)>20000:
+                raise RuntimeError('Metadata inventory exceeded its evidence budget')
+            file_integrity['physical_inventory'] = reconcile(inventory,known)
             states = {
                 name: json.loads(docker("inspect", name))[0]["State"]
                 for name in [app, pg]

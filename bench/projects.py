@@ -1,0 +1,93 @@
+"""Independent disposable project clusters for the G05 host-scale matrix."""
+import os
+from pathlib import Path
+import secrets
+import time
+import urllib.error
+
+from campaign import docker, free_port, owns_listener, request, token
+from watchdog import LABEL
+
+FIXED_USER = '00000000-0000-4000-8000-000000000001'
+
+
+class Project:
+    def __init__(self, identity, index, count, binary, directory, cpus):
+        self.label = f'project-{index}'
+        self.app = identity + f'-app-{index}'
+        self.pg = identity + f'-pg-{index}'
+        self.volume = identity + f'-data-{index}'
+        self.identity = identity
+        self.binary = binary
+        self.storage = directory / self.label
+        self.storage.mkdir(parents=True)
+        self.cpus = cpus
+        self.quota = str(1 / count)
+        self.jwt = secrets.token_urlsafe(48)
+        self.password = secrets.token_urlsafe(32)
+        self.admin_email = f'operator-{index}@example.test'
+        self.email = 'stress-user@example.test'
+        self.base = f'http://127.0.0.1:{free_port()}'
+        self.port = int(self.base.rsplit(':', 1)[1])
+        self.environment = {}
+        self.fixture = None
+
+    def sql(self, statement):
+        return docker('exec', '-i', '-e', 'PGOPTIONS=-cstatement_timeout=15000', self.pg, 'psql', '-Atq', '-U', 'postgres', '-v', 'ON_ERROR_STOP=1', stdin=statement)
+
+    def start_app(self):
+        command = ['run', '-d', '--name', self.app, '--label', LABEL+'='+self.identity, '--pids-limit', '128', '--network', 'host', '--user', f'{os.getuid()}:{os.getgid()}', '--cpus', self.quota, '--cpuset-cpus', str(self.cpus[0]), '--memory', '128m', '--memory-swap', '128m', '-v', str(self.binary)+':/usr/local/bin/nelcota:ro', '-v', str(self.storage)+':/storage']
+        for key in self.environment:
+            command.extend(['-e', key])
+        command.extend(['ubuntu:24.04', '/usr/local/bin/nelcota', 'serve'])
+        docker(*command, env=self.environment)
+        for _ in range(120):
+            try:
+                if owns_listener(self.app, self.port):
+                    request(self.base, '/auth/v1/.well-known/jwks.json')
+                    return
+            except (RuntimeError, urllib.error.URLError):
+                pass
+            time.sleep(.25)
+        raise RuntimeError('Owned project listener did not become ready: '+self.label)
+
+    def create(self):
+        password = secrets.token_urlsafe(32)
+        docker('volume', 'create', '--label', LABEL+'='+self.identity, self.volume)
+        docker('run', '-d', '--name', self.pg, '--label', LABEL+'='+self.identity, '--pids-limit', '128', '--cpus', self.quota, '--cpuset-cpus', str(self.cpus[1]), '--memory', '256m', '--memory-swap', '256m', '-e', 'POSTGRES_PASSWORD', '-p', '127.0.0.1::5432', '--mount', f'type=volume,source={self.volume},destination=/var/lib/postgresql/data', 'postgres:17-alpine', 'postgres', '-c', 'max_connections=32', '-c', 'shared_buffers=32MB', '-c', 'max_wal_size=64MB', '-c', 'min_wal_size=32MB', env={'POSTGRES_PASSWORD': password})
+        import json
+        port = int(json.loads(docker('inspect', self.pg))[0]['NetworkSettings']['Ports']['5432/tcp'][0]['HostPort'])
+        for attempt in range(120):
+            try:
+                if self.sql('SELECT 1') == '1':
+                    break
+            except RuntimeError:
+                pass
+            if attempt == 119:
+                raise RuntimeError('Owned project database readiness deadline')
+            time.sleep(.25)
+        self.environment = {'TOKIO_WORKER_THREADS':'2', 'RUST_LOG':'warn', 'NELCOTA_DATABASE_URL':f'postgres://postgres:{password}@127.0.0.1:{port}/postgres', 'NELCOTA_AUTHENTICATOR_PASSWORD':secrets.token_urlsafe(32), 'NELCOTA_JWT_SECRET':self.jwt, 'NELCOTA_LISTEN':self.base.removeprefix('http://'), 'NELCOTA_DB_POOL_SIZE':'4', 'NELCOTA_AUTH_RATE_LIMIT_PER_MINUTE':'100000', 'NELCOTA_REQUEST_TIMEOUT_SECS':'5', 'NELCOTA_STATEMENT_TIMEOUT_SECS':'3', 'NELCOTA_STORAGE_BACKEND':'disk', 'NELCOTA_STORAGE_DIR':'/storage', 'NELCOTA_STORAGE_MIN_FREE_BYTES':'0'}
+        self.start_app()
+        request(self.base, '/auth/v1/signup', {'email':self.admin_email,'password':self.password})
+        self.environment['NELCOTA_ADMIN_EMAIL'] = self.admin_email
+        self.environment['NELCOTA_ADMIN_PASSWORD_HASH'] = self.sql('SELECT encrypted_password FROM auth.users LIMIT 1')
+        self.sql("INSERT INTO auth.users SELECT (json_populate_record(NULL::auth.users, (to_jsonb(u)||jsonb_build_object('id','"+FIXED_USER+"','email','"+self.email+"'))::json)).* FROM auth.users u LIMIT 1;")
+        docker('rm', '-f', self.app)
+        self.start_app()
+        _, headers = request(self.base, '/admin/api/login', {'email':self.admin_email,'password':self.password}, {'Origin':self.base})
+        cookie = headers['Set-Cookie'].split(';',1)[0]
+        self.sql("CREATE TABLE public.bench_products(id integer PRIMARY KEY,name text,stock integer); INSERT INTO public.bench_products SELECT i,'"+self.label+":'||i,i%50 FROM generate_series(1,1000)i; CREATE INDEX ON public.bench_products(stock,id); GRANT SELECT ON public.bench_products TO anon; GRANT SELECT,UPDATE ON public.bench_products TO service_role; CREATE TABLE public.bench_private(id integer PRIMARY KEY,user_id uuid,body text); INSERT INTO public.bench_private SELECT i,CASE WHEN i%2=0 THEN '"+FIXED_USER+"'::uuid ELSE gen_random_uuid() END,'"+self.label+"' FROM generate_series(1,1000)i; CREATE INDEX ON public.bench_private(user_id,id); ALTER TABLE public.bench_private ENABLE ROW LEVEL SECURITY; CREATE POLICY own ON public.bench_private TO authenticated USING(user_id=auth.uid()); GRANT SELECT ON public.bench_private TO authenticated; INSERT INTO storage.buckets(id,public) VALUES('bench',true); ANALYZE public.bench_products; ANALYZE public.bench_private; NOTIFY nelcota,'reload schema';")
+        service = token(self.jwt, {'role':'service_role','exp':int(time.time())+7200})
+        time.sleep(.25)
+        request(self.base, '/storage/v1/object/bench/fixture.txt', self.label+': payload', {'Authorization':'Bearer '+service}, method='PUT')
+        self.fixture = {'label':self.label,'marker':self.label+':','base':self.base,'email':self.email,'password':self.password,'service':service,'cookie':cookie,'user':FIXED_USER,'invalid_access':token(secrets.token_urlsafe(48),{'role':'authenticated','sub':FIXED_USER,'exp':int(time.time())+7200})}
+        return self.fixture
+
+    def assert_foreign_denied(self, foreign):
+        try:
+            request(self.base,'/rest/v1/bench_products?limit=1',headers={'Authorization':'Bearer '+foreign['service']})
+        except urllib.error.HTTPError as error:
+            if error.code == 401:
+                return
+            raise RuntimeError('Unexpected cross-project rejection class') from None
+        raise RuntimeError('Cross-project credential was accepted')

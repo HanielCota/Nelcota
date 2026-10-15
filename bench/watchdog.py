@@ -1,6 +1,7 @@
 """Independent fail-closed cleanup for explicitly labeled stress fixtures."""
 import argparse
 import json
+import math
 import os
 from pathlib import Path
 import signal
@@ -66,6 +67,26 @@ def atomic_json(path, value):
     temporary.replace(path)
 
 
+def heartbeat_failure(manifest,state,now):
+    preparation = manifest.get('preparation_seconds',180)
+    if isinstance(preparation,bool) or not isinstance(preparation,int) or not 30 <= preparation <= 900:
+        return 'invalid_preparation_budget'
+    clock = state.get('monotonic')
+    if isinstance(clock,bool) or not isinstance(clock,(int,float)) or not math.isfinite(clock) or clock > now or now-clock>45:
+        return 'resource_heartbeat_lost'
+    phase = state.get('phase')
+    if phase == 'preparation':
+        if now-manifest['started_monotonic']>preparation:
+            return 'preparation_deadline'
+        return None
+    if phase == 'teardown':
+        return None
+    resource = state.get('resource_monotonic')
+    if isinstance(resource,bool) or not isinstance(resource,(int,float)) or not math.isfinite(resource) or resource > now or now-resource>30:
+        return 'resource_observation_gap'
+    return None
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('manifest', type=Path)
@@ -83,12 +104,9 @@ def main():
             reason = 'campaign_deadline'
         try:
             state = json.loads(heartbeat.read_text())
-            if now - state['monotonic'] > 45:
-                reason = 'resource_heartbeat_lost'
-            if state.get('phase') not in ('preparation', 'teardown') and now - state.get('resource_monotonic', 0) > 30:
-                reason = 'resource_observation_gap'
-            if state.get('phase') == 'preparation' and now - manifest['started_monotonic'] > 180:
-                reason = 'preparation_deadline'
+            failure = heartbeat_failure(manifest,state,now)
+            if failure:
+                reason = failure
         except (OSError, ValueError, KeyError):
             reason = 'resource_heartbeat_invalid'
         if reason:

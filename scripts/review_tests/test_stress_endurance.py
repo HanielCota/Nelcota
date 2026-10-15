@@ -68,6 +68,15 @@ class ExistingDefects(unittest.TestCase):
                 module.validate_storage_filesystem('disk', filesystem)
         module.validate_storage_filesystem('disk', 'overlayfs')
 
+    def test_disk_preflight_reserves_room_for_growth_not_only_current_usage(self):
+        module = campaign_module()
+        stats = mock.Mock(f_blocks=10000, f_bavail=2500, f_frsize=1024*1024)
+        with mock.patch.object(module.os,'statvfs',return_value=stats):
+            with self.assertRaisesRegex(RuntimeError,'growth headroom'):
+                module.validate_disk_headroom('/fixture',2048)
+            stats.f_bavail=6000
+            module.validate_disk_headroom('/fixture',2048)
+
     def test_listener_from_another_process_does_not_authorize_target(self):
         module = campaign_module()
         owned = 'lrwx------ 1 user user 64 socket -> socket:[111]\n'
@@ -179,6 +188,89 @@ class MetricsAndOwnership(unittest.TestCase):
         result = subprocess.CompletedProcess([], 0, json.dumps({'io.nelcota.stress.run': 'other-run'}), '')
         with mock.patch('watchdog.subprocess.run', return_value=result):
             self.assertFalse(owned_container('same-looking-prefix', 'this-run'))
+
+
+class HostEvidence(unittest.TestCase):
+    def setUp(self):
+        campaign_module()
+        import host_campaign
+        self.module = host_campaign
+
+    def test_incomplete_baselines_cannot_certify_fairness(self):
+        for values in [[], [{}], [{},{},{}]]:
+            with self.assertRaises(ValueError):
+                self.module.median_baseline(values)
+
+    def test_healthy_overload_or_missing_latency_fails_fairness(self):
+        metrics = {'successful_operations':{'rate':8},'iterations':{'count':2400},'dropped_iterations':{'count':0},'overload_rejections':{'count':0}}
+        for name in ['read','rls','panel','storage','login','refresh','write']:
+            metrics['latency_'+name] = {'p(95)':10,'p(99)':20}
+        import copy
+        baseline = {'project-1':{'metrics':metrics}}
+        candidate = copy.deepcopy(baseline)
+        self.assertEqual(self.module.fairness_violations(baseline,candidate,8,300),[])
+        candidate['project-1']['metrics']['overload_rejections']['count']=1
+        self.assertTrue(self.module.fairness_violations(baseline,candidate,8,300))
+        candidate = copy.deepcopy(baseline)
+        candidate['project-1']['metrics']['latency_read']['p(95)']=math.nan
+        self.assertTrue(self.module.fairness_violations(baseline,candidate,8,300))
+
+    def test_project_metrics_do_not_merge_other_tenants(self):
+        from metrics import NativeMetrics
+        reader = NativeMetrics('http://unused.invalid')
+        expressions=[]
+        def value(expression, optional=False):
+            expressions.append(expression)
+            return 1.0
+        with mock.patch.object(reader,'value',side_effect=value):
+            reader.summary('balanced-1',300,'project-2')
+            self.assertTrue(expressions)
+            self.assertTrue(all('project="project-2"' in expression for expression in expressions))
+            with self.assertRaises(ValueError):
+                reader.summary('balanced-1',300,'project-2"} or vector(1)')
+
+
+class PhysicalStorageEvidence(unittest.TestCase):
+    def setUp(self):
+        campaign_module()
+        import objects
+        self.module=objects
+
+    def test_incomplete_s3_inventory_cannot_certify(self):
+        from xml.etree import ElementTree as ET
+        reader=self.module.S3Inventory('http://127.0.0.1:9000','fixture','fixture','bucket')
+        for xml in ['<ListBucketResult/>','<ListBucketResult><IsTruncated>true</IsTruncated></ListBucketResult>']:
+            with mock.patch.object(reader,'query',return_value=ET.fromstring(xml)):
+                with self.assertRaises(RuntimeError): reader.inventory()
+
+    def test_multipart_state_and_disk_symlinks_block_approval(self):
+        with self.assertRaises(RuntimeError):
+            self.module.reconcile({'keys':[],'bytes':0,'multipart_uploads':1},[])
+        with tempfile.TemporaryDirectory() as directory:
+            (Path(directory)/'link').symlink_to('/etc/passwd')
+            with self.assertRaises(RuntimeError):self.module.disk_inventory(directory)
+        with self.assertRaises(RuntimeError):
+            self.module.reconcile({'keys':['bench/pending#part'],'bytes':7,'multipart_uploads':None},[])
+
+    def test_recent_version_is_reported_separately_from_documented_gc_grace(self):
+        key='bench/0199dc00-0000-7000-8000-000000000001'
+        result=self.module.reconcile({'keys':[key],'bytes':17,'multipart_uploads':0},[])
+        self.assertEqual(result['unreferenced_keys'],[key])
+        self.assertEqual(result['gc_grace_seconds'],86400)
+
+
+class WatchdogClocks(unittest.TestCase):
+    def test_corrupt_or_future_heartbeat_cannot_disable_watchdog(self):
+        campaign_module()
+        from watchdog import heartbeat_failure
+        manifest={'started_monotonic':0,'preparation_seconds':180}
+        valid={'monotonic':99,'resource_monotonic':98,'phase':'soak'}
+        self.assertIsNone(heartbeat_failure(manifest,valid,100))
+        for key in ['monotonic','resource_monotonic']:
+            for value in [math.nan,math.inf,True,None,101,'99']:
+                self.assertIsNotNone(heartbeat_failure(manifest,{**valid,key:value},100))
+        for value in [None,'180',False,math.nan,1000]:
+            self.assertEqual(heartbeat_failure({**manifest,'preparation_seconds':value},valid,100),'invalid_preparation_budget')
 
 
 if __name__ == '__main__':
