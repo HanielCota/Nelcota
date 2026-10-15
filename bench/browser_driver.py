@@ -39,6 +39,8 @@ async def main():
         os._exit(77)  # PID 1 exit also stops its private PID namespace children.
     def request_seen(request):
         parsed = urllib.parse.urlsplit(request.url)
+        if (parsed.scheme, parsed.netloc) != (origin.scheme, origin.netloc):
+            fatal('unexpected_browser_request_origin')
         if parsed.path.startswith('/admin/api/') or parsed.path.startswith('/auth/') or parsed.path.startswith('/rest/'):
             state['api_requests'] += 1
             paths[parsed.path] += 1
@@ -158,8 +160,99 @@ async def main():
             }''') for page in pages])
             require(refreshed[0] and len(set(refreshed)) == 1 and grants['refresh_token']-before == 1, 'cross_tab_refresh_did_not_coalesce')
             auth_started = time.monotonic()
-            initial = await pages[0].evaluate('''async () => {const value=await window.g05Client.auth.getSession();window.g05InitialAccess=value?.access_token;return Boolean(value?.access_token);}''')
+            initial = await pages[0].evaluate('''async () => {const value=await window.g05Client.auth.getSession();window.g05InitialAccess=value.data?.access_token;return !value.error&&Boolean(window.g05InitialAccess);}''')
             require(initial, 'browser_SDK_session_missing')
+            state['phase'] = 'offline-and-reconnect'
+            rest_path = '/rest/v1/bench_private'
+            before_offline = paths[rest_path]
+            try:
+                await context.set_offline(True)
+                disconnected = await pages[0].evaluate('''async () => {
+                  const result=await window.g05Client.from('bench_private').select('id').limit(1).timeout(3000);
+                  return {code:result.error?.code,hasData:result.data!==null};
+                }''')
+                await asyncio.sleep(1)
+                require(disconnected['code']=='network_error' and not disconnected['hasData'], 'offline_SDK_reported_success')
+                require(paths[rest_path]-before_offline <= 1, 'offline_SDK_retried_without_contract')
+            finally:
+                await context.set_offline(False)
+            for page in pages:
+                await sdk_read(page)
+                await navigate(page, 'bench_alternate', 'alternate:')
+                await navigate(page, 'bench_products', 'project-0:')
+            state['phase'] = 'real-response-cancellation'
+            delayed = []
+            async def hold_actual_response(pattern, action, continuation):
+                """Pause verified real response headers, never substitute a body.
+
+                CDP pauses after the server has replied through trusted HTTPS.
+                The browser can cancel that real response while a new view or
+                caller completes. Only that explicit cancellation may make its
+                continuation fail. All pauses have an independent short expiry.
+                """
+                profiler = profilers[0]
+                seen, release, finished = asyncio.Event(), asyncio.Event(), asyncio.Event()
+                observation = {'server_status':None, 'cancelled':False, 'continued':False, 'error':False}
+                network_id = None
+                def failed(event):
+                    if event.get('requestId')==network_id and event.get('canceled') is True:
+                        observation['cancelled'] = True
+                async def paused(event):
+                    nonlocal network_id
+                    if seen.is_set():
+                        observation['error'] = True
+                        await profiler.send('Fetch.continueResponse', {'requestId':event['requestId']})
+                        return
+                    observation['server_status'] = event.get('responseStatusCode')
+                    network_id = event.get('networkId')
+                    seen.set()
+                    try:
+                        await asyncio.wait_for(release.wait(), timeout=5)
+                        await profiler.send('Fetch.continueResponse', {'requestId':event['requestId']})
+                        observation['continued'] = True
+                    except Error:
+                        await asyncio.sleep(.1)
+                        if not observation['cancelled']:
+                            observation['error'] = True
+                    except TimeoutError:
+                        observation['error'] = True
+                    finally:
+                        finished.set()
+                profiler.on('Network.loadingFailed', failed)
+                profiler.on('Fetch.requestPaused', paused)
+                await profiler.send('Fetch.enable', {'patterns':[{'urlPattern':pattern, 'requestStage':'Response'}]})
+                try:
+                    await action()
+                    await asyncio.wait_for(seen.wait(), timeout=10)
+                    require(observation['server_status']==200, 'delayed_real_response_not_successful')
+                    await continuation()
+                    release.set()
+                    await asyncio.wait_for(finished.wait(), timeout=5)
+                    require(not observation['error'] and (observation['continued'] or observation['cancelled']), 'real_response_pause_did_not_retire')
+                    delayed.append(observation)
+                finally:
+                    release.set()
+                    await profiler.send('Fetch.disable')
+                    profiler.remove_listener('Network.loadingFailed', failed)
+                    profiler.remove_listener('Fetch.requestPaused', paused)
+            async def old_navigation():
+                await pages[0].evaluate('''() => {history.pushState(null,'','/admin/tables/bench_alternate');dispatchEvent(new PopStateEvent('popstate'));}''')
+            async def new_navigation():
+                await navigate(pages[0], 'bench_products', 'project-0:')
+            await hold_actual_response(base+'/admin/api/tables/bench_alternate?*', old_navigation, new_navigation)
+            await asyncio.sleep(.25)
+            require(await pages[0].evaluate('''() => location.pathname==='/admin/tables/bench_products' && document.querySelector('[data-cell="0:1"]')?.textContent?.includes('project-0:')'''), 'late_real_response_overwrote_new_view')
+            async def cancellable_read():
+                await pages[0].evaluate('''() => {
+                  window.g05Abort=new AbortController();
+                  window.g05AbortResult=Promise.resolve(window.g05Client.from('bench_private').select('id').limit(1).abortSignal(window.g05Abort.signal));
+                }''')
+            async def abort_read():
+                began = time.monotonic()
+                outcome = await pages[0].evaluate('''async () => {window.g05Abort.abort();const value=await window.g05AbortResult;return {code:value.error?.code,hasData:value.data!==null};}''')
+                require(outcome['code']=='aborted' and not outcome['hasData'] and time.monotonic()-began < 1, 'live_SDK_cancellation_not_prompt')
+            await hold_actual_response(base+'/rest/v1/bench_private?*', cancellable_read, abort_read)
+            await sdk_read(pages[0])
             async def sample(label):
                 values = []
                 for profiler in profilers:
@@ -219,11 +312,11 @@ async def main():
             }''')
             require(expired == 401, 'actually_expired_access_not_rejected')
             state['phase'] = 'shared-SDK-signout'
-            signed_out = await pages[0].evaluate('''async () => {window.g05Last=await window.g05Client.auth.getSession();const value=await window.g05Client.auth.signOut();return !value.error;}''')
+            signed_out = await pages[0].evaluate('''async () => {const current=await window.g05Client.auth.getSession();if(current.error||!current.data)return false;window.g05Last=current.data;const value=await window.g05Client.auth.signOut();return !value.error;}''')
             require(signed_out, 'browser_signout_failed')
             await asyncio.sleep(1)
             for page in pages:
-                require(await page.evaluate('(async ()=>(await window.g05Client.auth.getSession())===null)()'), 'cross_tab_logout_state_retained')
+                require(await page.evaluate('(async ()=>{const value=await window.g05Client.auth.getSession();return !value.error&&value.data===null;})()'), 'cross_tab_logout_state_retained')
             revoked = await pages[0].evaluate('''async () => {
               const response=await fetch('/auth/v1/token?grant_type=refresh_token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({refresh_token:window.g05Last.refresh_token})});
               return response.status;
@@ -245,6 +338,8 @@ async def main():
                       'authoritative_visual_feedback_p95_ms':p95, 'feedback_SLO_ms':1000, 'api_requests':state['api_requests'],
                       'decoded_network_bytes':state['decoded_network_bytes'], 'auth_grants':dict(grants), 'auth_consumers':dict(consumers),
                       'sdk_RLS_reads':reads, 'cross_tab_refresh_coalesced':True, 'actual_credential_renewal':True,
+                      'offline_reconnect':True, 'offline_read_error':disconnected['code'],
+                      'actual_server_response_controls':delayed, 'late_response_view_preserved':True, 'inflight_SDK_cancellation':True,
                       'actual_expired_access_status':expired,
                       'actual_expires_in_seconds':signin['expires'], 'auth_observation_seconds':time.monotonic()-auth_started,
                       'logout_refresh_status':revoked, 'access_logout_contract':'Existing access remains valid until its expiry; no immediate access revocation claim',

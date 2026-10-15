@@ -388,6 +388,10 @@ one project's database, three browser tabs, verified local HTTPS with separate
 untrusted/trusted NSS controls, five navigation/rest cycles, CDP memory/owner
 observations, real multi-tab SDK refresh and actual credential expiry. The
 normal logout contract remains: refresh stops; issued access lasts until expiry.
+It also declares offline/reconnect, a cancelled SDK read and navigation away
+from a delayed real server response. CDP pauses actual verified HTTPS response
+headers for at most five seconds; it never supplies a substitute BaaS body.
+Those controls still require a successful native campaign before acceptance.
 No BaaS responses are mocked. Only the built SDK's test assets are served by
 the browser harness. External page requests are blocked before transmission.
 
