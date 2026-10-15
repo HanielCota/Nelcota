@@ -196,3 +196,49 @@ budgets, provider/runtime versions and dataset before comparing runs. The legacy
 laptop table above has no current source/artifact identity and is historical.
 See [execution evidence](../docs/goals/execution-report.md) for saved campaign
 reports and practical limits; [contributing](../CONTRIBUTING.md) covers test isolation.
+
+
+## G05 extended fixture profiles
+
+The full fixture creates the 10,000 empty objects physically, with matching
+size/hash metadata. S3 preparation has eight workers, at most 32 queued objects
+and a 15-minute deadline. PostgreSQL and object data have separate monitored disk
+budgets. S3 uses a labeled named volume. Docker operations verify ownership and
+use immutable container IDs; a foreign volume is refused before mounting.
+A critical stop can signal a verified generator through pidfd independently
+of the Docker API.
+
+Long runs hold one continuous RLS session and renew its token near actual expiry.
+Its separate scenario cannot mask dropped nominal arrivals; combined admission
+remains 128 VUs. Two aged cohorts exercise auth, webhook and physical-object GC.
+PID/container/StartedAt checks preserve process continuity. Per-container cgroup
+counters include PostgreSQL child OOMs; controller counters describe the controller.
+
+Use `--rows 1000000` for the separate million-row investigation and
+`--object-bytes 1048576` for 1-MiB transfers. These profiles need separate
+baselines. `--metadata-only-seed` is explicitly a listing investigation and
+cannot certify full physical-fixture integrity.
+
+The fault runner checks atomic transfers, balances, a hot counter and committed
+operation identities. Disconnected replies stay ambiguous until reconciliation;
+no mutation is automatically retried. It covers deadlock, database/app restart,
+tagged OOM, owned tmpfs byte/inode exhaustion and local live-writer snapshot
+restore. The tmpfs fault does not certify physical disk endurance.
+
+```sh
+python3 bench/launch.py --run-id fault-smoke --kind fault --binary target/release/nelcota --rate 8
+python3 bench/launch.py --run-id fault-pass-1 --kind fault --binary target/release/nelcota --capacity
+python3 bench/host_compare.py target/stress-g05/host-before target/stress-g05/host-after --output target/stress-g05/host-comparison.json
+python3 bench/evidence.py target/stress-g05/disk-pass-1 --output target/stress-public/disk-pass-1
+```
+
+Functional smoke has no capacity claim. Full fault mode holds four five-minute
+arrival steps and uses 80% of the qualified lower bound. Host comparisons need
+three completed five-minute samples with equivalent budgets, images, dataset
+and rates. Per-operation p95 and useful-throughput limits remain 10%. Rejected
+HTTP requests cannot mask lost useful work; a later failed campaign cannot
+certify successful initial samples.
+
+Public bundles contain bounded structured outcomes and hashes. Raw logs,
+credential fixtures, database dumps and free-form diagnostics stay private.
+Failed/invalid evidence remains explicit; the exporter does not certify G05.

@@ -1,0 +1,133 @@
+{
+  "status": "in progress",
+  "backend_source": "2efede8c27ee12119142170e8bd9742ff7cb900e",
+  "binary_sha256": "75c44c85a85db26195166aa1d2c6caf481e3db476801ec8131525ef62adf1be0",
+  "rows": [
+    {
+      "id": "auth",
+      "area": "Authentication and independent consumers",
+      "entrypoints": "crates/server/tests/auth.rs; concurrency.rs; scripts/test-auth-package.py",
+      "status": "not run",
+      "scope_or_limit": "Real login/refresh traffic is active; ordinary regressions and independent consumers still pending."
+    },
+    {
+      "id": "rest",
+      "area": "REST, RPC, RLS and statistics",
+      "entrypoints": "bench/campaign.py; crates/server/tests/api.rs; rls.rs; hardening.rs",
+      "status": "not run",
+      "scope_or_limit": "100k fixtures active; 1M fixture and dedicated RPC/concurrency checks pending."
+    },
+    {
+      "id": "mutations",
+      "area": "Concurrent mutations and ambiguous replies",
+      "entrypoints": "bench/fault_campaign.py; crates/server/tests/concurrency.rs",
+      "status": "not run",
+      "scope_or_limit": "Persisted operation ledger, disconnects and duplicate explicit primary keys prepared; live run pending."
+    },
+    {
+      "id": "catalog",
+      "area": "Catalog, DDL and refresh recovery",
+      "entrypoints": "crates/server/tests/architecture.rs; admin/migrations.rs",
+      "status": "not run",
+      "scope_or_limit": "Existing real-service tests must run on this candidate."
+    },
+    {
+      "id": "disk",
+      "area": "Disk bytes, quotas, collisions and paths",
+      "entrypoints": "bench/campaign.py; bench/fault_campaign.py; crates/server/tests/storage.rs; concurrency.rs",
+      "status": "not run",
+      "scope_or_limit": "Real overlay endurance active; owned quota/inode cases and regression suites pending."
+    },
+    {
+      "id": "s3",
+      "area": "Real S3-compatible storage and multipart",
+      "entrypoints": "bench/campaign.py; crates/server/tests/storage_s3.rs",
+      "status": "not run",
+      "scope_or_limit": "RustFS available; short real smoke passed earlier; continuous four-hour run and final inventory pending."
+    },
+    {
+      "id": "webhooks",
+      "area": "Signatures, committed identities, queue and retries",
+      "entrypoints": "bench/campaign.py; crates/server/tests/webhooks",
+      "status": "not run",
+      "scope_or_limit": "Signed positive traffic and identity ledger active; competing workers/retries and cap boundaries pending."
+    },
+    {
+      "id": "admin",
+      "area": "SQL/export admission and cancellation",
+      "entrypoints": "crates/server/tests/architecture.rs; admin/sql.rs; hardening.rs",
+      "status": "not run",
+      "scope_or_limit": "Existing real-service cancellation/budget suites pending."
+    },
+    {
+      "id": "browser",
+      "area": "Panel tabs, request lifetime and retained resources",
+      "entrypoints": "crates/admin/ui/e2e; src/lib/query-client.test.ts",
+      "status": "not run",
+      "scope_or_limit": "Browser and memory suites pending; server panel HTTP latency does not certify visual feedback."
+    },
+    {
+      "id": "sdks",
+      "area": "TypeScript/Rust SDK runtime, cancellation and refresh",
+      "entrypoints": "sdk/typescript; sdk/rust; crates/server/tests/sdk_rust.rs",
+      "status": "not run",
+      "scope_or_limit": "Existing runtime/contract/memory suites pending."
+    },
+    {
+      "id": "topologies",
+      "area": "Independent 1/5/10-project capacity and fairness",
+      "entrypoints": "bench/host_campaign.py",
+      "status": "not run",
+      "scope_or_limit": "Single-project functional smoke passed; final five-minute topology passes and noisy-neighbor measurements pending."
+    },
+    {
+      "id": "management",
+      "area": "Concurrent host management, durable receipts and limits",
+      "entrypoints": "scripts/test-host-management.py; crates/cli/src/updates/management",
+      "status": "not run",
+      "scope_or_limit": "Owned Docker acceptance available; DNS/provenance/public TLS/proxy doubles remain explicit."
+    },
+    {
+      "id": "updates",
+      "area": "Update activation, interruption and compatibility",
+      "entrypoints": "scripts/test-upgrade.py; crates/cli/src/updates",
+      "status": "not run",
+      "scope_or_limit": "Existing safe acceptance/regression cases pending; no production activation."
+    },
+    {
+      "id": "backup",
+      "area": "Local paired snapshots and restored integrity",
+      "entrypoints": "bench/fault_campaign.py; scripts/test-host-management.py",
+      "status": "not run",
+      "scope_or_limit": "Local live-writer snapshot and real CLI restore fixtures available; execution pending."
+    },
+    {
+      "id": "hostile",
+      "area": "Malformed inputs, churn and ingress policy",
+      "entrypoints": "crates/server/tests/hardening.rs; storage.rs; webhooks",
+      "status": "not run",
+      "scope_or_limit": "Native-router tests available; actual public ingress acceptance is separate."
+    },
+    {
+      "id": "deployment",
+      "area": "Public DNS/ACME/TLS, native systemd and power loss",
+      "entrypoints": "docs/host-management.md; scripts/acceptance-systemd.sh",
+      "status": "blocked",
+      "scope_or_limit": "No disposable VM with external observer, public DNS enrollment or systemd deployment target is configured. Process kill cannot certify power loss."
+    },
+    {
+      "id": "offhost",
+      "area": "Off-host restore, external cloud provider and PITR",
+      "entrypoints": "docs/backup.md; scripts/acceptance-pitr.sh",
+      "status": "blocked",
+      "scope_or_limit": "No separate recovery host or configured WAL archive/PITR destination is available. Local RustFS does not certify external cloud latency or off-host durability."
+    },
+    {
+      "id": "arm64",
+      "area": "Separate ARM64 operating envelope",
+      "entrypoints": "G05 execution boundaries",
+      "status": "blocked",
+      "scope_or_limit": "This measured host is x86_64; no isolated ARM64 load target is configured."
+    }
+  ]
+}

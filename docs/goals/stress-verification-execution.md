@@ -105,3 +105,57 @@ Não haverá deploy de produção ou merge automático.
 - `disk-pass-1-004` está em andamento com fonte congelada e o mesmo executável
   imutável. O status final depende das quatro horas contínuas, invariantes,
   retenção, recursos e cleanup; iniciar a campanha não aprova o endurance.
+
+
+## Primeiro endurance em execução
+
+A campanha `disk-pass-1-004` concluiu 4.395 segundos de carga antes do endurance.
+Cada qualificação abaixo durou cinco minutos, em iterações/s e com histogramas
+nativos no perfil local declarado.
+
+| Taxa | Qualificação | p95 de login |
+|---:|---|---:|
+| 183 | passou | 42 ms |
+| 367 | passou | 55 ms |
+| 551 | passou | 142 ms |
+| 735 | falhou: SLOs e chegadas descartadas | 2.349 ms |
+| 642 | falhou: SLO de login | 867 ms |
+| 596 | falhou: SLOs de login | 1.493 ms |
+| 573 | passou | 320 ms |
+
+O comportamento não foi monotônico entre amostras; as falhas foram preservadas.
+A campanha repetiu capacidade, saturação, cinco ciclos de pico/recuperação e
+reinício antes de iniciar 14.400 segundos contínuos a 458 iterações/s. O resultado
+ainda está pendente. Preparação e espera não entram nos 4.395 segundos concluídos.
+
+Esse snapshot usa 10.000 registros de listagem sintéticos da fixture anterior.
+A integridade cobre os objetos efetivamente publicados pela API. O candidato
+seguinte cria 10.000 objetos vazios reais e verifica inventário, tamanho e hash.
+Perfis diferentes não serão apresentados como uma comparação equivalente.
+
+## Correções adicionais em validação
+
+- Docker verifica ownership e usa IDs imutáveis. Volumes estrangeiros são
+  recusados antes de montar; S3 recebe volume nomeado e rotulado.
+- A parada crítica valida PID, starttime, UID e cgroup do gerador, com sinalização
+  independente da API Docker. Recibos concorrentes usam temporários distintos.
+- Contadores cgroup detectam OOM de filho PostgreSQL com postmaster ainda vivo.
+  Neste ambiente, parte dos cgroups está fora do mount do controlador; a leitura
+  usa o namespace do contêiner quando necessário.
+- A comparação usa trabalho bem-sucedido e exige campanha final aprovada e
+  cleanup. Rejeições HTTP não podem mascarar uma regressão; boas amostras
+  iniciais não aprovam uma campanha que falhou depois.
+- Há perfis de um milhão de linhas, transferências até 1 MiB, inventário físico,
+  duas coortes de GC e sessão contínua renovada na expiração. A validação
+  integrada e as repetições no candidato final permanecem pendentes.
+- O runner de falhas tem ledger de transferências, saldos e contador atômico;
+  inclui desconexões, deadlock, reinício, OOM marcado, quotas de bytes/inodes,
+  snapshot sob escritores e restauração independente. Ainda não foi executado.
+- O workflow publica somente bundle estruturado com remoção de segredos;
+  logs brutos, fixtures e dumps permanecem privados. Exportar não certifica G05.
+
+O inventário `results/stress/coverage-inventory.json` distingue cenários não
+executados e destinos indisponíveis. Os scripts legados que exigem cgroup do
+host privilegiado ou bypass de TLS não foram executados. Não há VM descartável
+com systemd, DNS público, destino off-host ou WAL archive/PITR configurado
+para os respectivos gates neste ambiente.
