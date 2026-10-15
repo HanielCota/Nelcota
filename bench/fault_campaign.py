@@ -36,6 +36,7 @@ from ownership import OwnedDocker
 from objects import S3Inventory
 from ports import published_port
 from postgres_evidence import retain_failure
+from http_boundary import opener
 
 ROOT = Path(__file__).resolve().parents[1]
 MUTATION_PATH='/rest/v1/rpc/stress_transfer'
@@ -104,14 +105,14 @@ def require_running(critical,watchdog,action_errors):
         raise RuntimeError('Fault resource guard stopped traffic')
 
 
-def raw(project,method,path,value=None,token=None):
+def raw(project,method,path,value=None,token=None,s3_endpoint=None):
     body = None
     if value is not None:
         body=json.dumps(value).encode()
     headers={'Content-Type':'application/json','Authorization':'Bearer '+(token or project.fixture['service'])}
     query=urllib.request.Request(project.base+path,data=body,method=method,headers=headers)
     try:
-        response=urllib.request.urlopen(query,timeout=8)
+        response=opener(s3_endpoint).open(query,timeout=8)
     except urllib.error.HTTPError as error:
         response=error
     with response:
@@ -564,7 +565,10 @@ def run(args):
                 if fill.returncode==0 or 'No space left on device' not in fill.stderr:
                     raise RuntimeError('The owned filesystem did not reach its declared quota')
                 code,body=raw(source,'PUT','/storage/v1/object/bench/fault-exhausted.txt','bounded quota probe')
-                if code!=500 or json.loads(body).get('code')!='internal':
+                failure_code=json.loads(body).get('code')
+                atomic_json(output/('filesystem-'+kind+'-response.json'),{'status':code,'code':failure_code})
+                expected={'bytes':(507,'storage_full'),'inodes':(500,'internal')}[kind]
+                if (code,failure_code)!=expected:
                     raise RuntimeError('Unexpected real ENOSPC response contract')
                 if source.sql("SELECT count(*) FROM storage.objects WHERE bucket_id='bench' AND name='fault-exhausted.txt'")!='0':
                     raise RuntimeError('Failed upload published metadata')
@@ -588,7 +592,7 @@ def run(args):
                 code,_=raw(source,'DELETE','/storage/v1/object/bench/fault-recovery.txt')
                 if not 200<=code<300:
                     raise RuntimeError('Post-ENOSPC object cleanup failed')
-                atomic_json(output/('filesystem-'+kind+'.json'),{'status':'passed','filesystem':'owned 16-MiB tmpfs','host_disk_filled':False,'observed_enospc':True,'inodes':source.ephemeral_storage_inodes,'database_commits_during_fault':committed_during,'failure_http_status':500,'failure_code':'internal','failed_metadata_rows':0,'subsequent_upload_and_bytes_verified':True})
+                atomic_json(output/('filesystem-'+kind+'.json'),{'status':'passed','filesystem':'owned 16-MiB tmpfs','host_disk_filled':False,'observed_enospc':True,'inodes':source.ephemeral_storage_inodes,'database_commits_during_fault':committed_during,'failure_http_status':expected[0],'failure_code':expected[1],'failed_metadata_rows':0,'subsequent_upload_and_bytes_verified':True})
             finally:
                 owned('rm','-f',source.app)
                 source.ephemeral_storage_mib=None
@@ -654,7 +658,7 @@ def run(args):
                             body=None
                             if write:
                                 method='PUT';path='/storage/v1/object/bench/provider-probe.txt';body=probe_body
-                            code,payload=raw(source,method,path,body)
+                            code,payload=raw(source,method,path,body,s3_endpoint=endpoint)
                             if 200<=code<300:
                                 if not write and payload!=fixture_bytes:
                                     raise RuntimeError('Provider restart changed published fixture bytes')
@@ -700,7 +704,7 @@ def run(args):
                     recovered_seconds=None
                     while time.monotonic()-recovery_began<=35:
                         try:
-                            code,payload=raw(source,'GET','/storage/v1/object/bench/fixture.txt')
+                            code,payload=raw(source,'GET','/storage/v1/object/bench/fixture.txt',s3_endpoint=endpoint)
                             invalid,_=raw(source,'GET','/rest/v1/bench_products?limit=1',token=source.fixture['invalid_access'])
                             require_unauthorized(invalid)
                             if code==200 and payload!=fixture_bytes:
@@ -708,7 +712,7 @@ def run(args):
                             if code==200:
                                 put_status,_=raw(source,'PUT','/storage/v1/object/bench/'+recovery_name,probe_body)
                                 if 200<=put_status<300:
-                                    read_status,read_bytes=raw(source,'GET','/storage/v1/object/bench/'+recovery_name)
+                                    read_status,read_bytes=raw(source,'GET','/storage/v1/object/bench/'+recovery_name,s3_endpoint=endpoint)
                                     if read_status==200 and read_bytes!=probe_bytes:
                                         raise RuntimeError('Successful recovered write returned corrupt bytes')
                                     if read_status==200:
@@ -727,7 +731,7 @@ def run(args):
                     for thread in threads:thread.join(timeout=10)
                 if failures or any(thread.is_alive() for thread in threads):
                     raise RuntimeError('Provider probe failed or retained a task')
-                code,payload=raw(source,'GET','/storage/v1/object/bench/provider-probe.txt')
+                code,payload=raw(source,'GET','/storage/v1/object/bench/provider-probe.txt',s3_endpoint=endpoint)
                 if code!=200 or payload!=probe_bytes:
                     raise RuntimeError('Acknowledged provider object did not survive recovery')
                 deleted,_=raw(source,'DELETE','/storage/v1/object/bench/'+recovery_name)
