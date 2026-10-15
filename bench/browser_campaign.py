@@ -15,7 +15,7 @@ import time
 
 from browser_runtime import prepare
 from campaign import ResourceCoverage, docker, effective_cpus, owns_listener, validate_disk_headroom, validate_storage_filesystem
-from disk_usage import host as disk_usage
+from disk_usage import host as disk_usage, container as container_disk_usage
 from host_resources import owned_cgroup_snapshot, require_no_oom, snapshot as host_snapshot
 from ingress import Ingress
 from observations import generator_observation, inspect_container
@@ -108,7 +108,8 @@ def campaign(args):
                    'proxy_config_sha256':hashlib.sha256(configuration.encode()).hexdigest(),
                    'auth_consumers':2, 'app_aggregate_cpus':1, 'postgres_cpus':.5, 'browser_cpus':1,
                    'app_memory_mib_each':128, 'postgres_memory_mib':256, 'browser_memory_mib':1536,
-                   'browser_pids_limit':256, 'profile_disk_mib':256, 'database_disk_mib':512,
+                   'browser_pids_limit':256, 'browser_home_disk_mib_each':256, 'database_disk_mib':512,
+                   'browser_fixture_disk_mib':3072,
                    'session_seconds':args.session_seconds, 'tabs':3, 'pressure_rest_cycles':5,
                    'navigation_interval_minimum_ms':100, 'maximum_API_requests':12000, 'maximum_API_requests_per_second':64,
                    'maximum_decoded_network_mib':128, 'feedback_p95_ms':1000,
@@ -153,6 +154,12 @@ def campaign(args):
                     database = json.loads(source.sql("SELECT json_build_object('connections',count(*),'stuck_idle_transactions',count(*) FILTER(WHERE state='idle in transaction' AND clock_timestamp()-state_change>interval '5 seconds'),'waiting_locks',count(*) FILTER(WHERE wait_event_type='Lock')) FROM pg_stat_activity WHERE backend_type='client backend'"))
                     if database['connections'] > 32 or database['stuck_idle_transactions']:
                         raise RuntimeError('Browser database owner budget')
+                    database_disk = container_disk_usage(owned, source.pg, '/var/lib/postgresql/data')
+                    if database_disk['value'] > 512:
+                        raise RuntimeError('Browser database disk budget')
+                    home_disk = {home.name:disk_usage(home) for home in directory.glob('*-home')}
+                    if any(value['value'] > 256 for value in home_disk.values()):
+                        raise RuntimeError('Browser home disk budget')
                     allocated = disk_usage(directory)
                     if allocated['value'] > 3072:
                         raise RuntimeError('Browser fixture disk budget')
@@ -160,7 +167,8 @@ def campaign(args):
                     coverage.observe(resource_at-resource_began)
                     with (output/'resources.jsonl').open('a') as stream:
                         stream.write(json.dumps({'phase':phase, 'monotonic':resource_at, 'component_cgroups':cgroups,
-                                    'generator':generation, 'database':database, 'allocated_disk_mib':allocated,
+                                    'generator':generation, 'database':database, 'database_disk_mib':database_disk,
+                                    'browser_home_disk_mib':home_disk, 'allocated_disk_mib':allocated,
                                     'host':host_snapshot(cpus)})+'\n')
                     atomic_json(output/'checkpoint.json', {'phase':phase, 'monotonic':resource_at, 'resource_observations':coverage.count})
                 except Exception as error:
