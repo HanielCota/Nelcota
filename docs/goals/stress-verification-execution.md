@@ -292,3 +292,19 @@ headers seguem o template de deployment. A preparação passou na descoberta
 Python com 131 testes em 5,940 segundos. Nenhuma campanha nativa com esse perfil
 foi executada neste checkpoint. DNS público, ACME, controller, falhas de proxy
 e limites de clientes lentos continuam sem aprovação por esse perfil.
+
+## Extensão do teste de admissão no histórico completo
+
+Foi adicionado um teste Rust com PostgreSQL real para 100.000 registros de
+histórico. Ele captura eventos reais de 100.000 escritas de fixture; 99.999 são
+cancelados explicitamente durante a preparação, e duas entregas positivas usam
+um receiver HTTP local com validação das assinaturas. O teste exige que 16 novas
+escritas concorrentes sejam rejeitadas com `503 unavailable`/SQLSTATE `53300`,
+sem gravar as linhas de negócio, e que replay, leitura de status, RLS e rejeição
+de JWT inválido mantenham os contratos. Somente depois de provar a admissão cheia
+ele executa a limpeza explícita e verifica nova escrita/entrega, preservando as
+100.000 linhas de negócio anteriores. O contador de uso não é forjado.
+
+A formatação do novo teste foi verificada. Sua execução Rust local e no CI ainda
+está pendente neste registro; preparar o caso não equivale a aprová-lo. O
+endurance S3 permanece no artefato congelado, sem compilação local concorrente.
