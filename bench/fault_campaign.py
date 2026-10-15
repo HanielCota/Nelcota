@@ -1,0 +1,605 @@
+"""Owned fault/cancellation ledger and live snapshot restore, without public ingress.
+
+Without --capacity this is a functional smoke. Full mode first qualifies four
+five-minute arrival steps, then injects faults at 80% of the qualified bound.
+The workload is explicit ledger mutations plus negative JWT probes; native
+controller/public deployment acceptance remains separate.
+"""
+import argparse
+from concurrent.futures import ThreadPoolExecutor
+from collections import Counter
+import hashlib
+import http.client
+import json
+import math
+import os
+from pathlib import Path
+import secrets
+import shutil
+import signal
+import subprocess
+import sys
+import tempfile
+import threading
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+import uuid
+
+from campaign import ResourceCoverage, docker, effective_cpus, redacted_diagnostic, request, validate_disk_headroom
+from observations import ObservationEpoch, inspect_container
+from projects import Project
+from watchdog import LABEL, atomic_json, cleanup, host_reserves, process_identity
+from host_resources import snapshot as host_snapshot
+from ownership import OwnedDocker
+
+ROOT = Path(__file__).resolve().parents[1]
+MUTATION_PATH='/rest/v1/rpc/stress_transfer'
+MUTATION_FIXTURE="""
+CREATE TABLE public.stress_operations(id uuid PRIMARY KEY,digest text NOT NULL,delta smallint NOT NULL CHECK(delta IN(-1,1)));
+CREATE TABLE public.stress_accounts(id integer PRIMARY KEY,balance bigint NOT NULL CHECK(balance>=0));
+INSERT INTO public.stress_accounts VALUES(1,1000000),(2,1000000);
+CREATE TABLE public.stress_counts(singleton boolean PRIMARY KEY DEFAULT true CHECK(singleton),value bigint NOT NULL);
+INSERT INTO public.stress_counts VALUES(true,0);
+CREATE FUNCTION public.stress_transfer(operation_id uuid,operation_digest text,delta integer) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
+BEGIN
+  IF delta IS NULL OR delta NOT IN(-1,1) OR operation_digest IS NULL OR operation_digest !~ '^[0-9a-f]{64}$' THEN
+    RAISE EXCEPTION 'invalid fixture operation' USING ERRCODE='22023';
+  END IF;
+  PERFORM id FROM public.stress_accounts ORDER BY id FOR UPDATE;
+  INSERT INTO public.stress_operations VALUES(operation_id,operation_digest,delta);
+  UPDATE public.stress_accounts SET balance=balance+CASE id WHEN 1 THEN delta ELSE -delta END;
+  UPDATE public.stress_counts SET value=value+1 WHERE singleton;
+  RETURN jsonb_build_object('accepted',operation_id);
+END $$;
+REVOKE ALL ON FUNCTION public.stress_transfer(uuid,text,integer) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.stress_transfer(uuid,text,integer) TO service_role;
+GRANT SELECT ON public.stress_operations,public.stress_accounts,public.stress_counts TO service_role;
+NOTIFY nelcota,'reload schema';
+"""
+
+
+def accounting(project):
+    value=json.loads(project.sql("SELECT json_build_object('accounts',(SELECT count(*) FROM public.stress_accounts),'total',(SELECT sum(balance) FROM public.stress_accounts),'first_balance',(SELECT balance FROM public.stress_accounts WHERE id=1),'committed',(SELECT count(*) FROM public.stress_operations),'delta',(SELECT coalesce(sum(delta),0) FROM public.stress_operations),'counter',(SELECT value FROM public.stress_counts WHERE singleton))"))
+    if value['accounts']!=2 or value['total']!=2000000 or value['first_balance']!=1000000+value['delta'] or value['counter']!=value['committed']:
+        raise RuntimeError('Atomic transfer, rollback or hot counter accounting failed')
+    return value
+
+
+def successful_latency_evidence(values):
+    if not values:
+        return None
+    if any(isinstance(value,bool) or not isinstance(value,(int,float)) or not math.isfinite(value) or value<=0 for value in values):
+        raise ValueError('Invalid successful-response latency evidence')
+    ordered=sorted(values)
+    return {'p95_ms':ordered[max(0,math.ceil(len(ordered)*.95)-1)],'p99_ms':ordered[max(0,math.ceil(len(ordered)*.99)-1)],'successful_post_responses':len(ordered),'method':'nearest rank, successful POST only'}
+
+
+def raw(project,method,path,value=None,token=None):
+    body = None
+    if value is not None:
+        body=json.dumps(value).encode()
+    headers={'Content-Type':'application/json','Authorization':'Bearer '+(token or project.fixture['service'])}
+    query=urllib.request.Request(project.base+path,data=body,method=method,headers=headers)
+    try:
+        response=urllib.request.urlopen(query,timeout=8)
+    except urllib.error.HTTPError as error:
+        response=error
+    with response:
+        payload=response.read(1024*1024+1)
+        if len(payload)>1024*1024:
+            raise RuntimeError('Canary response exceeded its byte budget')
+        return response.status,payload
+
+
+def run(args):
+    output=args.output.resolve()
+    if output.exists() and any(output.iterdir()):
+        raise RuntimeError('Preserve previous evidence; use a fresh output directory')
+    output.mkdir(parents=True,exist_ok=True)
+    cpus=sorted(os.sched_getaffinity(0))
+    if len(cpus)<4 or effective_cpus(cpus)<3.5 or host_reserves(output):
+        raise RuntimeError('Insufficient host resource reserves')
+    validate_disk_headroom(output,1024,startup_mib=1600)
+    os.sched_setaffinity(0,{cpus[2]})
+    identity='nelcota-fault-'+secrets.token_hex(16)
+    owned=OwnedDocker(identity,docker)
+    directory=Path(tempfile.mkdtemp(prefix='fixture-',dir=output))
+    projects=[Project(identity,index,2,args.binary.resolve(),directory,cpus) for index in range(2)]
+    source,target=projects
+    began=time.monotonic()
+    phase='preparation'
+    resource_at=began
+    load_seconds=0
+    fault_window=ObservationEpoch()
+    stop=threading.Event()
+    critical=threading.Event()
+    coverage=ResourceCoverage()
+    violations=[]
+    observations_started=None
+    sampler=watchdog=None
+    status='failed'
+    attempts={}
+    attempt_lock=threading.RLock()
+    initialized=[]
+    manifest={'identity':identity,'output':str(output),'reserve_path':str(output),'pid':os.getpid(),'process_identity':process_identity(os.getpid()),'started_monotonic':began,'maximum_seconds':2400,'containers':[item for project in projects for item in [project.app,project.pg]],'volumes':[project.volume for project in projects]}
+    atomic_json(output/'ownership.json',manifest)
+    atomic_json(output/'heartbeat.json',{'monotonic':began,'phase':phase,'resource_monotonic':began})
+    previous=signal.getsignal(signal.SIGTERM)
+
+    def terminate(signum,frame):
+        critical.set()
+        raise RuntimeError('Fault campaign stopped by watchdog or owner')
+
+    def heartbeat():
+        while not stop.is_set():
+            atomic_json(output/'heartbeat.json',{'monotonic':time.monotonic(),'phase':phase,'resource_monotonic':resource_at,'load_seconds_completed':load_seconds})
+            stop.wait(2)
+
+    signal.signal(signal.SIGTERM,terminate)
+    heart=threading.Thread(target=heartbeat,daemon=True)
+    heart.start()
+    try:
+        watchdog=subprocess.Popen([sys.executable,str(ROOT/'bench/watchdog.py'),str(output/'ownership.json')],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,start_new_session=True)
+        atomic_json(output/'manifest.json',{'scope':'local ledger mutations and negative JWT probes; no public proxy/controller acceptance','capacity_qualification':args.capacity,'binary_sha256':hashlib.file_digest(args.binary.open('rb'),'sha256').hexdigest(),'initial_iterations_per_second':args.rate,'maximum_inflight':8,'maximum_attempts':100000,'parent_rss_limit_mib':512,'app_cpu_each':.5,'postgres_cpu_each':.5,'app_memory_mib_each':128,'postgres_memory_mib_each':256,'owned_filesystem_exhaustion_mib':16,'recovery_deadline_seconds':35,'snapshot':'pg_dump snapshot under controlled database writers, immutable file fixture','storage':'disk, with one explicitly temporary tmpfs ENOSPC scenario'})
+        source.create()
+        initialized.append(source)
+        source.sql(MUTATION_FIXTURE)
+        time.sleep(1)
+        observations_started=time.monotonic()
+        resource_at=observations_started
+
+        def sample():
+            nonlocal resource_at
+            while not stop.is_set():
+                cycle=time.monotonic()
+                epoch,fault=fault_window.capture()
+                try:
+                    reason=host_reserves(output)
+                    if reason:
+                        raise RuntimeError(reason)
+                    parent_rss=next(int(line.split()[1]) for line in Path('/proc/self/status').read_text().splitlines() if line.startswith('VmRSS:'))
+                    if parent_rss>512*1024:
+                        raise RuntimeError('Fault ledger exceeded the parent 512-MiB RSS budget')
+                    states={}
+                    running=[]
+                    disks={}
+                    for project in list(initialized):
+                        for name in [project.app,project.pg]:
+                            state=inspect_container(name)
+                            states[name]=None
+                            if state is not None:
+                                states[name]=state['State']
+                            allowed=fault is not None and name==fault['container'] and time.monotonic()<=fault['expires']
+                            if (state is None or not state['State']['Running'] or state['State']['OOMKilled']) and not allowed:
+                                raise RuntimeError('Unexpected component stop or OOM: '+name)
+                            if state is not None and state['RestartCount']:
+                                raise RuntimeError('Unexpected automatic container restart')
+                            if state is not None and state['State']['Running'] and not allowed:
+                                running.append(name)
+                        if project.pg in running:
+                            disks[project.label]=int(owned('exec',project.pg,'du','-sm','/var/lib/postgresql/data').split()[0])
+                            if disks[project.label]>512:
+                                raise RuntimeError('Owned fault database exceeded its 512-MiB budget')
+                    stats=[json.loads(line) for line in owned('stats','--no-stream','--format','{{json .}}',*running).splitlines()]
+                    if not running or len(stats)!=len(running):
+                        raise RuntimeError('Incomplete fault resource evidence')
+                    if fault_window.changed(epoch):
+                        continue
+                    resource_at=time.monotonic()
+                    coverage.observe(resource_at-observations_started)
+                    with (output/'resources.jsonl').open('a') as target_file:
+                        target_file.write(json.dumps({'monotonic':resource_at,'phase':phase,'states':states,'containers':stats,'database_disk_mib':disks,'fault':fault,'host':host_snapshot(cpus),'parent_rss_kib':parent_rss})+'\n')
+                    atomic_json(output/'checkpoint.json',{'phase':phase,'monotonic':resource_at,'load_seconds_completed':load_seconds,'resource_observations':coverage.count})
+                except Exception as error:
+                    if fault_window.changed(epoch):
+                        continue
+                    violations.append({'phase':phase,'type':type(error).__name__,'reason':redacted_diagnostic(error,[*source.environment.values(),*target.environment.values()])})
+                    critical.set()
+                    return
+                stop.wait(max(0,5-(time.monotonic()-cycle)))
+
+        phase='ready'
+        sampler=threading.Thread(target=sample,daemon=True)
+        sampler.start()
+
+        def operation(label,index,allow_unavailable):
+            operation_id=str(uuid.uuid4())
+            delta=1
+            if index%2:
+                delta=-1
+            digest=hashlib.sha256((operation_id+':'+str(delta)).encode()).hexdigest()
+            mutation={'operation_id':operation_id,'operation_digest':digest,'delta':delta}
+            with attempt_lock:
+                if len(attempts)>=100000:
+                    raise RuntimeError('Operation ledger exceeded its admission budget')
+                attempts[operation_id]={'digest':digest,'delta':delta,'acknowledged':False,'phase':label,'ambiguous':False}
+                with (output/'operation-ledger.jsonl').open('a') as ledger:
+                    ledger.write(json.dumps({'event':'attempt','id':operation_id,'digest':digest,'delta':delta,'phase':label})+'\n')
+            post_ms=None
+            try:
+                if index%10==9:
+                    parsed=urllib.parse.urlsplit(source.base)
+                    connection=http.client.HTTPConnection(parsed.hostname,parsed.port,timeout=5)
+                    try:
+                        connection.request('POST',MUTATION_PATH,body=json.dumps(mutation),headers={'Authorization':'Bearer '+source.fixture['service'],'Content-Type':'application/json'})
+                    finally:
+                        connection.close()
+                    with attempt_lock:
+                        attempts[operation_id]['ambiguous']=True
+                        with (output/'operation-ledger.jsonl').open('a') as ledger:
+                            ledger.write(json.dumps({'event':'ambiguous','id':operation_id})+'\n')
+                    return 'deliberately-dropped-reply',0,None
+                post_began=time.monotonic()
+                code,body=raw(source,'POST',MUTATION_PATH,mutation)
+                post_ms=(time.monotonic()-post_began)*1000
+                if 200<=code<300:
+                    with attempt_lock:
+                        attempts[operation_id]['acknowledged']=True
+                        with (output/'operation-ledger.jsonl').open('a') as ledger:
+                            ledger.write(json.dumps({'event':'acknowledged','id':operation_id,'monotonic':time.monotonic()})+'\n')
+                    foreign_code,_=raw(source,'GET','/rest/v1/bench_products?limit=1',token=source.fixture['invalid_access'])
+                    if foreign_code!=401:
+                        raise RuntimeError('Unauthorized probe was not rejected before database access')
+                    return str(code),1,post_ms
+                if allow_unavailable and code in (503,504):
+                    value=json.loads(body)
+                    if value.get('code') not in ('unavailable','db_error','request_timeout'):
+                        raise RuntimeError('Unexpected database failure code: '+str(value.get('code'))[:80])
+                    return str(code),0,post_ms
+                raise RuntimeError('Unexpected mutation status: '+str(code))
+            except (urllib.error.URLError,TimeoutError,ConnectionError,http.client.HTTPException):
+                with attempt_lock:
+                    acknowledged=attempts[operation_id]['acknowledged']
+                    if not acknowledged:
+                        attempts[operation_id]['ambiguous']=True
+                        with (output/'operation-ledger.jsonl').open('a') as ledger:
+                            ledger.write(json.dumps({'event':'ambiguous','id':operation_id})+'\n')
+                if allow_unavailable:
+                    return 'connection-unavailable',int(acknowledged),post_ms
+                raise
+
+        def traffic(label,seconds,action=None,allow_unavailable=False,rate=None,exploratory=False):
+            nonlocal phase,load_seconds
+            phase=label
+            if rate is None:
+                rate=args.rate
+            print('Running',label,rate,'iterations/s for',seconds,'seconds',flush=True)
+            start=time.monotonic()
+            counts=Counter()
+            success_latencies=[]
+            in_flight=set()
+            action_error=[]
+            action_thread=None
+            if action is not None:
+                def invoke():
+                    try:
+                        time.sleep(2)
+                        action()
+                    except Exception as error:
+                        action_error.append(error)
+                        critical.set()
+                action_thread=threading.Thread(target=invoke,daemon=True)
+                action_thread.start()
+            with ThreadPoolExecutor(max_workers=8) as workers:
+                for index in range(seconds*rate):
+                    if critical.is_set() or watchdog.poll() is not None:
+                        raise RuntimeError('Fault resource guard stopped traffic')
+                    for future in list(in_flight):
+                        if future.done():
+                            outcome,ack,latency=future.result()
+                            counts[outcome]+=1;counts['acknowledged']+=ack
+                            if ack:
+                                success_latencies.append(latency)
+                            in_flight.remove(future)
+                    delay=start+index/rate-time.monotonic()
+                    if delay < -1/rate:
+                        counts['late_arrivals']+=1
+                        counts['dropped_arrivals']+=1
+                        continue
+                    if delay>0:
+                        time.sleep(delay)
+                    if len(in_flight)>=8:
+                        counts['dropped_arrivals']+=1
+                        continue
+                    in_flight.add(workers.submit(operation,label,index,allow_unavailable))
+                for future in in_flight:
+                    outcome,ack,latency=future.result()
+                    counts[outcome]+=1;counts['acknowledged']+=ack
+                    if ack:
+                        success_latencies.append(latency)
+            if action_thread is not None:
+                action_thread.join(timeout=40)
+                if action_thread.is_alive():
+                    raise RuntimeError('Fault injection did not finish within its deadline')
+            if action_error:
+                raise action_error[0]
+            elapsed=time.monotonic()-start
+            if elapsed<seconds:
+                time.sleep(seconds-elapsed)
+                elapsed=time.monotonic()-start
+            latency=successful_latency_evidence(success_latencies)
+            qualified=latency is not None and latency['p95_ms']<=500 and latency['p99_ms']<=1500 and counts['dropped_arrivals']<=seconds*rate*.01 and not counts['503'] and not counts['504'] and not counts['connection-unavailable']
+            report={'counts':dict(counts),'requested_seconds':seconds,'elapsed_seconds':elapsed,'offered_iterations':seconds*rate,'rate':rate,'fault_injected':action is not None,'exploratory':exploratory,'success_latency':latency,'nominal_qualified':qualified}
+            atomic_json(output/(label+'.json'),report)
+            with (output/'traffic-ledger.jsonl').open('a') as ledger:
+                ledger.write(json.dumps({'phase':label,'requested_seconds':seconds,'elapsed_seconds':elapsed,'completed':True,'started_monotonic':start,'ended_monotonic':time.monotonic()})+'\n')
+            load_seconds+=min(seconds,elapsed)
+            if not allow_unavailable and not exploratory and not qualified:
+                raise RuntimeError('Nominal ledger delivery or latency SLO failed')
+            return report
+
+        def recover(label,began_recovery):
+            nonlocal phase
+            phase=label
+            while time.monotonic()-began_recovery<=35:
+                try:
+                    code,body=raw(source,'GET','/rest/v1/bench_products?limit=1')
+                    invalid,_=raw(source,'GET','/rest/v1/bench_products?limit=1',token=source.fixture['invalid_access'])
+                    if code==200 and invalid==401 and json.loads(body)[0]['name'].startswith(source.label+':'):
+                        atomic_json(output/(label+'.json'),{'status':'passed','recovery_seconds':time.monotonic()-began_recovery,'positive_status':code,'unauthorized_status':invalid})
+                        return
+                except (OSError,ValueError):
+                    pass
+                time.sleep(.25)
+            raise RuntimeError('Authorized and unauthorized recovery probes exceeded 35 seconds')
+
+        traffic('baseline',30)
+        invalid_id=str(uuid.uuid4())
+        invalid_status,_=raw(source,'POST',MUTATION_PATH,{'operation_id':invalid_id,'operation_digest':hashlib.sha256(invalid_id.encode()).hexdigest(),'delta':0})
+        if invalid_status!=400 or source.sql("SELECT count(*) FROM public.stress_operations WHERE id='"+invalid_id+"'")!='0':
+            raise RuntimeError('Invalid transfer published partial fixture state')
+        session,_=request(source.base,'/auth/v1/token?grant_type=password',{'email':source.email,'password':source.password})
+        forbidden,_=raw(source,'POST',MUTATION_PATH,{'operation_id':str(uuid.uuid4()),'operation_digest':hashlib.sha256(invalid_id.encode()).hexdigest(),'delta':1},token=session['access_token'])
+        if forbidden!=403:
+            raise RuntimeError('Authenticated user reached the privileged fixture mutation')
+        atomic_json(output/'mutation-boundaries.json',{'invalid_delta_status':invalid_status,'authenticated_without_execute_status':forbidden,'partial_invalid_rows':0})
+        if args.capacity:
+            probes=[]
+            qualified=0
+            for percent in [25,50,75,100]:
+                offered=max(1,args.provisional_rate*percent//100)
+                result=traffic('capacity-'+str(percent),300,rate=offered,allow_unavailable=True,exploratory=True)
+                probes.append(result)
+                atomic_json(output/'capacity-probes.json',probes)
+                if result['nominal_qualified']:
+                    qualified=max(qualified,offered)
+            if not qualified:
+                raise RuntimeError('No ledger workload rate qualified for faults')
+            args.rate=max(1,int(qualified*.8))
+            atomic_json(output/'capacity.json',{'qualified_lower_bound_iterations_per_second':qualified,'fault_rate':args.rate,'ratio':args.rate/qualified,'workload':'90% acknowledged atomic-transfer RPC plus negative JWT probe, 10% deliberately disconnected RPC; ambiguous outcomes reconciled without retries'})
+        def database_stop():
+            fault_window.set({'name':'database-unavailable','container':source.pg,'expires':time.monotonic()+20})
+            try:
+                owned('stop','-t','1',source.pg)
+                time.sleep(5)
+            finally:
+                recovery_began=time.monotonic()
+                owned('start',source.pg)
+            recover('database-recovery',recovery_began)
+            fault_window.set(None)
+        traffic('database-unavailable',20,database_stop,allow_unavailable=True)
+        traffic('database-recovered',20)
+        def deadlock():
+            before=int(source.sql("SELECT deadlocks FROM pg_stat_database WHERE datname=current_database()"))
+            statement="BEGIN; SET LOCAL lock_timeout='10s'; SELECT id FROM public.stress_accounts WHERE id=2 FOR UPDATE; SELECT pg_sleep(2); SELECT id FROM public.stress_accounts WHERE id=1 FOR UPDATE; COMMIT;"
+            try:
+                source.sql(statement)
+            except RuntimeError as error:
+                if 'deadlock detected' not in str(error):
+                    raise
+            deadline=time.monotonic()+3
+            while time.monotonic()<deadline:
+                after=int(source.sql("SELECT deadlocks FROM pg_stat_database WHERE datname=current_database()"))
+                if after>before:
+                    atomic_json(output/'deadlock.json',{'observed':after-before,'status':'passed','direct_locker_mutations':False})
+                    return
+                time.sleep(.2)
+            raise RuntimeError('Controlled deadlock did not occur')
+        traffic('deadlock-under-writers',20,deadlock,allow_unavailable=True)
+        traffic('deadlock-recovered',20)
+        def application_kill():
+            fault_window.set({'name':'app-kill','container':source.app,'expires':time.monotonic()+30})
+            recovery_began=time.monotonic()
+            try:
+                owned('kill','--signal','KILL',source.app)
+                owned('rm',source.app)
+                source.start_app()
+                recover('app-recovery',recovery_began)
+            finally:
+                fault_window.set(None)
+        traffic('app-kill',20,application_kill,allow_unavailable=True)
+        traffic('app-recovered',20)
+        def application_oom():
+            fault_window.set({'name':'declared-container-oom','container':source.app,'expires':time.monotonic()+60})
+            source.extra_labels={'io.nelcota.stress.fault':'oom'}
+            try:
+                owned('rm','-f',source.app)
+                source.start_app()
+                owned('update','--memory','8m','--memory-swap','8m',source.app)
+                deadline=time.monotonic()+10
+                while time.monotonic()<deadline:
+                    state=inspect_container(source.app)
+                    if state is not None and state['State']['OOMKilled']:
+                        atomic_json(output/'declared-oom.json',{'status':'observed','state':state['State'],'limit_mib':8,'tag':'io.nelcota.stress.fault=oom','scope':'only the owned source app'})
+                        break
+                    time.sleep(.1)
+                if state is None or not state['State']['OOMKilled']:
+                    raise RuntimeError('The declared OOM did not occur')
+                recovery_began=time.monotonic()
+            finally:
+                owned('rm','-f',source.app)
+                source.extra_labels={}
+                source.start_app()
+            recover('oom-recovery',recovery_began)
+            fault_window.set(None)
+        traffic('container-oom',30,application_oom,allow_unavailable=True)
+        traffic('oom-recovered',20)
+        phase='snapshot'
+        # pg_dump obtains one consistent MVCC snapshot while writers continue.
+        # Object bytes are immutable in this declared workload.
+        def snapshot():
+            archive=directory/'database.dump'
+            snapshot_began=time.monotonic()
+            with archive.open('wb') as destination:
+                result=subprocess.run(['docker','exec',source.docker.require(source.pg),'pg_dump','-U','postgres','-Fc','--no-owner'],stdout=destination,stderr=subprocess.PIPE,timeout=60)
+            archive.chmod(0o600)
+            if result.returncode or archive.stat().st_size>128*1024*1024:
+                raise RuntimeError('Database snapshot failed or exceeded its size budget')
+            shutil.copytree(source.storage,directory/'snapshot-files')
+            atomic_json(output/'snapshot.json',{'bytes':archive.stat().st_size,'sha256':hashlib.file_digest(archive.open('rb'),'sha256').hexdigest(),'writers_active':True,'object_fixture_mutations':False,'started_monotonic':snapshot_began,'ended_monotonic':time.monotonic()})
+        traffic('snapshot-under-writers',20,snapshot)
+        writers_stopped=time.monotonic()
+        phase='restore-preparation'
+        target.create()
+        initialized.append(target)
+        fault_window.set({'name':'restore','container':target.app,'expires':time.monotonic()+90})
+        restored_at=time.monotonic()
+        try:
+            owned('rm','-f',target.app)
+            with (directory/'database.dump').open('rb') as archive:
+                result=subprocess.run(['docker','exec','-i',target.docker.require(target.pg),'pg_restore','-U','postgres','-d','postgres','--clean','--if-exists','--no-owner','--exit-on-error'],stdin=archive,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,timeout=60)
+            if result.returncode:
+                raise RuntimeError('Snapshot restore failed')
+            shutil.rmtree(target.storage)
+            shutil.copytree(directory/'snapshot-files',target.storage)
+            target.start_app()
+            restored_session,_=request(target.base,'/auth/v1/token?grant_type=password',{'email':source.email,'password':source.password})
+            if restored_session['user']['id']!=source.fixture['user']:
+                raise RuntimeError('Restored authentication identity changed')
+            target.assert_foreign_denied(source.fixture)
+            restored_accounting=accounting(target)
+            file_status,file_bytes=raw(target,'GET','/storage/v1/object/bench/fixture.txt')
+            if file_status!=200 or file_bytes!=json.dumps(source.label+': payload').encode():
+                raise RuntimeError('Restored physical bytes differ from the snapshot')
+            source_rows=json.loads(source.sql("SELECT coalesce(json_object_agg(id,digest),'{}'::json) FROM public.stress_operations"))
+            restored_rows=json.loads(target.sql("SELECT coalesce(json_object_agg(id,digest),'{}'::json) FROM public.stress_operations"))
+            if not restored_rows or any(source_rows.get(key)!=value for key,value in restored_rows.items()):
+                raise RuntimeError('Restored ledger is corrupt')
+            snapshot_info=json.loads((output/'snapshot.json').read_text())
+            atomic_json(output/'restore.json',{'status':'passed','rto_seconds':time.monotonic()-restored_at,'rpo_upper_bound_seconds':writers_stopped-snapshot_info['started_monotonic'],'restored_rows':len(restored_rows),'source_rows':len(source_rows),'restored_accounting':restored_accounting,'intentional_snapshot_rewind_rows':len(set(source_rows)-set(restored_rows)),'cross_project_token_status':401,'restored_user_matches':True,'physical_bytes_match':True,'scope':'local DB snapshot plus immutable files, no off-host/PITR/systemd certification'})
+        finally:
+            fault_window.set(None)
+        def filesystem_exhaustion(kind):
+            nonlocal phase
+            phase='owned-filesystem-'+kind
+            fault_window.set({'name':'owned-tmpfs-'+kind,'container':source.app,'expires':time.monotonic()+90})
+            source.ephemeral_storage_mib=16
+            source.ephemeral_storage_inodes=None
+            if kind=='inodes':
+                source.ephemeral_storage_inodes=64
+            try:
+                owned('rm','-f',source.app)
+                source.start_app()
+                owned('cp','-a',str(source.storage)+'/.',source.app+':/storage')
+                committed_before=int(source.sql('SELECT count(*) FROM public.stress_operations'))
+                fill_command=['dd','if=/dev/zero','of=/storage/.g05-quota-fill','bs=1048576','count=17']
+                if kind=='inodes':
+                    fill_command=['sh','-c','counter=0; while [ "$counter" -lt 128 ]; do : > "/storage/.g05-inode-$counter" || exit 17; counter=$((counter+1)); done']
+                fill=subprocess.run(['docker','exec',source.docker.require(source.app),*fill_command],capture_output=True,text=True,timeout=15)
+                if fill.returncode==0 or 'No space left on device' not in fill.stderr:
+                    raise RuntimeError('The owned filesystem did not reach its declared quota')
+                code,body=raw(source,'PUT','/storage/v1/object/bench/fault-exhausted.txt','bounded quota probe')
+                if code!=500 or json.loads(body).get('code')!='internal':
+                    raise RuntimeError('Unexpected real ENOSPC response contract')
+                if source.sql("SELECT count(*) FROM storage.objects WHERE bucket_id='bench' AND name='fault-exhausted.txt'")!='0':
+                    raise RuntimeError('Failed upload published metadata')
+                existing_status,existing_bytes=raw(source,'GET','/storage/v1/object/bench/fixture.txt')
+                if existing_status!=200 or existing_bytes!=json.dumps(source.label+': payload').encode():
+                    raise RuntimeError('Existing bytes changed during the owned quota fault')
+                time.sleep(2)
+                committed_during=int(source.sql('SELECT count(*) FROM public.stress_operations'))-committed_before
+                if committed_during<=0:
+                    raise RuntimeError('Ordinary database traffic did not progress during the filesystem fault')
+                if kind=='bytes':
+                    owned('exec',source.app,'rm','/storage/.g05-quota-fill')
+                if kind=='inodes':
+                    owned('exec',source.app,'sh','-c','rm -f /storage/.g05-inode-*')
+                code,_=raw(source,'PUT','/storage/v1/object/bench/fault-recovery.txt','bounded quota probe')
+                if not 200<=code<300:
+                    raise RuntimeError('Upload admission did not recover after filesystem pressure')
+                code,body=raw(source,'GET','/storage/v1/object/bench/fault-recovery.txt')
+                if code!=200 or body!=json.dumps('bounded quota probe').encode():
+                    raise RuntimeError('Post-ENOSPC upload bytes differ')
+                code,_=raw(source,'DELETE','/storage/v1/object/bench/fault-recovery.txt')
+                if not 200<=code<300:
+                    raise RuntimeError('Post-ENOSPC object cleanup failed')
+                atomic_json(output/('filesystem-'+kind+'.json'),{'status':'passed','filesystem':'owned 16-MiB tmpfs','host_disk_filled':False,'observed_enospc':True,'inodes':source.ephemeral_storage_inodes,'database_commits_during_fault':committed_during,'failure_http_status':500,'failure_code':'internal','failed_metadata_rows':0,'subsequent_upload_and_bytes_verified':True})
+            finally:
+                owned('rm','-f',source.app)
+                source.ephemeral_storage_mib=None
+                source.ephemeral_storage_inodes=None
+                source.start_app()
+                fault_window.set(None)
+        for kind in ['bytes','inodes']:
+            traffic('filesystem-'+kind+'-under-writers',30,lambda:filesystem_exhaustion(kind),allow_unavailable=True)
+        traffic('filesystem-recovered',20)
+        phase='reconciliation'
+        rows=json.loads(source.sql("SELECT coalesce(json_object_agg(id,digest),'{}'::json) FROM public.stress_operations"))
+        missing=[key for key,value in attempts.items() if value['acknowledged'] and rows.get(key)!=value['digest']]
+        extra=[key for key,value in rows.items() if key not in attempts or attempts[key]['digest']!=value]
+        ambiguous={key:value for key,value in attempts.items() if value['ambiguous']}
+        acknowledged=[key for key,value in attempts.items() if value['acknowledged']]
+        if not acknowledged:
+            raise RuntimeError('No positively acknowledged operation for reconciliation')
+        duplicate_id=acknowledged[0]
+        duplicate_status,_=raw(source,'POST',MUTATION_PATH,{'operation_id':duplicate_id,'operation_digest':attempts[duplicate_id]['digest'],'delta':attempts[duplicate_id]['delta']})
+        if duplicate_status!=409:
+            raise RuntimeError('Explicit operation primary key did not reject a duplicate')
+        atomic_json(output/'invariants.json',{'attempted':len(attempts),'acknowledged':sum(item['acknowledged'] for item in attempts.values()),'committed':len(rows),'acknowledged_missing':len(missing),'unknown_or_corrupt':len(extra),'ambiguous_attempts':len(ambiguous),'ambiguous_committed':sum(key in rows for key in ambiguous),'automatic_mutation_retries':0,'explicit_primary_key_duplicate_status':duplicate_status,'accounting':accounting(source)})
+        if missing or extra:
+            raise RuntimeError('Acknowledged operation ledger did not reconcile')
+        for project in initialized:
+            count=project.sql("SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND (state='idle in transaction' OR wait_event_type='Lock')")
+            if count!='0':
+                raise RuntimeError('Transaction or lock remained after faults')
+        stop.set()
+        sampler.join(timeout=30)
+        violations.extend(coverage.violations(time.monotonic()-observations_started))
+        if sampler.is_alive() or critical.is_set() or violations:
+            raise RuntimeError('Fault resource evidence failed')
+        status='passed'
+    finally:
+        phase='teardown'
+        stop.set()
+        if sampler is not None:
+            sampler.join(timeout=30)
+        atomic_json(output/'resource-violations.json',violations)
+        if sys.exception() is not None:
+            atomic_json(output/'error.json',{'type':type(sys.exception()).__name__})
+        cleanup(manifest)
+        remaining=owned('ps','-aq','--filter','label='+LABEL+'='+identity)
+        volumes=owned('volume','ls','-q','--filter','label='+LABEL+'='+identity)
+        shutil.rmtree(directory)
+        clean=not remaining and not volumes and not directory.exists()
+        atomic_json(output/'cleanup.json',{'confirmed':clean,'containers':remaining.splitlines(),'volumes':volumes.splitlines(),'directory_removed':not directory.exists()})
+        if clean:
+            (output/'watchdog-disarmed').touch()
+        if not clean:
+            status='failed'
+        heart.join(timeout=5)
+        if watchdog is not None:
+            watchdog.wait(timeout=20)
+        signal.signal(signal.SIGTERM,previous)
+        atomic_json(output/'completion.json',{'status':status,'load_seconds':load_seconds,'resource_observations':coverage.count,'cleanup_confirmed':clean,'error_type':type(sys.exception()).__name__})
+        if status!='passed' and sys.exception() is None:
+            raise RuntimeError('Fault final cleanup failed')
+
+
+def main():
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--binary',type=Path,required=True)
+    parser.add_argument('--output',type=Path,required=True)
+    parser.add_argument('--rate',type=int,default=8)
+    parser.add_argument('--capacity',action='store_true')
+    parser.add_argument('--provisional-rate',type=int,default=64)
+    args=parser.parse_args()
+    if not 1<=args.rate<=64 or not 4<=args.provisional_rate<=64:
+        parser.error('Functional canary rate must be 1..64 iterations/second')
+    run(args)
+
+
+if __name__=='__main__':
+    main()

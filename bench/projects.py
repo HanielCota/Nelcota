@@ -7,6 +7,7 @@ import urllib.error
 
 from campaign import docker, free_port, owns_listener, request, token
 from watchdog import LABEL
+from ownership import OwnedDocker
 
 FIXED_USER = '00000000-0000-4000-8000-000000000001'
 
@@ -18,6 +19,7 @@ class Project:
         self.pg = identity + f'-pg-{index}'
         self.volume = identity + f'-data-{index}'
         self.identity = identity
+        self.docker=OwnedDocker(identity,docker)
         self.binary = binary
         self.storage = directory / self.label
         self.storage.mkdir(parents=True)
@@ -31,19 +33,35 @@ class Project:
         self.port = int(self.base.rsplit(':', 1)[1])
         self.environment = {}
         self.fixture = None
+        self.ephemeral_storage_mib = None
+        self.ephemeral_storage_inodes = None
+        self.extra_labels = {}
 
     def sql(self, statement):
-        return docker('exec', '-i', '-e', 'PGOPTIONS=-cstatement_timeout=15000', self.pg, 'psql', '-Atq', '-U', 'postgres', '-v', 'ON_ERROR_STOP=1', stdin=statement)
+        return self.docker('exec', '-i', '-e', 'PGOPTIONS=-cstatement_timeout=15000', self.pg, 'psql', '-Atq', '-U', 'postgres', '-v', 'ON_ERROR_STOP=1', stdin=statement)
 
     def start_app(self):
-        command = ['run', '-d', '--name', self.app, '--label', LABEL+'='+self.identity, '--pids-limit', '128', '--network', 'host', '--user', f'{os.getuid()}:{os.getgid()}', '--cpus', self.quota, '--cpuset-cpus', str(self.cpus[0]), '--memory', '128m', '--memory-swap', '128m', '-v', str(self.binary)+':/usr/local/bin/nelcota:ro', '-v', str(self.storage)+':/storage']
+        command = ['run', '-d', '--name', self.app, '--label', LABEL+'='+self.identity, '--pids-limit', '128', '--network', 'host', '--user', f'{os.getuid()}:{os.getgid()}', '--cpus', self.quota, '--cpuset-cpus', str(self.cpus[0]), '--memory', '128m', '--memory-swap', '128m', '-v', str(self.binary)+':/usr/local/bin/nelcota:ro']
+        if self.ephemeral_storage_mib is None:
+            command.extend(['-v',str(self.storage)+':/storage'])
+        if self.ephemeral_storage_mib is not None:
+            if not 8 <= self.ephemeral_storage_mib <= 64:
+                raise ValueError('Ephemeral fault filesystem must be 8..64 MiB')
+            options=f'/storage:rw,noexec,nosuid,size={self.ephemeral_storage_mib}m,uid={os.getuid()},gid={os.getgid()},mode=0700'
+            if self.ephemeral_storage_inodes is not None:
+                if not 32 <= self.ephemeral_storage_inodes <= 256:
+                    raise ValueError('Fault inode quota must be 32..256')
+                options+=f',nr_inodes={self.ephemeral_storage_inodes}'
+            command.extend(['--tmpfs',options])
+        for key,value in self.extra_labels.items():
+            command.extend(['--label',key+'='+value])
         for key in self.environment:
             command.extend(['-e', key])
         command.extend(['ubuntu:24.04', '/usr/local/bin/nelcota', 'serve'])
-        docker(*command, env=self.environment)
+        created=self.docker(*command, env=self.environment)
         for _ in range(120):
             try:
-                if owns_listener(self.app, self.port):
+                if owns_listener(created, self.port):
                     request(self.base, '/auth/v1/.well-known/jwks.json')
                     return
             except (RuntimeError, urllib.error.URLError):
@@ -53,10 +71,10 @@ class Project:
 
     def create(self):
         password = secrets.token_urlsafe(32)
-        docker('volume', 'create', '--label', LABEL+'='+self.identity, self.volume)
-        docker('run', '-d', '--name', self.pg, '--label', LABEL+'='+self.identity, '--pids-limit', '128', '--cpus', self.quota, '--cpuset-cpus', str(self.cpus[1]), '--memory', '256m', '--memory-swap', '256m', '-e', 'POSTGRES_PASSWORD', '-p', '127.0.0.1::5432', '--mount', f'type=volume,source={self.volume},destination=/var/lib/postgresql/data', 'postgres:17-alpine', 'postgres', '-c', 'max_connections=32', '-c', 'shared_buffers=32MB', '-c', 'max_wal_size=64MB', '-c', 'min_wal_size=32MB', env={'POSTGRES_PASSWORD': password})
+        self.docker('volume', 'create', '--label', LABEL+'='+self.identity, self.volume)
+        self.docker('run', '-d', '--name', self.pg, '--label', LABEL+'='+self.identity, '--pids-limit', '128', '--cpus', self.quota, '--cpuset-cpus', str(self.cpus[1]), '--memory', '256m', '--memory-swap', '256m', '-e', 'POSTGRES_PASSWORD', '-p', '127.0.0.1::5432', '--mount', f'type=volume,source={self.volume},destination=/var/lib/postgresql/data', 'postgres:17-alpine', 'postgres', '-c', 'max_connections=32', '-c', 'shared_buffers=32MB', '-c', 'max_wal_size=64MB', '-c', 'min_wal_size=32MB', env={'POSTGRES_PASSWORD': password})
         import json
-        port = int(json.loads(docker('inspect', self.pg))[0]['NetworkSettings']['Ports']['5432/tcp'][0]['HostPort'])
+        port = int(json.loads(self.docker('inspect', self.pg))[0]['NetworkSettings']['Ports']['5432/tcp'][0]['HostPort'])
         for attempt in range(120):
             try:
                 if self.sql('SELECT 1') == '1':
@@ -72,7 +90,7 @@ class Project:
         self.environment['NELCOTA_ADMIN_EMAIL'] = self.admin_email
         self.environment['NELCOTA_ADMIN_PASSWORD_HASH'] = self.sql('SELECT encrypted_password FROM auth.users LIMIT 1')
         self.sql("INSERT INTO auth.users SELECT (json_populate_record(NULL::auth.users, (to_jsonb(u)||jsonb_build_object('id','"+FIXED_USER+"','email','"+self.email+"'))::json)).* FROM auth.users u LIMIT 1;")
-        docker('rm', '-f', self.app)
+        self.docker('rm', '-f', self.app)
         self.start_app()
         _, headers = request(self.base, '/admin/api/login', {'email':self.admin_email,'password':self.password}, {'Origin':self.base})
         cookie = headers['Set-Cookie'].split(';',1)[0]

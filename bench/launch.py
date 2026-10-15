@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import re
 import shutil
+import signal
 import subprocess
 import sys
 
@@ -15,7 +16,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--run-id', required=True)
     parser.add_argument('--binary', type=Path, required=True)
-    parser.add_argument('--kind', choices=['single', 'host'], default='single')
+    parser.add_argument('--kind', choices=['single', 'host', 'fault'], default='single')
     args, extra = parser.parse_known_args()
     if not re.fullmatch(r'[a-z][a-z0-9-]{0,79}', args.run_id):
         parser.error('Run ID must be a bounded lowercase label')
@@ -38,8 +39,34 @@ def main():
     entrypoint = 'campaign.py'
     if args.kind == 'host':
         entrypoint = 'host_campaign.py'
-    result = subprocess.run([sys.executable, str(snapshot/'bench'/entrypoint), '--binary', str(binary), '--output', str(output), *extra], cwd=ROOT)
-    raise SystemExit(result.returncode)
+    if args.kind == 'fault':
+        entrypoint = 'fault_campaign.py'
+    child=None
+    pending_signal=None
+    previous=signal.getsignal(signal.SIGTERM)
+    def terminate(signum,frame):
+        nonlocal pending_signal
+        pending_signal=signum
+        if child is not None and child.poll() is None:
+            child.send_signal(signum)
+    signal.signal(signal.SIGTERM,terminate)
+    try:
+        child=subprocess.Popen([sys.executable,str(snapshot/'bench'/entrypoint),'--binary',str(binary),'--output',str(output),*extra],cwd=ROOT)
+        if pending_signal is not None:
+            child.send_signal(pending_signal)
+        result=child.wait()
+    finally:
+        if child is not None and child.poll() is None:
+            child.terminate()
+            try:
+                child.wait(timeout=60)
+            except subprocess.TimeoutExpired:
+                child.kill()  # The campaign's independent watchdog owns teardown.
+                child.wait(timeout=10)
+        signal.signal(signal.SIGTERM,previous)
+        output.mkdir(parents=True,exist_ok=True)
+        shutil.copyfile(snapshot/'launch.json',output/'launch-manifest.json')
+    raise SystemExit(result)
 
 
 if __name__ == '__main__':
