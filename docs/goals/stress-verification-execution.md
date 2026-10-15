@@ -401,3 +401,28 @@ A [evidência estruturada](results/stress/semantic-oracle-before-after.json)
 certifica apenas os oráculos controlados. A validação contra o backend real
 precede a retomada das campanhas longas. Nenhum endurance de quatro horas
 está aprovado nesta atualização.
+
+
+### 2026-10-15 15:20 UTC — validações reais e cancelamento seguro
+
+Os testes `semantic-disk-smoke-001` e `semantic-s3-smoke-001` passaram com
+150 segundos efetivos cada, respectivamente 39 e 36 amostras, reconciliação
+final e limpeza. Cada inventário físico tinha 10.017 objetos: as 10.000
+entradas vazias da fixture e 17 objetos verificados por bytes. Foram
+reconciliados 1.553 eventos no disco e 1.549 no S3, sem identidades ausentes,
+extras ou assinaturas inválidas. Os patamares finais não tinham transações
+ociosas nem locks em espera. São diagnósticos curtos, com calibração de cinco
+segundos, sem aprovação de capacidade ou endurance.
+[Evidência](results/stress/semantic-real-backend-smokes.json).
+
+A revisão encontrou ainda uma janela entre conferir a identidade do processo
+controlador e sinalizar seu PID numérico. O watchdog agora abre um `pidfd`,
+confere início/UID e envia SIGTERM pelo descritor, preservando a identidade
+do processo. Duas regressões usam processos reais e proíbem o caminho com
+`os.kill`; 138 testes Python passaram em 5,653 s. A aceitação nativa
+`native-guards-002` provocou uma lacuna de amostragem de 31 segundos: o
+watchdog encerrou um gerador real por pidfd/SIGKILL e seu controlador por
+pidfd/SIGTERM, rejeitou quatro operações sobre recursos de outra fixture e
+preservou seu container/volume até a limpeza explicitamente pertencente a
+essa fixture. Limpeza confirmada em ambas.
+[Evidência](results/stress/native-guards-pidfd.json).

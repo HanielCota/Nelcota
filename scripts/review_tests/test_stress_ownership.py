@@ -91,6 +91,19 @@ class EmergencyTrafficStop(unittest.TestCase):
         self.addCleanup(finish)
         return process
 
+    def test_owner_termination_uses_a_bound_pidfd_and_no_numeric_kill(self):
+        from watchdog import process_identity, stop_owner
+        process = self.child()
+        with mock.patch('watchdog.os.kill', side_effect=AssertionError('Numeric PID kill is unsafe')):
+            self.assertTrue(stop_owner({'pid': process.pid, 'process_identity': process_identity(process.pid)}))
+        self.assertEqual(process.wait(timeout=5), -signal.SIGTERM)
+
+    def test_reused_owner_identity_cannot_signal_the_new_task(self):
+        from watchdog import stop_owner
+        process = self.child()
+        self.assertFalse(stop_owner({'pid': process.pid, 'process_identity': '1'}))
+        self.assertIsNone(process.poll())
+
     def test_pidfd_stops_owned_traffic_without_a_docker_request(self):
         from watchdog import atomic_json,process_identity,stop_generator
         process=self.child()

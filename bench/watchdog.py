@@ -20,6 +20,29 @@ def process_identity(pid):
         return None
 
 
+def stop_owner(manifest):
+    """Bind termination to the original task, even if its numeric PID is reused."""
+    descriptor = None
+    try:
+        pid = manifest['pid']
+        start = manifest['process_identity']
+        if isinstance(pid, bool) or not isinstance(pid, int) or pid <= 1 or not isinstance(start, str) or not start.isdigit():
+            return False
+        descriptor = os.pidfd_open(pid)
+        if process_identity(pid) != start:
+            return False
+        uid = next(int(line.split()[1]) for line in Path(f'/proc/{pid}/status').read_text().splitlines() if line.startswith('Uid:'))
+        if uid != os.getuid():
+            return False
+        signal.pidfd_send_signal(descriptor, signal.SIGTERM)
+        return True
+    except (OSError, ValueError, KeyError, StopIteration, AttributeError):
+        return False
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+
+
 def stop_generator(manifest):
     """Stop known owned traffic even when the Docker API is unavailable."""
     path=Path(manifest['output'])/'generator-process.json'
@@ -148,8 +171,7 @@ def main():
         if reason:
             atomic_json(root / 'watchdog-stop.json', {'reason': reason, 'monotonic': now})
             stop_generator(manifest)
-            if process_identity(manifest['pid']) == manifest['process_identity']:
-                os.kill(manifest['pid'], signal.SIGTERM)
+            stop_owner(manifest)
             cleanup(manifest)
             return
         time.sleep(2)
