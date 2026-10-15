@@ -112,6 +112,7 @@ def campaign(args):
                    'browser_fixture_disk_mib':3072,
                    'session_seconds':args.session_seconds, 'tabs':3, 'pressure_rest_cycles':5,
                    'navigation_interval_minimum_ms':100, 'maximum_API_requests':12000, 'maximum_API_requests_per_second':64,
+                   'SDK_additional_read_retries':2, 'SDK_mutation_retries':0,
                    'maximum_decoded_network_mib':128, 'feedback_p95_ms':1000,
                    'maximum_heap_growth_per_page_mib':8, 'maximum_node_growth_per_page':250, 'maximum_listener_growth_per_page':32,
                    'private_PID_namespace':True, 'browser_OS_sandbox':'outer owned nonroot container, all capabilities dropped, read-only root, no-new-privileges; Chromium sandbox disabled inside it',

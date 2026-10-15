@@ -142,7 +142,7 @@ async def main():
             for page in pages:
                 await page.evaluate('''async ({base,key}) => {
                   const sdk=await import('/g05-sdk/index.js'); window.g05SDK=sdk;
-                  window.g05Client=sdk.createClient(base,{auth:{storageKey:key}});
+                  window.g05Client=sdk.createClient(base,{retries:2,auth:{storageKey:key}});
                 }''', {'base':base, 'key':fixture['storage_key']})
             signin = await pages[0].evaluate('''async ({email,password,user}) => {
               const value=await window.g05Client.auth.signInWithPassword({email,password});
@@ -175,14 +175,25 @@ async def main():
                   return {code:result.error?.code,hasData:result.data!==null};
                 }''')
                 await asyncio.sleep(1)
+                offline_attempts = paths[rest_path]-before_offline
+                save(output/'browser-offline-read.json', {'actual_attempts':offline_attempts, 'maximum_attempts':3, 'configured_additional_read_retries':2, 'code':disconnected['code'], 'has_data':disconnected['hasData']})
                 require(disconnected['code']=='network_error' and not disconnected['hasData'], 'offline_SDK_reported_success')
-                require(paths[rest_path]-before_offline <= 1, 'offline_SDK_retried_without_contract')
+                require(offline_attempts==3, 'offline_SDK_exceeded_or_missed_declared_read_retry_contract')
+                before_mutation = paths[rest_path]
+                offline_mutation = await pages[0].evaluate('''async ({user}) => {
+                  const result=await window.g05Client.from('bench_private').insert({id:-1,user_id:user,body:'owned-offline-canary'}).timeout(3000);
+                  return {code:result.error?.code,hasData:result.data!==null};
+                }''', {'user':fixture['user']})
+                await asyncio.sleep(1)
+                offline_mutation_attempts = paths[rest_path]-before_mutation
+                require(offline_mutation['code']=='network_error' and not offline_mutation['hasData'] and offline_mutation_attempts==1, 'offline_SDK_mutation_retry_or_false_success')
             finally:
                 await context.set_offline(False)
             for page in pages:
                 await sdk_read(page)
                 await navigate(page, 'bench_alternate', 'alternate:')
                 await navigate(page, 'bench_products', 'project-0:')
+            require(await pages[0].evaluate('''async () => {const result=await window.g05Client.from('bench_private').select('id').eq('id',-1);return !result.error&&Array.isArray(result.data)&&result.data.length===0;}'''), 'offline_mutation_was_committed_or_replayed')
             state['phase'] = 'real-response-cancellation'
             delayed = []
             async def hold_actual_response(pattern, action, continuation):
@@ -393,6 +404,8 @@ async def main():
                       'decoded_network_bytes':state['decoded_network_bytes'], 'auth_grants':dict(grants), 'auth_consumers':dict(consumers),
                       'sdk_RLS_reads':reads, 'cross_tab_refresh_coalesced':True, 'actual_credential_renewal':True,
                       'offline_reconnect':True, 'offline_read_error':disconnected['code'],
+                      'offline_read_attempts':offline_attempts, 'configured_additional_read_retries':2,
+                      'offline_mutation_attempts':offline_mutation_attempts, 'offline_mutation_not_replayed':True,
                       'actual_server_response_controls':delayed, 'late_response_view_preserved':True, 'inflight_SDK_cancellation':True,
                       'upload_conflict_File_ownership_cycles':6, 'real_upload_HTTP_status_counts':dict(uploads),
                       'uploaded_file_integrity':file_integrity, 'real_file_preview_cycles':5,
