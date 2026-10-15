@@ -14,6 +14,7 @@ FIELDS.append('harness_js_sha256')
 FIELDS.append('client_initialization')
 FIELDS.append('webhooks')
 FIELDS.append('ingress')
+FIELDS.append('startup_disk_budget')
 
 
 def positive(value):

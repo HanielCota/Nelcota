@@ -278,6 +278,13 @@ arrival ordinal preserves the declared operation mix; initializing a new VU
 cannot silently add hashing to nominal traffic. Bootstrap uses its own metric
 project tag and is excluded from nominal throughput/latency and effective load
 duration. The preparation profile and exact JavaScript hash must match.
+Every successful operation checks its response contract, including filtered and
+ordered fixture rows, RLS identities, the panel's `size=20` pagination, session
+identity and safe expiry, and upload size/SHA-256 receipts. Writes explicitly
+request and validate their returned representation. A generic 2xx response is
+insufficient. The native oracle control also accepts
+`--semantic-baseline-script PATH` to preserve and reproduce older false passes;
+its controlled HTTP fixture is never backend or endurance evidence.
 `--calibration-ceiling N` caps the provisional arrival rate before measurement;
 it does not waive any SLO/delivery gate or certify the observed median as stable.
 Retain failed higher-rate investigations separately. `--s3-memory-mib 512|1024`
@@ -310,6 +317,7 @@ python3 bench/launch.py --run-id fault-smoke --kind fault --binary target/releas
 python3 bench/launch.py --run-id fault-pass-1 --kind fault --binary target/release/nelcota --capacity --s3-faults
 python3 bench/host_compare.py target/stress-g05/host-before target/stress-g05/host-after --output target/stress-g05/host-comparison.json
 python3 bench/evidence.py target/stress-g05/disk-pass-1 --output target/stress-public/disk-pass-1
+python3 bench/guard_check.py --output target/stress-g05/native-guards
 ```
 
 Functional smoke has no capacity claim. Full fault mode holds four five-minute
@@ -335,3 +343,19 @@ owns and joins its intermediary and closes both sockets.
 Public bundles contain bounded structured outcomes and hashes. Raw logs,
 credential fixtures, database dumps and free-form diagnostics stay private.
 Failed/invalid evidence remains explicit; the exporter does not certify G05.
+
+With host `--caddy`, a separate nominal traffic phase applies a syntactically
+valid proxy configuration containing an occupied, verified owned backend port.
+The real admin reload must reject the bind, the original configuration is
+explicitly restored, and every project must return correct data and reject an
+invalid credential over verified HTTPS. Proxy PID/start identity must remain
+unchanged; nominal SLO and arrival gates still apply. This local ingress fault
+does not certify public DNS/ACME or production deployment recovery.
+The fixture retains the image's exact executable bytes while stripping file
+capabilities from its owned copy, so unprivileged high ports work with
+`cap-drop ALL` and `no-new-privileges`. The binary SHA-256, image digest and
+128-MiB proxy disk budget are recorded before traffic.
+Fleet preflight includes image storage-driver costs independently from database
+data. VFS reserves two full container-layer copies plus a margin per project;
+unknown drivers or invalid image sizes require an explicit supported profile.
+An insufficient reserve blocks preparation before containers are created.

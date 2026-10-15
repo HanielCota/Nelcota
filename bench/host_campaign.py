@@ -1,7 +1,8 @@
 """Bounded independent 1/5/10-project clusters; local Docker ingress only.
 
 This measures application/database isolation and shared CPU interference.
-It does not certify the production controller, Caddy, public TLS or a VPS.
+Optional Caddy covers verified local HTTPS and reload rejection, without
+certifying the production controller, public TLS or a VPS.
 """
 import argparse
 import hashlib
@@ -32,6 +33,26 @@ from fleet_webhooks import FleetWebhooks
 from ingress import Ingress
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def startup_disk_budget(images, projects, caddy=False):
+    if not isinstance(images, list) or len(images) != 2 or any(not isinstance(image, dict) for image in images) or isinstance(projects, bool) or not isinstance(projects, int) or projects not in (1, 5, 10):
+        raise ValueError('Startup budget requires two image profiles and an independent topology')
+    sizes = [image.get('Size') for image in images]
+    if any(isinstance(size, bool) or not isinstance(size, int) or not 0 < size <= 2*1024**3 for size in sizes):
+        raise ValueError('Invalid fixture image size evidence')
+    drivers = [image.get('GraphDriver', {}).get('Name') for image in images]
+    if any(driver not in ('vfs', 'overlay2', 'overlayfs', 'fuse-overlayfs', 'btrfs', 'zfs', 'devicemapper') for driver in drivers):
+        raise ValueError('Unknown fixture image storage driver requires a declared startup profile')
+    copy_factor = 1
+    if 'vfs' in drivers:
+        copy_factor = 2
+    per_project = max(400, math.ceil(sum(sizes)*copy_factor/1024**2)+64)
+    total = projects*per_project+512
+    if caddy:
+        total += 128
+    return {'per_project_mib':per_project, 'container_layer_copy_factor':copy_factor,
+            'total_startup_mib':total, 'image_storage_drivers':drivers}
 
 
 def fairness_violations(baseline, candidate, offered, seconds):
@@ -84,7 +105,11 @@ def campaign(args):
         raise RuntimeError('Host cannot cover the declared CPU, memory and disk reserves')
     if args.caddy and (len(cpus) < 5 or effective_cpus(cpus) < 4):
         raise RuntimeError('Real Caddy profile requires five affinity slots and four effective CPUs including reserves')
-    validate_disk_headroom(output,args.disk_mib,startup_mib=args.projects*400+512)
+    fixture_images = [json.loads(docker('image', 'inspect', name))[0] for name in ['ubuntu:24.04', 'postgres:17-alpine']]
+    startup_budget = startup_disk_budget(fixture_images, args.projects, args.caddy)
+    atomic_json(output/'preflight-budget.json', {**startup_budget, 'separate_database_data_mib':args.disk_mib,
+                'minimum_free_disk_fraction':.15, 'resource_creation_started':False})
+    validate_disk_headroom(output,args.disk_mib,startup_mib=startup_budget['total_startup_mib'])
     identity = 'nelcota-fleet-' + secrets.token_hex(16)
     owned=OwnedDocker(identity,docker)
     telemetry, generator = identity + '-metrics', identity + '-load'
@@ -138,6 +163,7 @@ def campaign(args):
             for project in projects:
                 webhooks.attach(project)
         profile=json.loads((output/'manifest.json').read_text())
+        profile['startup_disk_budget'] = {**startup_budget, 'separate_database_data_mib':args.disk_mib}
         profile['ingress'] = {'kind': 'direct loopback HTTP'}
         if ingress is not None:
             profile['scope'] = 'local independent app/PG clusters with verified local Caddy, no public DNS/controller'
@@ -238,7 +264,7 @@ def campaign(args):
         sampler = threading.Thread(target=sample, daemon=True)
         sampler.start()
 
-        def run(label, rates, hot='', overload=False, seconds=None):
+        def run(label, rates, hot='', overload=False, seconds=None, action=None):
             nonlocal phase, active_generator, load_seconds
             if seconds is None:
                 seconds = args.seconds
@@ -254,11 +280,18 @@ def campaign(args):
             with (output/(label+'.log')).open('w') as target:
                 process = subprocess.Popen(command, stdout=target, stderr=subprocess.STDOUT, env={**os.environ, 'FIXTURE':json.dumps({'projects':fixtures})})
                 active_generator = {'process':process, 'name':generator, 'identity':identity, 'phase':label, 'started':start}
+                action_completed = action is None
+                next_action_probe = start
                 try:
                     while process.poll() is None:
                         if critical.wait(.25) or watchdog.poll() is not None or time.monotonic()-start > seconds+120:
                             stop_generator(manifest)
                             raise RuntimeError('Fleet observation, watchdog or duration gate stopped traffic')
+                        if not action_completed and time.monotonic() >= next_action_probe:
+                            next_action_probe = time.monotonic()+2
+                            if metrics.value('sum(k6_iterations_total{run_id="'+label+'"})', optional=True) > 0:
+                                action()
+                                action_completed = True
                 finally:
                     elapsed = time.monotonic()-start
                     with (output/'traffic-ledger.jsonl').open('a') as target:
@@ -270,6 +303,8 @@ def campaign(args):
                     atomic_json(output/(label+'-metrics-raw.json'), metrics.snapshot(label))
             if process.returncode or elapsed < seconds:
                 raise RuntimeError('Fleet generator failed or ended before its measured interval')
+            if not action_completed:
+                raise RuntimeError('Fleet fault was not injected during positive traffic')
             reports = {project.label:metrics.summary(label,seconds,project.label) for project in projects}
             atomic_json(output/(label+'.json'), reports)
             load_seconds += seconds
@@ -318,6 +353,17 @@ def campaign(args):
             balanced_samples.append(reports)
         baseline = median_baseline(balanced_samples)
         atomic_json(output/'balanced-median.json',baseline)
+        if ingress is not None:
+            reports = run('proxy-reload', [nominal_rate]*args.projects, action=lambda: ingress.reload_failure(projects, output))
+            failures = []
+            for label, report in reports.items():
+                failures.extend({'project':label, **item} for item in nominal_violations(report, 'mixed'))
+                values = report['metrics']
+                if values['overload_rejections']['count'] or values['iterations']['count'] < nominal_rate*args.seconds*.99 or values['dropped_iterations']['count'] > nominal_rate*args.seconds*.01:
+                    failures.append({'project':label, 'arrival_or_rejection_gate':False})
+            atomic_json(output/'proxy-reload-gates.json', failures)
+            if failures:
+                raise RuntimeError('Proxy reload fault violated nominal service gates')
         if args.projects > 1:
             for hot in ['mixed','login','read','storage','write']:
                 reports = run('noisy-'+hot, [4*(args.projects-1)*nominal_rate]+[nominal_rate]*(args.projects-1), hot)

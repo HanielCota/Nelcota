@@ -426,3 +426,59 @@ pidfd/SIGTERM, rejeitou quatro operações sobre recursos de outra fixture e
 preservou seu container/volume até a limpeza explicitamente pertencente a
 essa fixture. Limpeza confirmada em ambas.
 [Evidência](results/stress/native-guards-pidfd.json).
+
+
+### 2026-10-15 15:22 UTC — Caddy real, reload e dez projetos
+
+As duas primeiras preparações de Caddy falharam antes do tráfego e foram
+limpas. O segundo diagnóstico preservou `exec /usr/bin/caddy: operation not
+permitted`; a leitura da imagem confirmou `cap_net_bind_service=ep`. Com
+capabilities removidas do bounding set, esse arquivo não podia ser executado.
+A fixture agora copia exatamente os bytes da imagem sem atributos de
+capability, confere o SHA-256, monta o executável somente para leitura e
+preserva usuário sem privilégios, `cap-drop ALL` e `no-new-privileges`. O
+orçamento próprio do proxy passa a 128 MiB de disco, incluindo essa cópia,
+sem alterar quotas de CPU/RAM nem SLOs.
+
+`fleet-caddy-1-smoke-003` passou: 120 segundos de tráfego, 27 amostras, HTTPS
+com CA verificada e controle negativo da CA não confiável, 24 eventos assinados
+reconciliados e limpeza. Durante tráfego nominal, uma configuração válida
+com listener adicional sobre uma porta ocupada pela aplicação foi realmente
+rejeitada pelo admin de Caddy. A configuração original foi reaplicada,
+consultas reais e JWT inválido/401 foram conferidos, o mesmo processo
+permaneceu ativo e todos os gates nominais da etapa passaram. Recuperação
+medida após reaplicação: 0,108 s; procedimento inteiro: 0,420 s. Isso não
+certifica DNS/ACME público nem o controlador de produção.
+[Evidência](results/stress/caddy-before-after.json).
+
+A preparação inicial de dez projetos foi bloqueada por headroom insuficiente,
+antes de criar recursos. Para preservar a mesma carga e os mesmos limites,
+1.613.082.512 bytes de caches `.rlib` recentes foram transferidos, com hashes
+conferidos e links preservados, para RAM disponível. O espaço livre real em
+`/workspace` aumentou de 11.450.265.600 para 12.995.010.560 bytes. Nenhum banco,
+objeto nem executável de benchmark foi movido para tmpfs. A nova tentativa
+`fleet-caddy-10-smoke-002` mantém os parâmetros e a reserva de 15%; segue em
+preparação/validação e ainda não representa aprovação de isolamento/fairness.
+
+
+### 2026-10-15 15:33 UTC — limite real da topologia de dez projetos
+
+`fleet-caddy-10-smoke-002` foi encerrado automaticamente durante a criação
+dos clusters por `host_disk_reserve`, antes de iniciar carga. A limpeza de
+todos os recursos próprios foi confirmada. A estimativa anterior de 400 MiB
+por projeto não cobria o custo do driver `vfs`; a nova estimativa considera
+os tamanhos reais das imagens, duas cópias de camadas nesse driver, margem
+por projeto, proxy e orçamento separado para dados PostgreSQL. A repetição
+`fleet-caddy-10-preflight-003` foi barrada antes de criar qualquer recurso.
+Duas regressões conferem a rejeição antecipada e impedem estimativas com
+tamanho inválido ou driver desconhecido; 140 testes passaram em 6,617 s.
+[Evidência](results/stress/fleet-vfs-headroom-before-after.json).
+
+Uma tentativa adicional de realocar 4.298.415.884 bytes de caches antigos
+não liberou espaço: esses arquivos pertenciam à camada inferior do overlay.
+As cópias e seus hashes foram preservados; isso não constitui capacidade de
+disco adicional. O perfil declarado de dez projetos precisa de aproximadamente
+15,5 GiB inicialmente livres neste filesystem/driver, acima dos cerca de
+12,1 GiB disponíveis após a limpeza. Essa célula permanece bloqueada por
+recursos; não será substituída por dez bancos no mesmo cluster nem por dados
+em tmpfs. A validação real de cinco projetos segue com os limites originais.

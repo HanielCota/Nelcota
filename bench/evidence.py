@@ -15,6 +15,11 @@ STATIC.add('resource-plateaus.json')
 STATIC.add('lost-commit-replies.json')
 STATIC.update({'webhook-invariants.json', 'webhook-cleanup.json'})
 STATIC.add('proxy.json')
+STATIC.add('proxy-reload-failure.json')
+STATIC.add('proxy-reload-gates.json')
+STATIC.add('proxy-startup-failure.json')
+STATIC.add('native-guards.json')
+STATIC.add('preflight-budget.json')
 STATIC.update({'observer-reconnection.json', 'sparse-counter-before-after.json'})
 FREEFORM={'message','diagnostic','error','stack','traceback','sql','payload','body'}
 
