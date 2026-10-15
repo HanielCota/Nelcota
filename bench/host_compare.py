@@ -10,6 +10,7 @@ FIELDS=['schema','scope','projects','rows_per_project','shared_user_id','cpu_eff
 OPERATIONS=['read','rls','panel','storage','login','refresh','write']
 FIELDS.append('resource_protocol')
 FIELDS.append('container_log_profile')
+FIELDS.append('harness_js_sha256')
 
 
 def positive(value):

@@ -232,6 +232,17 @@ record 30 seconds of final rest. Queue drain, connections, locks, process owners
 and component cgroups are retained in `resource-plateaus.json`. Rest is excluded
 from effective load duration; interpreting live-owner growth still requires the
 full timeline and application evidence.
+Public object reads also verify their actual payload during traffic. Successful
+HTTP status cannot mask wrong/truncated bytes or a transport error. The workload
+JavaScript hash participates in regression-profile matching.
+
+```sh
+python3 bench/oracle_check.py --output target/stress-oracles/bytes
+```
+
+This short native k6 control uses a bounded HTTP fixture to prove that the
+benchmark oracle accepts correct bytes and rejects corrupt/truncated HTTP 200
+responses. It does not certify the Rust backend, real S3 or endurance.
 
 Use `--rows 1000000` for the separate million-row investigation and
 `--object-bytes 1048576` for 1-MiB transfers. These profiles need separate

@@ -72,18 +72,20 @@ function request(name, method, path, { body = null, token, cookie } = {}) {
   if (token) { headers.Authorization = `Bearer ${token}`; }
   if (cookie) { headers.Cookie = cookie; }
   let responseType = 'none';
-  if (['rls','login','refresh'].includes(name) || (fixture.marker && ['read','storage'].includes(name))) { responseType = 'text'; }
+  if (['rls','login','refresh'].includes(name) || (name === 'storage' && method === 'GET') || (fixture.marker && name === 'read')) { responseType = 'text'; }
   const response = http.request(method, base + path, body, { headers, responseType, timeout: '12s', tags: { workload: name } });
-  const ok = response.status >= 200 && response.status < 300;
+  const successStatus = response.status >= 200 && response.status < 300;
+  const ok = successStatus && response.error_code === 0;
   if (ok) {
     timings[name].add(response.timings.duration);
     successfulOperations.add(1, { workload: name });
     successfulDuration.add(response.timings.duration);
   }
-  const bounded = __ENV.OVERLOAD === 'true' && [429, 503, 504].includes(response.status);
+  const bounded = __ENV.OVERLOAD === 'true' && [429, 503, 504].includes(response.status) && [0, 1000 + response.status].includes(response.error_code);
   overloadRejections.add(0);
   if (bounded) { overloadRejections.add(1); }
   assertionsFailed.add(0);
+  if (successStatus && !ok) { fail('http_transport', name, response.status); }
   if (!ok && !bounded) { fail('unexpected_http_status', name, response.status); }
   assertionsPassed.add(1);
   unexpected.add(false);
@@ -123,7 +125,13 @@ function storage() {
   }
   if (operation === 1) {
     const result = request('storage','GET','/storage/v1/object/public/bench/fixture.txt');
-    if (fixture.marker && result.status === 200 && result.body !== JSON.stringify(fixture.marker+' payload')) { fail('object_bytes', 'storage', result.status); }
+    if (result.status >= 200 && result.status < 300 && result.status !== 200) { fail('object_status', 'storage', result.status); }
+    if (result.status === 200) {
+      let expected=payload();
+      if (fixture.marker || objectBytes===17) { expected=JSON.stringify(expected); }
+      if (result.body !== expected) { fail('object_bytes', 'storage', result.status); }
+      assertionsPassed.add(1);
+    }
     return;
   }
   request('storage','PUT',`/storage/v1/object/bench/probe-${__VU}.txt`,{body:payload(),token:fixture.service});
@@ -165,7 +173,7 @@ const operations = {read,rls,panel,storage,login,refresh,write};
 function rejectInvalidCredential() {
   if ((__ITER + __VU) % (fleet ? 10 : 1000) !== 0) { return; }
   const result = http.get(base + '/rest/v1/bench_private?limit=1', { headers: { Authorization: 'Bearer ' + fixture.invalid_access }, responseType: 'none', timeout: '5s', tags: { workload: 'security' } });
-  if (result.status !== 401) { fail('invalid_credential_response', 'security', result.status); }
+  if (result.status !== 401 || ![0,1401].includes(result.error_code)) { fail('invalid_credential_response', 'security', result.status); }
   assertionsPassed.add(1);
   expectedRejections.add(1);
 }
@@ -174,7 +182,7 @@ export default function runCurrent() {
   if (fleet && (__ITER + __VU) % 10 === 0 && projects.length > 1) {
     const foreign = projects[(projectIndex+1)%projects.length];
     const result = http.get(base+'/rest/v1/bench_products?limit=1',{headers:{Authorization:'Bearer '+foreign.service},responseType:'none',timeout:'5s',tags:{workload:'cross-project'}});
-    if (result.status !== 401) { fail('foreign_credential_response', 'cross-project', result.status); }
+    if (result.status !== 401 || ![0,1401].includes(result.error_code)) { fail('foreign_credential_response', 'cross-project', result.status); }
     assertionsPassed.add(1); expectedRejections.add(1);
   }
   if (fleet && projectIndex === 0 && __ENV.HOT_WORKLOAD && __ENV.HOT_WORKLOAD !== 'mixed') { operations[__ENV.HOT_WORKLOAD](); return; }
