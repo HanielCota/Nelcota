@@ -59,8 +59,9 @@ for directory in [args.baseline,args.candidate]:
 for field in ["steady_duration", "workloads", "s3", "schema", "metrics_backend", "metrics_memory_mb", "metrics_cpus", "metrics_cpu_affinity", "effective_cpu_quota", "offered_rate_unit", "nominal_slos_ms", "auth_rate_limit_per_minute", "autovacuum", "webhook_history_maintenance", "storage_filesystem", "physical_seeded_objects", "object_payload_bytes", "max_storage_fixture_disk_mib"]:
     if any(field in value for value in metadata):
         fixture_fields.append(field)
-if any('resource_protocol' in value for value in metadata):
-    fixture_fields.append('resource_protocol')
+for field in ['resource_protocol','postgres_observation_settings','soak_fraction']:
+    if any(field in value for value in metadata):
+        fixture_fields.append(field)
 fixture_differences = [
     field
     for field in fixture_fields

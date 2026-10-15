@@ -54,10 +54,13 @@ const assertionsPassed = new Counter('assertions_passed');
 const assertionsFailed = new Counter('assertions_failed');
 const expectedRejections = new Counter('expected_rejections');
 const overloadRejections = new Counter('overload_rejections');
-function fail() {
+const invariantFailures = new Counter('invariant_failures');
+function fail(reason = 'assertion', workload = 'invariant', status = 0) {
   assertionsFailed.add(1);
   unexpected.add(true);
-  execution.test.abort('Stress correctness invariant failed');
+  // Fixed operation labels and numeric status only: no URLs, bodies or tokens.
+  invariantFailures.add(1, { reason, workload, status: String(status) });
+  execution.test.abort(`Stress invariant failed: ${reason}; workload=${workload}; status=${status}`);
 }
 const timings = Object.fromEntries(['read','rls','panel','storage','login','refresh','write'].map(name => [name, new Trend(`latency_${name}`, true)]));
 let refreshToken;
@@ -81,7 +84,7 @@ function request(name, method, path, { body = null, token, cookie } = {}) {
   overloadRejections.add(0);
   if (bounded) { overloadRejections.add(1); }
   assertionsFailed.add(0);
-  if (!ok && !bounded) { fail(); }
+  if (!ok && !bounded) { fail('unexpected_http_status', name, response.status); }
   assertionsPassed.add(1);
   unexpected.add(false);
   check(response, { [`${name}: bounded response`]: () => ok || bounded });
@@ -92,8 +95,8 @@ function read() {
   const result = request('read','GET',`/rest/v1/bench_products?stock=eq.${__ITER % 50}&order=id&limit=20`);
   if (fixture.marker && result.status === 200) {
     let rows;
-    try { rows = result.json(); } catch { fail(); return; }
-    if (!Array.isArray(rows) || !rows.length || !rows.every(row => row && typeof row.name === 'string' && row.name.startsWith(fixture.marker))) { fail(); }
+    try { rows = result.json(); } catch { fail('malformed_read', 'read', result.status); return; }
+    if (!Array.isArray(rows) || !rows.length || !rows.every(row => row && typeof row.name === 'string' && row.name.startsWith(fixture.marker))) { fail('project_read_boundary', 'read', result.status); }
     assertionsPassed.add(1);
   }
 }
@@ -102,9 +105,9 @@ function rls() {
   const result = request('rls','GET','/rest/v1/bench_private?order=id&limit=20',{token:accessToken});
   if (result.status === 200) {
     let rows;
-    try { rows = result.json(); } catch { fail(); return; }
+    try { rows = result.json(); } catch { fail('malformed_rls', 'rls', result.status); return; }
     const isolated = Array.isArray(rows) && rows.length > 0 && rows.every(row => row !== null && typeof row === 'object' && row.user_id === fixture.user && (!fixture.marker || row.body === fixture.label));
-    if (!isolated) { fail(); }
+    if (!isolated) { fail('rls_boundary', 'rls', result.status); }
     assertionsPassed.add(1);
     check(result, { 'RLS preserves ownership': () => isolated });
   }
@@ -120,7 +123,7 @@ function storage() {
   }
   if (operation === 1) {
     const result = request('storage','GET','/storage/v1/object/public/bench/fixture.txt');
-    if (fixture.marker && result.status === 200 && result.body !== JSON.stringify(fixture.marker+' payload')) { fail(); }
+    if (fixture.marker && result.status === 200 && result.body !== JSON.stringify(fixture.marker+' payload')) { fail('object_bytes', 'storage', result.status); }
     return;
   }
   request('storage','PUT',`/storage/v1/object/bench/probe-${__VU}.txt`,{body:payload(),token:fixture.service});
@@ -128,9 +131,9 @@ function storage() {
 function installSession(result) {
   if (result.status !== 200) { return false; }
   let value;
-  try { value = result.json(); } catch { fail(); return false; }
+  try { value = result.json(); } catch { fail('malformed_session', 'auth', result.status); return false; }
   if (!value || typeof value.access_token !== 'string' || !value.access_token || typeof value.refresh_token !== 'string' || !value.refresh_token || !Number.isFinite(value.expires_in) || value.expires_in <= 0) {
-    fail();
+    fail('invalid_session_contract', 'auth', result.status);
     return false;
   }
   accessToken = value.access_token;
@@ -162,7 +165,7 @@ const operations = {read,rls,panel,storage,login,refresh,write};
 function rejectInvalidCredential() {
   if ((__ITER + __VU) % (fleet ? 10 : 1000) !== 0) { return; }
   const result = http.get(base + '/rest/v1/bench_private?limit=1', { headers: { Authorization: 'Bearer ' + fixture.invalid_access }, responseType: 'none', timeout: '5s', tags: { workload: 'security' } });
-  if (result.status !== 401) { fail(); }
+  if (result.status !== 401) { fail('invalid_credential_response', 'security', result.status); }
   assertionsPassed.add(1);
   expectedRejections.add(1);
 }
@@ -171,7 +174,7 @@ export default function runCurrent() {
   if (fleet && (__ITER + __VU) % 10 === 0 && projects.length > 1) {
     const foreign = projects[(projectIndex+1)%projects.length];
     const result = http.get(base+'/rest/v1/bench_products?limit=1',{headers:{Authorization:'Bearer '+foreign.service},responseType:'none',timeout:'5s',tags:{workload:'cross-project'}});
-    if (result.status !== 401) { fail(); }
+    if (result.status !== 401) { fail('foreign_credential_response', 'cross-project', result.status); }
     assertionsPassed.add(1); expectedRejections.add(1);
   }
   if (fleet && projectIndex === 0 && __ENV.HOT_WORKLOAD && __ENV.HOT_WORKLOAD !== 'mixed') { operations[__ENV.HOT_WORKLOAD](); return; }

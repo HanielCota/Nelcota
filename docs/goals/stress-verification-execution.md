@@ -58,7 +58,9 @@ reais. Limpeza manual do histórico aguarda a remoção desses eventos pelo prun
   A repetição em disco passou com a nova coleta de histogramas.
 - Smoke S3 real com 90 segundos de soak: passou; 4.719 eventos únicos observados,
   zero ausentes/extras e bytes verificados em 33 objetos.
-- Regressões Python relacionadas: 41 passaram na última verificação registrada.
+- Regressões Python: a descoberta completa de `scripts/review_tests` passou com
+  98 testes em 2,577 s no commit `855e8f7`. As 11 regressões de ownership/portas
+  passaram após a correção seguinte. Os 18 checks de CI também passaram em `855e8f7`.
   O registro final atualizará a contagem e o SHA correspondente.
 - Preflight com SLOs ativos: reprovou o login, p95 de 995 ms com alvo de
   750 ms, em carga estimada de 572 iterações/s. O critério foi preservado;
@@ -102,9 +104,8 @@ Não haverá deploy de produção ou merge automático.
   corrigidos. A repetição `fleet-1-smoke-002` passou por três intervalos de
   30 segundos, com métricas individuais e cleanup confirmado. É um smoke,
   sem certificação de etapas de cinco minutos ou de capacidade de dez projetos.
-- `disk-pass-1-004` está em andamento com fonte congelada e o mesmo executável
-  imutável. O status final depende das quatro horas contínuas, invariantes,
-  retenção, recursos e cleanup; iniciar a campanha não aprova o endurance.
+- `disk-pass-1-004` usou fonte congelada e o executável imutável. A campanha
+  foi reprovada e removida com cleanup confirmado; o diagnóstico está abaixo.
 
 
 ## Primeiro endurance em execução
@@ -125,8 +126,10 @@ nativos no perfil local declarado.
 
 O comportamento não foi monotônico entre amostras; as falhas foram preservadas.
 A campanha repetiu capacidade, saturação, cinco ciclos de pico/recuperação e
-reinício antes de iniciar 14.400 segundos contínuos a 458 iterações/s. O resultado
-ainda está pendente. Preparação e espera não entram nos 4.395 segundos concluídos.
+reinício antes de iniciar uma tentativa de 14.400 segundos contínuos a 458
+iterações/s. A tentativa foi interrompida após 10.679,235 segundos por uma falha
+inesperada. Não há aprovação de quatro horas. Preparação e espera não entram nos
+4.395 segundos de intervalos concluídos; a carga interrompida é registrada à parte.
 
 Esse snapshot usa 10.000 registros de listagem sintéticos da fixture anterior.
 A integridade cobre os objetos efetivamente publicados pela API. O candidato
@@ -159,3 +162,23 @@ executados e destinos indisponíveis. Os scripts legados que exigem cgroup do
 host privilegiado ou bypass de TLS não foram executados. Não há VM descartável
 com systemd, DNS público, destino off-host ou WAL archive/PITR configurado
 para os respectivos gates neste ambiente.
+
+## Falhas observadas às 07:34–07:43 UTC
+
+- O endurance foi interrompido por um `PATCH` com HTTP 504. O PostgreSQL registrou
+  statement timeout de três segundos ao atualizar `webhook_queue_usage`, além
+  de espera na linha de `auth.users` no mesmo instante. A causa raiz ainda está
+  em investigação; contenção e I/O são hipóteses, não conclusões.
+- As duas coortes de auth e webhooks foram removidas pelos pruners reais.
+  No fim observado, RSS era 48.728 KiB, oito threads; descritores caíram de 152
+  para 24 quando o gerador parou. A fila drenou a zero e não havia transação idle
+  no último sample. A reconciliação final não executou, portanto não há aprovação
+  integral de integridade ou recursos para essa tentativa.
+- O smoke `fault-real-s3-smoke-001` falhou na recuperação do banco, antes do S3.
+  Uma reprodução isolada comprovou mudança de porta Docker após stop/start:
+  `32800` → `32801`. O executor agora usa porta explícita em loopback e confere
+  sua identidade. A repetição isolada preservou a porta; a campanha afetada será
+  repetida. Ambos os runs falhos tiveram teardown confirmado.
+- O novo diagnóstico guarda somente em staging estatísticas e logs privados,
+  com snapshot sintético opcional limitado a 64 MiB e 30 segundos. A coleta é
+  pulada em paradas críticas. Seu resultado não transforma falha em aprovação.

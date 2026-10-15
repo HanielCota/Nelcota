@@ -41,6 +41,7 @@ from observations import generator_observation
 from objects import S3Inventory, disk_inventory, reconcile
 from host_resources import snapshot as host_snapshot, owned_cgroup_snapshot, require_no_oom
 from ownership import OwnedDocker
+from postgres_evidence import STATISTICS_SQL,retain_failure
 
 K6 = "grafana/k6:1.6.1@sha256:a5ad6bc089a08d77c3ec49f3db8c6fa7a148e4073efcac44c675dbaf3568d8e1"
 NOMINAL_SLOS = {"read": (200, 500), "rls": (200, 500), "refresh": (200, 500), "login": (750, 1500), "storage": (500, 2000), "panel": (500, 2000), "write": (500, 1500)}
@@ -372,11 +373,16 @@ def campaign(arguments):
                 "-c",
                 "shared_buffers=64MB",
                 "-c",
-                "max_wal_size=64MB",
+                "max_wal_size="+str(arguments.wal_mib)+"MB",
                 "-c",
                 "min_wal_size=32MB",
                 "-c",
                 "shared_preload_libraries=pg_stat_statements",
+                '-c','track_io_timing=on',
+                '-c','track_wal_io_timing=on',
+                '-c','log_lock_waits=on',
+                '-c','deadlock_timeout=100ms',
+                '-c','log_min_duration_statement=1000',
                 env={"POSTGRES_PASSWORD": pg_password},
             )
             port = int(
@@ -684,7 +690,7 @@ def campaign(arguments):
                 "generator_memory_mb": 512,
                 "generator_go_memory_limit_mib": 448,
                 "pg_data": "disposable disk volume",
-                "max_wal_mb": 64,
+                "max_wal_mb": arguments.wal_mib,
                 "max_fixture_disk_mb": arguments.fixture_disk_mib,
                 "pool": 8,
                 "max_connections": 40,
@@ -703,7 +709,9 @@ def campaign(arguments):
                 "soak_seconds": arguments.soak_seconds,
                 "maximum_campaign_seconds": 21600,
                 "resource_sample_seconds": 5,
-                "resource_protocol":"component cgroup v2 current/peak/stat/events/cpu/pids plus host and process owners",
+                "resource_protocol":"component cgroup v2 current/peak/stat/events/cpu/pids, PostgreSQL IO/WAL/checkpointer/locks and host/process owners",
+                "postgres_observation_settings":{"track_io_timing":True,"track_wal_io_timing":True,"log_lock_waits":True,"deadlock_timeout_ms":100,"log_min_duration_statement_ms":1000},
+                "soak_fraction":arguments.soak_fraction,
                 "metrics_backend": "native Prometheus histogram; k6 raw TrendSink disabled",
                 "metrics_memory_mb": 512,
                 "metrics_cpus": 0.25,
@@ -770,6 +778,7 @@ def campaign(arguments):
                         queue = sql(
                             "SELECT row_to_json(t) FROM (SELECT outstanding,retained FROM nelcota.webhook_queue_usage WHERE singleton) t;"
                         )
+                        database_statistics=json.loads(sql(STATISTICS_SQL))
                         sample_step = "disk_budget"
                         disk = int(
                             owned(
@@ -869,6 +878,7 @@ def campaign(arguments):
                                 ],
                                 "generator": generator_stats,
                                 "database": json.loads(activity),
+                                "postgres_statistics":database_statistics,
                                 "queue": json.loads(queue),
                                 "signature_errors": len(receiver.errors),
                                 "ownership": ownership,
@@ -1021,6 +1031,7 @@ def campaign(arguments):
                     (output / "failures.json").write_text(
                         json.dumps(failures, indent=2)
                     )
+                    retain_failure(output,owned,pg,sql,unsafe=critical.is_set())
                     if not arguments.allow_baseline_failures:
                         raise RuntimeError(
                             "k6 failed: " + label + "; inspect its report"
@@ -1161,7 +1172,7 @@ def campaign(arguments):
                 if not qualified:
                     upper = rate
             throughput = sustainable
-            soak_rate = max(1, int(throughput * 0.8))
+            soak_rate = max(1, int(throughput * arguments.soak_fraction))
             if arguments.soak_rate > 0:
                 soak_rate = arguments.soak_rate
             (output / "capacity.json").write_text(
@@ -1173,6 +1184,7 @@ def campaign(arguments):
                         "qualification_step_seconds":arguments.capacity_step_seconds,
                         "five_minute_qualification":arguments.capacity_step_seconds>=300,
                         "soak_iterations_per_second":soak_rate,
+                        "soak_fraction":arguments.soak_fraction,
                         "soak_rps": soak_rate,
                         "p95_regression_gate": 1.10,
                         "throughput_regression_gate": 0.90,
@@ -1374,7 +1386,7 @@ def campaign(arguments):
                         )
                     )
                     (output / (name.rsplit("-", 1)[-1] + ".log")).write_text(
-                        owned("logs", name, include_stderr=True)
+                        owned("logs", '--tail', '2000', name, include_stderr=True)
                     )
                 except (RuntimeError, subprocess.TimeoutExpired, OSError, ValueError):
                     pass
@@ -1449,6 +1461,8 @@ if __name__ == "__main__":
     )
     parser.add_argument("--soak-seconds", type=int, default=1800)
     parser.add_argument("--fixture-disk-mib", type=int, default=512)
+    parser.add_argument('--wal-mib',type=int,choices=[64,128,256,512],default=64)
+    parser.add_argument('--soak-fraction',type=float,choices=[.7,.75,.8],default=.8)
     parser.add_argument('--storage-fixture-disk-mib',type=int,default=1024)
     parser.add_argument('--rows',type=int,choices=[100000,1000000],default=100000)
     parser.add_argument('--object-bytes',type=int,default=17)
@@ -1479,6 +1493,8 @@ if __name__ == "__main__":
         parser.error("Invalid binary or soak budget")
     if not 512 <= arguments.fixture_disk_mib <= 4096:
         parser.error("Fixture disk budget must be 512 through 4096 MiB")
+    if arguments.fixture_disk_mib<arguments.wal_mib*3:
+        parser.error('Database disk budget must cover three WAL budgets plus its fixture')
     if not 64<=arguments.storage_fixture_disk_mib<=4096 or not 1<=arguments.object_bytes<=1048576:
         parser.error('Storage budget must be 64..4096 MiB; object bytes 1..1048576')
     if not 5 <= arguments.capacity_step_seconds <= 300:

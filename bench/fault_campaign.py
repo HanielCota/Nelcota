@@ -35,6 +35,7 @@ from host_resources import snapshot as host_snapshot, owned_cgroup_snapshot, req
 from ownership import OwnedDocker
 from objects import S3Inventory
 from ports import published_port
+from postgres_evidence import retain_failure
 
 ROOT = Path(__file__).resolve().parents[1]
 MUTATION_PATH='/rest/v1/rpc/stress_transfer'
@@ -761,6 +762,8 @@ def run(args):
         stop.set()
         if sampler is not None:
             sampler.join(timeout=30)
+        if initialized and sys.exception() is not None:
+            retain_failure(output,owned,source.pg,source.sql,unsafe=critical.is_set())
         atomic_json(output/'resource-violations.json',violations)
         if sys.exception() is not None:
             atomic_json(output/'error.json',{'type':type(sys.exception()).__name__})

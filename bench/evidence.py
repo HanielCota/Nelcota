@@ -10,6 +10,7 @@ STATIC={'ownership.json','metadata.json','manifest.json','launch-manifest.json',
 PHASE=re.compile(r'^(?:fresh-|read-|rls-|panel-|storage-|login-|refresh-|mixed-|write-|balanced-|noisy-|capacity-|calibrate-|stress-|overload-|spike-|recovery-|database-|app-|oom-|container-|filesystem-|snapshot-|provider-|baseline|soak)[a-z0-9-]*\.json$')
 SENSITIVE=re.compile(r'(?:password|secret|cookie|authorization|access_token|refresh_token|signed_url|token_hash|jwt)$',re.I)
 STATIC.add('memory-events-violation.json')
+STATIC.add('failure-diagnostics.json')
 FREEFORM={'message','diagnostic','error','stack','traceback','sql','payload','body'}
 
 

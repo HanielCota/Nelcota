@@ -216,6 +216,16 @@ counters include PostgreSQL child OOMs; controller counters describe the control
 Component cgroup observations also retain memory current/peak, anonymous/file
 cache counters, CPU quota/throttling and task gauges. The manifest identifies
 this observation protocol so comparisons cannot silently mix instrumentation.
+PostgreSQL observations include table/vacuum, WAL, checkpointer, I/O and blocker
+statistics. Lock waits and slow statements remain in private fixture logs.
+On an unexpected generator failure, safe host reserves permit a private
+64-MiB-limited database snapshot with a 30-second deadline. Critical resource
+stops skip this extra work; failed/partial diagnostics remain explicit.
+
+`--wal-mib 64|128|256|512` names a separate database resource profile; its disk
+budget must cover at least three WAL budgets. `--soak-fraction 0.7|0.75|0.8`
+chooses the declared share of independently qualified capacity. Defaults remain
+64 MiB and 0.8. Changing either value requires fresh comparable measurements.
 
 Use `--rows 1000000` for the separate million-row investigation and
 `--object-bytes 1048576` for 1-MiB transfers. These profiles need separate
