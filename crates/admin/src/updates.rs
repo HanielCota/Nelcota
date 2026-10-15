@@ -21,6 +21,27 @@ struct Controller {
 #[derive(Deserialize)]
 #[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
 enum Input {
+    HostStatus {
+        key: Option<String>,
+    },
+    HostPlan {
+        operation: nelcota_deployment::management::Operation,
+    },
+    HostStart {
+        plan: String,
+        key: String,
+        password: String,
+        confirmation: String,
+    },
+    HostRecover {
+        job: String,
+        password: String,
+        confirmation: String,
+    },
+    HostLogs {
+        project: String,
+        service: nelcota_deployment::management::LogService,
+    },
     Login {
         email: String,
         password: String,
@@ -153,6 +174,35 @@ async fn action(
     };
     let logout = matches!(input, Input::Logout);
     let request = match input {
+        Input::HostStatus { key } => Request::HostStatus { token, key },
+        Input::HostPlan { operation } => Request::HostPlan { token, operation },
+        Input::HostStart {
+            plan,
+            key,
+            password,
+            confirmation,
+        } => Request::HostStart {
+            token,
+            plan,
+            key,
+            password,
+            confirmation,
+        },
+        Input::HostRecover {
+            job,
+            password,
+            confirmation,
+        } => Request::HostRecover {
+            token,
+            job,
+            password,
+            confirmation,
+        },
+        Input::HostLogs { project, service } => Request::HostLogs {
+            token,
+            project,
+            service,
+        },
         Input::Logout => Request::Logout { token },
         Input::Check => Request::Check { token },
         Input::Plan { project } => Request::Plan { token, project },

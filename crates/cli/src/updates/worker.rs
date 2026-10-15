@@ -17,6 +17,7 @@ use tokio::{
     net::{UnixListener, UnixStream},
     sync::Semaphore,
 };
+mod host;
 
 #[derive(Default)]
 struct Cache {
@@ -36,6 +37,8 @@ struct Plan {
     manifest_digest: String,
 }
 struct State {
+    host_reads: Arc<Semaphore>,
+    host_plans: Mutex<HashMap<String, host::StoredPlan>>,
     policy: Policy,
     policy_path: PathBuf,
     passwords: nelcota_auth::Passwords,
@@ -53,8 +56,12 @@ pub async fn run(path: PathBuf) -> anyhow::Result<()> {
     let root = policy.root.join("updates");
     nelcota_deployment::private_dir(&root)?;
     let _worker = HostLock::acquire(&root)?;
-    if let Ok(_lease) = HostLock::acquire(&policy.root) {
-        Journal::open(&policy.root)?.reconcile()?;
+    match HostLock::acquire(&policy.root) {
+        Ok(_lease) => {
+            Journal::open(&policy.root)?.reconcile()?;
+            nelcota_deployment::management::HostJournal::open(&policy.root)?.reconcile()?;
+        }
+        Err(_) => host::reconcile_after_restart(&policy.root)?,
     }
     let socket = PathBuf::from(super::WORKER_SOCKET);
     if socket.exists() {
@@ -72,6 +79,8 @@ pub async fn run(path: PathBuf) -> anyhow::Result<()> {
         bail!("worker socket ownership failed");
     }
     let state = Arc::new(State {
+        host_reads: Arc::new(Semaphore::new(1)),
+        host_plans: Mutex::default(),
         policy,
         policy_path: path.clone(),
         passwords: nelcota_auth::Passwords::new(1),
@@ -157,8 +166,13 @@ impl State {
             };
             (release, cache.error.clone())
         };
-        let projects = operator
+        let names: Vec<_> = manifest
             .projects
+            .iter()
+            .filter(|p| self.policy.authorized(operator, &p.name))
+            .map(|p| &p.name)
+            .collect();
+        let projects = names
             .iter()
             .filter_map(|name| host.select(&manifest, Some(name)).ok())
             .map(|project| {
@@ -187,11 +201,16 @@ impl State {
         let jobs = Journal::open(&self.policy.root)?
             .list()?
             .into_iter()
-            .filter(|job| operator.projects.contains(&job.public.project))
+            .filter(|job| self.policy.authorized(operator, &job.public.project))
             .map(|job| job.public)
             .take(32)
             .collect();
         Ok(Status {
+            host_management: operator.manage_host && self.policy.host_management.is_some(),
+            host_busy: nelcota_deployment::management::HostJournal::open(&self.policy.root)?
+                .list()?
+                .iter()
+                .any(|task| !task.public.stage.terminal()),
             email: operator.email.clone(),
             projects,
             jobs,
@@ -218,24 +237,21 @@ impl State {
 fn policy_current(state: &State) -> anyhow::Result<bool> {
     Ok(
         nelcota_deployment::digest_file(&state.policy_path, 65536)? == state.policy_digest
-            && state
-                .policy
-                .project_ids
-                .keys()
-                .all(|name| state.policy.project_enrolled(name)),
+            && (state.policy.host_management.is_some() || state.policy.identities_valid()),
     )
 }
 async fn dispatch(state: &Arc<State>, request: Request) -> anyhow::Result<Response> {
     if nelcota_deployment::digest_file(&state.policy_path, 65536)? != state.policy_digest
-        || state
-            .policy
-            .project_ids
-            .keys()
-            .any(|name| !state.policy.project_enrolled(name))
+        || (state.policy.host_management.is_none() && !state.policy.identities_valid())
     {
         return Ok(error("policy_changed"));
     }
     match request {
+        request @ (Request::HostStatus { .. }
+        | Request::HostPlan { .. }
+        | Request::HostStart { .. }
+        | Request::HostRecover { .. }
+        | Request::HostLogs { .. }) => host::dispatch(state, request).await,
         Request::Login { email, password } => {
             if email.len() > 254 || password.len() > 1024 || !state.attempt_login() {
                 return Ok(error("login_rate_limited"));
@@ -340,7 +356,7 @@ async fn dispatch(state: &Arc<State>, request: Request) -> anyhow::Result<Respon
         } => {
             let index = state.operator(&session)?;
             let operator = &state.policy.operators[index];
-            if !operator.projects.contains(&project) {
+            if !state.policy.authorized(operator, &project) {
                 return Ok(error("project_forbidden"));
             }
             let host = crate::host::Host::new(&state.policy.root);
@@ -419,12 +435,14 @@ async fn dispatch(state: &Arc<State>, request: Request) -> anyhow::Result<Respon
                 return Ok(error("policy_changed"));
             }
             let lease = HostLock::acquire(&state.policy.root)?;
+            nelcota_deployment::management::ensure_idle(&state.policy.root)?;
             let journal = Journal::open(&state.policy.root)?;
             let mut job = journal
                 .list()?
                 .into_iter()
                 .find(|entry| {
-                    entry.public.id == job && operator.projects.contains(&entry.public.project)
+                    entry.public.id == job
+                        && state.policy.authorized(operator, &entry.public.project)
                 })
                 .context("job forbidden")?;
             if job.public.phase != Phase::NeedsOperator {
@@ -493,6 +511,7 @@ async fn start(
         return Ok(error("policy_changed"));
     }
     let _lease = HostLock::acquire(&state.policy.root)?;
+    nelcota_deployment::management::ensure_idle(&state.policy.root)?;
     let journal = Journal::open(&state.policy.root)?;
     if let Some(job) = journal
         .list()?
@@ -501,7 +520,7 @@ async fn start(
     {
         if job.actor != operator.email
             || job.fingerprint != id
-            || !operator.projects.contains(&job.public.project)
+            || !state.policy.authorized(operator, &job.public.project)
         {
             return Ok(error("idempotency_conflict"));
         }
@@ -520,7 +539,7 @@ async fn start(
     if plan.operator != index
         || plan.expires < Instant::now()
         || !plan.public.blockers.is_empty()
-        || !operator.projects.contains(&plan.public.project)
+        || !state.policy.authorized(operator, &plan.public.project)
     {
         return Ok(error("plan_blocked"));
     }
@@ -652,7 +671,7 @@ fn session_key(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    fn fixture() -> (tempfile::TempDir, Arc<State>, String) {
+    pub(super) fn fixture() -> (tempfile::TempDir, Arc<State>, String) {
         let temporary = match std::env::var_os("NELCOTA_IPC_FIXTURE_BASE") {
             Some(base) => tempfile::tempdir_in(base).unwrap(),
             None => tempfile::tempdir().unwrap(),
@@ -683,6 +702,7 @@ mod tests {
         }
         let password = token().unwrap();
         let operator = super::super::policy::Operator {
+            manage_host: false,
             email: "operator@example.test".into(),
             password_hash: nelcota_auth::hash_password(&password).unwrap(),
             projects: vec!["shop".into()],
@@ -694,6 +714,7 @@ mod tests {
         )
         .unwrap();
         let policy = Policy {
+            host_management: None,
             schema: 1,
             root: root.clone(),
             origin: "https://updates.example.test".into(),
@@ -710,6 +731,8 @@ mod tests {
         let path = root.join("policy.json");
         nelcota_deployment::atomic_write(&path, &serde_json::to_vec(&policy).unwrap()).unwrap();
         let state = Arc::new(State {
+            host_reads: Arc::new(Semaphore::new(1)),
+            host_plans: Mutex::default(),
             policy,
             policy_path: path.clone(),
             policy_digest: nelcota_deployment::digest_file(&path, 65536).unwrap(),
@@ -723,7 +746,7 @@ mod tests {
         });
         (temporary, state, password)
     }
-    async fn login(state: &Arc<State>, password: String) -> String {
+    pub(super) async fn login(state: &Arc<State>, password: String) -> String {
         match dispatch(
             state,
             Request::Login {

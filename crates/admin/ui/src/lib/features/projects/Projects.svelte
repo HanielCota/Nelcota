@@ -9,6 +9,7 @@
   import CircleAlert from '@lucide/svelte/icons/circle-alert'
   import Plus from '@lucide/svelte/icons/plus'
   import CodeBlock from '$lib/components/shared/CodeBlock.svelte'
+  import HostLink from '../host/HostLink.svelte'
   import mascot from '../../../assets/mascot.png'
   import { Button } from '$lib/components/ui/button'
   import { toast } from 'svelte-sonner'
@@ -118,6 +119,7 @@
       <!-- How to add one, as the last tile. -->
       <article class="flex flex-col gap-3 rounded-3xl border-2 border-dashed border-border p-5">
         <p class="flex items-center gap-2 font-semibold"><Plus class="size-4 text-muted-foreground" aria-hidden="true" />{t('projects.newProject.title')}</p>
+        <HostLink />
         <p class="text-sm text-muted-foreground">{t('projects.newProject.subdomain')}</p>
         <CodeBlock code={t('projects.newProject.subdomainCommand')} lang="sh" />
         <p class="text-sm text-muted-foreground">{t('projects.newProject.domain')}</p>

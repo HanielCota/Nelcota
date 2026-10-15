@@ -560,12 +560,14 @@ Secure, separately authenticated host update controller
 Usage: nelcota updates [OPTIONS] <COMMAND>
 
 Commands:
-  enroll   Enroll a host with a separate HTTPS origin and scoped operator (root/SSH only)
-  serve    Unprivileged HTTP controller (normally managed by systemd)
-  worker   Restricted privileged IPC worker (normally managed by systemd)
-  status   Inspect the durable journal over SSH, including interrupted jobs
-  recover  Recover one interrupted job. Never restores an old snapshot after commit
-  help     Print this message or the help of the given subcommand(s)
+  enroll        Enroll a host with a separate HTTPS origin and scoped operator (root/SSH only)
+  serve         Unprivileged HTTP controller (normally managed by systemd)
+  worker        Restricted privileged IPC worker (normally managed by systemd)
+  status        Inspect the durable journal over SSH, including interrupted jobs
+  recover       Recover one interrupted job. Never restores an old snapshot after commit
+  host-recover  Resume a host-management receipt after inspecting the interrupted operation
+  host-status   Inspect host projects and durable management receipts over SSH
+  help          Print this message or the help of the given subcommand(s)
 
 Options:
   -C, --dir <DIR>          Host folder (where nelcota-host.json, caddy/ and projects/ live) [env: NELCOTA_ROOT=] [default: .]
@@ -581,14 +583,53 @@ Enroll a host with a separate HTTPS origin and scoped operator (root/SSH only)
 Usage: nelcota updates enroll [OPTIONS] --origin <ORIGIN> --email <EMAIL> --password-file <PASSWORD_FILE> --verifier <VERIFIER> --projects <PROJECTS>
 
 Options:
-  -C, --dir <DIR>                      Host folder (where nelcota-host.json, caddy/ and projects/ live) [env: NELCOTA_ROOT=] [default: .]
+  -C, --dir <DIR>
+          Host folder (where nelcota-host.json, caddy/ and projects/ live) [env: NELCOTA_ROOT=] [default: .]
       --origin <ORIGIN>
+
       --email <EMAIL>
-  -p, --project <PROJECT>              Project (required when the host has more than one)
-      --password-file <PASSWORD_FILE>  Private file containing a new operator password (at least 16 characters)
-      --verifier <VERIFIER>            Root-owned native GitHub CLI supporting `attestation verify`
+
+  -p, --project <PROJECT>
+          Project (required when the host has more than one)
+      --password-file <PASSWORD_FILE>
+          Private file containing a new operator password (at least 16 characters)
+      --verifier <VERIFIER>
+          Root-owned native GitHub CLI supporting `attestation verify`
       --projects <PROJECTS>
-  -h, --help                           Print help
+
+      --host-management <HOST_MANAGEMENT>
+          Private root-owned JSON approving host management, image and DNS scope
+  -h, --help
+          Print help
+```
+
+### nelcota updates host-status
+
+```text
+Inspect host projects and durable management receipts over SSH
+
+Usage: nelcota updates host-status [OPTIONS]
+
+Options:
+  -C, --dir <DIR>          Host folder (where nelcota-host.json, caddy/ and projects/ live) [env: NELCOTA_ROOT=] [default: .]
+      --policy <POLICY>    [default: /etc/nelcota-updates/policy.json]
+  -p, --project <PROJECT>  Project (required when the host has more than one)
+  -h, --help               Print help
+```
+
+### nelcota updates host-recover
+
+```text
+Resume a host-management receipt after inspecting the interrupted operation
+
+Usage: nelcota updates host-recover [OPTIONS] --job <JOB>
+
+Options:
+  -C, --dir <DIR>          Host folder (where nelcota-host.json, caddy/ and projects/ live) [env: NELCOTA_ROOT=] [default: .]
+      --policy <POLICY>    [default: /etc/nelcota-updates/policy.json]
+      --job <JOB>
+  -p, --project <PROJECT>  Project (required when the host has more than one)
+  -h, --help               Print help
 ```
 
 ### nelcota updates recover

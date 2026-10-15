@@ -46,6 +46,10 @@ jobs:
           cargo package -p nelcota-core -p nelcota-auth --no-verify
           python3 scripts/test-auth-package.py --run
 
+      - name: host project lifecycle and interrupted restore
+        timeout-minutes: 12
+        run: python3 scripts/test-host-management.py --binary target/debug/nelcota
+
       # Storage on a real S3-compatible service (presigned URLs, multipart).
       - name: storage on S3
         env:

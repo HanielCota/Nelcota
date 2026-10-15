@@ -10,4 +10,5 @@ pub use secure_fs::{atomic_write, digest_file, private_dir, read_private, token}
 #[cfg(test)]
 mod tests;
 
+pub mod management;
 pub mod protocol;
