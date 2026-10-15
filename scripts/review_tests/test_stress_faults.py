@@ -36,3 +36,14 @@ class TransferAccounting(unittest.TestCase):
             project.sql.return_value=json.dumps({**valid,field:value})
             with self.assertRaises(RuntimeError):accounting(project)
 
+
+class RecoveryBoundaries(unittest.TestCase):
+    def test_later_good_probe_cannot_hide_a_successful_cross_project_read(self):
+        from fault_campaign import recovery_read_matches,require_unauthorized
+        self.assertTrue(recovery_read_matches(200,b'[{"name":"project-0:1"}]','project-0:'))
+        for body in [b'[]',b'null',b'not JSON',b'[{"name":"project-1:1"}]']:
+            with self.assertRaises(RuntimeError):recovery_read_matches(200,body,'project-0:')
+        require_unauthorized(401)
+        for code in [200,204,403,503]:
+            with self.assertRaises(RuntimeError):require_unauthorized(code)
+

@@ -50,7 +50,7 @@ class OwnedDocker:
             return result
         if command=='volume' and args[1]=='rm':
             self.volume(args[-1])
-        if command in ('rm','stop','start','kill','update','logs','inspect'):
+        if command in ('rm','stop','start','kill','pause','unpause','update','logs','inspect'):
             args[-1]=self.require(args[-1])
         if command=='exec':
             index=1

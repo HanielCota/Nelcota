@@ -33,6 +33,7 @@ from projects import Project
 from watchdog import LABEL, atomic_json, cleanup, host_reserves, process_identity
 from host_resources import snapshot as host_snapshot, container_memory_events, parse_counters, require_no_oom
 from ownership import OwnedDocker
+from objects import S3Inventory
 
 ROOT = Path(__file__).resolve().parents[1]
 MUTATION_PATH='/rest/v1/rpc/stress_transfer'
@@ -77,6 +78,23 @@ def successful_latency_evidence(values):
     return {'p95_ms':ordered[max(0,math.ceil(len(ordered)*.95)-1)],'p99_ms':ordered[max(0,math.ceil(len(ordered)*.99)-1)],'successful_post_responses':len(ordered),'method':'nearest rank, successful POST only'}
 
 
+def recovery_read_matches(code,body,marker):
+    if code!=200:
+        return False
+    try:
+        rows=json.loads(body)
+    except (ValueError,TypeError):
+        raise RuntimeError('Successful recovery response was malformed') from None
+    if not isinstance(rows,list) or not rows or any(not isinstance(row,dict) or not isinstance(row.get('name'),str) or not row['name'].startswith(marker) for row in rows):
+        raise RuntimeError('Successful recovery response crossed its data boundary')
+    return True
+
+
+def require_unauthorized(status):
+    if status!=401:
+        raise RuntimeError('Invalid credential received an unexpected authorization result')
+
+
 def raw(project,method,path,value=None,token=None):
     body = None
     if value is not None:
@@ -102,13 +120,16 @@ def run(args):
     cpus=sorted(os.sched_getaffinity(0))
     if len(cpus)<4 or effective_cpus(cpus)<3.5 or host_reserves(output):
         raise RuntimeError('Insufficient host resource reserves')
-    validate_disk_headroom(output,1024,startup_mib=1600)
+    validate_disk_headroom(output,1024+512*int(args.s3_faults),startup_mib=1600+512*int(args.s3_faults))
     os.sched_setaffinity(0,{cpus[2]})
     identity='nelcota-fault-'+secrets.token_hex(16)
     owned=OwnedDocker(identity,docker)
     directory=Path(tempfile.mkdtemp(prefix='fixture-',dir=output))
     projects=[Project(identity,index,2,args.binary.resolve(),directory,cpus) for index in range(2)]
     source,target=projects
+    provider=identity+'-s3'
+    provider_volume=identity+'-s3-data'
+    provider_started=False
     began=time.monotonic()
     phase='preparation'
     resource_at=began
@@ -124,7 +145,7 @@ def run(args):
     attempts={}
     attempt_lock=threading.RLock()
     initialized=[]
-    manifest={'identity':identity,'output':str(output),'reserve_path':str(output),'pid':os.getpid(),'process_identity':process_identity(os.getpid()),'started_monotonic':began,'maximum_seconds':2400,'containers':[item for project in projects for item in [project.app,project.pg]],'volumes':[project.volume for project in projects]}
+    manifest={'identity':identity,'output':str(output),'reserve_path':str(output),'pid':os.getpid(),'process_identity':process_identity(os.getpid()),'started_monotonic':began,'maximum_seconds':2400,'containers':[provider,*[item for project in projects for item in [project.app,project.pg]]],'volumes':[provider_volume,*[project.volume for project in projects]]}
     atomic_json(output/'ownership.json',manifest)
     atomic_json(output/'heartbeat.json',{'monotonic':began,'phase':phase,'resource_monotonic':began})
     previous=signal.getsignal(signal.SIGTERM)
@@ -143,7 +164,7 @@ def run(args):
     heart.start()
     try:
         watchdog=subprocess.Popen([sys.executable,str(ROOT/'bench/watchdog.py'),str(output/'ownership.json')],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,start_new_session=True)
-        atomic_json(output/'manifest.json',{'scope':'local ledger mutations and negative JWT probes; no public proxy/controller acceptance','capacity_qualification':args.capacity,'binary_sha256':hashlib.file_digest(args.binary.open('rb'),'sha256').hexdigest(),'initial_iterations_per_second':args.rate,'maximum_inflight':8,'maximum_attempts':100000,'parent_rss_limit_mib':512,'app_cpu_each':.5,'postgres_cpu_each':.5,'app_memory_mib_each':128,'postgres_memory_mib_each':256,'owned_filesystem_exhaustion_mib':16,'recovery_deadline_seconds':35,'snapshot':'pg_dump snapshot under controlled database writers, immutable file fixture','storage':'disk, with one explicitly temporary tmpfs ENOSPC scenario'})
+        atomic_json(output/'manifest.json',{'scope':'local ledger mutations and negative JWT probes; no public proxy/controller acceptance','capacity_qualification':args.capacity,'real_s3_faults':args.s3_faults,'binary_sha256':hashlib.file_digest(args.binary.open('rb'),'sha256').hexdigest(),'initial_iterations_per_second':args.rate,'maximum_inflight':8,'maximum_attempts':100000,'parent_rss_limit_mib':512,'app_cpu_each':.5,'postgres_cpu_each':.5,'app_memory_mib_each':128,'postgres_memory_mib_each':256,'provider_cpu':.5,'provider_memory_mib':512,'owned_filesystem_exhaustion_mib':16,'recovery_deadline_seconds':35,'snapshot':'pg_dump snapshot under controlled database writers, immutable file fixture','storage':'disk, with explicitly temporary tmpfs ENOSPC scenarios and optional real RustFS faults'})
         source.create()
         initialized.append(source)
         source.sql(MUTATION_FIXTURE)
@@ -187,6 +208,20 @@ def run(args):
                             disks[project.label]=int(owned('exec',project.pg,'du','-sm','/var/lib/postgresql/data').split()[0])
                             if disks[project.label]>512:
                                 raise RuntimeError('Owned fault database exceeded its 512-MiB budget')
+                    if provider_started:
+                        state=inspect_container(provider)
+                        allowed=fault is not None and fault['container']==provider and time.monotonic()<=fault['expires']
+                        states[provider]=None
+                        if state is not None:
+                            states[provider]=state['State']
+                        if (state is None or not state['State']['Running'] or state['State']['OOMKilled']) and not allowed:
+                            raise RuntimeError('Unexpected real provider stop or OOM')
+                        if state is not None and state['State']['Running'] and not allowed:
+                            events=parse_counters(owned('exec',provider,'cat','/sys/fs/cgroup/memory.events'))
+                            require_no_oom(events)
+                            if int(owned('exec',provider,'du','-sm','/data').split()[0])>512:
+                                raise RuntimeError('Owned S3 fault provider exceeded its 512-MiB disk budget')
+                            running.append(provider)
                     stats=[json.loads(line) for line in owned('stats','--no-stream','--format','{{json .}}',*running).splitlines()]
                     if not running or len(stats)!=len(running):
                         raise RuntimeError('Incomplete fault resource evidence')
@@ -342,7 +377,8 @@ def run(args):
                 try:
                     code,body=raw(source,'GET','/rest/v1/bench_products?limit=1')
                     invalid,_=raw(source,'GET','/rest/v1/bench_products?limit=1',token=source.fixture['invalid_access'])
-                    if code==200 and invalid==401 and json.loads(body)[0]['name'].startswith(source.label+':'):
+                    require_unauthorized(invalid)
+                    if recovery_read_matches(code,body,source.label+':'):
                         atomic_json(output/(label+'.json'),{'status':'passed','recovery_seconds':time.monotonic()-began_recovery,'positive_status':code,'unauthorized_status':invalid})
                         return
                 except (OSError,ValueError):
@@ -540,6 +576,156 @@ def run(args):
         for kind in ['bytes','inodes']:
             traffic('filesystem-'+kind+'-under-writers',30,lambda:filesystem_exhaustion(kind),allow_unavailable=True)
         traffic('filesystem-recovered',20)
+        if args.s3_faults:
+            phase='provider-preparation'
+            access,secret=secrets.token_hex(16),secrets.token_hex(32)
+            owned('volume','create','--label',LABEL+'='+identity,provider_volume)
+            owned('run','-d','--name',provider,'--label',LABEL+'='+identity,'--pids-limit','128','--cpus','.5','--cpuset-cpus',str(cpus[3]),'--memory','512m','--memory-swap','512m','-e','RUSTFS_ACCESS_KEY','-e','RUSTFS_SECRET_KEY','-p','127.0.0.1::9000','--mount',f'type=volume,source={provider_volume},destination=/data','rustfs/rustfs:1.0.1',env={'RUSTFS_ACCESS_KEY':access,'RUSTFS_SECRET_KEY':secret})
+            provider_started=True
+            provider_port=json.loads(owned('inspect',provider))[0]['NetworkSettings']['Ports']['9000/tcp'][0]['HostPort']
+            endpoint='http://127.0.0.1:'+provider_port
+            inventory_client=S3Inventory(endpoint,access,secret,'benchmark-files')
+            ready_deadline=time.monotonic()+30
+            while True:
+                try:
+                    inventory_client.send({},method='PUT',body=b'')
+                    break
+                except urllib.error.HTTPError as error:
+                    if error.code==409:
+                        break
+                    if time.monotonic()>=ready_deadline:
+                        raise RuntimeError('Real S3 fault provider did not become ready') from None
+                except (urllib.error.URLError,TimeoutError):
+                    if time.monotonic()>=ready_deadline:
+                        raise RuntimeError('Real S3 fault provider did not become ready') from None
+                time.sleep(.2)
+            fixture_key=source.sql("SELECT bucket_id||'/'||version::text FROM storage.objects WHERE name='fixture.txt' AND bucket_id='bench'")
+            fixture_bytes=json.dumps(source.label+': payload').encode()
+            inventory_client.write_key(fixture_key,body=fixture_bytes)
+            source.environment.update({'NELCOTA_STORAGE_BACKEND':'s3','NELCOTA_STORAGE_S3_ENDPOINT':endpoint,'NELCOTA_STORAGE_S3_BUCKET':'benchmark-files','NELCOTA_STORAGE_S3_REGION':'us-east-1','NELCOTA_STORAGE_S3_ACCESS_KEY_ID':access,'NELCOTA_STORAGE_S3_SECRET_ACCESS_KEY':secret})
+            fault_window.set({'name':'s3-backend-switch','container':source.app,'expires':time.monotonic()+60})
+            try:
+                owned('rm','-f',source.app)
+                source.start_app()
+            finally:
+                fault_window.set(None)
+
+            def provider_fault(kind):
+                nonlocal phase
+                phase='provider-'+kind
+                failures=[]
+                counters=Counter()
+                counter_lock=threading.Lock()
+                probe_stop=threading.Event()
+                expected=threading.Event()
+                probe_body='provider fault probe'
+                probe_bytes=json.dumps(probe_body).encode()
+                recovery_name='provider-recovery-'+kind+'.txt'
+                def probe(write):
+                    while not probe_stop.is_set():
+                        began_request=time.monotonic()
+                        may_fail=expected.is_set()
+                        try:
+                            method='GET'
+                            path='/storage/v1/object/bench/fixture.txt'
+                            body=None
+                            if write:
+                                method='PUT';path='/storage/v1/object/bench/provider-probe.txt';body=probe_body
+                            code,payload=raw(source,method,path,body)
+                            if 200<=code<300:
+                                if not write and payload!=fixture_bytes:
+                                    raise RuntimeError('Provider restart changed published fixture bytes')
+                            if not 200<=code<300:
+                                if not (may_fail or expected.is_set()) or code not in (500,503,504):
+                                    raise RuntimeError('Unexpected provider probe status: '+str(code))
+                                if code==500 and json.loads(payload).get('code')!='internal':
+                                    raise RuntimeError('Unexpected provider error contract')
+                            with counter_lock:
+                                counters[str(code)]+=1
+                        except (urllib.error.URLError,TimeoutError,ConnectionError,http.client.HTTPException):
+                            if not (may_fail or expected.is_set()):
+                                failures.append('unexpected provider connection failure')
+                                critical.set()
+                                return
+                            with counter_lock:
+                                counters['connection-unavailable']+=1
+                        except Exception as error:
+                            failures.append(type(error).__name__)
+                            critical.set()
+                            return
+                        probe_stop.wait(max(0,.1-(time.monotonic()-began_request)))
+                threads=[threading.Thread(target=probe,args=(value,),daemon=True) for value in [False,True]]
+                for thread in threads:thread.start()
+                try:
+                    time.sleep(1)
+                    expected.set()
+                    fault_window.set({'name':'provider-'+kind,'container':provider,'expires':time.monotonic()+45})
+                    try:
+                        if kind=='restart':
+                            owned('stop','-t','1',provider)
+                        if kind=='pause':
+                            owned('pause',provider)
+                        time.sleep(5)
+                    finally:
+                        recovery_began=time.monotonic()
+                        if kind=='restart':
+                            owned('start',provider)
+                        if kind=='pause':
+                            owned('unpause',provider)
+                    code,payload,invalid=0,b'',0
+                    recovered_seconds=None
+                    while time.monotonic()-recovery_began<=35:
+                        try:
+                            code,payload=raw(source,'GET','/storage/v1/object/bench/fixture.txt')
+                            invalid,_=raw(source,'GET','/rest/v1/bench_products?limit=1',token=source.fixture['invalid_access'])
+                            require_unauthorized(invalid)
+                            if code==200 and payload!=fixture_bytes:
+                                raise RuntimeError('Successful recovery read returned corrupt object bytes')
+                            if code==200:
+                                put_status,_=raw(source,'PUT','/storage/v1/object/bench/'+recovery_name,probe_body)
+                                if 200<=put_status<300:
+                                    read_status,read_bytes=raw(source,'GET','/storage/v1/object/bench/'+recovery_name)
+                                    if read_status==200 and read_bytes!=probe_bytes:
+                                        raise RuntimeError('Successful recovered write returned corrupt bytes')
+                                    if read_status==200:
+                                        recovered_seconds=time.monotonic()-recovery_began
+                                        break
+                        except (OSError,ValueError):
+                            pass
+                        time.sleep(.25)
+                    if recovered_seconds is None or recovered_seconds>35:
+                        raise RuntimeError('Storage provider did not recover within 35 seconds')
+                    time.sleep(1)
+                    expected.clear()
+                    fault_window.set(None)
+                finally:
+                    probe_stop.set()
+                    for thread in threads:thread.join(timeout=10)
+                if failures or any(thread.is_alive() for thread in threads):
+                    raise RuntimeError('Provider probe failed or retained a task')
+                code,payload=raw(source,'GET','/storage/v1/object/bench/provider-probe.txt')
+                if code!=200 or payload!=probe_bytes:
+                    raise RuntimeError('Acknowledged provider object did not survive recovery')
+                deleted,_=raw(source,'DELETE','/storage/v1/object/bench/'+recovery_name)
+                if not 200<=deleted<300:
+                    raise RuntimeError('Recovered provider probe did not clean up')
+                atomic_json(output/('provider-'+kind+'.json'),{'status':'passed','responses':dict(counters),'recovery_seconds':recovered_seconds,'positive_bytes_verified':True,'unauthorized_status':401,'real_provider':'RustFS'})
+            for kind in ['restart','pause']:
+                traffic('provider-'+kind+'-under-writers',30,lambda:provider_fault(kind))
+            code,_=raw(source,'DELETE','/storage/v1/object/bench/provider-probe.txt')
+            if not 200<=code<300 or inventory_client.inventory()['multipart_uploads']:
+                raise RuntimeError('Provider state did not drain after faults')
+            source.environment['NELCOTA_STORAGE_BACKEND']='disk'
+            for key in list(source.environment):
+                if key.startswith('NELCOTA_STORAGE_S3_'):
+                    del source.environment[key]
+            fault_window.set({'name':'disk-backend-recovery','container':source.app,'expires':time.monotonic()+60})
+            try:
+                owned('rm','-f',source.app)
+                source.start_app()
+            finally:
+                fault_window.set(None)
+            traffic('provider-recovered',20)
         phase='reconciliation'
         rows=json.loads(source.sql("SELECT coalesce(json_object_agg(id,digest),'{}'::json) FROM public.stress_operations"))
         missing=[key for key,value in attempts.items() if value['acknowledged'] and rows.get(key)!=value['digest']]
@@ -599,9 +785,12 @@ def main():
     parser.add_argument('--rate',type=int,default=8)
     parser.add_argument('--capacity',action='store_true')
     parser.add_argument('--provisional-rate',type=int,default=64)
+    parser.add_argument('--s3-faults',action='store_true')
     args=parser.parse_args()
     if not 1<=args.rate<=64 or not 4<=args.provisional_rate<=64:
         parser.error('Functional canary rate must be 1..64 iterations/second')
+    if args.s3_faults and effective_cpus(sorted(os.sched_getaffinity(0)))<4:
+        parser.error('S3 fault profile requires four effective CPUs')
     run(args)
 
 

@@ -55,6 +55,11 @@ class Project:
             command.extend(['--tmpfs',options])
         for key,value in self.extra_labels.items():
             command.extend(['--label',key+'='+value])
+        if self.environment.get('NELCOTA_STORAGE_BACKEND')=='s3':
+            trust=Path('/etc/ssl/certs/ca-certificates.crt')
+            if not trust.is_file() or trust.stat().st_size==0:
+                raise RuntimeError('S3 fixture needs the verified system trust bundle')
+            command.extend(['-v',str(trust)+':/etc/ssl/certs/ca-certificates.crt:ro'])
         for key in self.environment:
             command.extend(['-e', key])
         command.extend(['ubuntu:24.04', '/usr/local/bin/nelcota', 'serve'])

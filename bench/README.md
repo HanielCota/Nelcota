@@ -224,10 +224,14 @@ operation identities. Disconnected replies stay ambiguous until reconciliation;
 no mutation is automatically retried. It covers deadlock, database/app restart,
 tagged OOM, owned tmpfs byte/inode exhaustion and local live-writer snapshot
 restore. The tmpfs fault does not certify physical disk endurance.
+With `--s3-faults`, the runner also starts an owned real RustFS instance,
+restarts and pauses it under database writers and storage probes, and requires
+verified reads and new writes within the same recovery deadline. Its separate
+CPU, memory, disk and ownership budgets are part of the manifest.
 
 ```sh
 python3 bench/launch.py --run-id fault-smoke --kind fault --binary target/release/nelcota --rate 8
-python3 bench/launch.py --run-id fault-pass-1 --kind fault --binary target/release/nelcota --capacity
+python3 bench/launch.py --run-id fault-pass-1 --kind fault --binary target/release/nelcota --capacity --s3-faults
 python3 bench/host_compare.py target/stress-g05/host-before target/stress-g05/host-after --output target/stress-g05/host-comparison.json
 python3 bench/evidence.py target/stress-g05/disk-pass-1 --output target/stress-public/disk-pass-1
 ```

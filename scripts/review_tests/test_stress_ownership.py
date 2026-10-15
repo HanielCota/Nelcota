@@ -29,7 +29,8 @@ class OwnershipBoundaries(unittest.TestCase):
         raw=mock.Mock()
         owned=OwnedDocker('this-run',raw)
         with mock.patch('ownership.container_id',return_value=None):
-            with self.assertRaises(RuntimeError):owned('rm','-fv','same-reused-name')
+            for command in ['rm','stop','start','kill','pause','unpause','update']:
+                with self.assertRaises(RuntimeError):owned(command,'same-reused-name')
         raw.assert_not_called()
 
     def test_verified_container_is_removed_by_id_after_a_name_reuse(self):
