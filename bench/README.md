@@ -50,7 +50,8 @@ networking included.
 
 ## Release campaign
 
-On Linux with Docker and at least three available CPUs:
+On Linux with Docker, at least four affinity slots and an effective CPU quota
+of 3.5 CPUs for disk or 4 CPUs for S3:
 
 ```sh
 cargo build --locked --release -p nelcota-server
@@ -60,14 +61,16 @@ nice -n19 ionice -c3 python3 bench/campaign.py --binary target/release/nelcota -
 The campaign owns its disposable PostgreSQL, runtime-generated credentials and
 disk files. App, PostgreSQL and the native k6 generator use separate CPU affinity
 slots with CPU/memory quotas (app 1 CPU/128 MiB, PostgreSQL 1 CPU/384 MiB,
-generator 1 CPU/512 MiB with Go's memory target at 448 MiB, request pool 8,
+generator 1 CPU/512 MiB with Go's memory target at 448 MiB, Prometheus
+0.25 CPU/512 MiB, request pool 8,
 database connections 40). Keep unrelated
 work off those CPU slots. The app runs without root privileges. Reports contain
 metrics, plans and redacted logs; credential fixtures are deleted on teardown.
 
 PostgreSQL data uses an owned disk volume, removed at teardown. WAL targets
 64 MiB and the fixture's monitored disk budget is 512 MiB. Database files do not
-use tmpfs: counting growing data/WAL against a small RAM quota would turn the
+use tmpfs. Local object files must also reside on a real disk filesystem:
+counting growing data/WAL against a small RAM quota would turn the
 soak into a memory-filesystem experiment. k6 containers are named and removed
 on errors/timeouts as well as normal completion.
 
@@ -79,8 +82,10 @@ separate runs/plans. Mixed traffic has 50% reads, 20% RLS, 10% panel, 5% storage
 CPU, connections, idle transactions, locks and queue occupancy are sampled.
 
 The stress cycle uses 16/32/64/128 VUs, recovers at four VUs and restarts the
-server. The default soak lasts **1,800 real seconds**, at 80% of the observed
-mixed HTTP capacity. The queue must also drain within 30 seconds after traffic
+server. The default soak lasts **1,800 real seconds**, at 80% of independently
+qualified mixed iterations/second. Five-minute open-loop probes qualify rates
+against G05 SLOs, useful work and delivered arrivals. Rejected requests do not
+enter successful-response latency. Failed capacity probes remain in the evidence. The queue must also drain within 30 seconds after traffic
 stops. A failed response, RLS check, signature or resource invariant fails the
 candidate campaign. Database lock/unavailability, slow export cancellation,
 multipart/provider failures and lease recovery additionally have dedicated
@@ -92,8 +97,8 @@ For an isolated S3 workload with actual uploads/downloads on RustFS:
 python3 bench/campaign.py --binary target/release/nelcota --output target/s3-campaign --backend s3 --workloads storage --soak-seconds 0 --no-stress
 ```
 
-RustFS adds a 1-CPU/512-MiB fixture on a fourth CPU affinity slot; S3
-campaigns require at least four available CPUs. The small S3 campaign does not claim a
+RustFS adds a 0.5-CPU/512-MiB fixture on a fourth CPU affinity slot; S3
+campaigns require four effective CPUs including the observer/OS reserve. The small S3 campaign does not claim a
 30-minute S3 soak or production cloud/network capacity. Long campaigns belong
 on a dedicated host. `.github/workflows/stress.yml` provides a manual job for a
 self-hosted Linux runner labeled `nelcota-benchmark`, keeping this workload
@@ -119,6 +124,57 @@ never use that option to certify a candidate. `--workloads` and `--steady`
 select smaller investigations, while `--soak-seconds 0` disables the long soak.
 TLS verification in the original read runner is enabled by default; only a
 controlled development test should set `INSECURE_TLS=true`.
+
+## G05 endurance and independent projects
+
+Freeze the harness and keep a unique run ID. Never overwrite a failed run:
+
+```sh
+python3 bench/launch.py --run-id disk-pass-1 --binary target/release/nelcota \
+  --soak-seconds 14400 --fixture-disk-mib 2048 --capacity --spikes
+python3 bench/launch.py --run-id s3-pass-1 --binary target/release/nelcota \
+  --backend s3 --soak-seconds 14400 --fixture-disk-mib 2048 --capacity --spikes
+python3 bench/launch.py --run-id host-ten-pass-1 --kind host \
+  --binary target/release/nelcota --projects 10 --seconds 300 --rate 8
+```
+
+Run these sequentially on this profile. The single-project watchdog has a
+six-hour deadline, bounded preparation, 5-second resource samples and a maximum
+30-second observation gap. Host reserve floors are 10% available memory and
+15% free bytes/inodes. Preflight additionally reserves room for declared data
+growth, container roots and telemetry. A breached budget stops traffic and
+removes only explicitly owned resources. Keep an external deployment observer
+for power-loss acceptance; a local watchdog does not survive host loss.
+
+Endurance uses bounded native Prometheus histograms. k6's raw end-of-test trend
+collector is disabled; the script still aborts immediately on correctness
+violations. Output includes `ownership.json`, `metadata.json`, frozen source
+hashes, `traffic-ledger.jsonl`, `resources.jsonl`, capacity probes, retention
+cohorts, event reconciliation, cleanup and a final `completion.json`. Missing
+or failed evidence cannot certify a campaign. Duration counts completed,
+positive-traffic intervals; preparation and waiting are excluded.
+
+The fixture explicitly clears terminal webhook history through the documented
+admin API at 5,000 retained records, while an independent commit ledger keeps
+event identities. This does not change the product's 100,000-history admission
+limit; testing that limit without maintenance is a separate scenario. Two
+safely aged auth/event cohorts exercise the real pruning loops during long
+endurance. User access credentials rotate through supported login/refresh.
+
+The host runner creates 1, 5 or 10 independent app/PostgreSQL clusters with
+distinct keys, passwords and stores, intentionally reused user IDs and marked
+database/file bytes. Apps share an aggregate 1-CPU budget and databases another
+1 CPU; each app has 128 MiB and each database 256 MiB. k6 and telemetry retain
+their own slots. Three balanced samples establish the median. Noisy-neighbor
+phases leave healthy arrivals unchanged and send 80% of offered work to project
+zero, checking absolute SLOs and the 90%-throughput/120%-p95 fairness gates.
+`--seconds 30` is a functional smoke and does not certify five-minute steps.
+This 1,000-row topology measures local application/database isolation; it does
+not certify the host controller, Caddy/public TLS, larger datasets or VPS sizing.
+
+The manual workflow supports separate disk/S3 four-hour endurance jobs with a
+seven-hour job budget including the build. The internal campaign limit remains
+six hours. Ordinary pull-request jobs do not launch endurance.
 
 Campaign credentials are generated at runtime and passed to native k6 through
 the Docker child environment. The generator command contains the environment

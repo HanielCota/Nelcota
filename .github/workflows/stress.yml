@@ -2,16 +2,30 @@ name: Release stress campaign
 
 on:
   workflow_dispatch:
+    inputs:
+      backend:
+        description: Owned storage fixture
+        type: choice
+        options: [disk, s3]
+        default: disk
+      endurance:
+        description: Four uninterrupted hours after capacity qualification
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
+concurrency:
+  group: release-stress-${{ github.repository }}
+  cancel-in-progress: false
+
 jobs:
   stress:
-    # Dedicated host with at least three CPUs and Docker. Heavy load is kept
+    # Dedicated host with at least four affinity slots and Docker. Heavy load is kept
     # off pull-request runners and uses explicit per-container budgets.
     runs-on: [self-hosted, linux, x64, nelcota-benchmark]
-    timeout-minutes: 90
+    timeout-minutes: ${{ inputs.endurance && 420 || 150 }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -20,12 +34,28 @@ jobs:
         with:
           toolchain: '1.99.0'
       - run: nice -n19 ionice -c3 cargo build --locked --release -p nelcota-server
-      - run: nice -n19 ionice -c3 python3 bench/campaign.py --binary target/release/nelcota --output target/stress-report
+      - name: Bounded frozen campaign
+        env:
+          STRESS_BACKEND: ${{ inputs.backend }}
+          STRESS_ENDURANCE: ${{ inputs.endurance }}
+        run: |
+          soak=1800
+          extra=()
+          if [ "$STRESS_ENDURANCE" = true ]; then
+            soak=14400
+            extra=(--capacity --spikes)
+          fi
+          nice -n19 ionice -c3 python3 bench/launch.py \
+            --run-id "ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --binary target/release/nelcota --backend "$STRESS_BACKEND" \
+            --soak-seconds "$soak" --fixture-disk-mib 2048 "${extra[@]}"
       - name: Campaign diagnostics
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: release-stress-report
-          path: target/stress-report
+          path: |
+            target/stress-g05/ci-*
+            target/stress-g05/harness-snapshots/ci-*/launch.json
           if-no-files-found: ignore
           retention-days: 14

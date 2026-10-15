@@ -58,7 +58,7 @@ reais. Limpeza manual do histórico aguarda a remoção desses eventos pelo prun
   A repetição em disco passou com a nova coleta de histogramas.
 - Smoke S3 real com 90 segundos de soak: passou; 4.719 eventos únicos observados,
   zero ausentes/extras e bytes verificados em 33 objetos.
-- Regressões Python relacionadas: 29 passaram na última verificação registrada.
+- Regressões Python relacionadas: 41 passaram na última verificação registrada.
   O registro final atualizará a contagem e o SHA correspondente.
 - Preflight com SLOs ativos: reprovou o login, p95 de 995 ms com alvo de
   750 ms, em carga estimada de 572 iterações/s. O critério foi preservado;
@@ -84,3 +84,24 @@ Os doze critérios do G05 permanecem abertos até a consolidação de campanhas,
 regressões, duas passagens e revisão do artefato final. Recursos indisponíveis
 serão registrados como bloqueados, sem substituição silenciosa por mocks.
 Não haverá deploy de produção ou merge automático.
+
+## Checkpoint de correção do executor
+
+- `disk-pass-1-002` foi reprovada pelo guard de observação; o diagnóstico
+  `stats-race-diagnostic-001` reproduziu `EOF` ao encerrar o gerador entre fases.
+  A coleta agora usa o ID imutável e a geração do processo, sem ignorar erros
+  de um gerador ainda vivo. A repetição `stats-race-verification-001` passou
+  por 210 segundos de carga concluída, reinício e teardown.
+- `disk-pass-1-003` foi interrompida antes do endurance para ampliar a folga
+  de disco. Foram conservados 195 segundos de carga e o teardown confirmado.
+  O preflight agora exige espaço para o crescimento declarado acima da reserva
+  de 15%. Somente caches de compilação foram movidos para `/tmp`; dados de
+  bancos/arquivos permanecem no disco. Os caches e seus caminhos foram preservados.
+- O primeiro smoke do runner de projetos independentes falhou na consulta
+  escalar do Prometheus e na verificação do filtro de teardown. Ambos foram
+  corrigidos. A repetição `fleet-1-smoke-002` passou por três intervalos de
+  30 segundos, com métricas individuais e cleanup confirmado. É um smoke,
+  sem certificação de etapas de cinco minutos ou de capacidade de dez projetos.
+- `disk-pass-1-004` está em andamento com fonte congelada e o mesmo executável
+  imutável. O status final depende das quatro horas contínuas, invariantes,
+  retenção, recursos e cleanup; iniciar a campanha não aprova o endurance.
