@@ -253,6 +253,10 @@ arrival ordinal preserves the declared operation mix; initializing a new VU
 cannot silently add hashing to nominal traffic. Bootstrap uses its own metric
 project tag and is excluded from nominal throughput/latency and effective load
 duration. The preparation profile and exact JavaScript hash must match.
+`--calibration-ceiling N` caps the provisional arrival rate before measurement;
+it does not waive any SLO/delivery gate or certify the observed median as stable.
+Retain failed higher-rate investigations separately. `--s3-memory-mib 512|1024`
+names the provider memory budget; different budgets require fresh measurements.
 
 Use `--rows 1000000` for the separate million-row investigation and
 `--object-bytes 1048576` for 1-MiB transfers. These profiles need separate

@@ -182,3 +182,74 @@ para os respectivos gates neste ambiente.
 - O novo diagnóstico guarda somente em staging estatísticas e logs privados,
   com snapshot sintético opcional limitado a 64 MiB e 30 segundos. A coleta é
   pulada em paradas críticas. Seu resultado não transforma falha em aprovação.
+
+## Checkpoint de 09:25 UTC
+
+`s3-pass-1-001` começou às 09:22 UTC com snapshot congelado do commit
+`6d93f8b`, 10.000 objetos físicos, 100.000 linhas, WAL de 256 MiB e endurance
+a 70% da taxa que passar na qualificação de cinco minutos. Os SLOs, entrega
+mínima de 99% e limite de descarte de 1% foram preservados. Essa é uma nova
+medição: alterar o perfil não comprova a causa ou a resolução do 504 anterior.
+Nenhum endurance de quatro horas está aprovado neste checkpoint.
+
+- `filesystem-diagnostic-002`: passou, com 130 segundos de carga concluída,
+  27 amostras, 910 escritas confirmadas/conciliadas e zero ausentes/corrompidas.
+  Esgotamento de bytes retornou `507 storage_full`; inodes retornou `500 internal`.
+  Em ambos os casos, houve 18 commits durante a falha e novos uploads íntegros
+  após recuperação. O arquivo anterior permaneceu acessível. Cleanup confirmado.
+- A causa da falha de fixture foi reproduzida antes de aplicar pressão:
+  `docker cp` deixou o tmpfs visto pela aplicação vazio, resultando em 404.
+  O transporte limitado por tar/`docker exec` popula o mount usado pelo processo
+  e verifica os bytes antes de injetar a falha.
+- `provider-diagnostic-001`: passou, com 130 segundos de carga, RustFS real,
+  936 escritas confirmadas/conciliadas e zero ausentes/corrompidas. Reinício e
+  pausa tiveram RTO de 0,490 s e 0,108 s após restaurar o provedor; leitura,
+  nova escrita e rejeição de credencial inválida foram verificadas. As respostas
+  500/503 e conexões indisponíveis ficaram limitadas à janela de falha prevista.
+- `s3-extended-smoke-001` foi reprovado pelo sampler: `du` encontrou versões
+  removidas durante sobrescritas. A coleta agora conta somente `ENOENT` de
+  filhos de um root próprio com total válido. Outros erros continuam fatais.
+  `s3-extended-smoke-002` atravessou 47 dessas corridas, preservando as medidas,
+  mas reprovou a entrega na quinta recuperação: 6.035 iterações e 166 descartes
+  para 6.200 chegadas previstas. A reprovação foi preservada.
+- Essa recuperação realizou 409 logins onde a mistura declarava aproximadamente
+  302: novos VUs inicializavam sessões dentro da carga. O candidato prepara
+  sessões reais antes do intervalo e mantém 5% de hashing por uma sequência
+  global de chegadas. O bootstrap possui métricas separadas e não conta como
+  duração efetiva. O controle nativo de composição confirmou a mistura.
+- O oráculo anterior aceitava HTTP 200 com bytes incorretos. O controle nativo
+  reproduziu a falsa aprovação; o candidato aprovou bytes corretos e abortou
+  para corrupção e truncamento. Esses controles usam um servidor de teste
+  limitado para validar o benchmark e não certificam o backend ou S3.
+- A descoberta Python completa passou com 117 testes. Os testes de sockets
+  verificam descarte da resposta, ordem temporal, causa de erro e ausência de
+  crescimento de descritores/tarefas. A nova campanha de perda de resposta
+  após COMMIT ainda precisa rodar contra o backend real.
+
+Os dois diagnósticos focados não aprovam a matriz inteira de falhas. As tentativas
+`fault-real-s3-smoke-001` a `005`, o primeiro diagnóstico de filesystem e os dois
+smokes S3 reprovados permanecem nas evidências, com respectivos cleanups.
+O mínimo de oito horas efetivas e os doze critérios continuam abertos.
+
+## Repetição de capacidade reprovada às 10:31 UTC
+
+`s3-pass-1-001` terminou reprovado antes do endurance, com 4.035 segundos de
+carga concluída, 601 amostras e cleanup confirmado. A qualificação a 596
+iterações/s passou uma vez, mas a repetição reprovou p95 de leitura (226 ms),
+RLS (229 ms), refresh (246 ms) e storage (583 ms). Os limites continuam
+200/200/200/500 ms, respectivamente. Não houve aprovação por média entre
+amostras boas e ruins.
+
+A mediana de CPU da aplicação subiu de 91,1% na primeira amostra a 96,7% de
+um núcleo na repetição. O gerador ficou em 30,4% e 34,2%; a limitação observada
+não foi sua CPU. A etapa a 447 iterações/s passou com p95 de leitura 14,8 ms,
+login 79,4 ms e storage 58,0 ms. A memória anônima do RustFS aproximou-se de
+455 MiB no limite de 512 MiB, sem OOM observado; uma hora não distingue cache,
+retenção de alocador e crescimento de longo prazo.
+
+A próxima medição declara previamente teto de qualificação de 400 iterações/s
+e 1.024 MiB para RustFS, mantendo os demais budgets, a duração de cinco minutos,
+as rejeições, os SLOs e a exigência de entrega. O teto é um limite conservador
+para obter um ponto operacional repetível, não uma alegação de capacidade
+máxima. Os overloads continuam acima da taxa que efetivamente qualificar.
+O endurance só contará depois de iniciado e aprovado integralmente.

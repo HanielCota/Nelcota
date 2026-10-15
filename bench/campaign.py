@@ -440,9 +440,9 @@ def campaign(arguments):
                     "--cpuset-cpus",
                     str(cpus[3]),
                     "--memory",
-                    "512m",
+                    str(arguments.s3_memory_mib)+'m',
                     "--memory-swap",
-                    "512m",
+                    str(arguments.s3_memory_mib)+'m',
                     '--mount',
                     f'type=volume,source={s3_volume},destination=/data',
                     "-e",
@@ -706,6 +706,7 @@ def campaign(arguments):
                 "object_payload_bytes":arguments.object_bytes,
                 "max_storage_fixture_disk_mib":arguments.storage_fixture_disk_mib,
                 "steady_rate": arguments.steady_rate,
+                "calibration_ceiling_iterations_per_second":arguments.calibration_ceiling,
                 "steady_duration": arguments.steady,
                 "workloads": arguments.workloads,
                 "harness_sha256": hashlib.file_digest(js_snapshot.open("rb"), "sha256").hexdigest(),
@@ -745,7 +746,7 @@ def campaign(arguments):
                 metadata["s3"] = {
                     "cpu_affinity": cpus[3],
                     "cpus": 0.5,
-                    "memory_mb": 512,
+                    "memory_mb": arguments.s3_memory_mib,
                     "ca_bundle_sha256": hashlib.file_digest(
                         Path("/etc/ssl/certs/ca-certificates.crt").open("rb"), "sha256"
                     ).hexdigest(),
@@ -1178,6 +1179,9 @@ def campaign(arguments):
                 for kind, report in results
                 if kind == capacity_workload
             )[1]
+            measured_provisional_throughput=throughput
+            if arguments.calibration_ceiling:
+                throughput=min(throughput,arguments.calibration_ceiling)
             provisional_throughput=throughput
             qualification = []
             sustainable = 0
@@ -1221,6 +1225,8 @@ def campaign(arguments):
                 json.dumps(
                     {
                         "provisional_median_iterations_per_second":provisional_throughput,
+                        "measured_closed_loop_median_iterations_per_second":measured_provisional_throughput,
+                        "calibration_ceiling_iterations_per_second":arguments.calibration_ceiling,
                         "provisional_workload":capacity_workload,
                         "qualified_lower_bound_iterations_per_second":throughput,
                         "qualification_step_seconds":arguments.capacity_step_seconds,
@@ -1507,6 +1513,8 @@ if __name__ == "__main__":
     parser.add_argument("--fixture-disk-mib", type=int, default=512)
     parser.add_argument('--wal-mib',type=int,choices=[64,128,256,512],default=64)
     parser.add_argument('--soak-fraction',type=float,choices=[.7,.75,.8],default=.8)
+    parser.add_argument('--calibration-ceiling',type=int,default=0,help='Predeclared cap for provisional capacity iterations/second; zero uses the measured median')
+    parser.add_argument('--s3-memory-mib',type=int,choices=[512,1024],default=512)
     parser.add_argument('--storage-fixture-disk-mib',type=int,default=1024)
     parser.add_argument('--rows',type=int,choices=[100000,1000000],default=100000)
     parser.add_argument('--object-bytes',type=int,default=17)
@@ -1545,6 +1553,8 @@ if __name__ == "__main__":
         parser.error("Capacity steps must be 5 through 300 seconds")
     if not 0 <= arguments.steady_rate <= 10000:
         parser.error("Steady rate is outside the request budget")
+    if not 0<=arguments.calibration_ceiling<=10000:
+        parser.error('Calibration ceiling must be 0..10000 iterations/second')
     if not 0 <= arguments.soak_rate <= 10000:
         parser.error("Soak rate is outside the request budget")
     duration = re.fullmatch(r"([1-9][0-9]{0,2})s", arguments.steady)
