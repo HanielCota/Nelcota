@@ -226,6 +226,12 @@ stops skip this extra work; failed/partial diagnostics remain explicit.
 budget must cover at least three WAL budgets. `--soak-fraction 0.7|0.75|0.8`
 chooses the declared share of independently qualified capacity. Defaults remain
 64 MiB and 0.8. Changing either value requires fresh comparable measurements.
+Owned containers cap their local Docker logs at two 8-MiB files. Spike campaigns
+record 15 seconds without offered traffic after each recovery, and all campaigns
+record 30 seconds of final rest. Queue drain, connections, locks, process owners
+and component cgroups are retained in `resource-plateaus.json`. Rest is excluded
+from effective load duration; interpreting live-owner growth still requires the
+full timeline and application evidence.
 
 Use `--rows 1000000` for the separate million-row investigation and
 `--object-bytes 1048576` for 1-MiB transfers. These profiles need separate

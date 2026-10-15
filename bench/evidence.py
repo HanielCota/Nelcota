@@ -11,6 +11,7 @@ PHASE=re.compile(r'^(?:fresh-|read-|rls-|panel-|storage-|login-|refresh-|mixed-|
 SENSITIVE=re.compile(r'(?:password|secret|cookie|authorization|access_token|refresh_token|signed_url|token_hash|jwt)$',re.I)
 STATIC.add('memory-events-violation.json')
 STATIC.add('failure-diagnostics.json')
+STATIC.add('resource-plateaus.json')
 FREEFORM={'message','diagnostic','error','stack','traceback','sql','payload','body'}
 
 

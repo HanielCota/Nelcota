@@ -26,7 +26,7 @@ from observations import generator_observation
 from projects import Project
 from watchdog import LABEL, atomic_json, cleanup, host_reserves, process_identity, stop_generator
 from host_resources import snapshot as host_snapshot, owned_cgroup_snapshot, require_no_oom
-from ownership import OwnedDocker
+from ownership import LOG_PROFILE,OwnedDocker
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -123,6 +123,7 @@ def campaign(args):
         fixtures = [project.create() for project in projects]
         profile=json.loads((output/'manifest.json').read_text())
         profile['resource_protocol']='component cgroup v2 current/peak/stat/events/cpu/pids plus host and process owners'
+        profile['container_log_profile']=LOG_PROFILE
         profile.update({'schema':2,'cpu_affinity':cpus[:3],'metrics_cpu_affinity':cpus[-1],'capacity_qualification':args.capacity,'provisional_rate_per_project':args.provisional_rate,'max_connections_each':32,'pool_each':4,'generator_memory_mib':512,'metrics_memory_mib':512,'images':{image:json.loads(owned('image','inspect',image))[0]['RepoDigests'] for image in ['ubuntu:24.04','postgres:17-alpine',K6,PROMETHEUS]}})
         atomic_json(output/'manifest.json',profile)
         for project in projects:

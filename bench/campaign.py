@@ -40,7 +40,7 @@ from receiver import EventLedger
 from observations import generator_observation
 from objects import S3Inventory, disk_inventory, reconcile
 from host_resources import snapshot as host_snapshot, owned_cgroup_snapshot, require_no_oom
-from ownership import OwnedDocker
+from ownership import LOG_PROFILE,OwnedDocker
 from postgres_evidence import STATISTICS_SQL,retain_failure
 
 K6 = "grafana/k6:1.6.1@sha256:a5ad6bc089a08d77c3ec49f3db8c6fa7a148e4073efcac44c675dbaf3568d8e1"
@@ -712,6 +712,8 @@ def campaign(arguments):
                 "resource_protocol":"component cgroup v2 current/peak/stat/events/cpu/pids, PostgreSQL IO/WAL/checkpointer/locks and host/process owners",
                 "postgres_observation_settings":{"track_io_timing":True,"track_wal_io_timing":True,"log_lock_waits":True,"deadlock_timeout_ms":100,"log_min_duration_statement_ms":1000},
                 "soak_fraction":arguments.soak_fraction,
+                "container_log_profile":LOG_PROFILE,
+                "pressure_rest_seconds":15,
                 "metrics_backend": "native Prometheus histogram; k6 raw TrendSink disabled",
                 "metrics_memory_mb": 512,
                 "metrics_cpus": 0.25,
@@ -919,6 +921,32 @@ def campaign(arguments):
                     {"Origin": base},
                 )
                 fixture["cookie"] = headers["Set-Cookie"].split(";", 1)[0]
+
+            plateaus=[]
+            def idle(label,seconds=15):
+                nonlocal phase
+                phase=label
+                began_idle=time.monotonic()
+                while int(sql('SELECT outstanding FROM nelcota.webhook_queue_usage WHERE singleton')):
+                    if critical.is_set() or watchdog.poll() is not None:
+                        raise RuntimeError('Resource guard stopped the idle recovery phase')
+                    if time.monotonic()-began_idle>30:
+                        raise RuntimeError('Webhook queue did not drain before idle recovery')
+                    time.sleep(.5)
+                drained=time.monotonic()
+                while time.monotonic()-drained<seconds:
+                    if critical.wait(min(.5,max(0,seconds-(time.monotonic()-drained)))) or watchdog.poll() is not None:
+                        raise RuntimeError('Resource guard stopped the idle recovery phase')
+                components=[app,pg,telemetry]
+                if arguments.backend=='s3':components.append(s3)
+                cgroups={name:owned_cgroup_snapshot(owned,name) for name in components}
+                for value in cgroups.values():require_no_oom(value['memory.events'])
+                owners=owned('exec',app,'sh','-c',"printf 'fds '; ls /proc/1/fd | wc -l; printf 'tasks '; ls /proc/1/task | wc -l; printf 'sockets '; ls -l /proc/1/fd | grep -c 'socket:'")
+                database=json.loads(sql("SELECT json_build_object('connections',count(*),'stuck_idle_transactions',count(*) FILTER(WHERE state='idle in transaction' AND clock_timestamp()-state_change>interval '5 seconds'),'waiting_locks',count(*) FILTER(WHERE wait_event_type='Lock')) FROM pg_stat_activity WHERE datname=current_database()"))
+                plateaus.append({'phase':label,'idle_seconds':seconds,'queue_drain_seconds':drained-began_idle,'observed_monotonic':time.monotonic(),'app_owners':owners,'app_process':component_identity(json.loads(owned('inspect',app))[0]),'database':database,'component_cgroups':cgroups})
+                atomic_json(output/'resource-plateaus.json',plateaus)
+                if database['stuck_idle_transactions'] or database['waiting_locks']:
+                    raise RuntimeError('Database resource owners did not recover during rest')
 
             def run(label, workload, duration, vus=16, rate=0, overload=False):
                 nonlocal phase, load_seconds, soak_started, active_generator, soak_processes
@@ -1211,6 +1239,7 @@ def campaign(arguments):
                         raise RuntimeError("Required 3x spike exceeds the declared traffic ceiling")
                     run("spike-" + str(iteration), "mixed", "10s", 16, spike_rate, overload=True)
                     run("spike-recovery-" + str(iteration), "mixed", "20s", 16, soak_rate)
+                    idle('spike-idle-'+str(iteration))
             run("recovery-before-restart", "mixed", "20s", 4)
             restarting.set()
             sampling_epoch += 1
@@ -1223,6 +1252,7 @@ def campaign(arguments):
             run("recovery-after-restart", "mixed", "20s", 4)
             if arguments.soak_seconds:
                 run("soak", "mixed", str(arguments.soak_seconds) + "s", 16, soak_rate)
+            idle('post-load-idle',30)
             deadline = time.monotonic() + 30
             while True:
                 pending = int(

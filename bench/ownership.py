@@ -3,6 +3,7 @@ import json
 import subprocess
 
 LABEL='io.nelcota.stress.run'
+LOG_PROFILE={'driver':'local','max_size_bytes':8*1024*1024,'max_files':2}
 CONTAINER_FORMAT='{"id":{{json .Id}},"labels":{{json .Config.Labels}}}'
 
 
@@ -43,6 +44,10 @@ class OwnedDocker:
     def __call__(self,*arguments,**keywords):
         args=list(map(str,arguments))
         command=args[0]
+        if command=='run':
+            if any(value.split('=',1)[0] in ('--log-driver','--log-opt') for value in args):
+                raise ValueError('Owned fixtures require the bounded campaign log policy')
+            args[1:1]=['--log-driver','local','--log-opt','max-size=8m','--log-opt','max-file=2']
         if command=='volume' and args[1]=='create':
             self.volume(args[-1],missing_ok=True)
             result=self.raw(*args,**keywords)

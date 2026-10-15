@@ -17,6 +17,14 @@ sys.path.insert(0,str(ROOT/'bench'))
 
 
 class OwnershipBoundaries(unittest.TestCase):
+    def test_fixture_cannot_disable_its_log_disk_budget(self):
+        from ownership import OwnedDocker
+        raw=mock.Mock()
+        owned=OwnedDocker('this-run',raw)
+        for flag in ['--log-driver=none','--log-driver','--log-opt=max-size=0']:
+            with self.assertRaises(ValueError):owned('run',flag,'image')
+        raw.assert_not_called()
+
     def test_restarted_or_external_publication_cannot_impersonate_the_fixture(self):
         from ports import published_port
         def inspection(mappings):

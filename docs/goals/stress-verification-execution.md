@@ -108,7 +108,7 @@ Não haverá deploy de produção ou merge automático.
   foi reprovada e removida com cleanup confirmado; o diagnóstico está abaixo.
 
 
-## Primeiro endurance em execução
+## Primeira tentativa de endurance
 
 A campanha `disk-pass-1-004` concluiu 4.395 segundos de carga antes do endurance.
 Cada qualificação abaixo durou cinco minutos, em iterações/s e com histogramas
