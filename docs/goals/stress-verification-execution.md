@@ -482,3 +482,98 @@ disco adicional. O perfil declarado de dez projetos precisa de aproximadamente
 12,1 GiB disponíveis após a limpeza. Essa célula permanece bloqueada por
 recursos; não será substituída por dez bancos no mesmo cluster nem por dados
 em tmpfs. A validação real de cinco projetos segue com os limites originais.
+
+
+### 2026-10-15 15:54 UTC — CI e recusa de comparações incompletas
+
+Os 18 checks do commit `be76404` concluíram com sucesso. A evidência
+funcional foi atualizada para esse SHA, com links de cada check; isso não
+aprova capacidade nem endurance. A contagem local verificada é de 140 testes
+Python em 6,617 s. Contagens Rust não foram inferidas a partir do status.
+
+A reprodução nativa do comparador usou os três resultados iniciais de tráfego
+misto de `s3-pass-1-003`, cuja conclusão é `failed`. Comparar esse diretório
+consigo mesmo torna as amostras iniciais idênticas: o comparador anterior
+retornou aprovação, mesmo com a campanha final interrompida. O comparador
+atual recusou a mesma entrada, marcou ambas as conclusões como inválidas e
+usou operações úteis. Essa reprodução comprova a correção do gate, sem
+afirmar qualquer melhoria de desempenho do produto.
+[Evidência](results/stress/comparator-failed-run-before-after.json).
+
+`fleet-caddy-5-smoke-001` concluiu 150 segundos e 35 amostras, mas falhou
+no p95 relativo de RLS de `project-3` em `noisy-mixed`; o limite de 20%
+permanece intacto e a limpeza foi confirmada. As três referências curtas e
+o reload real de proxy passaram; não houve reconciliação final completa
+de webhooks porque o gate de fairness encerrou a execução. Uma repetição
+com etapas de 300 segundos ainda é necessária. A campanha completa
+`fault-pass-1-001` está qualificando a carga antes das falhas reais; as
+etapas de 300 segundos a 16 e 32 operações/s passaram. A reconciliação
+final de commits continua pendente.
+
+
+### 2026-10-15 16:06 UTC — campanha completa de falhas
+
+`fault-pass-1-001` passou com 1.580 segundos de carga, 309 amostras e limpeza
+confirmada. Foram reconciliadas 59.390 tentativas, 53.049 respostas confirmadas
+e 55.988 commits: zero confirmações perdidas e zero identidades/digests
+corrompidos. As 2.938 respostas realmente descartadas depois de sucesso do
+backend foram encontradas integralmente no banco. Houve 6.155 resultados
+ambíguos, dos quais 2.939 foram commits; um deles vinha da categoria de
+desconexão anterior à resposta. Nenhuma mutação foi repetida automaticamente;
+a repetição explícita da chave da operação retornou 409. As duas contas
+preservaram a soma de 2.000.000 e o contador igual ao número de commits.
+
+As etapas de cinco minutos a 16, 32 e 48 iterações/s qualificaram; 64 falhou
+por 1.940 chegadas descartadas entre 19.200 (10,104%). Isso não é capacidade
+máxima do backend: o gerador Python tem oito operações em voo. As falhas
+foram injetadas a 38 iterações/s, 79,167% do patamar qualificado de 48.
+
+Reinício do banco, deadlock, encerramento da aplicação, OOM intencional de
+8 MiB com Argon2 inalterado, bytes/inodes cheios e reinício/pausa de RustFS
+passaram pelas verificações funcionais e de rejeição. RTOs: banco 0,287 s;
+aplicação 1,877 s; OOM 1,509 s; provedor reiniciado 0,472 s; após pausa
+0,528 s. O dispositivo de teste retornou 507 `storage_full` por bytes e
+500 `internal` por inodes, preservando os bytes existentes, sem publicar
+metadados de falha e permitindo upload/read-back posterior. Ocorreram,
+respectivamente, 99 e 93 commits de banco durante essas falhas isoladas.
+
+O backup de 3.104.889 bytes ocorreu com escritores ativos. A restauração
+local em alvo novo preservou usuário, bytes e rejeição de token do outro
+projeto: RTO 2,636 s e RPO superior limitado a 17,997 s. As 646 linhas
+de rewind foram intencionais no snapshot restaurado; a origem manteve
+todas as confirmações. O gate de multipart vazio foi executado no provedor
+real antes da troca de backend; não há arquivo separado dessa contagem.
+[Evidência completa e limites](results/stress/fault-pass-1.json).
+
+### 2026-10-15 17:20 UTC — primeiro endurance final em disco
+
+A execução `disk-pass-1-005`, congelada no commit `3203330`, iniciou o trecho
+contínuo perto de 17:17 UTC, depois de 3.585 segundos de carga concluída.
+As três amostras de cada uma das oito classes, as qualificações e repetições
+de cinco minutos até 400 iterações/s, o stress, cinco picos com recuperação
+e o reinício planejado passaram. O trecho contínuo oferece 280 iterações/s
+(70% de 400); os mesmos processos de aplicação/banco devem permanecer vivos.
+A primeira coorte de eventos já foi podada; auth e GC ainda aguardam os ciclos
+reais. Nenhum endurance de quatro horas foi aprovado nesta atualização.
+
+O perfil inclui agora três amostras explícitas de escrita a 50 iterações/s e
+180 segundos de observação após a carga, para investigar retenção de recursos.
+Esse repouso não entra no tempo efetivo nem nas quatro horas contínuas.
+O código de produção e o SHA-256 do executável permanecem os do baseline.
+
+
+### 2026-10-15 17:32 UTC — renovação real e revisão atual
+
+Os 18 checks do commit `3203330` passaram. O checkpoint do cliente contínuo
+registrou 876 iterações, uma renovação de acesso e uma operação real de
+refresh bem-sucedida, lidas pelo protocolo de contador esparso corrigido.
+Isso não aprova o número final de renovações nem as quatro horas: a campanha
+continua ativa e a reconciliação final permanece pendente.
+
+O perfil de navegador real está sendo implementado em módulos separados,
+com runtime público copiado para uma fixture própria, TLS/NSS isolado,
+dois consumidores reais de autenticação e limites explícitos. Até aqui
+houve apenas verificação sintática e três testes de proteção contra
+traversal/symlinks em metadados do runtime; nenhum resultado de stress
+em navegador é apresentado como aprovado. A execução fica para uma janela
+entre campanhas, evitando tráfego e cópias pesadas durante o endurance.
