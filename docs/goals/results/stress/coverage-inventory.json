@@ -39,6 +39,12 @@
           "status": "passed",
           "scope": "First complete 14400-second continuous disk pass plus 3585 completed prelude seconds; same processes, 3094 samples, 248381 events reconciled and cleanup confirmed. Second independent pass and remaining row scenarios are still pending.",
           "evidence": "disk-pass-1.json"
+        },
+        {
+          "run_id": "browser-pass-1-009",
+          "status": "passed",
+          "scope": "First full local live-browser/SDK lifecycle pass: three tabs, foreground p95 399.4ms, all 300 disposed test clients collected, actual credential expiry/renewal, byte-verified uploads, real response cancellation and cleanup; independent second pass still pending.",
+          "evidence": "browser-pass-1.json"
         }
       ]
     },
@@ -197,7 +203,8 @@
           "scope": "150 seconds effective real-backend mixed diagnostic, not capacity or endurance certification",
           "evidence": "semantic-real-backend-smokes.json"
         }
-      ]
+      ],
+      "in_progress_run_id": "s3-pass-1-004"
     },
     {
       "id": "webhooks",
@@ -250,7 +257,7 @@
       "area": "Panel tabs, request lifetime and retained resources",
       "entrypoints": "crates/admin/ui/e2e; src/lib/query-client.test.ts",
       "status": "not run",
-      "scope_or_limit": "Live native browser profile implemented. Initial native preparation/startup failures are retained with cleanup confirmed; TLS control and full browser lifecycle remain unapproved while investigating the required native library closure.",
+      "scope_or_limit": "First full native profile passed with 511 actual foreground navigations and zero page/external-request errors. Startup/oracle failures remain recorded; second independent pass and final comparison are pending.",
       "functional_subset": {
         "status": "passed",
         "source_commit": "3203330cf3df2b9b7dd68efebc79412a8564e9fd",
@@ -283,6 +290,12 @@
           "run_id": "browser-pass-1-004",
           "status": "failed",
           "scope": "Chromium closed during the untrusted TLS control; no approved browser result, cleanup confirmed"
+        },
+        {
+          "run_id": "browser-pass-1-009",
+          "status": "passed",
+          "scope": "First full local live-browser/SDK lifecycle pass: three tabs, foreground p95 399.4ms, all 300 disposed test clients collected, actual credential expiry/renewal, byte-verified uploads, real response cancellation and cleanup; independent second pass still pending.",
+          "evidence": "browser-pass-1.json"
         }
       ]
     },
@@ -313,7 +326,15 @@
         ],
         "scope": "Existing TypeScript/Rust package, runtime, memory and server/browser contracts on documented CI runtimes; no VPS load envelope follows from these functional checks.",
         "test_count": null
-      }
+      },
+      "native_diagnostics": [
+        {
+          "run_id": "browser-pass-1-009",
+          "status": "passed",
+          "scope": "First full local live-browser/SDK lifecycle pass: three tabs, foreground p95 399.4ms, all 300 disposed test clients collected, actual credential expiry/renewal, byte-verified uploads, real response cancellation and cleanup; independent second pass still pending.",
+          "evidence": "browser-pass-1.json"
+        }
+      ]
     },
     {
       "id": "topologies",

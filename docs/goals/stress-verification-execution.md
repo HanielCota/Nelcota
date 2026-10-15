@@ -666,3 +666,34 @@ agora fecha por Escape, com confirmação de que o diálogo desapareceu.
 execução para conferir todos os 20 WeakRefs por aba/ciclo e alternar sempre a
 tabela, evitando medir dados já visíveis como uma nova resposta. Não há ainda
 aprovação do perfil completo de navegador nem do p95 visual final.
+
+### 2026-10-15 22:02 UTC — navegador real aprovado e S3 iniciado
+
+`browser-pass-1-009` passou pelo perfil fortalecido, em fixtures novas:
+três abas, 511 navegações com tabela realmente diferente e aba visível,
+p95 de 399,4 ms para os dados autoritativos e dois frames, abaixo de 1 segundo.
+Foram verificados todos os 300 clientes temporários descartados por WeakRef/GC,
+seis conflitos reais de upload de 1 MiB e três substituições com read-back e
+digest corretos, cinco prévias e cancelamento de duas respostas reais 200.
+
+A sessão foi observada por 1.082 segundos, com TTL real de 900: renovação
+automática, token inicial expirado rejeitado com 401 e logout entre abas com
+refresh revogado rejeitado com 400. As 2.499 leituras SDK mantiveram RLS e
+identidade; os dois consumidores de autenticação responderam. Offline houve
+três tentativas GET, uma POST e nenhuma mutação/repetição após reconectar.
+Zero erros de página e zero solicitações externas. Houve 219 amostras e limpeza
+confirmada. [Evidência](results/stress/browser-pass-1.json). O intervalo contém
+repousos e controles e não recebe crédito separado no contador conservador de
+oito horas. A segunda passada do navegador continua necessária.
+
+`008` foi interrompido de forma controlada para substituir os oráculos fracos;
+seus cinco ciclos e sua limpeza foram preservados, sem aprovação do perfil.
+A execução nova confirma todos os WeakRefs e registra o feedback antes de
+qualquer reprovação. Não se atribui melhoria de produto à correção do executor.
+
+`s3-pass-1-004` iniciou depois da limpeza do navegador, com RustFS real,
+1.024 MiB para o provedor, as oito classes, escrita nominal explícita de 50/s,
+WAL de 256 MiB, teto de qualificação de 400 e fração de 70%. O endurance
+solicitado é de 14.400 segundos após as fases de qualificação/picos. Nesta
+atualização ele está nas fases prévias: não há quatro horas S3 aprovadas.
+Os 18 checks de `f46ab4b` passaram.
