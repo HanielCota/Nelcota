@@ -38,6 +38,7 @@ from ports import published_port
 from postgres_evidence import retain_failure
 from http_boundary import opener
 from fixture_copy import copy_to_tmpfs
+from disk_usage import container as container_disk_usage
 
 ROOT = Path(__file__).resolve().parents[1]
 MUTATION_PATH='/rest/v1/rpc/stress_transfer'
@@ -201,6 +202,7 @@ def run(args):
                     states={}
                     running=[]
                     disks={}
+                    disk_observations={}
                     cgroups={}
                     for project in list(initialized):
                         for name in [project.app,project.pg]:
@@ -219,7 +221,8 @@ def run(args):
                                 require_no_oom(events)
                                 running.append(name)
                         if project.pg in running:
-                            disks[project.label]=int(owned('exec',project.pg,'du','-sm','/var/lib/postgresql/data').split()[0])
+                            disk_observations[project.label]=container_disk_usage(owned,project.pg,'/var/lib/postgresql/data')
+                            disks[project.label]=disk_observations[project.label]['value']
                             if disks[project.label]>512:
                                 raise RuntimeError('Owned fault database exceeded its 512-MiB budget')
                     if provider_started:
@@ -234,7 +237,8 @@ def run(args):
                             cgroups[provider]=owned_cgroup_snapshot(owned,provider)
                             events=cgroups[provider]['memory.events']
                             require_no_oom(events)
-                            if int(owned('exec',provider,'du','-sm','/data').split()[0])>512:
+                            disk_observations[provider]=container_disk_usage(owned,provider,'/data')
+                            if disk_observations[provider]['value']>512:
                                 raise RuntimeError('Owned S3 fault provider exceeded its 512-MiB disk budget')
                             running.append(provider)
                     stats=[json.loads(line) for line in owned('stats','--no-stream','--format','{{json .}}',*running).splitlines()]
@@ -245,7 +249,7 @@ def run(args):
                     resource_at=time.monotonic()
                     coverage.observe(resource_at-observations_started)
                     with (output/'resources.jsonl').open('a') as target_file:
-                        target_file.write(json.dumps({'monotonic':resource_at,'phase':phase,'states':states,'containers':stats,'database_disk_mib':disks,'fault':fault,'host':host_snapshot(cpus),'parent_rss_kib':parent_rss,'component_cgroups':cgroups})+'\n')
+                        target_file.write(json.dumps({'monotonic':resource_at,'phase':phase,'states':states,'containers':stats,'database_disk_mib':disks,'fault':fault,'host':host_snapshot(cpus),'parent_rss_kib':parent_rss,'component_cgroups':cgroups,'disk_observations':disk_observations})+'\n')
                     atomic_json(output/'checkpoint.json',{'phase':phase,'monotonic':resource_at,'load_seconds_completed':load_seconds,'resource_observations':coverage.count})
                 except Exception as error:
                     if fault_window.changed(epoch):

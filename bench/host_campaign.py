@@ -27,6 +27,7 @@ from projects import Project
 from watchdog import LABEL, atomic_json, cleanup, host_reserves, process_identity, stop_generator
 from host_resources import snapshot as host_snapshot, owned_cgroup_snapshot, require_no_oom
 from ownership import LOG_PROFILE,OwnedDocker
+from disk_usage import container as container_disk_usage
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -122,7 +123,7 @@ def campaign(args):
         atomic_json(output/'manifest.json', {'schema': 1, 'scope': 'local independent app/PG clusters, no proxy/controller', 'projects': args.projects, 'rows_per_project': 1000, 'shared_user_id': '00000000-0000-4000-8000-000000000001', 'binary_sha256': hashlib.file_digest(args.binary.open('rb'), 'sha256').hexdigest(), 'cpu_effective': effective_cpus(cpus), 'app_aggregate_cpus': 1, 'postgres_aggregate_cpus': 1, 'generator_cpus': 1, 'metrics_cpus': .25, 'app_memory_mib_each': 128, 'postgres_memory_mib_each': 256, 'max_arrival_rate': 10000, 'fixture_disk_mib': args.disk_mib, 'storage_filesystem': filesystem, 'seconds_per_step': args.seconds, 'certifies_five_minute_steps': args.seconds >= 300, 'base_rate_per_project': args.rate, 'SLOs': 'G05 unchanged'})
         fixtures = [project.create() for project in projects]
         profile=json.loads((output/'manifest.json').read_text())
-        profile['resource_protocol']='component cgroup v2 current/peak/stat/events/cpu/pids plus host and process owners'
+        profile['resource_protocol']='component cgroup v2 plus host/process owners; allocated du totals count only disappearing child entries'
         profile['container_log_profile']=LOG_PROFILE
         profile['harness_js_sha256']=hashlib.file_digest((ROOT/'bench/campaign.js').open('rb'),'sha256').hexdigest()
         profile.update({'schema':2,'cpu_affinity':cpus[:3],'metrics_cpu_affinity':cpus[-1],'capacity_qualification':args.capacity,'provisional_rate_per_project':args.provisional_rate,'max_connections_each':32,'pool_each':4,'generator_memory_mib':512,'metrics_memory_mib':512,'images':{image:json.loads(owned('image','inspect',image))[0]['RepoDigests'] for image in ['ubuntu:24.04','postgres:17-alpine',K6,PROMETHEUS]}})
@@ -186,7 +187,8 @@ def campaign(args):
                         values = json.loads(project.sql("SELECT json_build_object('connections',count(*),'idle_in_transaction',count(*) FILTER(WHERE state='idle in transaction'),'stuck_idle_transactions',count(*) FILTER(WHERE state='idle in transaction' AND now()-state_change>interval '5 seconds')) FROM pg_stat_activity WHERE backend_type='client backend';"))
                         if values['connections'] > 32 or values['stuck_idle_transactions']:
                             raise RuntimeError('Connection or transaction ownership violation')
-                        values['disk_bytes'] = int(owned('exec', project.pg, 'du', '-sk', '/var/lib/postgresql/data').split()[0])*1024
+                        values['disk_observation']=container_disk_usage(owned,project.pg,'/var/lib/postgresql/data',unit='k')
+                        values['disk_bytes']=values['disk_observation']['value']*1024
                         disk_bytes += values['disk_bytes']
                         databases[project.label] = values
                     if disk_bytes > args.disk_mib*1024*1024:

@@ -243,6 +243,10 @@ python3 bench/oracle_check.py --output target/stress-oracles/bytes
 This short native k6 control uses a bounded HTTP fixture to prove that the
 benchmark oracle accepts correct bytes and rejects corrupt/truncated HTTP 200
 responses. It does not certify the Rust backend, real S3 or endurance.
+Allocated-disk measurements retain totals and count children removed during
+concurrent overwrite/GC. Missing roots, ambiguous totals, permission/I/O errors
+and unknown diagnostics still abort. These observations are non-atomic; the
+host reserve guard and independent metadata/byte invariants remain required.
 
 Use `--rows 1000000` for the separate million-row investigation and
 `--object-bytes 1048576` for 1-MiB transfers. These profiles need separate

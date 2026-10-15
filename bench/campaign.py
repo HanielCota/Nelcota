@@ -42,6 +42,7 @@ from objects import S3Inventory, disk_inventory, reconcile
 from host_resources import snapshot as host_snapshot, owned_cgroup_snapshot, require_no_oom
 from ownership import LOG_PROFILE,OwnedDocker
 from postgres_evidence import STATISTICS_SQL,retain_failure
+from disk_usage import container as container_disk_usage,host as host_disk_usage
 
 K6 = "grafana/k6:1.6.1@sha256:a5ad6bc089a08d77c3ec49f3db8c6fa7a148e4073efcac44c675dbaf3568d8e1"
 NOMINAL_SLOS = {"read": (200, 500), "rls": (200, 500), "refresh": (200, 500), "login": (750, 1500), "storage": (500, 2000), "panel": (500, 2000), "write": (500, 1500)}
@@ -623,8 +624,12 @@ def campaign(arguments):
                         for offset in range(0,len(seeded_keys),32):
                             list(workers.map(seed_object,seeded_keys[offset:offset+32]))
                             atomic_json(output/'storage-seed-progress.json',{'completed':min(offset+32,len(seeded_keys)),'required':10000,'preparation':True})
-                            if offset%1024==0 and int(owned('exec',s3,'du','-sm','/data').split()[0])>arguments.storage_fixture_disk_mib:
-                                raise RuntimeError('S3 physical seed exceeded its declared disk budget')
+                            if offset%1024==0:
+                                allocation=container_disk_usage(owned,s3,'/data')
+                                with (output/'storage-seed-disk.jsonl').open('a') as record:
+                                    record.write(json.dumps({'completed_objects':min(offset+32,len(seeded_keys)),'allocation':allocation})+'\n')
+                                if allocation['value']>arguments.storage_fixture_disk_mib:
+                                    raise RuntimeError('S3 physical seed exceeded its declared disk budget')
             time.sleep(1)
             object_payload=b'benchmark payload'
             fixture_payload=b'"benchmark payload"'
@@ -709,7 +714,7 @@ def campaign(arguments):
                 "soak_seconds": arguments.soak_seconds,
                 "maximum_campaign_seconds": 21600,
                 "resource_sample_seconds": 5,
-                "resource_protocol":"component cgroup v2 current/peak/stat/events/cpu/pids, PostgreSQL IO/WAL/checkpointer/locks and host/process owners",
+                "resource_protocol":"component cgroup v2, PostgreSQL IO/WAL/checkpointer/locks, process owners; allocated du totals count only disappearing child entries",
                 "postgres_observation_settings":{"track_io_timing":True,"track_wal_io_timing":True,"log_lock_waits":True,"deadlock_timeout_ms":100,"log_min_duration_statement_ms":1000},
                 "soak_fraction":arguments.soak_fraction,
                 "container_log_profile":LOG_PROFILE,
@@ -782,17 +787,16 @@ def campaign(arguments):
                         )
                         database_statistics=json.loads(sql(STATISTICS_SQL))
                         sample_step = "disk_budget"
-                        disk = int(
-                            owned(
-                                "exec", pg, "du", "-sm", "/var/lib/postgresql/data"
-                            ).split()[0]
-                        )
-                        metrics_disk = int(owned("exec", telemetry, "du", "-sm", "/prometheus").split()[0])
+                        disk_observations={'postgres':container_disk_usage(owned,pg,'/var/lib/postgresql/data'),'metrics':container_disk_usage(owned,telemetry,'/prometheus')}
+                        disk=disk_observations['postgres']['value']
+                        metrics_disk=disk_observations['metrics']['value']
                         storage_disk=0
                         if arguments.backend=='disk':
-                            storage_disk=int(subprocess.check_output(['du','-sm',str(storage)],text=True,timeout=10).split()[0])
+                            disk_observations['storage']=host_disk_usage(storage)
+                            storage_disk=disk_observations['storage']['value']
                         if arguments.backend=='s3':
-                            storage_disk=int(owned('exec',s3,'du','-sm','/data').split()[0])
+                            disk_observations['storage']=container_disk_usage(owned,s3,'/data')
+                            storage_disk=disk_observations['storage']['value']
                         if storage_disk>arguments.storage_fixture_disk_mib:
                             raise RuntimeError('Storage fixture exceeded its declared disk budget')
                         if metrics_disk > 512:
@@ -873,6 +877,7 @@ def campaign(arguments):
                                 "pg_disk_mib": disk,
                                 "metrics_disk_mib": metrics_disk,
                                 "storage_disk_mib":storage_disk,
+                                "disk_observations":disk_observations,
                                 "memory_events":memory_events,
                                 "component_cgroups":cgroups,
                                 "containers": [
@@ -1038,9 +1043,17 @@ def campaign(arguments):
                         with (output / "traffic-ledger.jsonl").open("a") as ledger:
                             ledger.write(json.dumps({"phase": label, "workload": workload, "requested_seconds": int(duration[:-1]), "elapsed_seconds": elapsed, "completed": result.returncode == 0, "exit_code": result.returncode, "started_monotonic": load_started, "ended_monotonic": time.monotonic()}) + "\n")
                         if result.poll() is None:
+                            stop_generator(manifest)
                             result.terminate()
-                            owned("rm", "-f", generator)
-                            result.wait(timeout=20)
+                            try:
+                                owned("rm", "-f", generator)
+                            except (RuntimeError,subprocess.TimeoutExpired):
+                                atomic_json(output/(label+'-generator-cleanup-warning.json'),{'reason':'concurrent_or_unavailable_docker_removal','final_cleanup_required':True})
+                            try:
+                                result.wait(timeout=20)
+                            except subprocess.TimeoutExpired:
+                                result.kill()
+                                result.wait(timeout=5)
                         if active_generator is generator_context:
                             active_generator = None
                         try:
