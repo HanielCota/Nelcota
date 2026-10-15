@@ -471,11 +471,17 @@ def run(args):
                 source.start_app()
                 atomic_json(output/'declared-oom-before.json',{'state':inspect_container(source.app)['State'],'cgroup':owned_cgroup_snapshot(owned,source.app)})
                 owned('update','--memory','8m','--memory-swap','8m',source.app)
+                # Idle anonymous memory can fit in 8 MiB even with higher RSS.
+                # One unchanged Argon2 verification touches more than that cap.
+                try:
+                    raw(source,'POST','/auth/v1/token?grant_type=password',{'email':source.email,'password':source.password})
+                except (urllib.error.URLError,TimeoutError,ConnectionError,http.client.HTTPException):
+                    pass
                 deadline=time.monotonic()+10
                 while time.monotonic()<deadline:
                     state=inspect_container(source.app)
                     if state is not None and state['State']['OOMKilled']:
-                        atomic_json(output/'declared-oom.json',{'status':'observed','state':state['State'],'limit_mib':8,'tag':'io.nelcota.stress.fault=oom','scope':'only the owned source app'})
+                        atomic_json(output/'declared-oom.json',{'status':'observed','state':state['State'],'limit_mib':8,'tag':'io.nelcota.stress.fault=oom','scope':'only the owned source app','trigger':'one normal password verification with unchanged Argon2 parameters'})
                         break
                     time.sleep(.1)
                 if state is None or not state['State']['OOMKilled']:
