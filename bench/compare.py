@@ -42,7 +42,7 @@ metadata = [
     json.loads((directory / "metadata.json").read_text())
     for directory in [args.baseline, args.candidate]
 ]
-for field in ["steady_duration", "workloads", "s3", "schema", "metrics_backend", "metrics_memory_mb", "metrics_cpus", "offered_rate_unit", "nominal_slos_ms", "auth_rate_limit_per_minute", "autovacuum", "webhook_history_maintenance", "storage_filesystem"]:
+for field in ["steady_duration", "workloads", "s3", "schema", "metrics_backend", "metrics_memory_mb", "metrics_cpus", "metrics_cpu_affinity", "effective_cpu_quota", "offered_rate_unit", "nominal_slos_ms", "auth_rate_limit_per_minute", "autovacuum", "webhook_history_maintenance", "storage_filesystem"]:
     if any(field in value for value in metadata):
         fixture_fields.append(field)
 fixture_differences = [

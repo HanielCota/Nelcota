@@ -16,6 +16,9 @@ esperas e verificações estáticas não contam como tempo de carga.
   Prometheus tem quota adicional explícita de 0,25 CPU e 512 MiB.
 - App: 128 MiB; PostgreSQL: 384 MiB; gerador: 512 MiB; RustFS: 512 MiB.
   O consumo agregado e o throttling do host precisam acompanhar os resultados.
+- O perfil atual reserva 0,5 CPU ao RustFS e 0,25 CPU ao coletor; com app,
+  PostgreSQL e gerador a 1 CPU cada, restam 0,25 CPU da quota para observação
+  e sistema. O preflight verifica a quota efetiva, não só CPUs visíveis.
 - Banco em volume de disco próprio, sem tmpfs. Arquivos, volumes e contêineres
   recebem identidade exclusiva e descarte limitado ao respectivo run.
 - Reservas mínimas: 10% de RAM disponível e 15% de bytes/inodes livres.
@@ -55,7 +58,7 @@ reais. Limpeza manual do histórico aguarda a remoção desses eventos pelo prun
   A repetição em disco passou com a nova coleta de histogramas.
 - Smoke S3 real com 90 segundos de soak: passou; 4.719 eventos únicos observados,
   zero ausentes/extras e bytes verificados em 33 objetos.
-- Regressões Python relacionadas: 27 passaram na última verificação registrada.
+- Regressões Python relacionadas: 29 passaram na última verificação registrada.
   O registro final atualizará a contagem e o SHA correspondente.
 - Preflight com SLOs ativos: reprovou o login, p95 de 995 ms com alvo de
   750 ms, em carga estimada de 572 iterações/s. O critério foi preservado;

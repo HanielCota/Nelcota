@@ -104,6 +104,16 @@ def validate_storage_filesystem(backend, filesystem):
         raise RuntimeError("Real disk storage campaign cannot use a memory filesystem")
 
 
+def effective_cpus(affinity):
+    path = Path('/sys/fs/cgroup/cpu.max')
+    if not path.exists():
+        return float(len(affinity))
+    quota, period = path.read_text().split()
+    if quota == 'max':
+        return float(len(affinity))
+    return min(float(len(affinity)), int(quota) / int(period))
+
+
 class ResourceCoverage:
     """Constant-space coverage independent of the bounded diagnostic window."""
 
@@ -190,14 +200,19 @@ def campaign(arguments):
         raise RuntimeError("Host resource reserves do not permit a campaign")
     identity = "nelcota-bench-" + secrets.token_hex(4)
     cpus = sorted(os.sched_getaffinity(0))
-    if len(cpus) < 3:
+    if len(cpus) < 4:
         raise RuntimeError(
-            "Campaign needs three available CPUs for isolated app, DB and generator"
+            "Campaign needs four CPU slots for app, DB, generator and telemetry"
         )
     if arguments.backend == "s3" and len(cpus) < 4:
         raise RuntimeError(
             "S3 campaign needs four CPUs for app, DB, generator and object service"
         )
+    required_cpus = 3.5
+    if arguments.backend == "s3":
+        required_cpus = 4.0
+    if effective_cpus(cpus) < required_cpus:
+        raise RuntimeError("Effective CPU quota cannot cover the declared fixture and observer budgets")
     pg, app = identity + "-pg", identity + "-app"
     s3 = identity + "-s3"
     volume = identity + "-data"
@@ -367,7 +382,7 @@ def campaign(arguments):
                     "--name",
                     s3,
                     "--cpus",
-                    "1",
+                    "0.5",
                     "--cpuset-cpus",
                     str(cpus[3]),
                     "--memory",
@@ -590,6 +605,7 @@ def campaign(arguments):
                     subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT)
                 ),
                 "cpu_count": os.cpu_count(),
+                "effective_cpu_quota": effective_cpus(cpus),
                 "cpu_affinity": cpus[:3],
                 "app_cpus": 1,
                 "app_memory_mb": 128,
@@ -617,6 +633,7 @@ def campaign(arguments):
                 "metrics_backend": "native Prometheus histogram; k6 raw TrendSink disabled",
                 "metrics_memory_mb": 512,
                 "metrics_cpus": 0.25,
+                "metrics_cpu_affinity": cpus[-1],
                 "nominal_slos_ms": NOMINAL_SLOS,
                 "auth_rate_limit_per_minute": 100000,
                 "autovacuum": "enabled after fresh-statistics phase",
@@ -637,7 +654,7 @@ def campaign(arguments):
             if arguments.backend == "s3":
                 metadata["s3"] = {
                     "cpu_affinity": cpus[3],
-                    "cpus": 1,
+                    "cpus": 0.5,
                     "memory_mb": 512,
                     "ca_bundle_sha256": hashlib.file_digest(
                         Path("/etc/ssl/certs/ca-certificates.crt").open("rb"), "sha256"
@@ -659,6 +676,12 @@ def campaign(arguments):
                         if arguments.backend == "s3":
                             names.append(s3)
                         stats = docker("stats", "--no-stream", "--format", "{{json .}}", *names)
+                        generator_stats = None
+                        observation = subprocess.run(["docker", "stats", "--no-stream", "--format", "{{json .}}", generator], capture_output=True, text=True, timeout=10)
+                        if observation.returncode == 0 and observation.stdout.strip():
+                            generator_stats = json.loads(observation.stdout)
+                        if observation.returncode and not any(text in observation.stderr.lower() for text in ['no such container', 'is not running']):
+                            raise RuntimeError("Generator resource observation failed")
                         sample_step = "process_ownership"
                         status = docker("exec", app, "cat", "/proc/1/status")
                         rss = next(
@@ -736,6 +759,7 @@ def campaign(arguments):
                                 "containers": [
                                     json.loads(line) for line in stats.splitlines()
                                 ],
+                                "generator": generator_stats,
                                 "database": json.loads(activity),
                                 "queue": json.loads(queue),
                                 "signature_errors": len(receiver.errors),
@@ -1114,7 +1138,7 @@ def campaign(arguments):
                 )
             )
             hook_id = str(uuid.UUID(hook["endpoint"]["id"]))
-            expected_process = subprocess.Popen(["docker", "exec", pg, "psql", "-Atq", "-U", "postgres", "-v", "ON_ERROR_STOP=1", "-c", "SELECT event_id::text FROM public.bench_expected_events ORDER BY event_id"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+            expected_process = subprocess.Popen(["docker", "exec", "-e", "PGOPTIONS=-cstatement_timeout=30000", pg, "psql", "-Atq", "-U", "postgres", "-v", "ON_ERROR_STOP=1", "-c", "SELECT event_id::text FROM public.bench_expected_events ORDER BY event_id"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
             with expected_process.stdout as expected_stream:
                 event_evidence = event_ledger.validate(str(uuid.UUID(line.strip())) for line in expected_stream)
             if expected_process.wait(timeout=30) or event_evidence["missing"] or event_evidence["extra"]:
