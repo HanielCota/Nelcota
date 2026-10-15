@@ -78,6 +78,12 @@ class ExistingDefects(unittest.TestCase):
         with mock.patch.object(module, 'docker', return_value=owned+local):
             self.assertTrue(module.owns_listener('fixture', 8080))
 
+    def test_resource_diagnostic_preserves_failure_without_secrets(self):
+        module = campaign_module()
+        text = module.redacted_diagnostic(RuntimeError('Docker refused fixture-secret-123 during stats'), ['fixture-secret-123'])
+        self.assertIn('during stats', text)
+        self.assertNotIn('fixture-secret-123', text)
+
 
 class EvidenceOracles(unittest.TestCase):
     def setUp(self):
@@ -122,6 +128,40 @@ class EvidenceOracles(unittest.TestCase):
 
 
 class MetricsAndOwnership(unittest.TestCase):
+    def generator_context(self):
+        process = mock.Mock()
+        process.poll.return_value = None
+        return {'process': process, 'name': 'generator', 'container_id': 'old-container-id', 'identity': 'this-run', 'phase': 'fixture', 'started': 0}
+
+    def test_completed_generator_eof_is_a_lifecycle_boundary(self):
+        campaign_module()
+        from observations import generator_observation
+        context = self.generator_context()
+        results = [subprocess.CompletedProcess([], 1, '', 'EOF'), subprocess.CompletedProcess([], 0, json.dumps([{'State':{'Running':False}}]), '')]
+        with mock.patch('observations.subprocess.run', side_effect=results) as run:
+            self.assertIsNone(generator_observation(context, lambda: context))
+        self.assertEqual(run.call_args_list[0].args[0][-1], 'old-container-id')
+
+    def test_live_generator_eof_still_invalidates_evidence(self):
+        campaign_module()
+        from observations import generator_observation
+        context = self.generator_context()
+        results = [subprocess.CompletedProcess([], 1, '', 'EOF'), subprocess.CompletedProcess([], 0, json.dumps([{'State':{'Running':True}}]), '')]
+        with mock.patch('observations.subprocess.run', side_effect=results):
+            with self.assertRaisesRegex(RuntimeError, 'Live generator'):
+                generator_observation(context, lambda: context)
+
+    def test_reused_name_does_not_reassign_an_old_stats_stream(self):
+        campaign_module()
+        from observations import generator_observation
+        context = self.generator_context()
+        active = [context]
+        def end_generation(*args, **kwargs):
+            active[0] = self.generator_context()
+            return subprocess.CompletedProcess([], 1, '', 'EOF')
+        with mock.patch('observations.subprocess.run', side_effect=end_generation):
+            self.assertIsNone(generator_observation(context, lambda: active[0]))
+
     def test_nonfinite_remote_metrics_fail(self):
         campaign_module()
         from metrics import NativeMetrics

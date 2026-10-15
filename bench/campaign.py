@@ -36,6 +36,7 @@ sys.path.insert(0, str(ROOT / "bench"))
 from watchdog import LABEL, atomic_json, host_reserves, process_identity
 from metrics import NativeMetrics, PROMETHEUS
 from receiver import EventLedger
+from observations import generator_observation
 
 K6 = "grafana/k6:1.6.1@sha256:a5ad6bc089a08d77c3ec49f3db8c6fa7a148e4073efcac44c675dbaf3568d8e1"
 NOMINAL_SLOS = {"read": (200, 500), "rls": (200, 500), "refresh": (200, 500), "login": (750, 1500), "storage": (500, 2000), "panel": (500, 2000), "write": (500, 1500)}
@@ -112,6 +113,14 @@ def effective_cpus(affinity):
     if quota == 'max':
         return float(len(affinity))
     return min(float(len(affinity)), int(quota) / int(period))
+
+
+def redacted_diagnostic(error, values):
+    message = str(error)
+    for value in values:
+        if isinstance(value, str) and len(value) > 8:
+            message = message.replace(value, '<redacted>')
+    return message[-1200:]
 
 
 class ResourceCoverage:
@@ -241,6 +250,7 @@ def campaign(arguments):
     metadata = {}
     soak_started = None
     retention = []
+    active_generator = None
     js_snapshot = output / "campaign.js"
     shutil.copyfile(ROOT / "bench/campaign.js", js_snapshot)
     labels = ["--label", LABEL + "=" + identity, "--pids-limit", "256"]
@@ -677,11 +687,8 @@ def campaign(arguments):
                             names.append(s3)
                         stats = docker("stats", "--no-stream", "--format", "{{json .}}", *names)
                         generator_stats = None
-                        observation = subprocess.run(["docker", "stats", "--no-stream", "--format", "{{json .}}", generator], capture_output=True, text=True, timeout=10)
-                        if observation.returncode == 0 and observation.stdout.strip():
-                            generator_stats = json.loads(observation.stdout)
-                        if observation.returncode and not any(text in observation.stderr.lower() for text in ['no such container', 'is not running']):
-                            raise RuntimeError("Generator resource observation failed")
+                        sample_step = "generator_stats"
+                        generator_stats = generator_observation(active_generator, lambda: active_generator)
                         sample_step = "process_ownership"
                         status = docker("exec", app, "cat", "/proc/1/status")
                         rss = next(
@@ -778,7 +785,9 @@ def campaign(arguments):
                         # Ignore only observations crossing the explicit restart
                         # window. All other sampler failures invalidate evidence.
                         if epoch == sampling_epoch and not restarting.is_set():
-                            resource_violations.append({"sampler_error": type(error).__name__, "phase": phase, "step": sample_step, "http_status": getattr(error, "code", None)})
+                            private_values = [pg_password, authenticator, jwt, password, *env.values(), *fixture.values()]
+                            private_values.extend(value for key, value in os.environ.items() if any(word in key.upper() for word in ['TOKEN', 'PASSWORD', 'SECRET', 'KEY']))
+                            resource_violations.append({"sampler_error": type(error).__name__, "diagnostic": redacted_diagnostic(error, private_values), "phase": phase, "step": sample_step, "http_status": getattr(error, "code", None)})
                             critical.set()
                         with (output / "sampler-errors.log").open("a") as target:
                             target.write(type(error).__name__ + "\n")
@@ -800,7 +809,7 @@ def campaign(arguments):
                 fixture["cookie"] = headers["Set-Cookie"].split(";", 1)[0]
 
             def run(label, workload, duration, vus=16, rate=0, overload=False):
-                nonlocal phase, load_seconds, soak_started
+                nonlocal phase, load_seconds, soak_started, active_generator
                 if critical.is_set():
                     raise RuntimeError("Campaign resource guard stopped traffic")
                 phase = label
@@ -868,6 +877,8 @@ def campaign(arguments):
                         stderr=subprocess.STDOUT,
                         env={**os.environ, "FIXTURE": json.dumps(fixture)},
                     )
+                    generator_context = {"process": result, "name": generator, "identity": identity, "phase": label, "started": load_started}
+                    active_generator = generator_context
                     try:
                         while result.poll() is None:
                             if watchdog.poll() is not None:
@@ -885,6 +896,8 @@ def campaign(arguments):
                             result.terminate()
                             docker("rm", "-f", generator)
                             result.wait(timeout=20)
+                        if active_generator is generator_context:
+                            active_generator = None
                         try:
                             atomic_json(output / (label + "-metrics-raw.json"), native_metrics.snapshot(label))
                         except Exception as error:
