@@ -17,6 +17,22 @@ def environment_is_absolute():
     return Path(values[0].strip('"')).is_absolute()
 
 
+def migration_census():
+    def present(statement):
+        raw = sql(statement).strip()
+        require(raw in {b"t", b"f"}, "Native migration census returned an invalid SQL boolean")
+        return raw == b"t"
+    result = {"fixture_table_created": present("SELECT to_regclass('public.native_probe') IS NOT NULL;\n"),
+              "migration_journal_present": present("SELECT to_regclass('nelcota.user_migrations') IS NOT NULL;\n"),
+              "applied_fixture_migrations": None}
+    if result["migration_journal_present"]:
+        raw = sql("SELECT count(*) FROM nelcota.user_migrations;\n").strip()
+        require(0 < len(raw) <= 16 and raw.isdigit(), "Native migration count is invalid")
+        result["applied_fixture_migrations"] = int(raw)
+        require(result["applied_fixture_migrations"] <= 1000, "Native fixture migration journal exceeded its bound")
+    return result
+
+
 def default_root():
     require(not ROOT.exists(), "Default-root probe requires a fresh guest root")
     install_limits()
@@ -44,10 +60,7 @@ def default_root():
                            cwd=ROOT, check=False, timeout=60)
         result[label + "_migration_exit_code"] = migrated.returncode
         result[label + "_migration_lease_busy"] = b"deployment_busy" in migrated.stdout + migrated.stderr
-    result["fixture_table_created"] = sql("SELECT to_regclass('public.native_probe') IS NOT NULL;\n").strip() == "t"
-    result["applied_fixture_migrations"] = None
-    if result["fixture_table_created"]:
-        result["applied_fixture_migrations"] = int(sql("SELECT count(*) FROM nelcota.user_migrations;\n"))
+    result.update(migration_census())
     return result
 
 

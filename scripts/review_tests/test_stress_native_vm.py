@@ -19,9 +19,31 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "bench"))
 import native_preflight
 import native_vm
 import native_evidence
+import native_contracts
 
 
 class NativeVMBoundaries(unittest.TestCase):
+    def test_migration_census_consumes_actual_psql_bytes(self):
+        with patch("native_contracts.sql", side_effect=[b"t\n", b"t\n", b"1\n"]):
+            self.assertEqual(native_contracts.migration_census(), {
+                "fixture_table_created": True, "migration_journal_present": True, "applied_fixture_migrations": 1})
+
+    def test_absent_migration_tables_do_not_invent_a_count(self):
+        with patch("native_contracts.sql", side_effect=[b"f\n", b"f\n"]) as read:
+            self.assertEqual(native_contracts.migration_census(), {
+                "fixture_table_created": False, "migration_journal_present": False, "applied_fixture_migrations": None})
+            self.assertEqual(read.call_count, 2)
+
+    def test_invalid_sql_booleans_and_counts_fail_closed(self):
+        for value in [b"", b"true", b"NaN", b"1"]:
+            with self.subTest(value=value), patch("native_contracts.sql", return_value=value):
+                with self.assertRaisesRegex(RuntimeError, "invalid SQL boolean"):
+                    native_contracts.migration_census()
+        for value in [b"", b"NaN", b"-1", b"1001", b"1" * 17]:
+            with self.subTest(value=value), patch("native_contracts.sql", side_effect=[b"t", b"t", value]):
+                with self.assertRaises(RuntimeError):
+                    native_contracts.migration_census()
+
     def signup_response(self, status, account):
         reader, writer = socket.socketpair()
         content = json.dumps(account).encode()

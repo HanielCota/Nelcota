@@ -1798,3 +1798,21 @@ inalterados, nenhum segundo manifesto/unit, HTTPS válido e limpeza. Catorze
 amostras, 72,177 s incluindo preparo. O [CodeQL](results/stress/codeql-invalid-fixtures-before-after.json)
 agregado e a análise Rust desse SHA também passaram. O job Rust de regressões
 completo ainda estava em andamento; não se anunciou a matriz inteira aprovada.
+
+### 16/10, 22:56 UTC — errata do census SQL e repetição preservada
+
+A revisão do probe novo encontrou um erro de tipo no oráculo: `sql()` retorna
+bytes, mas a presença da tabela era comparada com a string `"t"`. Portanto
+o campo `fixture_table_created: false` da execução `38976562183` não é uma
+prova independente da ausência da tabela. Os dois exits 1 e a presença real
+de `deployment_busy` continuam evidência independente da falha do subprocesso.
+A afirmação anterior de ausência verificada da tabela fica retirada.
+
+O census agora exige booleans PostgreSQL em bytes (`b"t"`/`b"f"`), registra a
+presença do journal separadamente e valida sua contagem antes de aceitá-la.
+Três regressões cobrem bytes reais, ausência sem contagem inventada, respostas
+malformadas/NaN e contagens inválidas. **Quinze testes focados passaram em
+0,014 s**; a duração exata no log privado prevalece sobre este valor arredondado.
+A VM `38978164074` já estava executando o snapshot anterior; será preservada
+com seu próprio veredito, sem aplicar alteração ao artefato em execução nem
+promover o census defeituoso. Uma nova repetição corrigida é necessária.
