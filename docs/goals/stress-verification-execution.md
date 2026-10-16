@@ -763,3 +763,53 @@ também na imagem Ubuntu exata do staging, isolados, sem rede, 96 MiB RAM,
 produziram 11 amostras e retornaram ao uso inicial; nenhuma OOM e limpeza
 confirmada. [Evidência](results/stress/allocation-target-controls.json).
 O smoke instrumentado do backend está em execução; não certifica desempenho.
+
+### 2026-10-16 04:31 UTC — uma hora de diagnóstico de alocação concluída
+
+`allocation-smoke-001` passou com 150 segundos de carga e 66 amostras;
+`allocation-disk-hour-001` passou com 3.600 segundos contínuos, 4.035 segundos
+registrados e 770 amostras, gap máximo 11 segundos. Ambos mantêm o binário
+de produção e adicionam somente o observador opcional. A preparação, o repouso
+e a instrumentação ficam explícitos; o comparador recusa esse perfil para
+certificação de regressão comum. Não substituem a segunda passada de quatro horas.
+
+Na hora contínua foram 720 amostras de allocator em quatro janelas de 15 minutos.
+As medianas em uso foram 4,846 / 4,899 / 4,936 / 4,959 MiB. Picos transitórios
+chegaram a aproximadamente 24 MiB e foram liberados. No final, 2.067.920 bytes
+continuavam em uso, 25.166.384 bytes estavam livres nas arenas e as arenas
+totalizavam 27.234.304 bytes. Isso distingue retenção do allocator dos bytes
+contados em uso nesta campanha; não é censo de objetos Rust nem prova absoluta
+de ausência de vazamento. O perfil curto não executa o canário especial de
+expiração nem duas coortes de retenção: esses cenários não recebem aprovação
+a partir deste diagnóstico. Limpeza confirmada.
+[Evidência](results/stress/allocation-disk-hour.json).
+
+### 2026-10-16 04:36 UTC — espaço recuperado sem reduzir reservas
+
+A inspeção encontrou artefatos de compilação recompiláveis com todos os seus
+hardlinks dentro de `target/debug`; foram excluídos executáveis ativos e o
+baseline de testes. Um arquivo privado limitado a 1 GiB preservou 121 caminhos,
+com hashes SHA-256 verificados após descompressão antes de remover os originais.
+A liberação efetivamente medida foi de 3.560,39 MiB em 54,12 segundos. O backup
+temporário contém somente cache de compilação; sua restauração é obrigatória
+antes dos checks Rust e será registrada separadamente. Dados e objetos de
+staging continuam em disco; nenhuma evidência irreproduzível foi transferida
+para tmpfs. O script de restauração já está preparado.
+
+Também foram comprimidos de forma reversível 577 arquivos privados de
+observação/metrics de execuções concluídas e limpas, sem modificar os resumos
+de fases, ledgers de eventos, falhas ou veredictos. Cada arquivo foi
+descomprimido e conferido por tamanho e SHA-256 antes de remover a cópia
+sem compressão; liberação adicional medida: 314,78 MiB. Os bytes originais
+estão em `.gz` no próprio diretório persistente da execução, e o índice
+privado registra os hashes e os metadados para leitura/restauração.
+
+A guarda real inclui 8.440 MiB de startup para dez projetos, 2.048 MiB para
+dados, outro buffer de 512 MiB e a reserva de 15% do filesystem. Nenhum deles
+foi reduzido. O preflight de `fleet-caddy-10-pass-1-001` passou e seu manifesto
+de ownership foi criado para 23 containers/11 volumes, preparação máxima
+de 900 segundos e duração total de 7.200 segundos. O perfil completo usa
+passos de 300 segundos, capacidade/saturação, webhooks e Caddy com TLS local
+verificado. Nesta atualização está provisionando; isolamento, capacidade e
+fairness ainda não foram aprovados.
+[Evidência do espaço](results/stress/staging-cache-and-diagnostics-space.json).

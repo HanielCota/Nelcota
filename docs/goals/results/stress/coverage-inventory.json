@@ -181,6 +181,12 @@
           "status": "passed",
           "scope": "First complete 14400-second continuous disk pass plus 3585 completed prelude seconds; same processes, 3094 samples, 248381 events reconciled and cleanup confirmed. Second independent pass and remaining row scenarios are still pending.",
           "evidence": "disk-pass-1.json"
+        },
+        {
+          "run_id": "allocation-disk-hour-001",
+          "status": "passed",
+          "scope": "Separate optional instrumented 3600-second allocation diagnostic, 770 samples, all numeric allocation/load coverage, idle glibc in-use 2067920 bytes versus 25166384 free-arena bytes; not ordinary performance or four-hour certification.",
+          "evidence": "allocation-disk-hour.json"
         }
       ]
     },
@@ -363,8 +369,8 @@
       "id": "topologies",
       "area": "Independent 1/5/10-project capacity and fairness",
       "entrypoints": "bench/host_campaign.py",
-      "status": "blocked",
-      "scope_or_limit": "Ten independent projects exceed safe VFS disk headroom in this 32-GiB workspace. Five-project short fairness failed; full-duration repetition is pending. No shared-cluster substitute or reserve reduction.",
+      "status": "not run",
+      "scope_or_limit": "Ten-project headroom was initially blocked and a short five-project fairness run failed. Verified reversible compiler-cache archival plus lossless completed-diagnostic compression now allow the unchanged ten-project preflight; a complete 300-second-step campaign is provisioning. No topology-wide capacity/fairness pass is claimed.",
       "native_diagnostics": [
         {
           "run_id": "fleet-caddy-1-smoke-003",
@@ -389,7 +395,8 @@
           "scope": "updated size-based VFS guard refused preparation before resource creation",
           "evidence": "fleet-vfs-headroom-before-after.json"
         }
-      ]
+      ],
+      "in_progress_run_id": "fleet-caddy-10-pass-1-001"
     },
     {
       "id": "management",
