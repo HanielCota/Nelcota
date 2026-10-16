@@ -347,6 +347,14 @@ HTTP requests cannot mask lost useful work; a later failed campaign cannot
 certify successful initial samples.
 `--focus filesystem` or `--focus provider --s3-faults` isolates an investigation;
 the manifest names the subset and cannot certify the complete fault matrix.
+
+Completed private raw diagnostics can be archived as adjacent `.gz` files with
+an index of original and compressed hashes. Verify decompressed bytes before
+removing the uncompressed copy and retain every failed verdict and phase report.
+Read archived observations with a gzip reader. Before archiving a closed SQLite
+ledger, `bench/sqlite_evidence.py` verifies read-only integrity, rejects journal
+sidecars and explicitly releases the connection before space accounting. A
+SQLite connection transaction context alone does not close the descriptor.
 Filesystem setup copies bounded immutable bytes through `docker exec` into the
 actual tmpfs mount, then verifies reads before exhaustion. Byte reservation
 rejects a full device with `507 storage_full`; failed inode allocation uses the

@@ -851,3 +851,27 @@ testes passou em 10,290 segundos. O comparador recusa períodos diferentes e
 valores ausentes, não finitos ou inválidos. Nenhum SLO foi relaxado e nenhum
 resultado anterior reprovado foi reescrito. O efeito da configuração sob
 carga ainda requer campanha nova no artefato congelado.
+
+### 2026-10-16 05:35 UTC — fechamento dos leitores de evidência SQLite
+
+A segunda compactação preservou por SHA-256 os bytes de 44 arquivos concluídos,
+incluindo 35 ledgers SQLite fechados, após `PRAGMA integrity_check` em modo
+read-only/immutable. Suas cópias `.sqlite.gz` ficam no diretório persistente
+da respectiva execução. O índice e as falhas anteriores foram mantidos.
+
+A medida imediata de espaço nesse utilitário ficou negativa porque o contexto
+de transação do SQLite não fecha a conexão: descritores ainda seguravam
+arquivos já substituídos por cópias compactadas. O encerramento do processo
+liberou os leitores. O índice preserva a medida original e um checkpoint
+posterior registra o espaço após a saída, sem reescrever a observação.
+
+O helper de verificação agora fecha explicitamente cada conexão, inclusive
+se a consulta falha, e rejeita journals e symlinks. O controle nativo, com
+35 verificações e GC desativado em ambos os casos, reproduziu quatro para
+39 descritores com o contexto antigo; a versão corrigida permaneceu em
+quatro. Os bytes do banco não mudaram. Quatro regressões passaram, cobrindo
+fechamento repetido, erro de integridade, journal ativo e redirecionamento
+por symlink. [Antes/depois](results/stress/sqlite-archive-owner-before-after.json).
+É uma correção do utilitário de evidência do staging; não foi uma falha do
+processo Rust ou dos bancos da aplicação. A próxima compactação utilizará
+o helper corrigido. O espaço continua sujeito ao preflight e à reserva de 15%.
