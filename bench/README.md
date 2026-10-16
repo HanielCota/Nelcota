@@ -197,6 +197,15 @@ ACME request is used. This local ingress rehearsal does not certify public
 deployment, controller operations, proxy failure recovery or slow-client limits.
 Comparisons reject direct HTTP versus Caddy HTTPS profiles.
 
+`--cpu-period-micros 10000` explicitly selects a 10-ms CPU bandwidth period for
+each independent application/database container; the default remains 100 ms.
+The shorter period preserves the same aggregate application/database CPU caps
+and requires at least the kernel's 1-ms quota per project. This option lets a
+fractional-CPU staging profile investigate long scheduling pauses under bursty
+password hashing. Record the actual `cpu.max` and repeat all affected campaigns;
+comparisons reject different periods. A failed SLO at the default period remains
+a failed result, and changing this policy does not certify production capacity.
+
 The manual workflow supports separate disk/S3 four-hour endurance jobs with a
 seven-hour job budget including the build. The internal campaign limit remains
 six hours. Ordinary pull-request jobs do not launch endurance.

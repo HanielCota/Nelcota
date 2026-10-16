@@ -13,8 +13,20 @@ from ports import published_port
 FIXED_USER = '00000000-0000-4000-8000-000000000001'
 
 
+def cpu_arguments(count, period_micros):
+    if isinstance(count,bool) or not isinstance(count,int) or not 1<=count<=10 or isinstance(period_micros,bool) or not isinstance(period_micros,int) or period_micros not in (10000,100000):
+        raise ValueError('Invalid independent-project CPU policy')
+    if period_micros==100000:
+        return ['--cpus',str(1/count)]
+    quota,remainder=divmod(period_micros,count)
+    if remainder or quota<1000:
+        raise ValueError('CPU period cannot represent the declared project fraction')
+    return ['--cpu-period',str(period_micros),'--cpu-quota',str(quota)]
+
+
 class Project:
-    def __init__(self, identity, index, count, binary, directory, cpus):
+    def __init__(self, identity, index, count, binary, directory, cpus, cpu_period_micros=100000):
+        self.cpu_limits=cpu_arguments(count,cpu_period_micros)
         self.label = f'project-{index}'
         self.app = identity + f'-app-{index}'
         self.pg = identity + f'-pg-{index}'
@@ -43,7 +55,7 @@ class Project:
         return self.docker('exec', '-i', '-e', 'PGOPTIONS=-cstatement_timeout=15000', self.pg, 'psql', '-Atq', '-U', 'postgres', '-v', 'ON_ERROR_STOP=1', stdin=statement)
 
     def start_app(self):
-        command = ['run', '-d', '--name', self.app, '--label', LABEL+'='+self.identity, '--pids-limit', '128', '--network', 'host', '--user', f'{os.getuid()}:{os.getgid()}', '--cpus', self.quota, '--cpuset-cpus', str(self.cpus[0]), '--memory', '128m', '--memory-swap', '128m', '-v', str(self.binary)+':/usr/local/bin/nelcota:ro']
+        command = ['run', '-d', '--name', self.app, '--label', LABEL+'='+self.identity, '--pids-limit', '128', '--network', 'host', '--user', f'{os.getuid()}:{os.getgid()}', *self.cpu_limits, '--cpuset-cpus', str(self.cpus[0]), '--memory', '128m', '--memory-swap', '128m', '-v', str(self.binary)+':/usr/local/bin/nelcota:ro']
         if self.ephemeral_storage_mib is None:
             command.extend(['-v',str(self.storage)+':/storage'])
         if self.ephemeral_storage_mib is not None:
@@ -80,7 +92,7 @@ class Project:
         password = secrets.token_urlsafe(32)
         self.pg_port=free_port()
         self.docker('volume', 'create', '--label', LABEL+'='+self.identity, self.volume)
-        self.docker('run', '-d', '--name', self.pg, '--label', LABEL+'='+self.identity, '--pids-limit', '128', '--cpus', self.quota, '--cpuset-cpus', str(self.cpus[1]), '--memory', '256m', '--memory-swap', '256m', '-e', 'POSTGRES_PASSWORD', '-p', f'127.0.0.1:{self.pg_port}:5432', '--mount', f'type=volume,source={self.volume},destination=/var/lib/postgresql/data', 'postgres:17-alpine', 'postgres', '-c', 'max_connections=32', '-c', 'shared_buffers=32MB', '-c', 'max_wal_size=64MB', '-c', 'min_wal_size=32MB', env={'POSTGRES_PASSWORD': password})
+        self.docker('run', '-d', '--name', self.pg, '--label', LABEL+'='+self.identity, '--pids-limit', '128', *self.cpu_limits, '--cpuset-cpus', str(self.cpus[1]), '--memory', '256m', '--memory-swap', '256m', '-e', 'POSTGRES_PASSWORD', '-p', f'127.0.0.1:{self.pg_port}:5432', '--mount', f'type=volume,source={self.volume},destination=/var/lib/postgresql/data', 'postgres:17-alpine', 'postgres', '-c', 'max_connections=32', '-c', 'shared_buffers=32MB', '-c', 'max_wal_size=64MB', '-c', 'min_wal_size=32MB', env={'POSTGRES_PASSWORD': password})
         port = published_port(self.docker,self.pg,5432,self.pg_port)
         for attempt in range(120):
             try:

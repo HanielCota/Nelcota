@@ -813,3 +813,41 @@ passos de 300 segundos, capacidade/saturação, webhooks e Caddy com TLS local
 verificado. Nesta atualização está provisionando; isolamento, capacidade e
 fairness ainda não foram aprovados.
 [Evidência do espaço](results/stress/staging-cache-and-diagnostics-space.json).
+
+### 2026-10-16 05:16 UTC — dez projetos: reprovação nominal preservada
+
+`fleet-caddy-10-pass-1-001` provisionou dez aplicações/bancos independentes,
+passou os 90 rejeites direcionados de credenciais cruzadas e executou 1.590
+segundos de carga, com 124 observações e limpeza confirmada. As qualificações
+de 8/16/24 iterações/s por projeto passaram; 32/s reprovou refresh em oito
+projetos. A primeira medição nominal a 19/s reprovou refresh em dois projetos:
+p95 233,01 e 234,27 ms, contra 200 ms. Cada projeto entregou 5.701 iterações,
+zero drops, falhas inesperadas ou rejeições por sobrecarga. Não se aprova
+capacidade sustentável a partir de um passo isolado que não se repetiu em
+serviço nominal. Fairness, demais amostras e reconciliação final não foram
+atingidas. [Evidência da falha](results/stress/fleet-10-default-cpu-period.json).
+
+As observações tiveram mediana de 16,09 segundos e máximo de 24,30: abaixo
+do limite crítico de 30 segundos, mas o alvo de cinco segundos não foi
+atingido. Não houve OOM, violações de assinatura ou locks esperando observados.
+A coleta de dez projetos precisa manter esse custo/limitação visível.
+
+Cada aplicação/banco tinha quota de 10 ms a cada 100 ms (0,1 CPU). No trecho
+final observado de 170,5 segundos, aplicações sofreram throttling em cerca
+de 9% a 18% dos períodos. A hipótese é que bursts de hashing e outras tarefas
+consomem a quota cedo e prolongam a espera da API mesmo com uso médio menor.
+A identificação não implica uma correção no código de produção.
+
+O executor agora aceita `--cpu-period-micros 10000` para investigar a mesma
+fatia de CPU em janelas menores. O padrão segue em 100 ms; a soma das cotas
+de apps/bancos permanece a mesma. Seis controles nativos de kernel passaram
+para 1/5/10 projetos: em dez projetos, 1.000 microssegundos a cada 10.000
+contra 10.000 a cada 100.000. Sem rede, 32 MiB RAM, PID/capabilities/root/duração
+limitados, watchdog e limpeza confirmada.
+[Evidência](results/stress/cpu-policy-native-controls.json).
+
+Doze testes de política/comparação passaram; o conjunto relacionado de 138
+testes passou em 10,290 segundos. O comparador recusa períodos diferentes e
+valores ausentes, não finitos ou inválidos. Nenhum SLO foi relaxado e nenhum
+resultado anterior reprovado foi reescrito. O efeito da configuração sob
+carga ainda requer campanha nova no artefato congelado.

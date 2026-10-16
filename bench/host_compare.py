@@ -15,6 +15,7 @@ FIELDS.append('client_initialization')
 FIELDS.append('webhooks')
 FIELDS.append('ingress')
 FIELDS.append('startup_disk_budget')
+FIELDS.append('project_cpu_period_micros')
 
 
 def positive(value):
@@ -37,6 +38,9 @@ def read_run(root):
     if completion.get('status')!='passed' or completion.get('cleanup_confirmed') is not True or cleanup.get('confirmed') is not True or violations:
         raise ValueError('Failed or incomplete run cannot certify host regressions')
     projects=profile.get('projects')
+    period=profile.get('project_cpu_period_micros')
+    if isinstance(period,bool) or not isinstance(period,int) or period not in (10000,100000):
+        raise ValueError('Missing declared project CPU period')
     if isinstance(projects,bool) or not isinstance(projects,int) or projects not in (1,5,10) or positive(profile.get('seconds_per_step'))<300 or profile.get('certifies_five_minute_steps') is not True or any(field not in profile for field in FIELDS):
         raise ValueError('Missing equivalent profile or full-duration evidence')
     positive(profile['nominal_rate_per_project'])

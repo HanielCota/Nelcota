@@ -10,6 +10,9 @@ and [Rust SDK](sdk/rust/CHANGELOG.md) have independent package versions.
 
 ### Added
 
+- Allow disposable independent-project benchmarks to declare a shorter CPU
+  bandwidth period while preserving aggregate CPU caps; comparison evidence
+  must use the same policy on both sides.
 - Add explicitly enrolled host project management with visual operation review,
   typed confirmation and reauthentication, durable idempotent jobs, bounded
   project status/logs, Docker namespace collision checks, paired backups and

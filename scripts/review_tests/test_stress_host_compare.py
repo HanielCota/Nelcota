@@ -20,7 +20,7 @@ class HostComparison(unittest.TestCase):
         for root in [self.before,self.after]:
             root.mkdir()
             profile={field:1 for field in host_compare.FIELDS}
-            profile.update(schema=2,projects=1,seconds_per_step=300,nominal_rate_per_project=8,certifies_five_minute_steps=True)
+            profile.update(schema=2,projects=1,seconds_per_step=300,nominal_rate_per_project=8,certifies_five_minute_steps=True,project_cpu_period_micros=100000)
             (root/'manifest.json').write_text(json.dumps(profile))
             (root/'completion.json').write_text(json.dumps({'status':'passed','cleanup_confirmed':True}))
             (root/'cleanup.json').write_text(json.dumps({'confirmed':True}))
@@ -47,6 +47,24 @@ class HostComparison(unittest.TestCase):
         result=host_compare.compare(self.before,self.after)
         self.assertFalse(result['gate_passed'])
         self.assertIn('webhooks',result['fixture_differences'])
+
+    def test_different_cpu_bandwidth_periods_cannot_certify_equivalent_latency(self):
+        path=self.after/'manifest.json'
+        value=json.loads(path.read_text())
+        value['project_cpu_period_micros']=10000
+        path.write_text(json.dumps(value))
+        result=host_compare.compare(self.before,self.after)
+        self.assertFalse(result['gate_passed'])
+        self.assertIn('project_cpu_period_micros',result['fixture_differences'])
+
+    def test_unknown_cpu_bandwidth_policy_cannot_certify(self):
+        path=self.after/'manifest.json'
+        original=json.loads(path.read_text())
+        for period in [None,True,10000.0,0,math.nan,1000]:
+            value={**original,'project_cpu_period_micros':period}
+            path.write_text(json.dumps(value))
+            with self.subTest(period=period),self.assertRaises(ValueError):
+                host_compare.compare(self.before,self.after)
 
     def test_one_operation_regression_cannot_hide_in_total_throughput(self):
         for index in range(1,4):

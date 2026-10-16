@@ -369,8 +369,8 @@
       "id": "topologies",
       "area": "Independent 1/5/10-project capacity and fairness",
       "entrypoints": "bench/host_campaign.py",
-      "status": "not run",
-      "scope_or_limit": "Ten-project headroom was initially blocked and a short five-project fairness run failed. Verified reversible compiler-cache archival plus lossless completed-diagnostic compression now allow the unchanged ten-project preflight; a complete 300-second-step campaign is provisioning. No topology-wide capacity/fairness pass is claimed.",
+      "status": "failed",
+      "scope_or_limit": "The initial complete-step ten-project attempt provisioned ten independent clusters and passed 90 cross-project preflight rejections, but failed its first 19/s nominal sample: refresh p95 233.01/234.27 ms in two projects versus 200 ms. It did not reach final fairness/reconciliation. A separately declared 10-ms CPU-period experiment preserves aggregate bandwidth; backend improvement has not yet been demonstrated.",
       "native_diagnostics": [
         {
           "run_id": "fleet-caddy-1-smoke-003",
@@ -394,9 +394,14 @@
           "status": "blocked",
           "scope": "updated size-based VFS guard refused preparation before resource creation",
           "evidence": "fleet-vfs-headroom-before-after.json"
+        },
+        {
+          "run_id": "fleet-caddy-10-pass-1-001",
+          "status": "failed",
+          "scope": "1590 completed load seconds, 124 observations, no resource violation/OOM/drop/unexpected error, first nominal refresh SLO failed in two projects, owned cleanup confirmed. Later phases and final event identities were not run.",
+          "evidence": "fleet-10-default-cpu-period.json"
         }
-      ],
-      "in_progress_run_id": "fleet-caddy-10-pass-1-001"
+      ]
     },
     {
       "id": "management",
