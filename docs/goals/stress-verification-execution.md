@@ -1881,7 +1881,7 @@ O monitor local passou para a célula 993. Ele só executa o census agregado
 quando a própria campanha entrar no descanso final de 180 s, mantendo a
 verificação de run/label/phase e recusando qualquer query durante o soak.
 
-### 16/10, 23:43 UTC — descoberta real do alocador e dois defeitos no controle
+### 16/10, 23:38 UTC — descoberta real do alocador e dois defeitos no controle
 
 A [primeira descoberta](results/stress/provider-memory-discovery-first-failure.json)
 foi executada em `38981893129`, fonte `5fd78f2`. Foram 18 amostras e 17
@@ -1905,3 +1905,16 @@ somente esse JSON legível pelo uploader (0644); a pasta privada segue 0700.
 Duas regressões novas verificam o prefixo real/flag de disponibilidade e a
 fronteira de permissão/publicação. As seis regressões do receiver/publicador
 passaram em 1,012 s, sem tráfego contra o benchmark local em endurance.
+
+### 16/10, 23:39 UTC — diagnóstico CI limitado, sem divulgar assertions
+
+O downloader de logs via `gh` falhou nas duas tentativas anteriores sem
+código HTTP recuperável; isso ainda não identifica o motivo do teste Rust.
+O novo controle usa a API HTTPS diretamente, limita 8 MiB/45 s, restringe
+redirecionamentos GitHub/Azure e nunca encaminha o token API para o download
+assinado. Para a etapa Rust só publica nome/local do panic e categorias fixas;
+assertions, comandos, URLs e corpo de erros permanecem privados.
+Cinco regressões passaram em 0,002 s. Uma primeira execução das regressões
+falhou pela expectativa textual `byte budget` versus `file budget`; a asserção
+foi corrigida, preservando o limite de 8 MiB. O teste de identidade original
+segue reprovado até recuperar o diagnóstico e reproduzir/corrigir sua causa.
