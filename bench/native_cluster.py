@@ -40,6 +40,10 @@ apt-get install -y -q postgresql-17
     require(query("17/main", "SHOW port;\n") == "5433", "Target is not on its declared alternate port")
     result = cli("init", "--local", "--project", PROJECT, "--runtime", "systemd", "--profile", "1gb", "--yes",
                  timeout=650, check=False)
+    layout_rejection = any(message in result.stderr for message in [
+        b"native PostgreSQL requires 17/main on port 5432",
+        b"port 5432 belongs to another PostgreSQL cluster",
+    ])
     after = query("17/sentinel", "SELECT rolpassword IS NOT NULL FROM pg_authid WHERE rolname='postgres';\n")
     require(after in {"t", "f"}, "Missing sentinel password-presence evidence")
     count = int(query("17/sentinel", "SELECT count(*) FROM public.g05_cluster_sentinel;\n"))
@@ -47,6 +51,7 @@ apt-get install -y -q postgresql-17
     from pathlib import Path
     return {"case": "17/main at 5433; owned unrelated 17/sentinel at 5432 before native init",
             "init_exit_code": result.returncode,
+            "layout_rejection_reported": layout_rejection,
             "named_target_port": 5433, "unrelated_sentinel_port": 5432,
             "sentinel_password_present_before": False, "sentinel_password_present_after": after == "t",
             "sentinel_password_changed": before != after,

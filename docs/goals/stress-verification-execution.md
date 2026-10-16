@@ -1567,3 +1567,26 @@ continua sem reiniciar app/banco. A mudança real na CLI exigirá um novo
 binário: essa execução preserva seu hash anterior como **baseline**,
 sem ser promovida silenciosamente a evidência do artefato corrigido.
 As campanhas afetadas terão novas medições depois da compilação/verificação.
+
+### 16/10, 21:20 UTC — bloqueios de CI da correção candidata preservados
+
+O CI de `0028307` reprovou nos steps de **Clippy** e **`npm run check`**.
+Os testes Rust ainda não foram anunciados como aprovados. O módulo de testes
+nativo foi movido para depois do helper de remoção, conforme a regra de
+ordenação do Clippy; a mensagem exata do job ainda será recuperada pelo
+diagnóstico remoto, sem inventar a causa a partir do exit 101 genérico.
+
+O checker de guias confirmou uma tradução ausente no novo parágrafo de
+`docs/deploy.md`. O catálogo português foi atualizado e o check estático
+passou, preservando inline code e links. O bundle versionado ainda precisa
+ser reconstruído em commit próprio durante um intervalo seguro entre
+campanhas; não se iniciou build/teste pesado local junto ao soak.
+
+O inventário manual pode agora recuperar apenas cabeçalhos públicos de
+diagnósticos dos jobs falhos de lint/painel, com token somente de leitura,
+prazo e limite de arquivo. O download local dos logs continua indisponível;
+logs completos, stderr de URLs assinadas e dados de runtime não são publicados.
+O caso de colisão também passa a exigir a mensagem específica do guard de
+layout e a verificar o SHA-256 do binário dentro da convidada, evitando
+aprovar uma rejeição genérica ou um executável diferente. A identidade do
+artifact anterior será publicada separadamente sem mudar seu relatório.

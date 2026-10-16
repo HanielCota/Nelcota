@@ -17,6 +17,10 @@ on:
         type: choice
         options: [runtime, cluster-routing]
         default: runtime
+      diagnostic_jobs:
+        description: Optional failed public lint/panel job IDs for native-preflight (comma separated)
+        type: string
+        default: ''
       backend:
         description: Owned storage fixture
         type: choice
@@ -39,12 +43,21 @@ jobs:
     if: inputs.target == 'native-preflight'
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Inventory disposable GitHub-hosted VM without starting services
         run: python3 bench/native_preflight.py
+      - name: Read bounded public compiler and guide diagnostics
+        if: inputs.diagnostic_jobs != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DIAGNOSTIC_JOBS: ${{ inputs.diagnostic_jobs }}
+        run: python3 scripts/report-ci-diagnostics.py "$DIAGNOSTIC_JOBS"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: native-vm-preflight
@@ -85,6 +98,17 @@ jobs:
           if len(reports) != 1:
               raise SystemExit('Expected one earlier public native report')
           subprocess.run(['python3', 'bench/native_evidence.py', str(reports[0])], check=True)
+          PY
+      - name: Publish earlier native artifact identity separately
+        if: inputs.evidence_run != ''
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          profiles = list(Path('target/native-evidence-download').rglob('predeclared-profile.json'))
+          if len(profiles) != 1:
+              raise SystemExit('Expected one earlier public native profile')
+          subprocess.run(['python3', 'bench/native_evidence.py', str(profiles[0]), '--profile'], check=True)
           PY
       - name: Prepare KVM tooling
         timeout-minutes: 10

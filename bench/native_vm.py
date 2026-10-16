@@ -356,6 +356,7 @@ def campaign(binary, output, scenario):
     public = output / "public"
     public.mkdir(mode=0o755)
     began = time.monotonic()
+    binary_digest = hashlib.file_digest(binary.open("rb"), "sha256").hexdigest()
     cpu_sum = 2.25
     if scenario == "cluster-routing":
         cpu_sum = 3.25
@@ -370,7 +371,7 @@ def campaign(binary, output, scenario):
     atomic_json(public / "predeclared-profile.json", {
         "scope": "disposable Ubuntu 24.04 x64 native functional and guest power-cut acceptance; no production certification",
         "source": capabilities["source"], "scenario": scenario,
-        "binary_sha256": hashlib.file_digest(binary.open("rb"), "sha256").hexdigest(),
+        "binary_sha256": binary_digest,
         "maximum_seconds": MAXIMUM_SECONDS, "vm_vcpus": 2, "vm_memory_mib": 3072,
         "guest_target_cpu_ceiling": 1.5, "guest_os_cpu_reserve": 0.5,
         "guest_target_memory_ceiling_mib": 2048, "guest_os_memory_reserve_mib": 1024,
@@ -391,7 +392,8 @@ def campaign(binary, output, scenario):
     guard.start()
     watcher = subprocess.Popen([sys.executable, str(Path(__file__).resolve()), "--watchdog", str(output)],
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
-    report = {"identity": identity, "source": capabilities["source"], "scenario": scenario, "certifies_g05": False, "checks": []}
+    report = {"identity": identity, "source": capabilities["source"], "binary_sha256": binary_digest,
+              "scenario": scenario, "certifies_g05": False, "checks": []}
     clean = False
     try:
         sums = receive(ORIGIN + "SHA256SUMS", output / "SHA256SUMS", MIB)
@@ -425,6 +427,8 @@ def campaign(binary, output, scenario):
         guest.copy(Path(__file__).with_name("native_guest.py"), "/tmp/native_guest.py")
         guest.copy(Path(__file__).with_name("native_cluster.py"), "/tmp/native_cluster.py")
         guest.ssh(["sudo", "-n", "install", "-m", "755", "/tmp/nelcota-g05", "/usr/local/bin/nelcota"])
+        installed_digest = guest.ssh(["sha256sum", "/usr/local/bin/nelcota"]).stdout.decode().split()[0]
+        require(installed_digest == binary_digest, "Guest binary differs from the frozen controller input")
         guest.ssh(["sudo", "-n", "install", "-d", "-m", "700", "/opt/g05-tools"])
         guest.ssh(["sudo", "-n", "install", "-m", "600", "/tmp/native_guest.py", "/opt/g05-tools/native_guest.py"])
         guest.ssh(["sudo", "-n", "install", "-m", "600", "/tmp/native_cluster.py", "/opt/g05-tools/native_cluster.py"])
@@ -436,6 +440,7 @@ def campaign(binary, output, scenario):
             evidence = report["cluster_routing"]
             require(not evidence["sentinel_password_changed"], "Native init changed an unrelated cluster password")
             require(evidence["init_exit_code"] != 0, "Native init accepted an unsupported cluster port layout")
+            require(evidence["layout_rejection_reported"], "Native init failed without reporting the required layout guard")
             require(evidence["sentinel_rows"] == 1, "Native init modified unrelated sentinel data")
             require(not evidence["host_root_created"] and not evidence["native_postgres_configuration_written"],
                     "Native init wrote configuration before rejecting the cluster collision")
