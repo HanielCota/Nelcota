@@ -28,6 +28,37 @@ int main(void) {
 }
 '''
 
+WORKER_FIXTURE = r'''
+#define _DEFAULT_SOURCE
+#include <malloc.h>
+#include <pthread.h>
+#include <stdlib.h>
+#include <unistd.h>
+static void *allocate_in_worker(void *unused) {
+    (void)unused;
+    void *held[32];
+    for (size_t index=0; index<32; index++) {
+        held[index] = malloc(1024 * 1024);
+        if (!held[index]) _exit(2);
+        volatile unsigned char *bytes = held[index];
+        for (size_t offset=0; offset<1024*1024; offset+=4096) bytes[offset]=1;
+    }
+    usleep(350000);
+    for (size_t index=0; index<32; index++) free(held[index]);
+    usleep(350000);
+    return NULL;
+}
+int main(void) {
+    /* Only the control changes this threshold, never the application. */
+    if (!mallopt(M_MMAP_THRESHOLD, 4 * 1024 * 1024)) return 2;
+    usleep(350000);
+    pthread_t worker;
+    if (pthread_create(&worker, NULL, allocate_in_worker, NULL)) return 2;
+    if (pthread_join(worker, NULL)) return 2;
+    return 0;
+}
+'''
+
 
 @unittest.skipUnless(platform.system()=='Linux' and platform.libc_ver()[0]=='glibc' and shutil.which('cc'), 'Native glibc/cc diagnostic is unavailable')
 class NativeAllocationObserver(unittest.TestCase):
@@ -37,11 +68,16 @@ class NativeAllocationObserver(unittest.TestCase):
         cls.root = Path(cls.temporary.name)
         cls.library = cls.root/'libg05alloc.so'
         cls.executable = cls.root/'nelcota'
+        (cls.root/'worker').mkdir()
+        cls.worker_executable = cls.root/'worker/nelcota'
         fixture = cls.root/'fixture.c'
         fixture.write_text(FIXTURE)
+        worker_fixture = cls.root/'worker.c'
+        worker_fixture.write_text(WORKER_FIXTURE)
         for arguments in [
             ['-std=c11','-O2','-Wall','-Wextra','-Werror','-shared','-fPIC','-pthread',str(ROOT/'bench/allocation_probe.c'),'-o',str(cls.library)],
             ['-std=c11','-O2','-Wall','-Wextra','-Werror',str(fixture),'-o',str(cls.executable)],
+            ['-std=c11','-O2','-Wall','-Wextra','-Werror','-pthread',str(worker_fixture),'-o',str(cls.worker_executable)],
         ]:
             subprocess.run(['cc',*arguments],check=True,capture_output=True,text=True,timeout=15)
 
@@ -76,6 +112,22 @@ class NativeAllocationObserver(unittest.TestCase):
             helper.chmod(0o700)
             self.invoke(Path(temporary),helper)
             self.assertEqual(list(Path(temporary).iterdir()),[])
+
+    def test_secondary_worker_arena_is_measured_and_released(self):
+        with tempfile.TemporaryDirectory(dir=self.root) as temporary:
+            root=Path(temporary)
+            self.invoke(root,self.worker_executable)
+            files=list(root.glob('alloc-*.jsonl'))
+            self.assertEqual(len(files),1)
+            values=[json.loads(line) for line in files[0].read_text().splitlines()]
+            self.assertGreaterEqual(len(values),6)
+            used=[row['in_use_including_mmap_bytes'] for row in values]
+            arenas=[row['arena_bytes'] for row in values]
+            mapped=[row['mmap_bytes'] for row in values]
+            self.assertGreaterEqual(max(used)-used[0],30*1024*1024)
+            self.assertGreaterEqual(max(arenas)-arenas[0],30*1024*1024)
+            self.assertLess(max(mapped)-mapped[0],1024*1024)
+            self.assertLess(used[-1],used[0]+1024*1024)
 
     def test_group_writable_diagnostic_directory_is_refused(self):
         with tempfile.TemporaryDirectory(dir=self.root) as temporary:

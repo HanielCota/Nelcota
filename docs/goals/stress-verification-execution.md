@@ -697,3 +697,26 @@ WAL de 256 MiB, teto de qualificação de 400 e fração de 70%. O endurance
 solicitado é de 14.400 segundos após as fases de qualificação/picos. Nesta
 atualização ele está nas fases prévias: não há quatro horas S3 aprovadas.
 Os 18 checks de `f46ab4b` passaram.
+
+### 2026-10-16 01:35 UTC — controle adicional de arenas de threads
+
+O observador opcional de alocação recebeu um controle nativo que aloca e toca
+32 MiB em uma thread secundária, abaixo do limiar de mmap definido somente
+no controle, e depois libera todos os blocos. O teste confirmou aumento nos
+bytes em uso e nas arenas, sem atribuir o aumento a mmap, e retorno após free.
+Passou em 1,300 segundo; wrapper 1,420 segundo, CPU de filhos 0,320 segundo,
+RSS máximo 33.408 KiB. Foi isolado na CPU 4, em baixa prioridade. Isso valida
+a glibc do controlador; a glibc da imagem de staging ainda precisa do mesmo
+controle antes de interpretar um diagnóstico instrumentado do backend.
+
+O preload é desenvolvimento opcional, com um descritor e uma thread adicionais,
+amostragem limitada e evidência numérica. Não altera o executável de produção,
+não chama malloc_trim nem ajusta arenas do backend. O comparador recusa esses
+perfis para certificação de desempenho comum. Os cinco controles nativos
+anteriores e seis testes de evidência/comparação passaram; não há ainda
+campanha instrumentada de backend concluída. Os 18 checks de d016e4c passaram.
+
+O S3 contínuo segue em execução desde aproximadamente 23:05 UTC: 2h30 neste
+checkpoint, sem OOM ou erro de assinatura e com as duas coortes de retenção
+removidas. A campanha só poderá ser aprovada após quatro horas, repouso final,
+reconciliação e limpeza.
