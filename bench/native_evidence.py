@@ -2,12 +2,14 @@
 """Publish bounded, lossless Actions notices for an already-public VM report."""
 
 import argparse
+import base64
+import gzip
 import hashlib
 import json
 from pathlib import Path
 import re
 
-FIELDS = {"identity", "source", "certifies_g05", "checks", "image", "image_checksum_manifest",
+FIELDS = {"identity", "source", "scenario", "cluster_routing", "certifies_g05", "checks", "image", "image_checksum_manifest",
           "native_init", "tls_ca_sha256", "status", "failure", "guest_diagnostics",
           "diagnostic_failure_type", "elapsed_seconds_including_preparation", "resource_samples",
           "cleanup_confirmed", "cleanup_scope", "safety_guard_failure", "backup",
@@ -28,14 +30,19 @@ def notices(report):
     if len(text.encode()) > 64 * 1024:
         raise ValueError("Native report exceeds the notice boundary")
     digest = hashlib.sha256(text.encode()).hexdigest()
-    fragments = [text[index:index + 900] for index in range(0, len(text), 900)]
+    transport = base64.b64encode(gzip.compress(text.encode(), mtime=0)).decode("ascii")
+    fragments = [transport[index:index + 3000] for index in range(0, len(transport), 3000)]
+    # Actions also limits annotations per step. Reserve one of ten for summary.
+    if len(fragments) > 9:
+        raise ValueError("Native report exceeds the per-step annotation count")
     output = []
     summary = {key: report.get(key) for key in ["identity", "source", "status", "failure", "cleanup_confirmed",
                                                "resource_samples", "elapsed_seconds_including_preparation"]}
     summary["report_sha256"] = digest
     output.append(("Native VM summary", summary))
     for index, fragment in enumerate(fragments, 1):
-        output.append(("Native VM evidence", {"part": index, "parts": len(fragments), "sha256": digest, "payload": fragment}))
+        output.append(("Native VM evidence", {"part": index, "parts": len(fragments), "sha256": digest,
+                                              "encoding": "gzip+base64", "payload": fragment}))
     values = []
     for title, value in output:
         encoded = json.dumps(value, separators=(",", ":"), allow_nan=False)

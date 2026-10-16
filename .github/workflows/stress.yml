@@ -12,6 +12,11 @@ on:
         description: Optional earlier native workflow artifact to republish before native-vm
         type: string
         default: ''
+      native_case:
+        description: Native lifecycle or collision between two owned PostgreSQL clusters
+        type: choice
+        options: [runtime, cluster-routing]
+        default: runtime
       backend:
         description: Owned storage fixture
         type: choice
@@ -94,11 +99,14 @@ jobs:
         run: nice -n19 ionice -c3 cargo build --locked --release -p nelcota-server
       - name: Bounded native VM acceptance with an external observer
         timeout-minutes: 35
+        env:
+          NATIVE_CASE: ${{ inputs.native_case }}
         run: |
           sudo env GITHUB_ACTIONS="$GITHUB_ACTIONS" RUNNER_ENVIRONMENT="$RUNNER_ENVIRONMENT" \
             GITHUB_SHA="$GITHUB_SHA" GITHUB_RUN_ID="$GITHUB_RUN_ID" GITHUB_RUN_ATTEMPT="$GITHUB_RUN_ATTEMPT" \
             python3 bench/native_vm.py --binary target/release/nelcota \
-              --output "target/stress-g05/native-vm-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+              --output "target/stress-g05/native-vm-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+              --scenario "$NATIVE_CASE"
       - name: Structured native VM evidence only
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

@@ -87,15 +87,17 @@ def unit(identity):
 
 
 def unit_fields(identity):
-    output = command(["systemctl", "show", unit(identity), "--property=Description,ActiveState,ControlGroup,MainPID"], check=False).stdout
+    output = command(["systemctl", "show", unit(identity), "--property=Description,LoadState,ActiveState,ControlGroup,MainPID"], check=False).stdout
     return dict(line.split("=", 1) for line in output.decode().splitlines() if "=" in line)
 
 
 def stop_owned(identity, *, power_cut=False):
     state = unit_fields(identity)
-    if state.get("ActiveState") in {"inactive", "failed"}:
+    if state.get("LoadState") == "not-found":
         return state
     require(state.get("Description") == identity, "Refusing to stop a foreign systemd service")
+    if state.get("ActiveState") in {"inactive", "failed"}:
+        return state
     arguments = ["systemctl", "stop", unit(identity)]
     if power_cut:
         arguments = ["systemctl", "kill", "--signal=SIGKILL", "--kill-whom=all", unit(identity)]
@@ -184,6 +186,10 @@ class Guest:
     def start(self):
         self.assert_safe()
         self.ready = False
+        state = unit_fields(self.identity)
+        if state.get("LoadState") != "not-found":
+            require(state.get("Description") == self.identity and state.get("ActiveState") in {"inactive", "failed"},
+                    "Refusing to reset or replace an existing foreign/running VM service")
         command(["systemctl", "reset-failed", unit(self.identity)], check=False)
         command(["systemd-run", "--unit=" + self.identity, "--description=" + self.identity,
                  "--property=MemoryMax=4G", "--property=MemorySwapMax=0", "--property=CPUQuota=200%",
@@ -246,7 +252,8 @@ class Guest:
                         require(probe["free_filesystem_fraction"] >= 0.15 and probe["free_inode_fraction"] >= 0.15, "guest_filesystem_reserve")
                         mem = probe["memory_bytes"]
                         require(mem["MemAvailable"] >= mem["MemTotal"] * 0.1, "guest_memory_reserve")
-                        require(probe["disk_bytes"].get("postgres", 0) <= 2048 * MIB, "guest_postgres_disk_budget")
+                        postgres_bytes = sum(value for name, value in probe["disk_bytes"].items() if name.startswith("postgres"))
+                        require(postgres_bytes <= 2048 * MIB, "guest_postgres_disk_budget")
                         require(probe["disk_bytes"].get("storage", 0) <= 256 * MIB, "guest_storage_disk_budget")
                         for value in probe["units"].values():
                             require(value.get("memory_events", {}).get("oom_kill", 0) == 0, "guest_unit_oom_kill")
@@ -339,7 +346,7 @@ def signup(api, email, password):
     return account["access_token"]
 
 
-def campaign(binary, output):
+def campaign(binary, output, scenario):
     capabilities = inventory()
     require(os.geteuid() == 0, "Native VM control requires root on the disposable Actions VM")
     require(os.access("/dev/kvm", os.R_OK | os.W_OK), "KVM is unavailable to the isolated VM controller")
@@ -349,9 +356,12 @@ def campaign(binary, output):
     public = output / "public"
     public.mkdir(mode=0o755)
     began = time.monotonic()
+    cpu_sum = 2.25
+    if scenario == "cluster-routing":
+        cpu_sum = 3.25
     identity = "native-vm-" + os.environ["GITHUB_RUN_ID"] + "-" + os.environ["GITHUB_RUN_ATTEMPT"]
     unit(identity)
-    require(unit_fields(identity).get("ActiveState") in {"inactive", "failed"}, "VM service already exists")
+    require(unit_fields(identity).get("LoadState") == "not-found", "VM service already exists")
     owner = {"identity": identity, "output": str(output), "pid": os.getpid(),
              "process_identity": process_identity(os.getpid()), "started_monotonic": began,
              "maximum_seconds": MAXIMUM_SECONDS}
@@ -359,11 +369,12 @@ def campaign(binary, output):
     atomic_json(output / "heartbeat.json", {"monotonic": began})
     atomic_json(public / "predeclared-profile.json", {
         "scope": "disposable Ubuntu 24.04 x64 native functional and guest power-cut acceptance; no production certification",
-        "source": capabilities["source"], "binary_sha256": hashlib.file_digest(binary.open("rb"), "sha256").hexdigest(),
+        "source": capabilities["source"], "scenario": scenario,
+        "binary_sha256": hashlib.file_digest(binary.open("rb"), "sha256").hexdigest(),
         "maximum_seconds": MAXIMUM_SECONDS, "vm_vcpus": 2, "vm_memory_mib": 3072,
         "guest_target_cpu_ceiling": 1.5, "guest_os_cpu_reserve": 0.5,
         "guest_target_memory_ceiling_mib": 2048, "guest_os_memory_reserve_mib": 1024,
-        "sum_of_individual_guest_unit_cpu_quotas": 2.25,
+        "sum_of_individual_guest_unit_cpu_quotas": cpu_sum,
         "individual_quota_oversubscription_is_bounded_by_parent_slice": True,
         "vm_process_memory_mib": 4096, "vm_process_cpu_quota": 2, "vm_process_pids": 128,
         "guest_root_virtual_disk_gib": 12, "maximum_external_network_bytes": 4 * GIB,
@@ -380,7 +391,7 @@ def campaign(binary, output):
     guard.start()
     watcher = subprocess.Popen([sys.executable, str(Path(__file__).resolve()), "--watchdog", str(output)],
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
-    report = {"identity": identity, "source": capabilities["source"], "certifies_g05": False, "checks": []}
+    report = {"identity": identity, "source": capabilities["source"], "scenario": scenario, "certifies_g05": False, "checks": []}
     clean = False
     try:
         sums = receive(ORIGIN + "SHA256SUMS", output / "SHA256SUMS", MIB)
@@ -412,11 +423,26 @@ def campaign(binary, output):
         guest.ssh(["sudo", "-n", "cloud-init", "status", "--wait"], timeout=180)
         guest.copy(binary, "/tmp/nelcota-g05")
         guest.copy(Path(__file__).with_name("native_guest.py"), "/tmp/native_guest.py")
+        guest.copy(Path(__file__).with_name("native_cluster.py"), "/tmp/native_cluster.py")
         guest.ssh(["sudo", "-n", "install", "-m", "755", "/tmp/nelcota-g05", "/usr/local/bin/nelcota"])
         guest.ssh(["sudo", "-n", "install", "-d", "-m", "700", "/opt/g05-tools"])
         guest.ssh(["sudo", "-n", "install", "-m", "600", "/tmp/native_guest.py", "/opt/g05-tools/native_guest.py"])
+        guest.ssh(["sudo", "-n", "install", "-m", "600", "/tmp/native_cluster.py", "/opt/g05-tools/native_cluster.py"])
         guest.ready = True
         guest.last_guest_sample = time.monotonic()
+        if scenario == "cluster-routing":
+            guest.phase = "native-cluster-routing"
+            report["cluster_routing"] = guest.action("cluster-routing", timeout=800)
+            evidence = report["cluster_routing"]
+            require(not evidence["sentinel_password_changed"], "Native init changed an unrelated cluster password")
+            require(evidence["init_exit_code"] != 0, "Native init accepted an unsupported cluster port layout")
+            require(evidence["sentinel_rows"] == 1, "Native init modified unrelated sentinel data")
+            require(not evidence["host_root_created"] and not evidence["native_postgres_configuration_written"],
+                    "Native init wrote configuration before rejecting the cluster collision")
+            report["checks"].append("native cluster port collision rejected before project/configuration or unrelated database changes")
+            guest.assert_safe()
+            report["status"] = "passed"
+            return
         guest.phase = "native-init"
         report["native_init"] = guest.action("prepare", timeout=650)
         require(report["native_init"]["binary_sha256"] == json.loads((public / "predeclared-profile.json").read_text())["binary_sha256"], "Guest binary differs from frozen input")
@@ -534,6 +560,9 @@ def campaign(binary, output):
         report["cleanup_confirmed"] = clean
         report["cleanup_scope"] = "owned QEMU service stopped; private guest disk/keys remain only on the disposable runner until its destruction"
         report["safety_guard_failure"] = guest.guard_failure
+        if report.get("status") == "passed" and (not clean or guest.guard_failure is not None):
+            report["status"] = "failed"
+            report["failure"] = {"phase": "cleanup", "type": "RuntimeError", "reason": "Native cleanup or safety guard did not pass"}
         atomic_json(public / "native-vm.json", report)
         publication = output.with_name(output.name + "-public")
         publication.mkdir(mode=0o755)
@@ -544,7 +573,7 @@ def campaign(binary, output):
             shutil.copyfile(path, target)
             target.chmod(0o644)
         publish(report)
-    require(report.get("status") == "passed" and clean and guest.guard_failure is None, "Native VM acceptance failed; preserved structured evidence")
+        require(report.get("status") == "passed" and clean and guest.guard_failure is None, "Native VM acceptance failed; preserved structured evidence")
 
 
 def main():
@@ -552,6 +581,7 @@ def main():
     parser.add_argument("--binary", type=Path)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--watchdog", type=Path)
+    parser.add_argument("--scenario", choices=["runtime", "cluster-routing"], default="runtime")
     args = parser.parse_args()
     if args.watchdog is not None:
         watchdog(args.watchdog.resolve(strict=True))
@@ -562,7 +592,7 @@ def main():
     for signum in [signal.SIGTERM, signal.SIGINT, signal.SIGALRM]:
         signal.signal(signum, stop)
     signal.setitimer(signal.ITIMER_REAL, MAXIMUM_SECONDS)
-    campaign(args.binary.resolve(strict=True), args.output.resolve())
+    campaign(args.binary.resolve(strict=True), args.output.resolve(), args.scenario)
 
 
 if __name__ == "__main__":

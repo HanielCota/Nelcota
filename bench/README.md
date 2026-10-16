@@ -141,6 +141,18 @@ report from a previous native run before repeating the campaign. Reports are
 also published in bounded, checksummed notice fragments: a single long Actions
 annotation truncates at 4,096 characters. Downloading/replaying a report never
 changes its original source, verdict or cleanup receipt.
+Notice transport uses gzip/base64, raw-JSON SHA-256 and at most nine fragments
+plus one summary, respecting both the byte limit and ten annotations per step.
+An oversized report fails publication rather than silently losing its tail.
+
+`native_case=cluster-routing` uses a separate fresh guest and two generated
+PostgreSQL 17 clusters: named `17/main` at 5433 and unrelated `17/sentinel`
+at 5432. Before/after queries explicitly qualify both clusters. Native init
+must reject that unsupported layout before changing the sentinel password,
+its row, the project root or native configuration. The extra cluster has
+its own 384-MiB/one-CPU/256-task limit within the same aggregate slice; the
+declared quota sum is 3.25 CPUs, and the aggregate database disk guard remains
+2 GiB. This case tests routing safety, with no effective endurance time credit.
 
 Save a release baseline binary before refactoring, then compare equivalent runs:
 

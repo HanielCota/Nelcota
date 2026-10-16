@@ -105,10 +105,12 @@ def resource_report():
             memory[fields[0].removesuffix(":")] = int(fields[1]) * 1024
     fs = os.statvfs("/")
     disks = {}
-    for role, path in {"postgres": Path("/var/lib/postgresql/17/main"), "storage": Path("/var/lib/nelcota-stress")}.items():
+    for role, path in {"postgres": Path("/var/lib/postgresql/17/main"),
+                       "postgres_sentinel": Path("/var/lib/postgresql/17/sentinel"),
+                       "storage": Path("/var/lib/nelcota-stress")}.items():
         if path.exists():
             resolved = path.resolve(strict=True)
-            require(resolved in {Path("/var/lib/postgresql/17/main"), Path("/var/lib/nelcota-stress"),
+            require(resolved in {Path("/var/lib/postgresql/17/main"), Path("/var/lib/postgresql/17/sentinel"), Path("/var/lib/nelcota-stress"),
                                  Path("/var/lib/private/nelcota-stress")}, "Guest disk owner path changed")
             result = command(["du", "-sxk", str(resolved)])
             disks[role] = int(result.stdout.split()[0]) * 1024
@@ -116,8 +118,26 @@ def resource_report():
             "free_filesystem_fraction": fs.f_bavail / fs.f_blocks,
             "free_inode_fraction": fs.f_favail / fs.f_files,
             "boot_id": Path("/proc/sys/kernel/random/boot_id").read_text().strip(),
-            "units": {name: unit_state(name) for name in [UNIT, "postgresql@17-main.service", "caddy.service"]},
+            "units": {name: unit_state(name) for name in [UNIT, "postgresql@17-main.service", "postgresql@17-sentinel.service", "caddy.service"]},
             "target_slice": unit_state("g05native.slice")}
+
+
+def install_limits(*, sentinel=False):
+    slice_path = Path("/etc/systemd/system/g05native.slice")
+    require(not slice_path.exists(), "Native slice already exists")
+    slice_path.write_text("[Slice]\nCPUQuota=150%\nMemoryMax=2G\nMemorySwapMax=0\nTasksMax=768\n")
+    limits = {UNIT: ("100%", "128M", 128), "postgresql@17-main.service": ("100%", "512M", 256),
+              "caddy.service": ("25%", "128M", 128)}
+    if sentinel:
+        limits["postgresql@17-sentinel.service"] = ("100%", "384M", 256)
+    for name, (cpu, memory, tasks) in limits.items():
+        directory = Path("/etc/systemd/system") / (name + ".d")
+        directory.mkdir(parents=True, exist_ok=True)
+        (directory / "90-g05-budgets.conf").write_text(
+            "[Service]\nSlice=g05native.slice\nCPUQuota=" + cpu + "\nMemoryMax=" + memory +
+            "\nMemorySwapMax=0\nTasksMax=" + str(tasks) + "\n")
+    command(["systemctl", "daemon-reload"])
+    return limits
 
 
 def prepare():
@@ -126,18 +146,7 @@ def prepare():
         clusters = command(["pg_lsclusters", "--no-header"], check=False)
         require(clusters.returncode == 0, "Cannot inventory existing guest PostgreSQL clusters")
         require(not clusters.stdout.strip(), "Guest image already contains PostgreSQL clusters")
-    slice_path = Path("/etc/systemd/system/g05native.slice")
-    require(not slice_path.exists(), "Native slice already exists")
-    slice_path.write_text("[Slice]\nCPUQuota=150%\nMemoryMax=2G\nMemorySwapMax=0\nTasksMax=768\n")
-    limits = {UNIT: ("100%", "128M", 128), "postgresql@17-main.service": ("100%", "512M", 256),
-              "caddy.service": ("25%", "128M", 128)}
-    for name, (cpu, memory, tasks) in limits.items():
-        directory = Path("/etc/systemd/system") / (name + ".d")
-        directory.mkdir(parents=True, exist_ok=True)
-        (directory / "90-g05-budgets.conf").write_text(
-            "[Service]\nSlice=g05native.slice\nCPUQuota=" + cpu + "\nMemoryMax=" + memory +
-            "\nMemorySwapMax=0\nTasksMax=" + str(tasks) + "\n")
-    command(["systemctl", "daemon-reload"])
+    limits = install_limits()
     cli("init", "--local", "--project", PROJECT, "--runtime", "systemd", "--profile", "1gb", "--yes", timeout=600)
     migrations = ROOT / "projects/stress/migrations"
     (migrations / "V1__native_probe.sql").write_text(
@@ -184,10 +193,14 @@ def backup():
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("identity")
-    parser.add_argument("action", choices=["prepare", "resources", "token", "backup", "restore", "remove", "diagnostics"])
+    parser.add_argument("action", choices=["prepare", "resources", "token", "backup", "restore", "remove", "diagnostics", "cluster-routing"])
     parser.add_argument("--dump")
     args = parser.parse_args()
     owned(args.identity)
+    if args.action == "cluster-routing":
+        from native_cluster import run
+        print(json.dumps(run(), allow_nan=False))
+        return
     if args.action == "prepare":
         print(json.dumps(prepare(), allow_nan=False))
         return

@@ -1488,3 +1488,37 @@ preservada. Na próxima VM o slice agregado recebe teto de **1,5 CPU**,
 reservando **0,5 CPU** para o SO da convidada, com verificação efetiva no
 kernel. Quotas individuais somam 2,25 CPUs dentro desse teto explícito;
 memória, disco, tráfego, TLS, duração e demais guardas não foram ampliados.
+
+### 16/10, 20:45–20:50 UTC — job nativo passou; segunda limitação das anotações
+
+A [repetição nativa 002](https://github.com/Nelcota/Nelcota/actions/runs/38963816198)
+terminou com sucesso. O resumo íntegro confirma 140,169 s incluindo preparo,
+27 amostras, `cleanup_confirmed=true` e SHA-256 do relatório
+`68a282ed4b290b365524a0236eecf4b2e226ad5e5a95eaeb0066978265fdd5da`.
+O código congelado é `7e1bd25`; o relatório detalhado ainda precisa ser
+recuperado antes de publicar suas medidas de recovery e reconciliação.
+
+Os sete fragmentos da **tentativa 001 reprovada** foram recuperados e
+reconstituídos com SHA-256 verificado, preservando o veredito original.
+Seu [relatório completo](results/stress/native-vm-runtime-first-failure.json)
+confirma limpeza, 13 amostras e 65,145 s incluindo preparo. Nenhum tempo de
+endurance é acrescentado por essa tentativa.
+
+Na própria tentativa 002 surgiu outro limite real do Actions: além do
+máximo de bytes, só dez anotações foram retidas no step. Resumo mais dez
+fragmentos suprimiu o último fragmento; o reconstituinte recusou a evidência
+incompleta. O transporte passa a usar gzip/base64, SHA-256 do JSON original
+e **no máximo nove fragmentos mais resumo**. Doze testes focados passaram
+em 0,009 s, cobrindo também o orçamento de quantidade e a rejeição de
+relatório grande demais. A próxima execução relerá o artifact original
+da 002 dentro do GitHub.
+
+Foi preparado um caso separado `cluster-routing`, ainda **não executado**:
+dois clusters PostgreSQL fictícios dentro de uma VM nova, `17/main` na 5433
+e `17/sentinel` na 5432. Testará se `init` rejeita o layout incompatível
+antes de alterar a senha do cluster alheio ou criar configuração. Nenhum
+defeito de roteamento de produção é declarado sem essa reprodução. O
+cluster extra tem CPU/RAM/PIDs próprios dentro do mesmo slice agregado,
+e o limite físico de PostgreSQL soma os dois diretórios. Os 18 checks
+ordinários de `e80770b` passaram; o job manual nativo reprovado permanece
+registrado separadamente, sem anunciar o conjunto inteiro como aprovado.

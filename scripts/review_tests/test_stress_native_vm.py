@@ -2,6 +2,8 @@
 
 import json
 import hashlib
+import base64
+import gzip
 import http.client
 from pathlib import Path
 import sys
@@ -71,9 +73,21 @@ class NativeVMBoundaries(unittest.TestCase):
             if "payload" in value:
                 fragments.append(value)
         self.assertEqual(len(fragments), fragments[0]["parts"])
-        content = "".join(value["payload"] for value in fragments)
+        content = gzip.decompress(base64.b64decode("".join(value["payload"] for value in fragments), validate=True)).decode()
         self.assertEqual(hashlib.sha256(content.encode()).hexdigest(), fragments[0]["sha256"])
         self.assertEqual(json.loads(content), report)
+        self.assertLessEqual(len(notices), 10)
+
+    def test_multiple_fragments_stay_within_ten_annotations_per_step(self):
+        report = {"identity": "native-vm-owned", "source": "1" * 40, "certifies_g05": False,
+                  "status": "failed", "cleanup_confirmed": True,
+                  "checks": [hashlib.sha256(str(i).encode()).hexdigest() for i in range(200)]}
+        notices = native_evidence.notices(report)
+        self.assertGreater(len(notices), 2)
+        self.assertLessEqual(len(notices), 10)
+        report["checks"] = [hashlib.sha256(str(i).encode()).hexdigest() for i in range(800)]
+        with self.assertRaisesRegex(ValueError, "annotation count"):
+            native_evidence.notices(report)
 
     def test_unknown_fields_and_nonfinite_values_are_never_published(self):
         report = {"identity": "native-vm-owned", "source": "1" * 40, "certifies_g05": False,
@@ -96,12 +110,17 @@ class NativeVMBoundaries(unittest.TestCase):
                 with self.assertRaises(RuntimeError):
                     native_vm.unit(identity)
 
-    def test_foreign_active_service_is_never_stopped(self):
-        with patch("native_vm.unit_fields", return_value={"ActiveState": "active", "Description": "foreign"}):
-            with patch("native_vm.command") as execute:
-                with self.assertRaisesRegex(RuntimeError, "foreign"):
-                    native_vm.stop_owned("native-vm-owned")
-                execute.assert_not_called()
+    def test_foreign_service_is_never_stopped_or_reset_in_any_state(self):
+        for state in ["active", "inactive", "failed"]:
+            with self.subTest(state=state), tempfile.TemporaryDirectory() as temporary:
+                with patch("native_vm.unit_fields", return_value={"ActiveState": state, "LoadState": "loaded", "Description": "foreign"}):
+                    with patch("native_vm.command") as execute:
+                        with self.assertRaisesRegex(RuntimeError, "foreign"):
+                            native_vm.stop_owned("native-vm-owned")
+                        guest = native_vm.Guest("native-vm-owned", Path(temporary))
+                        with self.assertRaisesRegex(RuntimeError, "foreign"):
+                            guest.start()
+                        execute.assert_not_called()
 
     def test_power_cut_requires_owned_description_and_waits_for_actual_stop(self):
         states = [{"ActiveState": "active", "Description": "native-vm-owned", "MainPID": "99"},
