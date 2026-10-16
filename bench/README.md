@@ -154,6 +154,15 @@ its own 384-MiB/one-CPU/256-task limit within the same aggregate slice; the
 declared quota sum is 3.25 CPUs, and the aggregate database disk guard remains
 2 GiB. This case tests routing safety, with no effective endurance time credit.
 
+`native_case=default-root` executes the documented native init from the owned
+application directory, with neither `-C` nor `NELCOTA_ROOT`. It checks the
+actual generated environment-file path, systemd verification, activation and
+verified HTTPS readiness. A successful init alone does not pass this regression.
+`native_case=host-root` first starts one native installation, then tries init in
+another owned directory with `--skip-checks`. The first database credential,
+Caddy configuration and sentinel row must remain unchanged, and the second
+host/unit must not be created. Both probes remain inside the disposable guest.
+
 `native_case=default-root` follows the documented command from the application
 directory without `-C` or an inherited `NELCOTA_ROOT`. It checks the actual
 systemd environment-file path, `systemd-analyze verify`, activation and verified

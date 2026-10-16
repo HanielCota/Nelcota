@@ -1666,3 +1666,23 @@ que a evidência não identifica e sem publicar URLs assinadas ou stderr bruto.
 No monitor local às 22:05:45: soak ativo há aproximadamente 65 min,
 1.423 amostras, idade de 1,1 s, app RSS 46.320 KiB, banco 320 MiB,
 zero erros de assinatura e zero OOMs observados.
+
+### 16/10, 22:12 UTC — instalação documentada reproduz falha de caminho relativo
+
+O probe `default-root` terminou **reprovado**, com limpeza confirmada e sem
+violação de segurança do staging: [relatório original](results/stress/native-default-root-before.json),
+run `38973154487`, código `77d2335`, binário
+`e5552ea9fa39b1a64491ba1d61da652c671e1375e565be3087dcdf8e93068533`.
+Rodar `init` no diretório da aplicação, sem `-C`/`NELCOTA_ROOT`, retornou
+exit 0, mas o `EnvironmentFile` da unit era relativo. `up` excedeu o prazo
+de 30 s; a unit estava sem PID ativo, em auto-restart, com 14 reinícios.
+`systemd-analyze verify` isoladamente retornou 0, portanto não substitui
+ativação/readiness real nesse caso. As versões efetivas constam no relatório.
+
+A CLI preservava `.` em `Host::root()` e escrevia diretamente esse caminho
+no arquivo de ambiente da unit. A correção resolve `cli.dir` para absoluto
+antes de construir o host e antes das operações de deploy/lease. Isso mantém
+o diretório escolhido, sem depender do cwd de systemd. O probe real existente
+é a regressão de ponta a ponta: exige caminho absoluto, ativação e HTTPS
+válido, e será repetido com novo binário/VM. Rustfmt e diff-check passaram;
+nenhum teste nativo foi executado contra a máquina local compartilhada.
