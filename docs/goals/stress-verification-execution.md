@@ -1522,3 +1522,48 @@ cluster extra tem CPU/RAM/PIDs próprios dentro do mesmo slice agregado,
 e o limite físico de PostgreSQL soma os dois diretórios. Os 18 checks
 ordinários de `e80770b` passaram; o job manual nativo reprovado permanece
 registrado separadamente, sem anunciar o conjunto inteiro como aprovado.
+
+### 16/10, 20:59–21:10 UTC — defeito real de seleção de cluster reproduzido
+
+O [caso nativo 003](https://github.com/Nelcota/Nelcota/actions/runs/38965444222)
+**reproduziu um defeito de produção**, usando somente dois clusters criados
+para o teste dentro da VM. Com `17/main` na porta 5433 e `17/sentinel` na
+5432, `init` retornou exit 0, criou configuração e alterou a senha do
+`postgres` no **sentinel**, que não era o cluster nomeado pelo runtime.
+Presença de senha passou de false para true; a linha sentinela continuou
+com count 1. As consultas antes/depois qualificaram explicitamente cada
+cluster. Não se publicaram senha nem hash de credencial.
+[Reprodução completa](results/stress/native-postgres-collision-before.json):
+88,188 s incluindo preparo, 17 amostras, nenhum guard crítico acionado e
+limpeza confirmada. Ambos os clusters estavam em cgroups próprios com os
+limites declarados; não foi usado PostgreSQL do ambiente compartilhado.
+
+A causa é a divergência entre a identidade fixa `17/main`/5432 e o
+`runuser ... psql` sem destino explícito. O wrapper Debian escolheu o
+cluster que atendia na porta padrão. A correção candidata valida o layout
+no preflight, antes de instalar pacotes ou escrever o host, e novamente
+antes de configurar o cluster. Clientes nativos passam a selecionar
+explicitamente o cluster/versão e socket/porta/usuário/banco locais,
+limpando overrides de host/service herdados. O password gerado sai dos
+argumentos de processo e é enviado por stdin, sem eco do SQL de erro,
+com prazos de conexão/statement/lock. Foram adicionadas seis regressões
+Rust para layouts válidos/incompatíveis/ambíguos, NaN/portas inválidas,
+roteamento herdado e limites da operação de senha. **Ainda não executadas
+neste checkpoint**; compilação, testes e repetição nativa são a próxima
+validação, em máquinas separadas para preservar o soak local.
+
+O mesmo workflow recuperou integralmente o relatório da campanha nativa
+normal 002, em dois fragmentos comprimidos, mantendo o SHA-256 original.
+[Resultado completo](results/stress/native-vm-runtime-pass-1.json): 30 ACKs
+externos reconciliados após perda da RAM da VM, zero perdas/duplicações/
+extras, boot de kernel diferente, bytes privados preservados, restore
+local de banco/arquivos em **1,606 s** e recuperação da convidada em
+**13,815 s**. `remove` eliminou unit/cluster e o QEMU foi parado com recibo.
+Não houve mutação em andamento no instante da interrupção; restore foi
+no mesmo alvo, sem alegar perda de energia do host físico, PITR ou off-host.
+
+O soak de `disk-final-pass-1-002` começou por volta de **21:01 UTC** e
+continua sem reiniciar app/banco. A mudança real na CLI exigirá um novo
+binário: essa execução preserva seu hash anterior como **baseline**,
+sem ser promovida silenciosamente a evidência do artefato corrigido.
+As campanhas afetadas terão novas medições depois da compilação/verificação.
