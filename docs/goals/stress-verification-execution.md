@@ -1420,3 +1420,18 @@ e também passou com limpeza confirmada. Os 18 checks de `c769934` passaram ante
 correção; o novo commit terá CI próprio. [CI anterior](results/stress/ci-c769934.json).
 O [checkpoint 011](results/stress/load-time-checkpoint-011.json) exclui a fase
 contínua interrompida e todos os controles sintéticos.
+
+### 16/10, 20:15 UTC — CI e inventário de VM nativa
+
+Os 18 checks de `1f39159` terminaram com sucesso, incluindo o controle nativo
+da compactação. A nova campanha `disk-final-pass-1-002` continua no artefato
+congelado desse commit; ainda não completou endurance e não foi aprovada.
+
+O workflow manual recebe um alvo separado `native-preflight`, executado
+somente em VM descartável `ubuntu-latest` do GitHub. Esse alvo exclui o job
+de benchmark em runner próprio, cujo ambiente não foi autorizado para uma
+carga adicional. O inventário é somente leitura, com prazo de cinco minutos:
+CPU, RAM/disco disponíveis, systemd, sudo e KVM. Não instala pacotes, não
+inicia serviços, não acessa dados de projetos e não representa aceitação
+nativa nem perda de energia. A disponibilidade efetiva será registrada após
+o dispatch; não é presumida a partir do arquivo do workflow.

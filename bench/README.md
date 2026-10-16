@@ -104,6 +104,14 @@ on a dedicated host. `.github/workflows/stress.yml` provides a manual job for a
 self-hosted Linux runner labeled `nelcota-benchmark`, keeping this workload
 outside ordinary PR checks.
 
+The manual workflow also accepts `target=native-preflight`. This selects a
+separate disposable `ubuntu-latest` GitHub-hosted VM and skips the self-hosted
+benchmark job. It only inventories CPU, available memory/disk, PID 1, systemd,
+noninteractive sudo and KVM/tool availability. It installs nothing and starts
+no service or load. The bounded JSON artifact and check notice record the
+workflow SHA; this inventory does not certify native deployment or power-loss
+recovery. Its five-minute deadline is independent of benchmark endurance.
+
 Save a release baseline binary before refactoring, then compare equivalent runs:
 
 ```sh
