@@ -342,6 +342,21 @@ Owned k6 runners explicitly disable anonymous usage reporting with
 `K6_NO_USAGE_REPORT=true`. This keeps generator reporting within the declared
 local metrics destination; the disabled setting is recorded in run profiles.
 
+Run the native sparse-counter regression from the repository root:
+
+```sh
+python3 bench/arrival_check.py --output target/stress-oracles/arrivals
+```
+
+It uses native k6/Prometheus, one sleeping VU, a six-second arrival burst and
+130 seconds without offered arrivals. The final instant query and 120-second
+range must expire while the continuously observed total stays positive.
+This artificial control verifies the measurement pipeline, not service capacity
+or effective endurance time. Each container has 0.25 CPU/128 MiB, the controller
+has a 240-second watchdog, and a polled 128-MiB metrics-volume limit preserves
+host reserves. Startup reserves 2 GiB for image/container preparation. CI retains
+only its structured profiles/completion/proof; raw metric snapshots stay private.
+
 `--final-idle-seconds 180` extends the final resource observation beyond the
 provider allocator's idle reclamation window. The bounded 30..300-second value
 is frozen in the profile and must match in comparisons. Idle/drain observation
