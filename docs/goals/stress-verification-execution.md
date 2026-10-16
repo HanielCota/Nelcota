@@ -1074,3 +1074,54 @@ contadores inconsistentes e rejeição por ambos os comparadores. A validação
 nativa do novo protocolo e as campanhas de substituição ainda estão pendentes;
 as quatro horas em curso não serão promovidas como se tivessem começado nele.
 [Achado e reprodução](results/stress/sparse-drop-staleness-finding.json).
+
+### 2026-10-16 14:47 UTC — segundo disco concluído e falha de controle reproduzida
+
+`disk-pass-2-001` concluiu 14.400 segundos contínuos no executor congelado
+`028f6e7`, com os mesmos processos de aplicação/PostgreSQL, 3.134 amostras
+e lacuna máxima de 13,7 segundos. Foram 4.030.874 operações úteis, 16 renovações
+reais e duas coortes removidas pelos pruners. A reconciliação contou 249.795
+eventos e entregas, sem ausentes, extras ou duplicatas, e 129 objetos verificados
+além dos 10.000 objetos vazios reais. A fila drenou a zero; o plateau final
+voltou a 24 descritores/quatro tarefas/18 sockets. O banco tinha 15 conexões,
+zero transações idle e zero esperas por locks. Limpeza confirmada.
+
+O resultado bruto antigo continua `passed`, mas **a aprovação do protocolo de
+chegadas fica reprovada**: ele reportou zero descartes, enquanto o observador
+suplementar reteve 1.127. Uma observação real mostrou tanto a consulta instantânea
+quanto a janela de uma hora em zero enquanto esse total permanecia preservado.
+A coleta suplementar começou durante a fase e teve uma lacuna inicial de
+124,49 segundos; não substitui a cobertura de 30 segundos desde o início
+exigida pelo executor corrigido. [Diagnóstico](results/stress/disk-pass-2-diagnostic.json).
+
+O checkpoint 006 soma **89.204 segundos (24h46m44s)** de carga concluída,
+excluindo preparação, warmup, repouso, intervalos interrompidos e duplicação
+de janelas concorrentes. São horas efetivas de testes, incluindo reprovações,
+e não uma certificação do G05.
+[Contagem auditável](results/stress/load-time-checkpoint-006.json).
+
+O controle nativo novo de contadores reprovou no CI de `c49470b`. A reprodução
+local preservada também reprovou: k6 saiu ao atingir taxa zero e não manteve
+a cauda sem chegadas por 130 segundos. O teste então rejeitou corretamente
+a cobertura inferior aos 136 segundos exigidos. A regressão de relógio virtual
+falha no código anterior; após a correção, 15 testes focados passaram em
+0,207 segundo. O controlador agora conserva observação limitada de contadores,
+volume e reservas por pelo menos 130 segundos após o flush final do gerador.
+Esse repouso artificial não entra na contagem de stress da aplicação. A
+repetição real do controle permanece pendente neste checkpoint; os logs e
+a tentativa reprovada foram preservados, com limpeza confirmada.
+
+A repetição `sparse-drop-native-control-002`, em `d4ea5bc`, passou com k6 e
+Prometheus reais: 538 descartes retidos, consulta instantânea final zero e
+janela final de 120 segundos zero. A cobertura fechada teve 30 observações,
+140,012 segundos e lacuna máxima de 6,491 segundos. Foram 130,012 segundos
+de observação após a saída do gerador; limpeza confirmada. Essa duração
+artificial continua excluída das horas efetivas de stress da aplicação.
+[A falha e a repetição](results/stress/native-arrival-control-before-after.json).
+
+A descoberta completa de regressões Python passou: **211 testes em 12,813
+segundos**, após a correção do controle (`python-checks-015.log`). O check
+`native-lint` de `d4ea5bc` também passou no CI; os demais checks desse SHA ainda
+estavam em andamento neste registro. A tentativa 2 de Rust no SHA anterior
+`3e3e92b` terminou com sucesso; a falha original e sua causa não identificada
+continuam preservadas, sem declarar que um defeito Rust foi corrigido.

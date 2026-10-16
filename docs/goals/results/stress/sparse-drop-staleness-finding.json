@@ -67,5 +67,20 @@
         "passed_workloads": 0
       }
     ]
+  },
+  "completed_live_investigation": {
+    "run_id": "disk-pass-2-001",
+    "evidence": "disk-pass-2-diagnostic.json",
+    "physical_continuous_seconds": 14400,
+    "old_instant_final_count": 0,
+    "retained_supplemental_max": 1127,
+    "actual_expiry_observation": {
+      "observed_monotonic": 221562.929124216,
+      "instant": 0.0,
+      "range_last_hour": 0.0,
+      "supplemental": 1127.0
+    },
+    "corrected_protocol_certified": false,
+    "cleanup_confirmed": true
   }
 }

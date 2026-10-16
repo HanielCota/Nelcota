@@ -91,5 +91,13 @@
   },
   "observed_utc": "2026-10-16T12:37:16.401686+00:00",
   "root_cause": "unknown; named failing test not available from the original annotations",
-  "diagnostic_change": "Retain the failed Rust command exit status through pipefail and emit only bounded validated failed-test identities as check annotations; do not publish assertion payloads."
+  "diagnostic_change": "Retain the failed Rust command exit status through pipefail and emit only bounded validated failed-test identities as check annotations; do not publish assertion payloads.",
+  "later_repeat_observation": {
+    "observed_utc": "2026-10-16T14:52:49.372397+00:00",
+    "run_attempt": 2,
+    "status": "completed",
+    "conclusion": "success",
+    "head_sha": "3e3e92b5cec34c2a22bfe9f945a59356a8137692",
+    "scope": "The exact-SHA repeat succeeded; original failure and unknown root cause remain preserved."
+  }
 }
