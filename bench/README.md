@@ -112,6 +112,29 @@ no service or load. The bounded JSON artifact and check notice record the
 workflow SHA; this inventory does not certify native deployment or power-loss
 recovery. Its five-minute deadline is independent of benchmark endurance.
 
+`target=native-vm` separately builds a frozen release on a disposable
+`ubuntu-24.04` runner (two Cargo jobs). It verifies the official Ubuntu 24.04
+cloud-image checksum over HTTPS, creates one fresh KVM guest with a 12-GiB
+virtual disk and a controller-generated SSH host key, and exercises actual
+systemd init/up, TLS ingress, RLS, private file bytes, database/files backup
+and restore, guest power cut, boot activation, acknowledgement reconciliation
+and removal. This is a small functional/durability campaign, not capacity or
+four-hour endurance. Its report records actual source/binary/image hashes.
+
+The guest has two vCPUs/3 GiB RAM; its QEMU service is capped at two CPUs,
+4 GiB RAM, 128 tasks and 1,800 seconds. App/PostgreSQL/Caddy have separate
+systemd CPU, memory and task limits in a 2-GiB slice. Five-second observers
+enforce 10% free RAM, 15% disk/inode reserves, 2-GiB PostgreSQL disk, 256-MiB
+storage and a 4-GiB external network budget after the controller starts.
+An independent observer stops the owned VM and controller on loss of sampling
+or the duration limit; TLS and SSH host verification remain enabled.
+
+Only structured diagnostics are uploaded. Keys, seed data, guest disks,
+credentials, request bodies and private logs stay on the disposable runner.
+The guest power cut discards guest RAM after acknowledged writes and proves
+a new kernel boot; it does not certify an in-flight write, physical host
+power loss, public DNS/ACME, PITR or an off-host/fresh-target restore.
+
 Save a release baseline binary before refactoring, then compare equivalent runs:
 
 ```sh

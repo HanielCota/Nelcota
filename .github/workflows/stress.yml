@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       target:
-        description: Dedicated benchmark host or read-only disposable VM inventory
+        description: Dedicated benchmark, disposable VM inventory or native acceptance
         type: choice
-        options: [benchmark, native-preflight]
+        options: [benchmark, native-preflight, native-vm]
         default: benchmark
       backend:
         description: Owned storage fixture
@@ -42,8 +42,48 @@ jobs:
           path: target/stress-g05/native-preflight.json
           retention-days: 14
 
+  native-vm:
+    if: inputs.target == 'native-vm'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    env:
+      CARGO_BUILD_JOBS: 2
+      RUST_TEST_THREADS: 2
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Inventory the disposable outer VM
+        run: python3 bench/native_preflight.py
+      - name: Prepare KVM tooling
+        timeout-minutes: 10
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends qemu-system-x86 qemu-utils cloud-image-utils
+      - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d
+        with:
+          toolchain: '1.99.0'
+      - name: Build the frozen native artifact
+        timeout-minutes: 25
+        run: nice -n19 ionice -c3 cargo build --locked --release -p nelcota-server
+      - name: Bounded native VM acceptance with an external observer
+        timeout-minutes: 35
+        run: |
+          sudo env GITHUB_ACTIONS="$GITHUB_ACTIONS" RUNNER_ENVIRONMENT="$RUNNER_ENVIRONMENT" \
+            GITHUB_SHA="$GITHUB_SHA" GITHUB_RUN_ID="$GITHUB_RUN_ID" GITHUB_RUN_ATTEMPT="$GITHUB_RUN_ATTEMPT" \
+            python3 bench/native_vm.py --binary target/release/nelcota \
+              --output "target/stress-g05/native-vm-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+      - name: Structured native VM evidence only
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-vm-acceptance
+          path: target/stress-g05/native-vm-*-public
+          if-no-files-found: ignore
+          retention-days: 14
+
   stress:
-    if: inputs.target != 'native-preflight'
+    if: inputs.target == 'benchmark' || inputs.target == ''
     # Dedicated host with at least four affinity slots and Docker. Heavy load is kept
     # off pull-request runners and uses explicit per-container budgets.
     runs-on: [self-hosted, linux, x64, nelcota-benchmark]

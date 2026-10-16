@@ -1,0 +1,553 @@
+#!/usr/bin/env python3
+"""Bounded native/systemd and guest power-cut acceptance on an owned KVM VM.
+
+This manual Actions harness never runs on an unknown/self-hosted machine.
+The guest's loss of RAM is not physical host/controller power-loss evidence.
+"""
+
+import argparse
+import hashlib
+import http.client
+import json
+import os
+from pathlib import Path
+import re
+import shlex
+import shutil
+import signal
+import socket
+import ssl
+import subprocess
+import sys
+import threading
+import time
+import urllib.request
+
+from native_preflight import inventory
+from watchdog import atomic_json, process_identity, stop_owner
+
+IMAGE = "ubuntu-24.04-server-cloudimg-amd64.img"
+ORIGIN = "https://cloud-images.ubuntu.com/releases/noble/release/"
+GIB = 1024 ** 3
+MIB = 1024 ** 2
+MAXIMUM_SECONDS = 1800
+
+
+def require(condition, message):
+    if not condition:
+        raise RuntimeError(message)
+
+
+def command(arguments, *, timeout=30, check=True):
+    result = subprocess.run([str(value) for value in arguments], capture_output=True, timeout=timeout)
+    if check and result.returncode:
+        raise RuntimeError("Host command failed: " + Path(arguments[0]).name + " exit " + str(result.returncode))
+    return result
+
+
+def free_port():
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        return probe.getsockname()[1]
+
+
+def receive(url, path, limit):
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    digest = hashlib.sha256()
+    length = 0
+    began = time.monotonic()
+    with opener.open(url, timeout=30) as response, path.open("xb") as target:
+        require(response.url.startswith(ORIGIN) and response.url.startswith("https://"), "Unexpected image download origin")
+        while True:
+            value = response.read(1024 * 1024)
+            if not value:
+                break
+            length += len(value)
+            require(length <= limit and time.monotonic() - began < 300, "Image download exceeded its boundary")
+            digest.update(value)
+            target.write(value)
+    return {"bytes": length, "sha256": digest.hexdigest(), "url": url}
+
+
+def network_bytes():
+    total = 0
+    for item in Path("/sys/class/net").iterdir():
+        if item.name == "lo":
+            continue
+        for direction in ["rx_bytes", "tx_bytes"]:
+            total += int((item / "statistics" / direction).read_text())
+    return total
+
+
+def unit(identity):
+    require(re.fullmatch(r"native-vm-[a-z0-9-]{1,64}", identity), "Invalid VM service identity")
+    return identity + ".service"
+
+
+def unit_fields(identity):
+    output = command(["systemctl", "show", unit(identity), "--property=Description,ActiveState,ControlGroup,MainPID"], check=False).stdout
+    return dict(line.split("=", 1) for line in output.decode().splitlines() if "=" in line)
+
+
+def stop_owned(identity, *, power_cut=False):
+    state = unit_fields(identity)
+    if state.get("ActiveState") in {"inactive", "failed"}:
+        return state
+    require(state.get("Description") == identity, "Refusing to stop a foreign systemd service")
+    arguments = ["systemctl", "stop", unit(identity)]
+    if power_cut:
+        arguments = ["systemctl", "kill", "--signal=SIGKILL", "--kill-whom=all", unit(identity)]
+    command(arguments)
+    until = time.monotonic() + 15
+    while time.monotonic() < until:
+        state = unit_fields(identity)
+        if state.get("ActiveState") in {"inactive", "failed"} and state.get("MainPID", "0") == "0":
+            return state
+        time.sleep(0.2)
+    raise RuntimeError("Owned VM service did not stop")
+
+
+def watchdog(directory):
+    owner = json.loads((directory / "ownership.json").read_text())
+    identity = owner["identity"]
+    unit(identity)
+    require(directory.resolve() == Path(owner["output"]).resolve(), "Watchdog ownership path mismatch")
+    while not (directory / "watchdog-disarmed").exists():
+        reason = None
+        now = time.monotonic()
+        try:
+            heartbeat = json.loads((directory / "heartbeat.json").read_text())
+            if now - heartbeat["monotonic"] > 30:
+                reason = "resource_observation_gap"
+        except (OSError, ValueError, KeyError):
+            reason = "missing_resource_observer"
+        if process_identity(owner["pid"]) != owner["process_identity"]:
+            reason = "controller_disappeared"
+        if now - owner["started_monotonic"] > MAXIMUM_SECONDS:
+            reason = "campaign_duration_limit"
+        if reason is not None:
+            state = stop_owned(identity)
+            atomic_json(directory / "public/emergency-stop.json", {"reason": reason, "unit_state": state})
+            stop_owner(owner)
+            return
+        time.sleep(1)
+
+
+class Guest:
+    def __init__(self, identity, directory):
+        self.identity = identity
+        self.directory = directory
+        self.ssh_port = free_port()
+        self.https_port = free_port()
+        while self.https_port == self.ssh_port:
+            self.https_port = free_port()
+        self.ready = False
+        self.guard_failure = None
+        self.phase = "preparation"
+        self.fault_until = 0
+        self.network_initial = network_bytes()
+        self.stopped = threading.Event()
+        self.last_guest_sample = time.monotonic()
+        self.samples = 0
+        self.started = time.monotonic()
+
+    def ssh(self, arguments, *, timeout=30, check=True):
+        options = ["-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes", "-o", "IdentitiesOnly=yes",
+                   "-o", "UserKnownHostsFile=" + str(self.directory / "known_hosts"),
+                   "-o", "ConnectTimeout=5", "-i", str(self.directory / "client"), "-p", str(self.ssh_port)]
+        return command(["ssh", *options, "g05@127.0.0.1", shlex.join([str(value) for value in arguments])],
+                       timeout=timeout, check=check)
+
+    def copy(self, source, target):
+        command(["scp", "-q", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes", "-o", "IdentitiesOnly=yes",
+                 "-o", "UserKnownHostsFile=" + str(self.directory / "known_hosts"), "-o", "ConnectTimeout=5",
+                 "-i", self.directory / "client", "-P", str(self.ssh_port), source, "g05@127.0.0.1:" + target], timeout=60)
+
+    def action(self, action, *extra, timeout=60):
+        result = self.ssh(["sudo", "-n", "python3", "/opt/g05-tools/native_guest.py", self.identity, action, *extra],
+                          timeout=timeout, check=False)
+        if result.returncode:
+            try:
+                evidence = json.loads(result.stdout)
+            except ValueError:
+                evidence = {"failure_type": "unstructured_guest_command", "exit_code": result.returncode}
+            with (self.directory / "public/guest-action-failures.jsonl").open("a") as stream:
+                stream.write(json.dumps({"action": action, "phase": self.phase, "monotonic": time.monotonic(),
+                                         "evidence": evidence}, allow_nan=False) + "\n")
+            raise RuntimeError("Native guest action failed: " + action)
+        if action == "token":
+            return result.stdout.decode().strip()
+        return json.loads(result.stdout)
+
+    def start(self):
+        self.assert_safe()
+        self.ready = False
+        command(["systemctl", "reset-failed", unit(self.identity)], check=False)
+        command(["systemd-run", "--unit=" + self.identity, "--description=" + self.identity,
+                 "--property=MemoryMax=4G", "--property=MemorySwapMax=0", "--property=CPUQuota=200%",
+                 "--property=TasksMax=128", "--property=RuntimeMaxSec=1800", "--property=KillMode=control-group",
+                 "--property=TimeoutStopSec=10", "--", "qemu-system-x86_64", "-accel", "kvm", "-cpu", "host",
+                 "-smp", "2", "-m", "3072", "-display", "none", "-no-reboot",
+                 "-serial", "file:" + str(self.directory / "serial.log"),
+                 "-drive", "file=" + str(self.directory / "guest.qcow2") + ",if=virtio,format=qcow2,cache=none",
+                 "-drive", "file=" + str(self.directory / "seed.iso") + ",media=cdrom,readonly=on",
+                 "-netdev", "user,id=net0,hostfwd=tcp:127.0.0.1:" + str(self.ssh_port) + "-:22,hostfwd=tcp:127.0.0.1:" + str(self.https_port) + "-:443",
+                 "-device", "virtio-net-pci,netdev=net0"], timeout=30)
+        self.fault_until = time.monotonic() + 180
+        until = time.monotonic() + 180
+        while time.monotonic() < until:
+            self.assert_safe()
+            result = self.ssh(["true"], timeout=8, check=False)
+            if result.returncode == 0:
+                return
+            time.sleep(1)
+        raise RuntimeError("Owned guest SSH readiness deadline")
+
+    def assert_safe(self):
+        if self.guard_failure is not None:
+            raise RuntimeError("Native VM safety guard: " + self.guard_failure)
+        require(time.monotonic() - self.started <= MAXIMUM_SECONDS, "Native VM duration exhausted")
+        require(not (self.directory / "public/emergency-stop.json").exists(), "Independent native VM watchdog stopped the run")
+
+    def guard(self):
+        while not self.stopped.is_set():
+            now = time.monotonic()
+            try:
+                memory = {}
+                for line in Path("/proc/meminfo").read_text().splitlines():
+                    values = line.split()
+                    if values[0] in {"MemTotal:", "MemAvailable:"}:
+                        memory[values[0]] = int(values[1]) * 1024
+                fs = os.statvfs(self.directory)
+                require(memory["MemAvailable:"] >= memory["MemTotal:"] * 0.1, "host_memory_reserve")
+                require(fs.f_bavail >= fs.f_blocks * 0.15 and fs.f_favail >= fs.f_files * 0.15, "host_filesystem_reserve")
+                traffic = network_bytes() - self.network_initial
+                require(traffic <= 4 * GIB, "external_traffic_budget")
+                state = unit_fields(self.identity)
+                group = state.get("ControlGroup", "")
+                if group:
+                    require(state.get("Description") == self.identity, "VM_service_ownership")
+                    events_path = Path("/sys/fs/cgroup") / group.lstrip("/") / "memory.events"
+                    if events_path.is_file():
+                        events = dict(line.split() for line in events_path.read_text().splitlines())
+                        require(int(events.get("oom_kill", "0")) == 0, "VM_oom_kill")
+                sample = {"monotonic": now, "phase": self.phase, "host_memory_bytes": memory,
+                          "host_free_filesystem_fraction": fs.f_bavail / fs.f_blocks,
+                          "external_network_bytes_since_start": traffic, "vm_unit": state}
+                serial = self.directory / "serial.log"
+                if serial.exists():
+                    require(serial.stat().st_size <= 4 * MIB, "serial_log_budget")
+                if self.ready:
+                    try:
+                        probe = self.action("resources", timeout=12)
+                        self.last_guest_sample = time.monotonic()
+                        require(probe["free_filesystem_fraction"] >= 0.15 and probe["free_inode_fraction"] >= 0.15, "guest_filesystem_reserve")
+                        mem = probe["memory_bytes"]
+                        require(mem["MemAvailable"] >= mem["MemTotal"] * 0.1, "guest_memory_reserve")
+                        require(probe["disk_bytes"].get("postgres", 0) <= 2048 * MIB, "guest_postgres_disk_budget")
+                        require(probe["disk_bytes"].get("storage", 0) <= 256 * MIB, "guest_storage_disk_budget")
+                        for value in probe["units"].values():
+                            require(value.get("memory_events", {}).get("oom_kill", 0) == 0, "guest_unit_oom_kill")
+                        sample["guest"] = probe
+                    except (OSError, ValueError, subprocess.TimeoutExpired, RuntimeError) as error:
+                        if str(error).startswith(("guest_", "VM_")):
+                            raise
+                        require(time.monotonic() - self.last_guest_sample <= 30 or time.monotonic() < self.fault_until,
+                                "guest_observation_gap")
+                        sample["guest_sample_error_type"] = type(error).__name__
+                with (self.directory / "public/resources.jsonl").open("a") as stream:
+                    stream.write(json.dumps(sample, allow_nan=False) + "\n")
+                self.samples += 1
+                atomic_json(self.directory / "heartbeat.json", {"monotonic": time.monotonic()})
+            except Exception as error:
+                self.guard_failure = str(error)[:200]
+                try:
+                    stop_owned(self.identity)
+                finally:
+                    atomic_json(self.directory / "public/critical-stop.json", {"reason": self.guard_failure, "monotonic": now})
+                return
+            self.stopped.wait(5)
+
+
+class Connection(http.client.HTTPSConnection):
+    def __init__(self, port, context):
+        super().__init__("stress.localhost", context=context, timeout=5)
+        self.forwarded_port = port
+
+    def connect(self):
+        transport = socket.create_connection(("127.0.0.1", self.forwarded_port), timeout=self.timeout)
+        try:
+            self.sock = self._context.wrap_socket(transport, server_hostname="stress.localhost")
+        except Exception:
+            transport.close()
+            raise
+
+
+class Api:
+    def __init__(self, guest, certificate):
+        self.guest = guest
+        self.context = ssl.create_default_context(cadata=certificate)
+        self.attempts = 0
+        self.received_bytes = 0
+        self.sent_bytes = 0
+
+    def request(self, method, path, *, token=None, value=None, raw=None, expected=(200,), headers=None):
+        self.guest.assert_safe()
+        fields = dict(headers or {})
+        body = raw
+        if value is not None:
+            body = json.dumps(value).encode()
+            fields["Content-Type"] = "application/json"
+        if token is not None:
+            fields["Authorization"] = "Bearer " + token
+        fields["Accept-Encoding"] = "identity"
+        connection = Connection(self.guest.https_port, self.context)
+        try:
+            self.attempts += 1
+            self.sent_bytes += len(body or b"")
+            connection.request(method, path, body=body, headers=fields)
+            response = connection.getresponse()
+            content = response.read(MIB + 1)
+            self.received_bytes += len(content)
+            require(len(content) <= MIB, "Native response body exceeded its bound")
+            require(response.status in expected, "Unexpected native HTTP status " + str(response.status))
+            return content
+        finally:
+            connection.close()
+
+    def ready(self, seconds=90):
+        until = time.monotonic() + seconds
+        while time.monotonic() < until:
+            self.guest.assert_safe()
+            try:
+                result = json.loads(self.request("GET", "/health"))
+                if result.get("status") == "ok":
+                    return
+            except (OSError, ValueError, RuntimeError, http.client.HTTPException):
+                time.sleep(0.5)
+        raise RuntimeError("Native verified HTTPS health deadline")
+
+
+def campaign(binary, output):
+    capabilities = inventory()
+    require(os.geteuid() == 0, "Native VM control requires root on the disposable Actions VM")
+    require(os.access("/dev/kvm", os.R_OK | os.W_OK), "KVM is unavailable to the isolated VM controller")
+    require(capabilities["cpu_affinity_slots"] >= 4, "Native VM campaign needs four CPU slots")
+    require(not output.exists(), "Preserve prior native VM evidence")
+    output.mkdir(parents=True, mode=0o700)
+    public = output / "public"
+    public.mkdir(mode=0o755)
+    began = time.monotonic()
+    identity = "native-vm-" + os.environ["GITHUB_RUN_ID"] + "-" + os.environ["GITHUB_RUN_ATTEMPT"]
+    unit(identity)
+    require(unit_fields(identity).get("ActiveState") in {"inactive", "failed"}, "VM service already exists")
+    owner = {"identity": identity, "output": str(output), "pid": os.getpid(),
+             "process_identity": process_identity(os.getpid()), "started_monotonic": began,
+             "maximum_seconds": MAXIMUM_SECONDS}
+    atomic_json(output / "ownership.json", owner)
+    atomic_json(output / "heartbeat.json", {"monotonic": began})
+    atomic_json(public / "predeclared-profile.json", {
+        "scope": "disposable Ubuntu 24.04 x64 native functional and guest power-cut acceptance; no production certification",
+        "source": capabilities["source"], "binary_sha256": hashlib.file_digest(binary.open("rb"), "sha256").hexdigest(),
+        "maximum_seconds": MAXIMUM_SECONDS, "vm_vcpus": 2, "vm_memory_mib": 3072,
+        "vm_process_memory_mib": 4096, "vm_process_cpu_quota": 2, "vm_process_pids": 128,
+        "guest_root_virtual_disk_gib": 12, "maximum_external_network_bytes": 4 * GIB,
+        "network_budget_scope": "since controller start; includes image and guest package downloads, excludes checkout and outer build/tool installation",
+        "host_and_guest_available_memory_minimum_fraction": 0.1, "host_and_guest_free_disk_inode_minimum_fraction": 0.15,
+        "guest_postgres_maximum_disk_mib": 2048, "guest_storage_maximum_disk_mib": 256,
+        "sample_seconds": 5, "maximum_guest_sample_gap_seconds": 30,
+        "boot_fault_observation_grace_seconds": 180, "tls_verification": True,
+        "ssh_host_key_verification": "fresh controller-generated Ed25519 host key injected through owned cloud-init seed",
+        "host_power_loss_certified": False, "off_host_restore_certified": False,
+        "public_dns_acme_certified": False, "workload_maximum_mutations_per_second": 1})
+    guest = Guest(identity, output)
+    guard = threading.Thread(target=guest.guard, daemon=True)
+    guard.start()
+    watcher = subprocess.Popen([sys.executable, str(Path(__file__).resolve()), "--watchdog", str(output)],
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+    report = {"identity": identity, "source": capabilities["source"], "certifies_g05": False, "checks": []}
+    clean = False
+    try:
+        sums = receive(ORIGIN + "SHA256SUMS", output / "SHA256SUMS", MIB)
+        entries = [line.split() for line in (output / "SHA256SUMS").read_text().splitlines()]
+        expected = [fields[0] for fields in entries if len(fields) == 2 and fields[1].lstrip("*") == IMAGE]
+        require(len(expected) == 1 and re.fullmatch(r"[0-9a-f]{64}", expected[0]), "Missing unique cloud image checksum")
+        image = receive(ORIGIN + IMAGE, output / IMAGE, 1024 * MIB)
+        require(image["sha256"] == expected[0], "Cloud image checksum mismatch")
+        image_info = json.loads(command(["qemu-img", "info", "--output=json", output / IMAGE]).stdout)
+        require(image_info.get("format") == "qcow2" and not image_info.get("backing-filename"), "Unexpected cloud image backing chain")
+        require(0 < image_info.get("virtual-size", 0) <= 12 * GIB, "Cloud image exceeds declared guest disk")
+        report["image"] = image
+        report["image_checksum_manifest"] = sums
+        command(["qemu-img", "create", "-f", "qcow2", "-F", "qcow2", "-b", output / IMAGE, output / "guest.qcow2", "12G"])
+        for name in ["client", "host"]:
+            command(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", output / name])
+        host_key = (output / "host.pub").read_text().split()[:2]
+        (output / "known_hosts").write_text("[127.0.0.1]:" + str(guest.ssh_port) + " " + " ".join(host_key) + "\n")
+        user = {"users": [{"name": "g05", "sudo": "ALL=(ALL) NOPASSWD:ALL", "lock_passwd": True,
+                           "shell": "/bin/bash", "ssh_authorized_keys": [(output / "client.pub").read_text().strip()]}],
+                "ssh_pwauth": False, "disable_root": True,
+                "ssh_keys": {"ed25519_private": (output / "host").read_text(), "ed25519_public": (output / "host.pub").read_text()},
+                "write_files": [{"path": "/etc/g05-native-owner", "permissions": "0600", "owner": "root:root", "content": identity + "\n"}]}
+        (output / "user-data").write_text("#cloud-config\n" + json.dumps(user) + "\n")
+        (output / "meta-data").write_text(json.dumps({"instance-id": identity, "local-hostname": "g05-native"}))
+        command(["cloud-localds", output / "seed.iso", output / "user-data", output / "meta-data"])
+        guest.phase = "boot"
+        guest.start()
+        guest.ssh(["sudo", "-n", "cloud-init", "status", "--wait"], timeout=180)
+        guest.copy(binary, "/tmp/nelcota-g05")
+        guest.copy(Path(__file__).with_name("native_guest.py"), "/tmp/native_guest.py")
+        guest.ssh(["sudo", "-n", "install", "-m", "755", "/tmp/nelcota-g05", "/usr/local/bin/nelcota"])
+        guest.ssh(["sudo", "-n", "install", "-d", "-m", "700", "/opt/g05-tools"])
+        guest.ssh(["sudo", "-n", "install", "-m", "600", "/tmp/native_guest.py", "/opt/g05-tools/native_guest.py"])
+        guest.ready = True
+        guest.last_guest_sample = time.monotonic()
+        guest.phase = "native-init"
+        report["native_init"] = guest.action("prepare", timeout=650)
+        require(report["native_init"]["binary_sha256"] == json.loads((public / "predeclared-profile.json").read_text())["binary_sha256"], "Guest binary differs from frozen input")
+        certificate = guest.ssh(["sudo", "-n", "cat", "/var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt"]).stdout.decode()
+        require(len(certificate) <= 65536, "Native CA exceeded its bound")
+        report["tls_ca_sha256"] = hashlib.sha256(certificate.encode()).hexdigest()
+        api = Api(guest, certificate)
+        api.ready()
+        untrusted = Connection(guest.https_port, ssl.create_default_context())
+        rejected = False
+        try:
+            untrusted.connect()
+        except ssl.SSLCertVerificationError:
+            rejected = True
+        finally:
+            untrusted.close()
+        require(rejected, "Untrusted native Caddy CA was accepted")
+        report["checks"].append("verified native HTTPS and rejection of an untrusted CA")
+        guest.phase = "native-functional"
+        second = guest.ssh(["sudo", "-n", "/usr/local/bin/nelcota", "-C", "/opt/g05-native", "init", "--local", "--project", "refused", "--yes"], check=False)
+        require(second.returncode != 0, "Native second project was accepted")
+        report["checks"].append("second native project refused")
+        users = []
+        for name in ["alice", "bob"]:
+            account = json.loads(api.request("POST", "/auth/v1/signup", value={"email": name + "@example.invalid", "password": "native-fixture-password-123"}))
+            require(isinstance(account.get("access_token"), str), "Native signup returned no access token")
+            users.append(account["access_token"])
+        service = guest.action("token")
+        require(re.fullmatch(r"[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+", service), "Native service token output was not a JWT")
+        api.request("POST", "/rest/v1/native_probe", token=users[0], value={"id": 1, "value": 1}, expected=(201,))
+        require(json.loads(api.request("GET", "/rest/v1/native_probe?select=id", token=users[1])) == [], "Native RLS leaked another user's row")
+        api.request("GET", "/rest/v1/native_probe", expected=(401,))
+        report["checks"].append("native signup, two-user RLS isolation and anonymous rejection")
+        original = b"g05-native-before"
+        api.request("POST", "/storage/v1/object/native/kept.bin", token=service, raw=original,
+                    expected=(201,), headers={"Content-Type": "application/octet-stream"})
+        require(api.request("GET", "/storage/v1/object/native/kept.bin", token=service) == original, "Native uploaded bytes differ")
+        api.request("GET", "/storage/v1/object/native/kept.bin", expected=(404,))
+        guest.phase = "native-backup"
+        backup = guest.action("backup", timeout=150)
+        report["backup"] = {key: value for key, value in backup.items() if key != "dump"}
+        api.request("POST", "/rest/v1/native_probe", token=users[0], value={"id": 2, "value": 2}, expected=(201,))
+        api.request("PUT", "/storage/v1/object/native/kept.bin", token=service, raw=b"g05-native-after",
+                    expected=(200,), headers={"Content-Type": "application/octet-stream"})
+        guest.phase = "native-restore"
+        restored = time.monotonic()
+        guest.action("restore", "--dump", backup["dump"], timeout=200)
+        api.ready()
+        report["restore_elapsed_seconds"] = time.monotonic() - restored
+        require(json.loads(api.request("GET", "/rest/v1/native_probe?select=id&order=id", token=users[0])) == [{"id": 1}], "Native restore did not produce its declared rewind")
+        require(api.request("GET", "/storage/v1/object/native/kept.bin", token=service) == original, "Native restore lost matching immutable file bytes")
+        report["checks"].append("native backup and same-target restore of matching database and file bytes; one intentional row rewind")
+        guest.phase = "native-writer-before-power-cut"
+        acknowledged = []
+        load_began = time.monotonic()
+        with (output / "acknowledged-operations.jsonl").open("x") as ledger:
+            for operation in range(100, 130):
+                before = time.monotonic()
+                api.request("POST", "/rest/v1/native_probe", token=users[0], value={"id": operation, "value": operation}, expected=(201,))
+                acknowledged.append(operation)
+                ledger.write(json.dumps({"operation": operation, "acknowledged_monotonic": time.monotonic()}) + "\n")
+                ledger.flush()
+                os.fsync(ledger.fileno())
+                time.sleep(max(0, 1 - (time.monotonic() - before)))
+        report["completed_effective_load_seconds"] = min(30, time.monotonic() - load_began)
+        before_boot = guest.action("resources")["boot_id"]
+        guest.phase = "guest-power-cut"
+        guest.ready = False
+        guest.fault_until = time.monotonic() + 180
+        fault_began = time.monotonic()
+        report["power_cut_unit_state"] = stop_owned(identity, power_cut=True)
+        guest.start()
+        guest.ready = True
+        guest.last_guest_sample = time.monotonic()
+        api.ready()
+        report["guest_power_cut_recovery_seconds"] = time.monotonic() - fault_began
+        after = guest.action("resources")
+        require(after["boot_id"] != before_boot, "Guest power cut did not produce a fresh kernel boot")
+        actual = json.loads(api.request("GET", "/rest/v1/native_probe?select=id&order=id", token=users[0]))
+        require([item["id"] for item in actual] == [1, *acknowledged], "Guest power cut lost or duplicated an externally acknowledged operation")
+        require(api.request("GET", "/storage/v1/object/native/kept.bin", token=service) == original, "Guest power cut corrupted uploaded bytes")
+        report["checks"].append("guest power cut: changed kernel boot, native boot activation and external acknowledgement reconciliation")
+        report["power_cut_reconciliation"] = {"acknowledged": len(acknowledged), "missing": 0, "duplicate": 0,
+                                               "extra": 0, "file_sha256": hashlib.sha256(original).hexdigest(),
+                                               "fault_during_in_flight_write": False,
+                                               "scope": "loss of guest RAM after completed durable acknowledgements; no host power loss claim"}
+        guest.phase = "post-load-idle"
+        for _ in range(6):
+            guest.assert_safe()
+            time.sleep(5)
+        report["idle_resources"] = guest.action("resources")
+        guest.phase = "native-remove"
+        report["native_remove"] = guest.action("remove", timeout=200)
+        guest.assert_safe()
+        report["status"] = "passed"
+    except Exception as error:
+        report["status"] = "failed"
+        report["failure"] = {"phase": guest.phase, "type": type(error).__name__, "reason": str(error)[:256]}
+        if guest.ready:
+            try:
+                report["guest_diagnostics"] = guest.action("diagnostics", timeout=20)
+            except Exception as diagnostic:
+                report["diagnostic_failure_type"] = type(diagnostic).__name__
+    finally:
+        guest.stopped.set()
+        guard.join(timeout=20)
+        state = stop_owned(identity)
+        clean = state.get("ActiveState") in {"inactive", "failed"} and state.get("MainPID", "0") == "0"
+        if clean:
+            (output / "watchdog-disarmed").touch()
+        watcher.wait(timeout=15)
+        report["elapsed_seconds_including_preparation"] = time.monotonic() - began
+        report["resource_samples"] = guest.samples
+        report["cleanup_confirmed"] = clean
+        report["cleanup_scope"] = "owned QEMU service stopped; private guest disk/keys remain only on the disposable runner until its destruction"
+        report["safety_guard_failure"] = guest.guard_failure
+        atomic_json(public / "native-vm.json", report)
+        publication = output.with_name(output.name + "-public")
+        publication.mkdir(mode=0o755)
+        for path in public.iterdir():
+            require(path.is_file() and not path.is_symlink() and path.stat().st_size <= 16 * MIB,
+                    "Native structured artifact exceeded its publication boundary")
+            target = publication / path.name
+            shutil.copyfile(path, target)
+            target.chmod(0o644)
+        print("::notice title=Native VM result::" + json.dumps(report, separators=(",", ":"), allow_nan=False))
+    require(report.get("status") == "passed" and clean and guest.guard_failure is None, "Native VM acceptance failed; preserved structured evidence")
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--binary", type=Path)
+    parser.add_argument("--output", type=Path)
+    parser.add_argument("--watchdog", type=Path)
+    args = parser.parse_args()
+    if args.watchdog is not None:
+        watchdog(args.watchdog.resolve(strict=True))
+        return
+    require(args.binary is not None and args.output is not None, "Native VM requires a binary and fresh output directory")
+    def stop(signum, frame):
+        raise RuntimeError("Native VM controller received termination or its duration limit")
+    for signum in [signal.SIGTERM, signal.SIGINT, signal.SIGALRM]:
+        signal.signal(signum, stop)
+    signal.setitimer(signal.ITIMER_REAL, MAXIMUM_SECONDS)
+    campaign(args.binary.resolve(strict=True), args.output.resolve())
+
+
+if __name__ == "__main__":
+    main()

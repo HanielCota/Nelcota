@@ -1435,3 +1435,21 @@ CPU, RAM/disco disponíveis, systemd, sudo e KVM. Não instala pacotes, não
 inicia serviços, não acessa dados de projetos e não representa aceitação
 nativa nem perda de energia. A disponibilidade efetiva será registrada após
 o dispatch; não é presumida a partir do arquivo do workflow.
+
+O [inventário real](results/stress/native-vm-capacity-001.json) passou na
+execução `38960782906`: quatro CPUs, 16.766.406.656 bytes de RAM total,
+92.078.571.520 bytes livres em disco, PID 1 systemd, sudo disponível e
+`/dev/kvm` presente. O usuário comum não tinha permissão de leitura/escrita
+nesse dispositivo; a disponibilidade para o controlador privilegiado ainda
+depende de sua verificação efetiva. O job em runner próprio foi ignorado.
+
+Foi preparado um alvo manual **`native-vm`**, separado dos benchmarks locais:
+Ubuntu 24.04 descartável com convidada KVM, disco virtual de 12 GiB, duas
+vCPUs, 3 GiB de RAM e watchdog independente. O protocolo mantém validação
+de TLS e da chave SSH. Pretende verificar systemd, RLS, arquivos privados,
+backup/restauração e perda da RAM da convidada, comparando confirmações
+registradas pelo observador externo. Os seis testes rápidos dos limites de
+segurança passaram em 0,005 segundo, sem criar serviços ou máquinas locais.
+**A campanha nativa ainda não foi executada** e não recebe aprovação antecipada.
+Restauração em alvo novo, fora do host, PITR, perda física de energia e ACME
+público continuam separados dessa verificação funcional.
