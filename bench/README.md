@@ -154,6 +154,15 @@ its own 384-MiB/one-CPU/256-task limit within the same aggregate slice; the
 declared quota sum is 3.25 CPUs, and the aggregate database disk guard remains
 2 GiB. This case tests routing safety, with no effective endurance time credit.
 
+`native_case=default-root` follows the documented command from the application
+directory without `-C` or an inherited `NELCOTA_ROOT`. It checks the actual
+systemd environment-file path, `systemd-analyze verify`, activation and verified
+HTTPS readiness. `native_case=host-root` first starts a native fixture, then
+attempts another installation in a different generated directory with network
+checks skipped. The first database credential, Caddy configuration and sentinel
+row must remain intact; the second host/unit must be refused. No real host,
+existing data, credential verifier or Caddy configuration body is published.
+
 Save a release baseline binary before refactoring, then compare equivalent runs:
 
 ```sh

@@ -9,7 +9,7 @@ import json
 from pathlib import Path
 import re
 
-FIELDS = {"identity", "source", "binary_sha256", "scenario", "cluster_routing", "certifies_g05", "checks", "image", "image_checksum_manifest",
+FIELDS = {"identity", "source", "binary_sha256", "scenario", "cluster_routing", "native_contract", "certifies_g05", "checks", "image", "image_checksum_manifest",
           "native_init", "tls_ca_sha256", "status", "failure", "guest_diagnostics",
           "diagnostic_failure_type", "elapsed_seconds_including_preparation", "resource_samples",
           "cleanup_confirmed", "cleanup_scope", "safety_guard_failure", "backup",
@@ -80,7 +80,7 @@ if __name__ == "__main__":
                       "profile_file_sha256": hashlib.sha256(raw).hexdigest(),
                       "scenario": value.get("scenario", "runtime"),
                       "scope": "Artifact identity from the original public predeclared native profile; no verdict is changed"}
-        if projection["scenario"] not in {"runtime", "cluster-routing"}:
+        if projection["scenario"] not in {"runtime", "cluster-routing", "default-root", "host-root"}:
             raise SystemExit("Invalid prior native scenario")
         print("::notice title=Native VM profile::" + json.dumps(projection, separators=(",", ":")), flush=True)
         raise SystemExit(0)

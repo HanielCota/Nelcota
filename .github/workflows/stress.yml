@@ -13,9 +13,9 @@ on:
         type: string
         default: ''
       native_case:
-        description: Native lifecycle or collision between two owned PostgreSQL clusters
+        description: Native lifecycle, cluster routing or installation contracts
         type: choice
-        options: [runtime, cluster-routing]
+        options: [runtime, cluster-routing, default-root, host-root]
         default: runtime
       diagnostic_jobs:
         description: Optional failed public lint/panel job IDs for native-preflight (comma separated)

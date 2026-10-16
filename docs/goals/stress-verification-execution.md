@@ -1590,3 +1590,42 @@ O caso de colisão também passa a exigir a mensagem específica do guard de
 layout e a verificar o SHA-256 do binário dentro da convidada, evitando
 aprovar uma rejeição genérica ou um executável diferente. A identidade do
 artifact anterior será publicada separadamente sem mudar seu relatório.
+
+### 16/10, 21:31–21:48 UTC — correção nativa comprovada e fluxo normal revalidado
+
+A [repetição da colisão](results/stress/native-postgres-collision-after.json)
+passou na execução `38969205271`, com binário
+`fff01664c28916ddb67eb8d4f9852c5b443df710806102490fcace27fff3ba31`.
+`init` retornou exit 1 com a mensagem específica do guard de layout; senha
+sentinela inalterada, count 1, nenhum host ou arquivo de configuração nativa
+criado. Onze amostras, 55,099 s incluindo preparo, sem violação crítica e
+limpeza confirmada. A [identidade original do baseline](results/stress/native-postgres-collision-before-artifact.json)
+foi recuperada separadamente: binário `b424257b6c82b7e9051d29897ee3eedc7c2460355db88e248fbfa119a6065b02`.
+Não se presumiu igualdade com outros builds de código semelhante.
+
+O [fluxo normal candidato](results/stress/native-vm-runtime-candidate-pass-1.json)
+também passou na execução `38970590208`, código `6f8a3e7`, binário
+`0cccc84840b5d09ee76b1ab2005b52e7d702bd44c9f9c7662df5c6bde82e110f`.
+Incluiu senha por stdin, RLS, bytes privados, backup/restore e perda da RAM
+da convidada. Trinta ACKs externos preservados, zero perdas/duplicações/
+extras; restore no mesmo alvo **2,108 s**, recuperação da convidada
+**16,367 s**. São medidas funcionais desse build/VM, sem afirmar regressão
+ou melhoria de performance em relação ao build anterior. Trinta e duas
+amostras, 168,203 s com preparo, sem guard crítico e limpeza confirmada.
+O binário efetivamente usado foi retido como artifact de CI por 14 dias;
+isso não publica uma release.
+
+No CI de `dec797d`, Clippy e o job Rust/aceitação completo passaram. O job
+do painel passou pelos checks/testes/build e reprovou no guard esperado de
+`dist` versionado, ainda pendente do rebuild separado no intervalo seguro.
+O primeiro diagnóstico remoto dos logs falhou e seu workflow foi preservado
+(`38969200170`); a versão seguinte também publica recibo limitado da própria
+falha de download, sem URLs assinadas ou stderr bruto.
+
+Foram preparados dois probes adicionais de instalação, ainda sem veredito:
+diretório atual padrão do guia e tentativa de segundo host nativo em outra
+pasta na mesma VM. Nenhum novo defeito é declarado antes da reprodução.
+As próximas campanhas nativas passam a registrar versões efetivas de
+PostgreSQL/client/Caddy/systemd, kernel/libc e Python. Doze testes rápidos
+do executor passaram em 0,011 s; nenhum build ou suíte pesada local foi
+iniciado junto ao soak em andamento.

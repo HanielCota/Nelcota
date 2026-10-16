@@ -426,14 +426,38 @@ def campaign(binary, output, scenario):
         guest.copy(binary, "/tmp/nelcota-g05")
         guest.copy(Path(__file__).with_name("native_guest.py"), "/tmp/native_guest.py")
         guest.copy(Path(__file__).with_name("native_cluster.py"), "/tmp/native_cluster.py")
+        guest.copy(Path(__file__).with_name("native_contracts.py"), "/tmp/native_contracts.py")
         guest.ssh(["sudo", "-n", "install", "-m", "755", "/tmp/nelcota-g05", "/usr/local/bin/nelcota"])
         installed_digest = guest.ssh(["sha256sum", "/usr/local/bin/nelcota"]).stdout.decode().split()[0]
         require(installed_digest == binary_digest, "Guest binary differs from the frozen controller input")
         guest.ssh(["sudo", "-n", "install", "-d", "-m", "700", "/opt/g05-tools"])
         guest.ssh(["sudo", "-n", "install", "-m", "600", "/tmp/native_guest.py", "/opt/g05-tools/native_guest.py"])
         guest.ssh(["sudo", "-n", "install", "-m", "600", "/tmp/native_cluster.py", "/opt/g05-tools/native_cluster.py"])
+        guest.ssh(["sudo", "-n", "install", "-m", "600", "/tmp/native_contracts.py", "/opt/g05-tools/native_contracts.py"])
         guest.ready = True
         guest.last_guest_sample = time.monotonic()
+        if scenario in {"default-root", "host-root"}:
+            guest.phase = "native-" + scenario
+            report["native_contract"] = guest.action(scenario, timeout=850)
+            evidence = report["native_contract"]
+            if scenario == "default-root":
+                require(evidence["init_exit_code"] == 0, "Documented native init from cwd failed")
+                require(evidence["environment_file_absolute"], "Documented native cwd produced a relative systemd EnvironmentFile")
+                require(evidence["systemd_verify_exit_code"] == 0 and evidence["up_exit_code"] == 0,
+                        "Documented native cwd failed actual systemd verification or activation")
+            if scenario == "host-root":
+                require(not evidence["first_database_password_changed"] and not evidence["first_caddy_configuration_changed"],
+                        "Second native host directory modified the first installation")
+                require(evidence["second_init_exit_code"] != 0 and not evidence["second_host_created"] and not evidence["second_unit_created"],
+                        "Second native host directory was accepted on the same machine")
+                require(evidence["first_sentinel_rows"] == 1, "Second native host directory changed existing fixture data")
+            if scenario == "default-root":
+                certificate = guest.ssh(["sudo", "-n", "cat", "/var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt"]).stdout.decode()
+                Api(guest, certificate).ready()
+            guest.assert_safe()
+            report["checks"].append("native installation contract " + scenario)
+            report["status"] = "passed"
+            return
         if scenario == "cluster-routing":
             guest.phase = "native-cluster-routing"
             report["cluster_routing"] = guest.action("cluster-routing", timeout=800)
@@ -586,7 +610,7 @@ def main():
     parser.add_argument("--binary", type=Path)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--watchdog", type=Path)
-    parser.add_argument("--scenario", choices=["runtime", "cluster-routing"], default="runtime")
+    parser.add_argument("--scenario", choices=["runtime", "cluster-routing", "default-root", "host-root"], default="runtime")
     args = parser.parse_args()
     if args.watchdog is not None:
         watchdog(args.watchdog.resolve(strict=True))

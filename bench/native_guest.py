@@ -5,6 +5,7 @@ import argparse
 import hashlib
 import json
 import os
+import platform
 from pathlib import Path
 import re
 import shutil
@@ -32,8 +33,8 @@ def owned(identity):
     require(Path("/proc/1/comm").read_text().strip() == "systemd", "Not a systemd VM")
 
 
-def command(arguments, *, value=None, timeout=60, check=True):
-    result = subprocess.run(arguments, input=value, capture_output=True, timeout=timeout)
+def command(arguments, *, value=None, timeout=60, check=True, cwd=None):
+    result = subprocess.run(arguments, input=value, capture_output=True, timeout=timeout, cwd=cwd)
     if check and result.returncode:
         # Never publish command output: init and token output contain credentials.
         log = Path("/opt/g05-native-private.log")
@@ -53,8 +54,18 @@ def sql(value):
                     "-v", "ON_ERROR_STOP=1", "-d", "postgres"], value=value.encode()).stdout
 
 
+def versions():
+    def first(arguments):
+        return command(arguments).stdout.decode().splitlines()[0][:256]
+    return {"kernel": platform.release(), "architecture": platform.machine(),
+            "libc": list(platform.libc_ver()), "python": platform.python_version(),
+            "postgres_server": sql("SHOW server_version;\n").decode().strip(),
+            "postgres_client": first(["psql", "--cluster", "17/main", "--version"]),
+            "caddy": first(["caddy", "version"]), "systemd": first(["systemctl", "--version"])}
+
+
 def unit_state(name):
-    fields = ["ActiveState", "SubState", "MainPID", "MemoryCurrent", "MemoryPeak", "MemoryMax",
+    fields = ["LoadState", "ActiveState", "SubState", "MainPID", "MemoryCurrent", "MemoryPeak", "MemoryMax",
               "TasksCurrent", "TasksMax", "NRestarts", "CPUUsageNSec", "ControlGroup", "Result"]
     result = command(["systemctl", "show", name, "--property=" + ",".join(fields)], check=False)
     state = {}
@@ -174,7 +185,7 @@ def prepare():
             actual["memory_bytes"] == 2 * 1024 ** 3 and actual["swap_bytes"] == 0 and actual["pids"] == 768,
             "Native aggregate kernel limits differ from the declared OS reserve")
     return {"checks": ["native init", "native systemd up", "repeatable application migration", "native unit budgets"],
-            "units": units, "target_slice": parent,
+            "units": units, "target_slice": parent, "versions": versions(),
             "binary_sha256": hashlib.file_digest(Path('/usr/local/bin/nelcota').open('rb'), 'sha256').hexdigest()}
 
 
@@ -193,10 +204,14 @@ def backup():
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("identity")
-    parser.add_argument("action", choices=["prepare", "resources", "token", "backup", "restore", "remove", "diagnostics", "cluster-routing"])
+    parser.add_argument("action", choices=["prepare", "resources", "token", "backup", "restore", "remove", "diagnostics", "cluster-routing", "default-root", "host-root"])
     parser.add_argument("--dump")
     args = parser.parse_args()
     owned(args.identity)
+    if args.action in {"default-root", "host-root"}:
+        from native_contracts import run
+        print(json.dumps(run(args.action), allow_nan=False))
+        return
     if args.action == "cluster-routing":
         from native_cluster import run
         print(json.dumps(run(), allow_nan=False))
