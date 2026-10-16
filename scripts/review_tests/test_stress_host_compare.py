@@ -10,6 +10,12 @@ ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/'bench'))
 import host_compare
 from arrival_counters import PROTOCOL as ARRIVAL_COUNTER_PROTOCOL
+from cpu_policy import allocation as cpu_allocation
+
+
+def write_cpu_proof(root,declared):
+    rows=[{'project':'project-0','role':role,'effective_affinity':str(slot),'quota_usec':declared['quota_usec_each'],'period_usec':declared['period_usec']} for role,slot in [('app',0),('postgres',1)]]
+    (root/'cpu-allocation.json').write_text(json.dumps({'status':'passed','allocation':declared,'containers':rows}))
 
 
 class HostComparison(unittest.TestCase):
@@ -22,8 +28,11 @@ class HostComparison(unittest.TestCase):
             root.mkdir()
             profile={field:1 for field in host_compare.FIELDS}
             profile.update(schema=2,projects=1,seconds_per_step=300,nominal_rate_per_project=8,certifies_five_minute_steps=True,project_cpu_period_micros=100000,resource_probe_workers=4)
+            profile['cpu_affinity']=[0,1,2]
+            profile['project_cpu_allocation']=cpu_allocation(1,[0,1,2],100000,'quota')
             profile['arrival_counter_protocol']=ARRIVAL_COUNTER_PROTOCOL
             (root/'manifest.json').write_text(json.dumps(profile))
+            write_cpu_proof(root,profile['project_cpu_allocation'])
             (root/'completion.json').write_text(json.dumps({'status':'passed','cleanup_confirmed':True}))
             (root/'cleanup.json').write_text(json.dumps({'confirmed':True}))
             (root/'resource-violations.json').write_text('[]')
@@ -70,10 +79,38 @@ class HostComparison(unittest.TestCase):
         path=self.after/'manifest.json'
         value=json.loads(path.read_text())
         value['project_cpu_period_micros']=10000
+        value['project_cpu_allocation']=cpu_allocation(1,[0,1,2],10000,'quota')
+        write_cpu_proof(self.after,value['project_cpu_allocation'])
         path.write_text(json.dumps(value))
         result=host_compare.compare(self.before,self.after)
         self.assertFalse(result['gate_passed'])
         self.assertIn('project_cpu_period_micros',result['fixture_differences'])
+
+    def test_cpu_sharing_policy_changes_cannot_certify_a_quota_baseline(self):
+        path=self.after/'manifest.json'
+        value=json.loads(path.read_text())
+        value['project_cpu_allocation']=cpu_allocation(1,[0,1,2],100000,'shared')
+        write_cpu_proof(self.after,value['project_cpu_allocation'])
+        path.write_text(json.dumps(value))
+        result=host_compare.compare(self.before,self.after)
+        self.assertFalse(result['gate_passed'])
+        self.assertIn('project_cpu_allocation',result['fixture_differences'])
+
+    def test_one_project_legacy_geometry_is_exactly_one_cpu(self):
+        path=self.before/'manifest.json'
+        value=json.loads(path.read_text());value.pop('project_cpu_allocation')
+        path.write_text(json.dumps(value))
+        self.assertTrue(host_compare.compare(self.before,self.after)['gate_passed'])
+
+    def test_missing_multi_project_or_false_affinity_budget_cannot_certify(self):
+        path=self.after/'manifest.json';original=json.loads(path.read_text())
+        for change in [{'projects':5,'project_cpu_allocation':None},{'project_cpu_allocation':{**original['project_cpu_allocation'],'hard_cpu_ceiling_per_role':2}},{'app_aggregate_cpus':True},{'postgres_aggregate_cpus':2}]:
+            path.write_text(json.dumps({**original,**change}))
+            with self.subTest(change=change),self.assertRaises(ValueError):host_compare.compare(self.before,self.after)
+
+    def test_new_policy_cannot_certify_without_its_kernel_census(self):
+        (self.after/'cpu-allocation.json').unlink()
+        with self.assertRaises(OSError):host_compare.compare(self.before,self.after)
 
     def test_unknown_cpu_bandwidth_policy_cannot_certify(self):
         path=self.after/'manifest.json'

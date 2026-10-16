@@ -33,6 +33,7 @@ from fleet_webhooks import FleetWebhooks
 from ingress import Ingress
 from fleet_observer import collect as collect_probes,retain_metrics_snapshot,WORKERS as PROBE_WORKERS
 from arrival_counters import PROTOCOL as ARRIVAL_COUNTER_PROTOCOL
+from cpu_policy import allocation as cpu_allocation, verify as verify_cpu_allocation
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -125,6 +126,7 @@ def campaign(args):
         raise RuntimeError('Host cannot cover the declared CPU, memory and disk reserves')
     if args.caddy and (len(cpus) < 5 or effective_cpus(cpus) < 4):
         raise RuntimeError('Real Caddy profile requires five affinity slots and four effective CPUs including reserves')
+    declared_cpu = cpu_allocation(args.projects, cpus, args.cpu_period_micros, args.project_cpu_policy)
     fixture_images = [json.loads(docker('image', 'inspect', name))[0] for name in ['ubuntu:24.04', 'postgres:17-alpine']]
     startup_budget = startup_disk_budget(fixture_images, args.projects, args.caddy)
     atomic_json(output/'preflight-budget.json', {**startup_budget, 'separate_database_data_mib':args.disk_mib,
@@ -137,7 +139,7 @@ def campaign(args):
     directory = Path(tempfile.mkdtemp(prefix='fixture-', dir=output))
     filesystem = subprocess.check_output(['stat', '-f', '-c', '%T', str(directory)], text=True).strip()
     validate_storage_filesystem('disk', filesystem)
-    projects = [Project(identity, index, args.projects, args.binary.resolve(), directory, cpus, cpu_period_micros=args.cpu_period_micros) for index in range(args.projects)]
+    projects = [Project(identity, index, args.projects, args.binary.resolve(), directory, cpus, cpu_period_micros=args.cpu_period_micros, cpu_policy=args.project_cpu_policy) for index in range(args.projects)]
     for project in projects:
         project.webhooks_enabled = args.webhooks
     webhooks = FleetWebhooks(output)
@@ -180,11 +182,13 @@ def campaign(args):
         watchdog = subprocess.Popen([sys.executable, str(ROOT/'bench/watchdog.py'), str(output/'ownership.json')], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
         atomic_json(output/'manifest.json', {'schema': 1, 'scope': 'local independent app/PG clusters, no proxy/controller', 'projects': args.projects, 'rows_per_project': 1000, 'shared_user_id': '00000000-0000-4000-8000-000000000001', 'binary_sha256': hashlib.file_digest(args.binary.open('rb'), 'sha256').hexdigest(), 'cpu_effective': effective_cpus(cpus), 'app_aggregate_cpus': 1, 'postgres_aggregate_cpus': 1, 'generator_cpus': 1, 'metrics_cpus': .25, 'app_memory_mib_each': 128, 'postgres_memory_mib_each': 256, 'max_arrival_rate': 10000, 'fixture_disk_mib': args.disk_mib, 'storage_filesystem': filesystem, 'seconds_per_step': args.seconds, 'project_cpu_period_micros':args.cpu_period_micros, 'certifies_five_minute_steps': args.seconds >= 300, 'base_rate_per_project': args.rate, 'SLOs': 'G05 unchanged'})
         fixtures = [project.create() for project in projects]
+        atomic_json(output/'cpu-allocation.json', verify_cpu_allocation(owned, projects, declared_cpu))
         if args.webhooks:
             for project in projects:
                 webhooks.attach(project)
         profile=json.loads((output/'manifest.json').read_text())
         profile['project_cpu_period_micros']=args.cpu_period_micros
+        profile['project_cpu_allocation']=declared_cpu
         profile['startup_disk_budget'] = {**startup_budget, 'separate_database_data_mib':args.disk_mib}
         profile['ingress'] = {'kind': 'direct loopback HTTP'}
         if ingress is not None:
@@ -472,6 +476,7 @@ def main():
     parser.add_argument('--provisional-rate',type=int,default=32)
     parser.add_argument('--disk-mib',type=int,default=2048)
     parser.add_argument('--cpu-period-micros',type=int,choices=[10000,100000],default=100000,help='Explicit project CPU bandwidth period; preserves the aggregate CPU budget and must match between comparisons')
+    parser.add_argument('--project-cpu-policy',choices=['quota','shared'],default='quota',help='Quota divides one CPU per role; shared permits each project to use the same single role affinity slot, still bounding the whole role to one CPU')
     args = parser.parse_args()
     if not 30 <= args.seconds <= 300 or not 1 <= args.rate <= 64 or not 4 <= args.provisional_rate <= 64 or not 512 <= args.disk_mib <= 4096:
         parser.error('Steps must be 30..300 seconds, rate 1..64, disk budget 512..4096 MiB')

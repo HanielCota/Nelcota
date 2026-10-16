@@ -13,9 +13,11 @@ from ports import published_port
 FIXED_USER = '00000000-0000-4000-8000-000000000001'
 
 
-def cpu_arguments(count, period_micros):
-    if isinstance(count,bool) or not isinstance(count,int) or not 1<=count<=10 or isinstance(period_micros,bool) or not isinstance(period_micros,int) or period_micros not in (10000,100000):
+def cpu_arguments(count, period_micros, policy='quota'):
+    if isinstance(count,bool) or not isinstance(count,int) or not 1<=count<=10 or isinstance(period_micros,bool) or not isinstance(period_micros,int) or period_micros not in (10000,100000) or policy not in ('quota','shared'):
         raise ValueError('Invalid independent-project CPU policy')
+    if policy=='shared':
+        count=1
     if period_micros==100000:
         return ['--cpus',str(1/count)]
     quota,remainder=divmod(period_micros,count)
@@ -25,8 +27,8 @@ def cpu_arguments(count, period_micros):
 
 
 class Project:
-    def __init__(self, identity, index, count, binary, directory, cpus, cpu_period_micros=100000):
-        self.cpu_limits=cpu_arguments(count,cpu_period_micros)
+    def __init__(self, identity, index, count, binary, directory, cpus, cpu_period_micros=100000, cpu_policy='quota'):
+        self.cpu_limits=cpu_arguments(count,cpu_period_micros,cpu_policy)
         self.label = f'project-{index}'
         self.app = identity + f'-app-{index}'
         self.pg = identity + f'-pg-{index}'
@@ -38,6 +40,7 @@ class Project:
         self.storage.mkdir(parents=True)
         self.cpus = cpus
         self.quota = str(1 / count)
+        if cpu_policy=='shared':self.quota='1'
         self.jwt = secrets.token_urlsafe(48)
         self.password = secrets.token_urlsafe(32)
         self.admin_email = f'operator-{index}@example.test'

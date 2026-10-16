@@ -213,6 +213,27 @@ password hashing. Record the actual `cpu.max` and repeat all affected campaigns;
 comparisons reject different periods. A failed SLO at the default period remains
 a failed result, and changing this policy does not certify production capacity.
 
+`--project-cpu-policy shared` selects a separate experimental allocation. Each
+project may use one CPU, but every app is pinned to the same single app slot and
+every PostgreSQL is pinned to a different single database slot. Each entire role
+therefore remains bounded to one logical CPU. Configured quotas sum to the
+project count within that slot; this deliberate oversubscription lets idle
+projects lend scheduling time to active projects. The generator retains its
+separate slot. The default `quota` policy keeps each project's 1/N hard quota.
+Memory, disk, traffic ceilings, absolute SLOs, 90%/20% fairness and the 30-second
+webhook drain gate remain unchanged.
+
+Before traffic, `cpu-allocation.json` verifies the real owned cgroup namespace
+for every app/database: its effective affinity must be exactly its declared
+single slot and its finite quota/period must match. Unknown, missing or widened
+kernel evidence fails preparation. The allocation is frozen in the manifest;
+comparators require its complete native census and reject different policies.
+The previous single-project quota profile can be normalized to its exact 1/1
+geometry; missing multi-project allocation cannot certify a comparison. Run two
+fresh complete campaigns for a new sharing profile before interpreting its
+results. Historical fractional-quota failures remain failures and are not a
+baseline for a different allocation.
+
 The manual workflow supports separate disk/S3 four-hour endurance jobs with a
 seven-hour job budget including the build. The internal campaign limit remains
 six hours. Ordinary pull-request jobs do not launch endurance.

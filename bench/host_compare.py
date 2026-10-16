@@ -6,6 +6,7 @@ from pathlib import Path
 import statistics
 from campaign import NOMINAL_SLOS
 from arrival_counters import PROTOCOL as ARRIVAL_COUNTER_PROTOCOL, closed_count
+from cpu_policy import allocation as cpu_allocation, checked as checked_cpu_allocation, validate_proof as validate_cpu_proof
 
 FIELDS=['schema','scope','projects','rows_per_project','shared_user_id','cpu_effective','cpu_affinity','metrics_cpu_affinity','app_aggregate_cpus','postgres_aggregate_cpus','generator_cpus','metrics_cpus','app_memory_mib_each','postgres_memory_mib_each','generator_memory_mib','metrics_memory_mib','max_connections_each','pool_each','fixture_disk_mib','storage_filesystem','seconds_per_step','capacity_qualification','provisional_rate_per_project','nominal_rate_per_project','images']
 OPERATIONS=['read','rls','panel','storage','login','refresh','write']
@@ -20,6 +21,7 @@ FIELDS.append('project_cpu_period_micros')
 FIELDS.append('resource_probe_workers')
 FIELDS.append('arrival_counter_protocol')
 FIELDS.append('generator_usage_reporting')
+FIELDS.append('project_cpu_allocation')
 
 
 def positive(value):
@@ -52,6 +54,20 @@ def read_run(root):
         raise ValueError('Missing bounded fleet observation worker policy')
     if profile.get('arrival_counter_protocol') != ARRIVAL_COUNTER_PROTOCOL:
         raise ValueError('Missing continuous scheduler counter protocol')
+    declared=profile.get('project_cpu_allocation')
+    legacy_one=declared is None and projects==1
+    # With one project, the legacy 1/N quota is exactly one CPU. Normalize that
+    # explicit old geometry only; missing multi-project policy remains invalid.
+    if legacy_one:
+        declared=cpu_allocation(1,profile.get('cpu_affinity'),period,'quota')
+        profile['project_cpu_allocation']=declared
+    checked_cpu_allocation(declared,projects,profile.get('cpu_affinity'),period)
+    for field in ['app_aggregate_cpus','postgres_aggregate_cpus']:
+        value=profile.get(field)
+        if isinstance(value,bool) or not isinstance(value,(int,float)) or value!=declared['hard_cpu_ceiling_per_role']:
+            raise ValueError('Role CPU budget contradicts the declared hard affinity ceiling')
+    if not legacy_one:
+        validate_cpu_proof(json.loads((root/'cpu-allocation.json').read_text()),declared)
     if isinstance(projects,bool) or not isinstance(projects,int) or projects not in (1,5,10) or positive(profile.get('seconds_per_step'))<300 or profile.get('certifies_five_minute_steps') is not True or any(field not in profile for field in FIELDS):
         raise ValueError('Missing equivalent profile or full-duration evidence')
     positive(profile['nominal_rate_per_project'])
