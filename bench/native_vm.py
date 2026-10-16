@@ -6,6 +6,7 @@ The guest's loss of RAM is not physical host/controller power-loss evidence.
 """
 
 import argparse
+import base64
 import hashlib
 import http.client
 import json
@@ -346,6 +347,68 @@ def signup(api, email, password):
     return account["access_token"]
 
 
+def clock_probe(guest, api, token, service, result):
+    """Step only the owned guest's wall clock; the observer stays monotonic."""
+    require(isinstance(token, str) and len(token) <= 4096 and len(token.split(".")) == 3,
+            "Invalid clock-probe access token")
+    encoded = token.split(".")[1]
+    claims = json.loads(base64.urlsafe_b64decode(encoded + "=" * (-len(encoded) % 4)))
+    expires = claims.get("exp")
+    now = int(time.time())
+    require(type(expires) is int and 0 < expires - now <= 1500,
+            "Clock probe requires a fresh bounded access-token lifetime")
+    target = expires + 120
+    require(0 < target - now <= 1800, "Guest clock step exceeded its bound")
+    initial = guest.ssh(["timedatectl", "show", "--property=NTP", "--value"]).stdout.strip()
+    require(initial in {b"yes", b"no"}, "Unknown guest NTP state")
+    result.update({"scope": "owned guest wall-clock control; no host/controller clock change or throughput credit",
+                   "initial_ntp_enabled": initial == b"yes", "planned_forward_seconds": target - now,
+                   "maximum_forward_seconds": 1800, "observer_clock": "external monotonic",
+                   "status": "failed"})
+    path = "/rest/v1/native_probe?select=id&order=id"
+    require(json.loads(api.request("GET", path, token=token)) == [{"id": 1}], "Clock canary failed before the step")
+    try:
+        guest.ssh(["sudo", "-n", "timedatectl", "set-ntp", "false"])
+        guest.ssh(["sudo", "-n", "date", "--utc", "--set=@" + str(target), "+%s"])
+        shifted = guest.ssh(["date", "+%s"]).stdout.strip()
+        require(shifted.isdigit() and len(shifted) <= 16, "Invalid stepped guest clock")
+        result["observed_forward_seconds"] = int(shifted) - time.time()
+        require(abs(int(shifted) - target) <= 5 and 0 < result["observed_forward_seconds"] <= 1805,
+                "Guest clock did not perform the declared bounded step")
+        guest.assert_safe()
+        api.request("GET", path, token=token, expected=(401,))
+        result["expired_access_rejected"] = True
+        require(json.loads(api.request("GET", path, token=service)) == [{"id": 1}],
+                "Service-role canary failed during the controlled clock step")
+        result["long_lived_service_canary_passed"] = True
+        api.request("GET", path, expected=(401,))
+    finally:
+        restored_epoch = int(time.time())
+        restore_ntp = "false"
+        if initial == b"yes":
+            restore_ntp = "true"
+        for label, arguments in [
+            ("wall_clock", ["sudo", "-n", "date", "--utc", "--set=@" + str(restored_epoch), "+%s"]),
+            ("ntp_state", ["sudo", "-n", "timedatectl", "set-ntp", restore_ntp]),
+        ]:
+            try:
+                result[label + "_restore_exit_code"] = guest.ssh(arguments, check=False, timeout=15).returncode
+            except Exception as error:
+                result[label + "_restore_failure_type"] = type(error).__name__
+    require(result.get("wall_clock_restore_exit_code") == 0 and result.get("ntp_state_restore_exit_code") == 0,
+            "Owned guest clock or NTP restoration failed")
+    raw = guest.ssh(["date", "+%s"]).stdout.strip()
+    require(raw.isdigit() and len(raw) <= 16, "Invalid restored guest clock")
+    result["restored_clock_offset_seconds"] = abs(int(raw) - time.time())
+    require(result["restored_clock_offset_seconds"] <= 5, "Guest clock did not return to the external observer time")
+    restored_ntp = guest.ssh(["timedatectl", "show", "--property=NTP", "--value"]).stdout.strip()
+    require(restored_ntp == initial, "Guest NTP state changed after restoration")
+    require(json.loads(api.request("GET", path, token=token)) == [{"id": 1}],
+            "Ordinary access canary failed after restoring the guest clock")
+    result["ordinary_access_restored"] = True
+    result["status"] = "passed"
+
+
 def campaign(binary, output, scenario):
     capabilities = inventory()
     require(os.geteuid() == 0, "Native VM control requires root on the disposable Actions VM")
@@ -386,7 +449,11 @@ def campaign(binary, output, scenario):
         "boot_fault_observation_grace_seconds": 180, "tls_verification": True,
         "ssh_host_key_verification": "fresh controller-generated Ed25519 host key injected through owned cloud-init seed",
         "host_power_loss_certified": False, "off_host_restore_certified": False,
-        "public_dns_acme_certified": False, "workload_maximum_mutations_per_second": 1})
+        "public_dns_acme_certified": False, "workload_maximum_mutations_per_second": 1,
+        "controlled_guest_clock": {"enabled": scenario == "clock-drift", "maximum_forward_seconds": 1800,
+                                   "step_verification_tolerance_seconds": 5,
+                                   "maximum_restored_offset_seconds": 5, "restore_command_timeout_seconds": 15,
+                                   "ntp_restoration": "original state", "host_clock_modified": False}})
     guest = Guest(identity, output)
     guard = threading.Thread(target=guest.guard, daemon=True)
     guard.start()
@@ -447,7 +514,7 @@ def campaign(binary, output, scenario):
                         "Documented native cwd failed actual systemd verification or activation")
                 require(evidence["cwd_migration_exit_code"] == 0 and evidence["root_environment_migration_exit_code"] == 0,
                         "Native migrations from host cwd or NELCOTA_ROOT failed")
-                require(evidence["fixture_table_created"] and evidence["applied_fixture_migrations"] == 1,
+                require(evidence["fixture_table_created"] and evidence["migration_journal_present"] and evidence["applied_fixture_migrations"] == 1,
                         "Native cwd migrations were absent or repeated")
             if scenario == "host-root":
                 require(not evidence["first_database_password_changed"] and not evidence["first_caddy_configuration_changed"],
@@ -510,6 +577,16 @@ def campaign(binary, output, scenario):
         require(json.loads(api.request("GET", "/rest/v1/native_probe?select=id", token=users[1])) == [], "Native RLS leaked another user's row")
         api.request("GET", "/rest/v1/native_probe", expected=(401,))
         report["checks"].append("native signup, two-user RLS isolation and anonymous rejection")
+        if scenario == "clock-drift":
+            guest.phase = "native-clock-drift"
+            report["clock_drift"] = {}
+            clock_probe(guest, api, users[0], service, report["clock_drift"])
+            report["checks"].append("guest clock advance rejects expired access while service access remains valid; clock/NTP and ordinary access restored")
+            guest.phase = "native-remove"
+            report["native_remove"] = guest.action("remove", timeout=200)
+            guest.assert_safe()
+            report["status"] = "passed"
+            return
         original = b"g05-native-before"
         api.request("POST", "/storage/v1/object/native/kept.bin", token=service, raw=original,
                     expected=(201,), headers={"Content-Type": "application/octet-stream"})
@@ -614,7 +691,7 @@ def main():
     parser.add_argument("--binary", type=Path)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--watchdog", type=Path)
-    parser.add_argument("--scenario", choices=["runtime", "cluster-routing", "default-root", "host-root"], default="runtime")
+    parser.add_argument("--scenario", choices=["runtime", "cluster-routing", "default-root", "host-root", "clock-drift"], default="runtime")
     args = parser.parse_args()
     if args.watchdog is not None:
         watchdog(args.watchdog.resolve(strict=True))

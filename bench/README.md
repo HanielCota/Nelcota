@@ -163,6 +163,16 @@ another owned directory with `--skip-checks`. The first database credential,
 Caddy configuration and sentinel row must remain unchanged, and the second
 host/unit must not be created. Both probes remain inside the disposable guest.
 
+`native_case=clock-drift` uses a fresh owned guest, with the same resource
+budgets, to advance only its wall clock beyond a fresh access token's expiry
+(at most 1,800 seconds). The token must be rejected while a longer-lived
+service token still reads the exact seeded row and anonymous access fails.
+A finally handler restores the guest clock and original NTP state; ordinary
+access must recover with at most five seconds of offset from the external
+observer. The host/controller clock and monotonic watchdogs are unchanged.
+This functional control has no endurance/throughput credit and does not claim
+protection against a malicious host clock or physical power loss.
+
 `native_case=default-root` follows the documented command from the application
 directory without `-C` or an inherited `NELCOTA_ROOT`. It checks the actual
 systemd environment-file path, `systemd-analyze verify`, activation and verified

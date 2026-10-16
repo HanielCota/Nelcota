@@ -1816,3 +1816,24 @@ malformadas/NaN e contagens inválidas. **Quinze testes focados passaram em
 A VM `38978164074` já estava executando o snapshot anterior; será preservada
 com seu próprio veredito, sem aplicar alteração ao artefato em execução nem
 promover o census defeituoso. Uma nova repetição corrigida é necessária.
+
+### 16/10, 23:03 UTC — controle de relógio isolado preparado
+
+O G05 também exige testar desvio de relógio. Foi adicionado o cenário
+`clock-drift` à VM própria, sem tocar no relógio do host/controlador. Ele
+mantém TLS/SSH, recursos e watchdogs monotônicos; verifica acesso/RLS antes
+de avançar a convidada até expirar um JWT fresco, limitado a 1.800 s.
+O access deve receber 401, enquanto a credencial de serviço mais longa
+continua lendo a mesma linha e acesso anônimo segue negado. A restauração
+do relógio/NTP original ocorre em finally inclusive após erro do oráculo;
+a prova exige offset final de até 5 s e acesso ordinário recuperado.
+
+O manifesto registra os limites antes da operação, inclusive tolerância de
+verificação de 5 s e timeout de 15 s por comando de restauração. O relatório
+retém o passo realmente observado, códigos de restauração e o estado anterior
+do NTP, sem tokens/claims privados. Isso é um controle funcional, sem crédito
+de endurance, proteção contra um host malicioso ou alteração do relógio real.
+Dois testes novos provam restauração após falha e rejeição de NaN/bool/TTL
+inadequado antes de qualquer comando na convidada. Com os quinze testes do
+runner/census, **17 passaram em 0,017 s**. A execução real desse cenário ainda
+está pendente e não foi anunciada como aprovada.
