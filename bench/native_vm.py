@@ -12,6 +12,7 @@ import json
 import os
 from pathlib import Path
 import re
+import secrets
 import shlex
 import shutil
 import signal
@@ -24,6 +25,7 @@ import time
 import urllib.request
 
 from native_preflight import inventory
+from native_evidence import publish
 from watchdog import atomic_json, process_identity, stop_owner
 
 IMAGE = "ubuntu-24.04-server-cloudimg-amd64.img"
@@ -328,6 +330,15 @@ class Api:
         raise RuntimeError("Native verified HTTPS health deadline")
 
 
+def signup(api, email, password):
+    account = json.loads(api.request("POST", "/auth/v1/signup", value={"email": email, "password": password}, expected=(201,)))
+    require(isinstance(account, dict) and isinstance(account.get("access_token"), str) and bool(account["access_token"]),
+            "Native signup returned no access token")
+    user = account.get("user")
+    require(isinstance(user, dict) and user.get("email") == email, "Native signup returned another identity")
+    return account["access_token"]
+
+
 def campaign(binary, output):
     capabilities = inventory()
     require(os.geteuid() == 0, "Native VM control requires root on the disposable Actions VM")
@@ -350,6 +361,10 @@ def campaign(binary, output):
         "scope": "disposable Ubuntu 24.04 x64 native functional and guest power-cut acceptance; no production certification",
         "source": capabilities["source"], "binary_sha256": hashlib.file_digest(binary.open("rb"), "sha256").hexdigest(),
         "maximum_seconds": MAXIMUM_SECONDS, "vm_vcpus": 2, "vm_memory_mib": 3072,
+        "guest_target_cpu_ceiling": 1.5, "guest_os_cpu_reserve": 0.5,
+        "guest_target_memory_ceiling_mib": 2048, "guest_os_memory_reserve_mib": 1024,
+        "sum_of_individual_guest_unit_cpu_quotas": 2.25,
+        "individual_quota_oversubscription_is_bounded_by_parent_slice": True,
         "vm_process_memory_mib": 4096, "vm_process_cpu_quota": 2, "vm_process_pids": 128,
         "guest_root_virtual_disk_gib": 12, "maximum_external_network_bytes": 4 * GIB,
         "network_budget_scope": "since controller start; includes image and guest package downloads, excludes checkout and outer build/tool installation",
@@ -424,11 +439,12 @@ def campaign(binary, output):
         second = guest.ssh(["sudo", "-n", "/usr/local/bin/nelcota", "-C", "/opt/g05-native", "init", "--local", "--project", "refused", "--yes"], check=False)
         require(second.returncode != 0, "Native second project was accepted")
         report["checks"].append("second native project refused")
+        guest.phase = "native-signup"
         users = []
+        password = secrets.token_urlsafe(32)
         for name in ["alice", "bob"]:
-            account = json.loads(api.request("POST", "/auth/v1/signup", value={"email": name + "@example.invalid", "password": "native-fixture-password-123"}))
-            require(isinstance(account.get("access_token"), str), "Native signup returned no access token")
-            users.append(account["access_token"])
+            users.append(signup(api, name + "@example.invalid", password))
+        guest.phase = "native-functional"
         service = guest.action("token")
         require(re.fullmatch(r"[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+", service), "Native service token output was not a JWT")
         api.request("POST", "/rest/v1/native_probe", token=users[0], value={"id": 1, "value": 1}, expected=(201,))
@@ -527,7 +543,7 @@ def campaign(binary, output):
             target = publication / path.name
             shutil.copyfile(path, target)
             target.chmod(0o644)
-        print("::notice title=Native VM result::" + json.dumps(report, separators=(",", ":"), allow_nan=False))
+        publish(report)
     require(report.get("status") == "passed" and clean and guest.guard_failure is None, "Native VM acceptance failed; preserved structured evidence")
 
 

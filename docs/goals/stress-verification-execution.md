@@ -1453,3 +1453,38 @@ segurança passaram em 0,005 segundo, sem criar serviços ou máquinas locais.
 **A campanha nativa ainda não foi executada** e não recebe aprovação antecipada.
 Restauração em alvo novo, fora do host, PITR, perda física de energia e ACME
 público continuam separados dessa verificação funcional.
+
+### 16/10, 20:34–20:40 UTC — primeira VM real, falha do oráculo e limite de diagnóstico
+
+A [primeira execução nativa](https://github.com/Nelcota/Nelcota/actions/runs/38962480993)
+conseguiu usar KVM, iniciar uma Ubuntu 24.04 nova, instalar o runtime nativo,
+iniciar app/PostgreSQL/Caddy, reaplicar a migração da aplicação e verificar
+os limites reais de CPU/memória/swap/PIDs no kernel. HTTPS com a CA local
+validada passou, a CA não confiável foi rejeitada e o segundo projeto nativo
+foi recusado. O binário compilado nessa máquina tem SHA-256
+`f79fc282439f9f496b720953965b88bd99e195c695e9c6411b131821d665d0b3`;
+esse artefato é distinto do binário local e não recebe seus números de capacidade.
+
+**Resultado completo: reprovado.** O primeiro signup retornou o `201`
+documentado, mas o executor novo ainda esperava o `200` genérico. O oráculo
+foi corrigido para exigir exatamente `201`, token não vazio e identidade
+correta; não se alterou o contrato da API. Backup/restore, perda de RAM e
+reconciliação externa **não foram alcançados** nessa tentativa.
+
+A mensagem de resultado da anotação do Actions foi truncada exatamente em
+4.096 caracteres. O download do artifact voltou a retornar HTTP 403; o
+recibo final de limpeza ficou fora da parte acessível, portanto não é
+presumido. A execução descartável terminou, mas isso é diferente de ler o
+recibo específico do QEMU. O publicador agora divide o JSON público em
+fragmentos limitados com SHA-256 e índices; regressão reconstitui sem perda
+um relatório maior que o limite, inclusive escapes, Unicode e `%`.
+O workflow pode reler o artifact público anterior dentro do próprio GitHub,
+preservando seu veredito original, antes de repetir a campanha.
+
+Onze testes focados passaram em 0,006 s. A primeira execução dos novos
+testes falhou em quatro casos porque o mock tratava `assert_safe` como
+assertion inexistente; a fixture foi corrigida e a saída posterior foi
+preservada. Na próxima VM o slice agregado recebe teto de **1,5 CPU**,
+reservando **0,5 CPU** para o SO da convidada, com verificação efetiva no
+kernel. Quotas individuais somam 2,25 CPUs dentro desse teto explícito;
+memória, disco, tráfego, TLS, duração e demais guardas não foram ampliados.

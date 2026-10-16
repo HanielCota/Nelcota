@@ -1,19 +1,88 @@
 """Safety boundaries for the separately dispatched disposable native VM."""
 
 import json
+import hashlib
+import http.client
 from pathlib import Path
 import sys
+import socket
 import tempfile
 import time
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
+from unittest.mock import Mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "bench"))
 import native_preflight
 import native_vm
+import native_evidence
 
 
 class NativeVMBoundaries(unittest.TestCase):
+    def signup_response(self, status, account):
+        reader, writer = socket.socketpair()
+        content = json.dumps(account).encode()
+        response = None
+        try:
+            writer.sendall(("HTTP/1.1 " + str(status) + " Fixture\r\nContent-Length: " + str(len(content)) + "\r\n\r\n").encode() + content)
+            writer.shutdown(socket.SHUT_WR)
+            response = http.client.HTTPResponse(reader)
+            response.begin()
+            connection = Mock()
+            connection.getresponse.return_value = response
+            api = native_vm.Api.__new__(native_vm.Api)
+            api.guest = SimpleNamespace(https_port=8443, assert_safe=Mock())
+            api.context = None
+            api.attempts = api.received_bytes = api.sent_bytes = 0
+            with patch("native_vm.Connection", return_value=connection):
+                return native_vm.signup(api, "alice@example.invalid", "fixture-input")
+        finally:
+            if response is not None:
+                response.close()
+            reader.close()
+            writer.close()
+
+    def test_documented_201_signup_is_accepted(self):
+        account = {"access_token": "fixture-token", "user": {"email": "alice@example.invalid"}}
+        self.assertEqual(self.signup_response(201, account), "fixture-token")
+
+    def test_200_cannot_substitute_for_successful_creation(self):
+        with self.assertRaisesRegex(RuntimeError, "status 200"):
+            self.signup_response(200, {"access_token": "fixture-token", "user": {"email": "alice@example.invalid"}})
+
+    def test_signup_requires_matching_identity_and_a_token(self):
+        for account in [{"user": {"email": "alice@example.invalid"}},
+                        {"access_token": "fixture-token", "user": {"email": "bob@example.invalid"}}]:
+            with self.subTest(account=account):
+                with self.assertRaises(RuntimeError):
+                    self.signup_response(201, account)
+
+    def test_large_report_survives_annotation_limit_without_loss(self):
+        report = {"identity": "native-vm-owned", "source": "1" * 40, "certifies_g05": False,
+                  "status": "failed", "cleanup_confirmed": True,
+                  "checks": ['quotes" percent% newline\n unicode\u00e7 backslash\\' * 300]}
+        notices = native_evidence.notices(report)
+        fragments = []
+        for line in notices:
+            self.assertLessEqual(len(line.encode()), 4000)
+            decoded = line.split("::", 2)[2].replace("%0A", "\n").replace("%0D", "\r").replace("%25", "%")
+            value = json.loads(decoded)
+            if "payload" in value:
+                fragments.append(value)
+        self.assertEqual(len(fragments), fragments[0]["parts"])
+        content = "".join(value["payload"] for value in fragments)
+        self.assertEqual(hashlib.sha256(content.encode()).hexdigest(), fragments[0]["sha256"])
+        self.assertEqual(json.loads(content), report)
+
+    def test_unknown_fields_and_nonfinite_values_are_never_published(self):
+        report = {"identity": "native-vm-owned", "source": "1" * 40, "certifies_g05": False,
+                  "status": "failed", "cleanup_confirmed": True}
+        for fields in [{"private_log": "must never publish"}, {"elapsed_seconds_including_preparation": float("nan")}]:
+            with self.subTest(fields=fields):
+                with self.assertRaises(ValueError):
+                    native_evidence.notices({**report, **fields})
+
     def test_self_hosted_inventory_is_rejected_before_reading_capacity(self):
         with patch.dict("os.environ", {"GITHUB_ACTIONS": "true", "RUNNER_ENVIRONMENT": "self-hosted"}, clear=True):
             with patch("native_preflight.os.statvfs") as filesystem:

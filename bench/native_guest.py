@@ -66,7 +66,7 @@ def unit_state(name):
             value = int(value)
         state[key] = value
     group = state.get("ControlGroup")
-    if isinstance(group, str) and group.startswith("/g05native.slice/"):
+    if isinstance(group, str) and (group == "/g05native.slice" or group.startswith("/g05native.slice/")):
         path = Path("/sys/fs/cgroup") / group.lstrip("/")
         events = path / "memory.events"
         if events.is_file():
@@ -116,17 +116,19 @@ def resource_report():
             "free_filesystem_fraction": fs.f_bavail / fs.f_blocks,
             "free_inode_fraction": fs.f_favail / fs.f_files,
             "boot_id": Path("/proc/sys/kernel/random/boot_id").read_text().strip(),
-            "units": {name: unit_state(name) for name in [UNIT, "postgresql@17-main.service", "caddy.service"]}}
+            "units": {name: unit_state(name) for name in [UNIT, "postgresql@17-main.service", "caddy.service"]},
+            "target_slice": unit_state("g05native.slice")}
 
 
 def prepare():
     require(not ROOT.exists(), "Native project root already exists")
     if shutil.which("pg_lsclusters") is not None:
         clusters = command(["pg_lsclusters", "--no-header"], check=False)
+        require(clusters.returncode == 0, "Cannot inventory existing guest PostgreSQL clusters")
         require(not clusters.stdout.strip(), "Guest image already contains PostgreSQL clusters")
     slice_path = Path("/etc/systemd/system/g05native.slice")
     require(not slice_path.exists(), "Native slice already exists")
-    slice_path.write_text("[Slice]\nCPUQuota=200%\nMemoryMax=2G\nMemorySwapMax=0\nTasksMax=768\n")
+    slice_path.write_text("[Slice]\nCPUQuota=150%\nMemoryMax=2G\nMemorySwapMax=0\nTasksMax=768\n")
     limits = {UNIT: ("100%", "128M", 128), "postgresql@17-main.service": ("100%", "512M", 256),
               "caddy.service": ("25%", "128M", 128)}
     for name, (cpu, memory, tasks) in limits.items():
@@ -157,8 +159,13 @@ def prepare():
         require(actual["cpu_quota_usec"] == cpu * actual["cpu_period_usec"] and
                 actual["memory_bytes"] == memory and actual["swap_bytes"] == 0 and actual["pids"] == pids,
                 "Native unit kernel limits differ from its declared budget")
+    parent = unit_state("g05native.slice")
+    actual = parent["kernel_budget"]
+    require(actual["cpu_quota_usec"] == 1.5 * actual["cpu_period_usec"] and
+            actual["memory_bytes"] == 2 * 1024 ** 3 and actual["swap_bytes"] == 0 and actual["pids"] == 768,
+            "Native aggregate kernel limits differ from the declared OS reserve")
     return {"checks": ["native init", "native systemd up", "repeatable application migration", "native unit budgets"],
-            "units": units,
+            "units": units, "target_slice": parent,
             "binary_sha256": hashlib.file_digest(Path('/usr/local/bin/nelcota').open('rb'), 'sha256').hexdigest()}
 
 

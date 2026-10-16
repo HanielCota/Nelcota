@@ -8,6 +8,10 @@ on:
         type: choice
         options: [benchmark, native-preflight, native-vm]
         default: benchmark
+      evidence_run:
+        description: Optional earlier native workflow artifact to republish before native-vm
+        type: string
+        default: ''
       backend:
         description: Owned storage fixture
         type: choice
@@ -46,6 +50,9 @@ jobs:
     if: inputs.target == 'native-vm'
     runs-on: ubuntu-24.04
     timeout-minutes: 55
+    permissions:
+      contents: read
+      actions: read
     env:
       CARGO_BUILD_JOBS: 2
       RUST_TEST_THREADS: 2
@@ -55,6 +62,25 @@ jobs:
           persist-credentials: false
       - name: Inventory the disposable outer VM
         run: python3 bench/native_preflight.py
+      - name: Read earlier structured native evidence
+        if: inputs.evidence_run != ''
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: native-vm-acceptance
+          run-id: ${{ inputs.evidence_run }}
+          github-token: ${{ github.token }}
+          path: target/native-evidence-download
+      - name: Republish earlier structured native evidence
+        if: inputs.evidence_run != ''
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          reports = list(Path('target/native-evidence-download').rglob('native-vm.json'))
+          if len(reports) != 1:
+              raise SystemExit('Expected one earlier public native report')
+          subprocess.run(['python3', 'bench/native_evidence.py', str(reports[0])], check=True)
+          PY
       - name: Prepare KVM tooling
         timeout-minutes: 10
         run: |

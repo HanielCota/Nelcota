@@ -123,7 +123,9 @@ four-hour endurance. Its report records actual source/binary/image hashes.
 
 The guest has two vCPUs/3 GiB RAM; its QEMU service is capped at two CPUs,
 4 GiB RAM, 128 tasks and 1,800 seconds. App/PostgreSQL/Caddy have separate
-systemd CPU, memory and task limits in a 2-GiB slice. Five-second observers
+systemd CPU, memory and task limits in a 1.5-CPU/2-GiB slice, leaving
+0.5 guest CPU and 1 GiB for the guest OS. Individual unit quotas intentionally
+sum to 2.25 CPUs within that aggregate ceiling. Five-second observers
 enforce 10% free RAM, 15% disk/inode reserves, 2-GiB PostgreSQL disk, 256-MiB
 storage and a 4-GiB external network budget after the controller starts.
 An independent observer stops the owned VM and controller on loss of sampling
@@ -134,6 +136,11 @@ credentials, request bodies and private logs stay on the disposable runner.
 The guest power cut discards guest RAM after acknowledged writes and proves
 a new kernel boot; it does not certify an in-flight write, physical host
 power loss, public DNS/ACME, PITR or an off-host/fresh-target restore.
+The optional `evidence_run` input downloads the already-public structured
+report from a previous native run before repeating the campaign. Reports are
+also published in bounded, checksummed notice fragments: a single long Actions
+annotation truncates at 4,096 characters. Downloading/replaying a report never
+changes its original source, verdict or cleanup receipt.
 
 Save a release baseline binary before refactoring, then compare equivalent runs:
 
