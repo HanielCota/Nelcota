@@ -1947,3 +1947,17 @@ confirmadas, 96,148 s incluindo preparo. `requested_bytes_available` continua
 **false**; `live_owner_release` continua **not verified**. Isso aprova apenas
 a capacidade de observar o provider, sem promover os 415 MiB históricos a
 cache ou ausência de vazamento. A primeira falha permanece inalterada.
+
+### 16/10, 23:47 UTC — probe adicional de fronteira de remoção
+
+A revisão encontrou `let _ = remove_file(PGBACKREST_CONF)` na remoção
+nativa, que descarta qualquer erro. Ainda é uma hipótese operacional a
+reproduzir na VM: uma configuração ownada com tipo incorreto deve causar
+rejeição específica antes de unit/cluster/manifest/owner serem alterados.
+O cenário remove-boundary injeta somente um diretório marcado no caminho
+da configuração dentro da convidada, usa o sentinel gerado sem backup
+intencionalmente e restaura a configuração em finally. O watchdog externo
+continua eliminando a VM inteira no limite; não se alterou produção.
+Duas regressões novas provam restauração após erro e recusa de uma pasta
+preexistente; com os demais testes nativos, 17 passaram em 0,017 s.
+A execução real e qualquer correção de produção seguem pendentes.

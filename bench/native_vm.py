@@ -503,7 +503,7 @@ def campaign(binary, output, scenario):
         guest.ssh(["sudo", "-n", "install", "-m", "600", "/tmp/native_contracts.py", "/opt/g05-tools/native_contracts.py"])
         guest.ready = True
         guest.last_guest_sample = time.monotonic()
-        if scenario in {"default-root", "host-root"}:
+        if scenario in {"default-root", "host-root", "remove-boundary"}:
             guest.phase = "native-" + scenario
             report["native_contract"] = guest.action(scenario, timeout=850)
             evidence = report["native_contract"]
@@ -523,8 +523,18 @@ def campaign(binary, output, scenario):
                         "Second native host directory was accepted on the same machine")
                 require(evidence["owner_rejection_reported"], "Second native host failed without the specific ownership rejection")
                 require(evidence["first_sentinel_rows"] == 1, "Second native host directory changed existing fixture data")
+            if scenario == "remove-boundary":
+                require(evidence["remove_exit_code"] != 0 and evidence["specific_rejection"],
+                        "Native remove ignored an unsafe backup configuration")
+                require(evidence["machine_owner_preserved"] and evidence["manifest_preserved"] and evidence["cluster_preserved"]
+                        and evidence["sentinel_rows"] == 1 and evidence["configuration_fault_preserved"]
+                        and evidence["app_unit_after"].get("ActiveState") == "active",
+                        "Rejected native remove mutated protected runtime state")
+                require(evidence["configuration_fault_removed"], "Native removal fault remained installed")
             certificate = guest.ssh(["sudo", "-n", "cat", "/var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt"]).stdout.decode()
             Api(guest, certificate).ready()
+            if scenario == "remove-boundary":
+                report["native_remove"] = guest.action("remove", timeout=220)
             guest.assert_safe()
             report["checks"].append("native installation contract " + scenario)
             report["status"] = "passed"
@@ -691,7 +701,7 @@ def main():
     parser.add_argument("--binary", type=Path)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--watchdog", type=Path)
-    parser.add_argument("--scenario", choices=["runtime", "cluster-routing", "default-root", "host-root", "clock-drift"], default="runtime")
+    parser.add_argument("--scenario", choices=["runtime", "cluster-routing", "default-root", "host-root", "clock-drift", "remove-boundary"], default="runtime")
     args = parser.parse_args()
     if args.watchdog is not None:
         watchdog(args.watchdog.resolve(strict=True))

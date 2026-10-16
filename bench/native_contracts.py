@@ -1,11 +1,69 @@
 """Exercise documented native cwd and machine ownership only inside the guest."""
 
 import hashlib
+from contextlib import contextmanager
 from pathlib import Path
 import subprocess
 import time
 
 from native_guest import ROOT, PROJECT, UNIT, cli, command, install_limits, prepare, require, sql, unit_state, versions, write_migration
+
+BACKUP_CONFIG = Path("/etc/pgbackrest/pgbackrest.conf")
+MACHINE_OWNER = Path("/var/lib/nelcota-native/owner.json")
+
+
+@contextmanager
+def configuration_fault(path):
+    require(not path.is_symlink() and (not path.exists() or path.is_file()), "Refuse a preexisting configuration fault")
+    original = None
+    mode = None
+    if path.exists():
+        require(path.stat().st_size <= 65536, "Native backup configuration exceeds the fixture budget")
+        original, mode = path.read_bytes(), path.stat().st_mode & 0o777
+        path.unlink()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.mkdir(mode=0o700)
+    marker = path / "g05-owned-configuration-fault"
+    marker.write_bytes(b"owned disposable VM configuration fault\n")
+    marker.chmod(0o600)
+    inode = path.stat().st_ino
+    try:
+        yield
+    finally:
+        require(not path.is_symlink() and path.is_dir() and path.stat().st_ino == inode
+                and sorted(item.name for item in path.iterdir()) == [marker.name]
+                and not marker.is_symlink() and marker.read_bytes() == b"owned disposable VM configuration fault\n",
+                "Configuration fault ownership changed; refuse broad cleanup")
+        marker.unlink()
+        path.rmdir()
+        if original is not None:
+            path.write_bytes(original)
+            path.chmod(mode)
+
+
+def remove_boundary():
+    first = prepare()
+    sql("CREATE TABLE public.g05_remove_sentinel (id integer PRIMARY KEY); INSERT INTO public.g05_remove_sentinel VALUES (1);\n")
+    manifest = ROOT / "nelcota-host.json"
+    before_manifest = manifest.read_bytes()
+    before_owner = MACHINE_OWNER.read_bytes()
+    with configuration_fault(BACKUP_CONFIG):
+        removed = cli("-p", PROJECT, "remove", "--no-backup", "--yes", timeout=120, check=False)
+        clusters = command(["pg_lsclusters", "--no-header"]).stdout.decode().splitlines()
+        present = any(line.split()[:2] == ["17", "main"] for line in clusters)
+        rows = None
+        if present:
+            rows = int(sql("SELECT count(*) FROM public.g05_remove_sentinel;\n"))
+        result = {"case": "owned malformed backup configuration must block native removal before destruction",
+                  "first_native_init": first, "remove_exit_code": removed.returncode,
+                  "specific_rejection": b"unsafe native backup configuration" in removed.stdout + removed.stderr,
+                  "machine_owner_preserved": MACHINE_OWNER.is_file() and MACHINE_OWNER.read_bytes() == before_owner,
+                  "manifest_preserved": manifest.is_file() and manifest.read_bytes() == before_manifest,
+                  "cluster_preserved": present, "sentinel_rows": rows,
+                  "app_unit_after": unit_state(UNIT), "configuration_fault_preserved": BACKUP_CONFIG.is_dir(),
+                  "scope": "Generated disposable VM only; no-backup is intentional for this owned failure-injection sentinel"}
+    result["configuration_fault_removed"] = not BACKUP_CONFIG.is_dir()
+    return result
 
 
 def environment_is_absolute():
@@ -93,6 +151,8 @@ def host_root():
 
 
 def run(case):
+    if case == "remove-boundary":
+        return remove_boundary()
     if case == "default-root":
         return default_root()
     require(case == "host-root", "Unknown native installation contract")

@@ -918,18 +918,23 @@
       "status": "passed",
       "evidence": "native-clock-drift-pass-1.json",
       "scope": "Owned guest clock only; 1018.326s observed advance, expired access denied, service/anonymous canaries correct, original clock/NTP restored within 0.471s. External host unchanged; no load-time credit."
+    },
+    "remove_boundary": {
+      "status": "not run",
+      "scope": "Controlled malformed backup configuration in owned guest only. Must fail before unit/cluster/manifest/owner destruction; no production defect or passing result claimed before actual execution."
     }
   },
   "provider_allocator_discovery": {
-    "status": "failed",
-    "evidence": "provider-memory-discovery-first-failure.json",
-    "repeat": "in progress",
-    "scope": "Original report blocked on wrong metric prefix and uploader failed on root-owned 0600 JSON. Actual 17 OTLP exports include MiMalloc gauges; requested-bytes availability flag is zero. No live-owner or historical retention conclusion."
+    "status": "passed",
+    "evidence": "provider-memory-discovery-after.json",
+    "original_failed_evidence": "provider-memory-discovery-first-failure.json",
+    "scope": "Capability/publication only: 17 exports, 18 samples, three real memory gauges, owned cleanup. Requested bytes explicitly unavailable; live-owner release and historical retention attribution remain unverified."
   },
   "current_ci_failure": {
     "status": "under investigation",
     "evidence": "ci-native-executable-identity-failure.json",
     "test": "updates::runtime::tests::running_native_identity_rejects_replacement_even_with_the_same_hash",
-    "scope": "Later same-relevant-source Rust pass is not a cause or fix for the original failure; bounded panic-location retrieval pending."
+    "scope": "Original panic at first validation line 863: initial process identity mismatch. Fixture uses bounded real child I/O before observing /proc; production validation unchanged. A thousand real repetitions are pending.",
+    "diagnostic_evidence": "ci-native-executable-panic-location.json"
   }
 }

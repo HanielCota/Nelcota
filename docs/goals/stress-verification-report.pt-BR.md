@@ -108,7 +108,7 @@ de desempenho do backend de produção por essa correção de segurança.
 
 | Migração nativa no cwd/`NELCOTA_ROOT` tentava adquirir o próprio lease | Dois comandos reais retornavam exit 1/`deployment_busy`, com o lease externo corretamente mantido | Filho nativo recebe `--dir` explícito do projeto, preservando o lease do host no pai. [Antes](results/stress/native-cwd-migration-before.json)/[depois](results/stress/native-cwd-migration-after.json): ambos exit 0, tabela e journal presentes, uma linha em SQL. [Errata](results/stress/native-cwd-migration-census-erratum.json) retira a alegação antiga de ausência de tabela, pois o primeiro census comparava bytes/string; não retira os exits 1/busy observados. |
 | Census nativo podia negar presença SQL válida | Repetição já tinha migrate exit 0, mas o oráculo interpretava `b"t"` como falso e não contava linhas | Parser de bytes estrito, presença de tabela/journal separada e COUNT decimal limitado. Três regressões; VM nova passou com COUNT 1. A [execução intermediária](results/stress/native-cwd-migration-census-failure.json) continua reprovada. |
-| Descoberta de alocador ignorava o prefixo real e não publicava arquivo legível | 17 exports reais continham `rustfs_memory_allocator_`, mas o controle contou zero; uploader falhou no JSON 0600 | Prefixo corrigido, disponibilidade explícita separada de valor e publicação validada 0644. [Primeira falha](results/stress/provider-memory-discovery-first-failure.json) preservada; repetição está em andamento. Bytes solicitados vivos continuam indisponíveis e owners não verificados. |
+| Descoberta de alocador ignorava o prefixo real e não publicava arquivo legível | 17 exports reais continham `rustfs_memory_allocator_`, mas o controle contou zero; uploader falhou no JSON 0600 | Prefixo corrigido, disponibilidade explícita separada de valor e publicação validada 0644. [Primeira falha](results/stress/provider-memory-discovery-first-failure.json) preservada; [repetição corrigida](results/stress/provider-memory-discovery-after.json) passou com 17 exports e três gauges de memória, inclusive publicação. Bytes solicitados vivos continuam indisponíveis e owners não verificados. |
 
 Outras mudanças de propriedade, filesystem, fault injection, inicialização
 de clientes, browser, ingress e teardown estão descritas por commit no
@@ -160,8 +160,8 @@ explica toda a retenção de memória anônima. A descoberta remota com o digest
 exato recebeu 17 exports OTLP autenticados e observou gauges MiMalloc de
 reserved/committed/page-committed. A flag
 `malloc_requested_bytes_available = 0` impede interpretar requested-total como
-bytes vivos. O próprio controle teve duas falhas e está sendo repetido após
-correção; o relatório original permanece bloqueado e o job original vermelho.
+bytes vivos. O próprio controle teve duas falhas; a repetição corrigida passou no escopo
+de descoberta/publicação. O relatório original permanece bloqueado e o job original vermelho.
 
 ## Commits de referência, validação e pendências
 
@@ -206,8 +206,11 @@ mesmo SHA foram preservadas; downloads de logs retornaram HTTP 403, por isso
 não se atribuiu uma causa nem se inventou contagem de testes daquele job.
 O teste `running_native_identity_rejects_replacement_even_with_the_same_hash`
 reprovou em `14725d6`; Rust em `3b56b25`, com o mesmo código relevante, passou,
-sem comprovar a causa da falha original. Um novo downloader seguro buscará
-somente local/categoria do panic. Dois diagnósticos remotos limitados anteriores também falharam; o último publicou exit 1
+sem comprovar a causa da falha original. O novo downloader seguro recuperou
+[local/categoria do panic](results/stress/ci-native-executable-panic-location.json):
+primeira validação na linha 863, identidade inicial diferente. A fixture agora
+exige I/O real do filho antes de observar /proc; mil repetições reais estão
+pendentes, sem alterar a checagem de produção. Dois diagnósticos remotos limitados anteriores também falharam; o último publicou exit 1
 sem código HTTP identificável. Esses recibos não fornecem o diagnóstico
 original de compilação e não foram apresentados como testes aprovados.
 

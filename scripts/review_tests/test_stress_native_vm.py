@@ -23,6 +23,27 @@ import native_contracts
 
 
 class NativeVMBoundaries(unittest.TestCase):
+    def test_configuration_fault_restores_owned_original_even_after_failure(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "config"
+            path.write_bytes(b"private fixture configuration")
+            path.chmod(0o600)
+            with self.assertRaisesRegex(ValueError, "fixture interruption"):
+                with native_contracts.configuration_fault(path):
+                    self.assertTrue(path.is_dir())
+                    raise ValueError("fixture interruption")
+            self.assertEqual(path.read_bytes(), b"private fixture configuration")
+            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+
+    def test_preexisting_configuration_directory_is_never_removed_as_our_fault(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "foreign"
+            path.mkdir()
+            with self.assertRaisesRegex(RuntimeError, "preexisting"):
+                with native_contracts.configuration_fault(path):
+                    self.fail("must not inject into a foreign directory")
+            self.assertTrue(path.is_dir())
+
     def test_migration_census_consumes_actual_psql_bytes(self):
         with patch("native_contracts.sql", side_effect=[b"t\n", b"t\n", b"1\n"]):
             self.assertEqual(native_contracts.migration_census(), {

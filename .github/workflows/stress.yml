@@ -15,7 +15,7 @@ on:
       native_case:
         description: Native lifecycle, cluster routing, installation contracts or guest clock
         type: choice
-        options: [runtime, cluster-routing, default-root, host-root, clock-drift]
+        options: [runtime, cluster-routing, default-root, host-root, clock-drift, remove-boundary]
         default: runtime
       diagnostic_jobs:
         description: Optional failed public lint/panel job IDs for native-preflight (comma separated)

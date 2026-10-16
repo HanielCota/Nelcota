@@ -208,11 +208,11 @@ def backup():
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("identity")
-    parser.add_argument("action", choices=["prepare", "resources", "token", "backup", "restore", "remove", "diagnostics", "cluster-routing", "default-root", "host-root"])
+    parser.add_argument("action", choices=["prepare", "resources", "token", "backup", "restore", "remove", "diagnostics", "cluster-routing", "default-root", "host-root", "remove-boundary"])
     parser.add_argument("--dump")
     args = parser.parse_args()
     owned(args.identity)
-    if args.action in {"default-root", "host-root"}:
+    if args.action in {"default-root", "host-root", "remove-boundary"}:
         from native_contracts import run
         print(json.dumps(run(args.action), allow_nan=False))
         return
