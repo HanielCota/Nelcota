@@ -216,6 +216,13 @@ pub fn configure_postgres(profile: &str, password: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
+pub(super) fn remove_cluster() -> anyhow::Result<()> {
+    run(
+        Command::new("pg_dropcluster").args(["17", "main", "--stop"]),
+        "pg_dropcluster",
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -333,11 +340,4 @@ mod tests {
         assert!(validate_password(&"a".repeat(257)).is_err());
         validate_password(&"a9Z".repeat(14)).unwrap();
     }
-}
-
-pub(super) fn remove_cluster() -> anyhow::Result<()> {
-    run(
-        Command::new("pg_dropcluster").args(["17", "main", "--stop"]),
-        "pg_dropcluster",
-    )
 }
