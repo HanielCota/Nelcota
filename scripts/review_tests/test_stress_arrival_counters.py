@@ -27,7 +27,7 @@ class FleetArrivalCounters(unittest.TestCase):
     def response(self, url, **kwargs):
         query = urllib.parse.parse_qs(urllib.parse.urlsplit(url).query)['query'][0]
         values = [{'value': [1, '1']}]
-        if query.startswith('sum(k6_dropped_iterations_total{'):
+        if 'k6_dropped_iterations_total{' in query:
             import re
             labels = dict(re.findall(r'([a-z_]+)="([a-z0-9-]+)"', query))
             selected = [row for row in self.drops if all(row.get(key) == value for key, value in labels.items())]

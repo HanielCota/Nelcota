@@ -126,6 +126,12 @@ class MetricsArrivalIntegration(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'require continuous'):
                 self.metrics.summary('unobserved', 14400)
 
+    def test_long_summary_without_full_coverage_fails_before_network_io(self):
+        with mock.patch('metrics.urllib.request.urlopen') as request:
+            with self.assertRaisesRegex(ValueError, 'require continuous'):
+                self.metrics.summary('unobserved', 14400)
+            request.assert_not_called()
+
 
 if __name__ == '__main__':
     unittest.main()

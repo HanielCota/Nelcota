@@ -134,10 +134,6 @@ class NativeMetrics:
             metric = 'k6_' + name + '_seconds' + selector
             return {key: self.value('histogram_quantile(' + str(p) + ',sum(' + metric + '))') * 1000 for key, p in [('p(50)', .50), ('p(95)', .95), ('p(99)', .99), ('min', 0), ('max', 1)]}
 
-        requests = count('http_reqs')
-        iterations = count('iterations')
-        successful = count('successful_operations')
-        received, sent = count('data_received'), count('data_sent')
         dropped = None
         with self.arrival_lock:
             tracker = self.arrivals.get(phase)
@@ -151,7 +147,12 @@ class NativeMetrics:
         if dropped is None:
             if duration > 300:
                 raise ValueError('Long phases require continuous scheduler-counter evidence')
-            dropped = self.value('sum(k6_dropped_iterations_total' + dropped_selector + ')', True)
+            window = str(int(duration) + 120)
+            dropped = self.value('sum(last_over_time(k6_dropped_iterations_total' + dropped_selector + '[' + window + 's]))', True)
+        requests = count('http_reqs')
+        iterations = count('iterations')
+        successful = count('successful_operations')
+        received, sent = count('data_received'), count('data_sent')
         metrics = {
             'http_reqs': {'count': requests, 'rate': requests / duration},
             'iterations': {'count': iterations, 'rate': iterations / duration},

@@ -334,7 +334,8 @@ State is limited to 128 phases and 11 scenarios per phase. Comparators require
 this declared protocol and reject missing coverage or totals that disagree with
 the report; an absent sparse series cannot manufacture a zero. Historical
 endurance summaries using only the final instant query do not certify this
-protocol. Diagnostic one-shot summaries of at most five minutes remain distinct
+protocol. Diagnostic one-shot summaries of at most five minutes use a bounded
+range query and remain distinct
 from comparable campaign evidence.
 
 `--final-idle-seconds 180` extends the final resource observation beyond the

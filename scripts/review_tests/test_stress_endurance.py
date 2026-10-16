@@ -227,7 +227,7 @@ class HostEvidence(unittest.TestCase):
             reader.summary('balanced-1',300,'project-2')
             self.assertTrue(expressions)
             dropped = [expression for expression in expressions if 'k6_dropped_iterations_total' in expression]
-            self.assertEqual(dropped, ['sum(k6_dropped_iterations_total{run_id="balanced-1",scenario="project-2"})'])
+            self.assertEqual(dropped, ['sum(last_over_time(k6_dropped_iterations_total{run_id="balanced-1",scenario="project-2"}[420s]))'])
             operations = [expression for expression in expressions if expression not in dropped]
             self.assertTrue(operations)
             self.assertTrue(all('project="project-2"' in expression for expression in operations))
