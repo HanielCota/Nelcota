@@ -984,3 +984,46 @@ do contador requer controle nativo e validação nos próximos perfis; não torn
 a campanha em curso uma execução do executor corrigido. Nenhum prazo ou SLO
 foi ampliado. O limite de 128 VUs do gerador é agregado entre os dez projetos;
 sob a carga concentrada o gerador não entrega toda a taxa oferecida.
+
+### 2026-10-16 09:39 UTC — reprodução independente e controle nativo
+
+`fleet-caddy-10-bounded-pass-2-001` repetiu o perfil anterior em dez clusters
+novos: 3.990 segundos de carga concluída, 1.039 amostras, mediana entre
+amostras de 5,000 segundos, máximo de 5,887 e zero OOM observado. Qualificou
+novamente 6/s por projeto e adotou 4/s nominal. As três amostras balanceadas
+e o reload passaram; os cinco cenários de interferência reprovaram
+17/15/21/19/36 gates relativos. O prazo de drenagem de 30 segundos voltou
+a reprovar; a última observação de drenagem tinha 7.010 pendências no projeto
+zero. A escrita concentrada concluiu 9.204 iterações e teve 33.997 descartes
+do scheduler recuperados do snapshot bruto. Não houve reconciliação final
+de identidades/marcadores. Os 23 contêineres e 11 volumes foram removidos,
+com limpeza confirmada. Essa reprodução confirma uma reprovação do perfil
+com CPU fracionada e da entrega do gerador; não identifica por si só um
+defeito de produção ou uma capacidade sustentável máxima.
+[Evidência da repetição](results/stress/fleet-10-bounded-pass-2.json).
+
+O controle seguinte usou k6 e Prometheus reais, duas chegadas controladas
+com um VU por cenário e iterações artificiais de sleep. O filtro antigo por
+tag de projeto retornou zero para ambos; o filtro corrigido por cenário
+recuperou 127 e 51 descartes, com 34 e 30 iterações concluídas. Os contadores
+brutos realmente tinham `project=single`. O controle durou 23,804 segundos,
+com prazo independente de 180 segundos, quotas de 0,25 CPU/128 MiB por
+contêiner, sem tráfego HTTP de aplicação e limpeza confirmada. Ele valida
+o contador, não capacidade da aplicação.
+[Controle nativo](results/stress/scheduler-drop-native-control.json).
+
+O CI do primeiro commit da correção reprovou a asserção antiga que exigia
+a tag dinâmica em todas as consultas. A regressão foi atualizada para exigir
+isolamento por cenário nos descartes e por projeto nas operações. Cinco
+testes focados passaram, seguidos por **188 testes Python em 12,445 segundos**.
+Os 18 checks de CI de `621dab9` passaram. Uma tentativa local com nome de
+classe incorreto não executou o teste e foi corrigida; não entra na contagem.
+
+Os 121 caminhos de cache recompilável arquivados foram restaurados em
+20,043 segundos, com SHA-256, modos, mtimes e hardlinks conferidos antes
+dos checks locais. Nenhum arquivo existente foi sobrescrito.
+[Restauração](results/stress/staging-cache-restore.json).
+O checkpoint 005 soma **71.234 segundos (19h47m14s)** de carga efetiva
+conservadora, sem preparação, rest, intervalos interrompidos ou duplicação
+de janelas concorrentes. Esse total inclui testes reprovados com tráfego
+real e não implica aprovação de seus critérios.
