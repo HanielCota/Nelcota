@@ -661,7 +661,7 @@
       "area": "Concurrent host management, durable receipts and limits",
       "entrypoints": "scripts/test-host-management.py; crates/cli/src/updates/management",
       "status": "not run",
-      "scope_or_limit": "Owned Docker acceptance available; DNS/provenance/public TLS/proxy doubles remain explicit.",
+      "scope_or_limit": "Owned Docker acceptance and a real native machine-ownership fix have scoped evidence. New first-init/stale-registry/empty-host ownership regressions and remaining sustained host-operation combinations still need final verification; no whole management-matrix pass is inferred.",
       "functional_subset": {
         "status": "passed",
         "source_commit": "3203330cf3df2b9b7dd68efebc79412a8564e9fd",
@@ -681,7 +681,21 @@
           ],
           "scope": "Existing functional subset repeated in matching CI; no new load/topology or production certification."
         }
-      }
+      },
+      "native_diagnostics": [
+        {
+          "run_id": "native-vm-38973642284-1",
+          "status": "failed",
+          "evidence": "native-host-root-before.json",
+          "scope": "Second init in another generated directory with --skip-checks altered the first database password/Caddy and created a second host/unit. Owned cleanup confirmed."
+        },
+        {
+          "run_id": "native-vm-38976428540-1",
+          "status": "passed",
+          "evidence": "native-host-root-after.json",
+          "scope": "Durable machine owner candidate: specific second-directory rejection, unchanged first credential/Caddy/sentinel, no second host/unit, strict HTTPS readiness and owned cleanup. 72.176555455s including preparation, fourteen samples."
+        }
+      ]
     },
     {
       "id": "updates",
@@ -797,7 +811,7 @@
       "area": "Public DNS/ACME/TLS, native systemd and power loss",
       "entrypoints": "docs/host-management.md; scripts/acceptance-systemd.sh",
       "status": "not run",
-      "scope_or_limit": "Real disposable KVM native lifecycle passed before and after a confirmed PostgreSQL cluster-routing fix. Wrong-cluster mutation reproduced and fixed with a fresh VM negative regression. Current-directory and second-host-directory installation probes are pending. Native updates, final repetitions, public DNS/ACME and physical host power loss remain incomplete or unavailable.",
+      "scope_or_limit": "Three actual native provisioning defects now have scoped fresh-VM before/after evidence: PostgreSQL cluster routing, relative unit environment path and second host directory takeover. Full final runtime repetition and the extended cwd migration probe are pending. Public DNS/ACME and physical host power loss remain unavailable.",
       "native_diagnostics": [
         {
           "run_id": "native-vm-38963816198-1",
@@ -822,6 +836,30 @@
           "status": "passed",
           "evidence": "native-postgres-collision-after.json",
           "scope": "Fixed native PostgreSQL layout is rejected specifically before host/config writes; unrelated owned password and one-row sentinel unchanged. Exact guest artifact verified, cleanup confirmed."
+        },
+        {
+          "run_id": "native-vm-38973154487-1",
+          "status": "failed",
+          "evidence": "native-default-root-before.json",
+          "scope": "Documented cwd init returned 0 with a relative systemd environment file; actual up timed out and the unit restarted fourteen times. Cleanup confirmed."
+        },
+        {
+          "run_id": "native-vm-38974387655-1",
+          "status": "passed",
+          "evidence": "native-default-root-after.json",
+          "scope": "Absolute host path correction: init/up/verify 0 and verified HTTPS on a fresh guest. This older protocol did not test nested migrations from host cwd."
+        },
+        {
+          "run_id": "native-vm-38973642284-1",
+          "status": "failed",
+          "evidence": "native-host-root-before.json",
+          "scope": "Second init in another generated directory with --skip-checks altered the first database password/Caddy and created a second host/unit. Owned cleanup confirmed."
+        },
+        {
+          "run_id": "native-vm-38976428540-1",
+          "status": "passed",
+          "evidence": "native-host-root-after.json",
+          "scope": "Durable machine owner candidate: specific second-directory rejection, unchanged first credential/Caddy/sentinel, no second host/unit, strict HTTPS readiness and owned cleanup. 72.176555455s including preparation, fourteen samples."
         }
       ]
     },
@@ -856,19 +894,19 @@
   "native_vm_capacity": {
     "status": "passed",
     "evidence": "native-vm-capacity-001.json",
-    "scope": "Read-only capacity inventory only. Separate structured native reports now document actual lifecycle/recovery and a before/after PostgreSQL isolation fix; the capacity inventory alone certifies none of those behaviors."
+    "scope": "Read-only capacity inventory only; independent structured reports document real native lifecycle, guest restart and three reproduced fixes. Their passed scopes do not certify final G05 deployment/endurance."
   },
   "current_native_probes": {
-    "source": "77d2335e898830689babf4ef73107008f0fa873c",
-    "default_root": {
+    "extended_cwd_migrations": {
       "status": "not run",
-      "workflow_run": "https://github.com/Nelcota/Nelcota/actions/runs/38973154487",
-      "scope": "Active isolated workflow; no completed verdict yet"
+      "source": "f3c8d49f0536ebbf0ef1d49c57426f1b547b0625",
+      "workflow_run": "https://github.com/Nelcota/Nelcota/actions/runs/38976562183",
+      "scope": "Queued/active; require real migration from cwd and NELCOTA_ROOT, one fixture migration and strict HTTPS. No verdict yet."
     },
-    "host_root": {
+    "final_runtime_and_empty_host_release": {
       "status": "not run",
-      "workflow_run": "https://github.com/Nelcota/Nelcota/actions/runs/38973642284",
-      "scope": "Queued isolated workflow; no completed verdict yet"
+      "source": "76af3a45b8b8cd057711148dd9352595c34947b7",
+      "scope": "Production guard and regression added after reviewing complete removal; new runtime VM and final-artifact repetition remain pending."
     }
   }
 }
