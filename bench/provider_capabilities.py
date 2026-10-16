@@ -41,6 +41,7 @@ PUBLIC_FIELDS = {"identity", "source", "certifies_g05", "status", "scope", "cont
                  "collector_unauthorized_probe_status", "exports_received", "telemetry_wire_bytes", "first_memory_export",
                  "last_memory_export", "resource_peaks", "allocator_numeric_points", "blocker", "failure",
                  "cleanup_confirmed", "cleanup_errors", "elapsed_seconds_including_preparation", "telemetry_failure"}
+PUBLIC_FIELDS.add("allocator_capabilities")
 
 
 def require(condition, message):
@@ -152,7 +153,7 @@ def controller_budget(identity):
     return {"cpu_quota_usec": int(quota), "cpu_period_usec": int(period), "memory_bytes": int(memory), "swap_bytes": 0, "pids": 128}
 
 
-def publish(report):
+def public_payload(report):
     require(isinstance(report, dict) and not set(report) - PUBLIC_FIELDS, "Unknown provider evidence field")
     require(report.get("certifies_g05") is False and isinstance(report.get("cleanup_confirmed"), bool),
             "Missing scoped provider cleanup verdict")
@@ -162,6 +163,35 @@ def publish(report):
     require(report.get("status") in {"passed", "failed", "blocked"}, "Invalid provider capability verdict")
     raw = json.dumps(report, separators=(",", ":"), allow_nan=False).encode()
     require(len(raw) <= 65536, "Provider public evidence exceeded its byte budget")
+    return raw
+
+
+def write_public_report(directory, report):
+    public_payload(report)
+    directory.mkdir(mode=0o755)
+    path = directory / "provider-capabilities.json"
+    atomic_json(path, report)
+    # The controller runs as root; the artifact uploader runs as the runner.
+    # Only this validated public report crosses the private 0700 boundary.
+    path.chmod(0o644)
+
+
+def allocator_capabilities(points):
+    allocator = [point for point in points if point["available"] and
+                 point["name"].startswith(("rustfs_memory_allocator_", "rustfs_allocator_", "allocator_"))]
+    gauges = {point["name"]: point["value"] for point in allocator if point["kind"] == "gauge"}
+    memory_names = {"rustfs_memory_allocator_reserved_bytes", "rustfs_memory_allocator_committed_bytes",
+                    "rustfs_memory_allocator_page_committed_bytes"}
+    availability = gauges.get("rustfs_memory_allocator_malloc_requested_bytes_available")
+    live = None
+    if availability in {0, 1}:
+        live = bool(availability)
+    return {"numeric_points": len(allocator), "memory_gauges_observed": sorted(memory_names.intersection(gauges)),
+            "requested_bytes_available": live, "live_owner_release": "not verified"}
+
+
+def publish(report):
+    raw = public_payload(report)
     digest = hashlib.sha256(raw).hexdigest()
     encoded = base64.b64encode(gzip.compress(raw, mtime=0)).decode()
     parts = [encoded[index:index + 3000] for index in range(0, len(encoded), 3000)]
@@ -302,10 +332,12 @@ def main():
         points = []
         if receiver.last is not None:
             points = receiver.last["points"]
-        report["allocator_numeric_points"] = sum(value["available"] and value["name"].startswith(("rustfs_allocator", "allocator_")) for value in points)
+        capability = allocator_capabilities(points)
+        report["allocator_capabilities"] = capability
+        report["allocator_numeric_points"] = capability["numeric_points"]
         report["status"] = "blocked"
         report["blocker"] = "No numeric allocator telemetry observed; heap ownership remains unverified"
-        if report["allocator_numeric_points"]:
+        if capability["memory_gauges_observed"]:
             report["status"] = "passed"
             report.pop("blocker")
     except Exception as error:
@@ -350,8 +382,7 @@ def main():
         thread.join(timeout=5)
         signal.signal(signal.SIGTERM, previous)
         report["elapsed_seconds_including_preparation"] = time.monotonic() - began
-        public.mkdir(mode=0o755)
-        atomic_json(public / "provider-capabilities.json", report)
+        write_public_report(public, report)
         publish(report)
     if report["status"] == "failed":
         raise SystemExit(1)

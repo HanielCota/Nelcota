@@ -11,10 +11,11 @@ from pathlib import Path
 import secrets
 import sys
 import threading
+import tempfile
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "bench"))
-from provider_capabilities import Receiver, publish
+from provider_capabilities import Receiver, allocator_capabilities, publish, write_public_report
 from test_stress_otlp_metrics import attribute, export
 
 
@@ -64,6 +65,34 @@ class PrivateProviderReceiver(unittest.TestCase):
 
 
 class ProviderPublication(unittest.TestCase):
+    def test_root_controller_publishes_only_validated_runner_readable_evidence(self):
+        report = {"identity": "native-provider-123-1", "source": "1" * 40, "status": "blocked",
+                  "certifies_g05": False, "cleanup_confirmed": True}
+        with tempfile.TemporaryDirectory() as root:
+            directory = Path(root) / "public"
+            write_public_report(directory, report)
+            path = directory / "provider-capabilities.json"
+            self.assertEqual(path.stat().st_mode & 0o777, 0o644)
+            self.assertEqual(json.loads(path.read_text()), report)
+            denied = Path(root) / "denied"
+            with self.assertRaisesRegex(RuntimeError, "Unknown provider"):
+                write_public_report(denied, {"private_environment": "must-not-publish"})
+            self.assertFalse(denied.exists())
+
+    def test_real_provider_metric_prefix_and_availability_are_distinct(self):
+        def point(name, value, *, available=True):
+            return {"name": name, "value": value, "available": available, "kind": "gauge"}
+        points = [point("rustfs_memory_allocator_committed_bytes", 150601728),
+                  point("rustfs_memory_allocator_malloc_requested_bytes_available", 0),
+                  point("rustfs_memory_allocator_malloc_requested_total_bytes", 87361616),
+                  point("rustfs_memory_allocator_reserved_bytes", None, available=False)]
+        result = allocator_capabilities(points)
+        self.assertEqual(result["numeric_points"], 3)
+        self.assertEqual(result["memory_gauges_observed"], ["rustfs_memory_allocator_committed_bytes"])
+        self.assertIs(result["requested_bytes_available"], False)
+        self.assertEqual(result["live_owner_release"], "not verified")
+        self.assertIsNone(allocator_capabilities([])["requested_bytes_available"])
+
     def test_lossless_compressed_notices_stay_within_both_actions_limits(self):
         report = {"identity": "native-provider-123-1", "source": "1" * 40, "status": "blocked",
                   "certifies_g05": False, "cleanup_confirmed": True,

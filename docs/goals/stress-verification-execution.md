@@ -1880,3 +1880,28 @@ passaram em 1,012 s. A descoberta real ainda não foi executada.
 O monitor local passou para a célula 993. Ele só executa o census agregado
 quando a própria campanha entrar no descanso final de 180 s, mantendo a
 verificação de run/label/phase e recusando qualquer query durante o soak.
+
+### 16/10, 23:43 UTC — descoberta real do alocador e dois defeitos no controle
+
+A [primeira descoberta](results/stress/provider-memory-discovery-first-failure.json)
+foi executada em `38981893129`, fonte `5fd78f2`. Foram 18 amostras e 17
+exports OTLP autenticados em 102,157 s com preparo, sem carga BaaS e com
+limpeza confirmada. O teste não dá crédito de endurance. O job ficou vermelho:
+o uploader não podia ler o JSON 0600 escrito pelo controller root. O relatório
+original foi recuperado por notice gzip, com SHA-256 validado e sem alterar
+seu veredito bloqueado.
+
+Também havia erro no oráculo: ele reconhecia `rustfs_allocator_`, mas o
+provider exporta `rustfs_memory_allocator_`. O snapshot contém gauges reais
+de committed/reserved/page-committed, mas
+`malloc_requested_bytes_available = 0`. O contador solicitado disponível no
+mesmo export **não** comprova bytes vivos nem ausência de vazamento. A correção
+separa capacidade de exportação, disponibilidade de requested bytes e liberação
+de owners, que continua não verificada. Uma repetição é necessária; o resultado
+original não foi promovido retroativamente.
+
+A publicação agora valida o esquema antes de criar a pasta pública e torna
+somente esse JSON legível pelo uploader (0644); a pasta privada segue 0700.
+Duas regressões novas verificam o prefixo real/flag de disponibilidade e a
+fronteira de permissão/publicação. As seis regressões do receiver/publicador
+passaram em 1,012 s, sem tráfego contra o benchmark local em endurance.
