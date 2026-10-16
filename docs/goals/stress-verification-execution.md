@@ -1973,3 +1973,26 @@ que rodou exatamente um teste e publicou sua conclusão. Nenhum output de
 assertion foi exposto. Isso valida a nova prontidão da fixture e a rejeição de
 substituição por mesmo hash; não substitui CI completo, não apaga o panic
 original e não soma nove segundos ao crédito de tráfego BaaS/endurance.
+
+### 16/10, 23:55 UTC — quinto defeito nativo reproduzido, correção preparada
+
+A [VM anterior](results/stress/native-remove-boundary-before.json), fonte
+`a2a0123`, binário
+`e58a37f7107ddbe1cdfe2189100f65699f9711a8cfbab122e0aaa1dced31eb6b`,
+reprovou o cenário: remove retornou **0**, apagou unit/cluster e alterou o
+manifesto, liberando o owner apesar da configuração de backup não removida.
+A exclusão dos dados do sentinel era intencional pelo --no-backup do probe;
+o defeito é sucesso indevido e liberação do owner com limpeza incompleta,
+não uma perda de ACKs de escrita alegadamente não solicitada. Foram 15
+amostras, 78,127 s incluindo preparo e limpeza confirmada. A injeção própria
+foi removida em finally, e o resultado original continua reprovado.
+
+A correção verifica o tipo da configuração antes de destruir unit/cluster e
+propaga erros posteriores de unlink. Arquivo ausente permanece compatível;
+symlink é removido sem seguir/apagar seu alvo. A desativação do PITR tinha
+o mesmo erro ignorado: passa a validar antes de alterar parâmetros do banco,
+propagar a falha de remoção e preservar o marcador local se o unlink falhar.
+O PITR real fora do host continua bloqueado; não se certifica esse fluxo por
+uma prova de helper. Quatro regressões Rust cobrem rejeição antes de teardown,
+arquivo ausente/presente, falha de teardown/alteração tardia e symlinks.
+Rustfmt passou; essas regressões e a VM corrigida ainda precisam executar.

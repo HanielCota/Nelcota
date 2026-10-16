@@ -920,8 +920,9 @@
       "scope": "Owned guest clock only; 1018.326s observed advance, expired access denied, service/anonymous canaries correct, original clock/NTP restored within 0.471s. External host unchanged; no load-time credit."
     },
     "remove_boundary": {
-      "status": "not run",
-      "scope": "Controlled malformed backup configuration in owned guest only. Must fail before unit/cluster/manifest/owner destruction; no production defect or passing result claimed before actual execution."
+      "status": "failed",
+      "evidence": "native-remove-boundary-before.json",
+      "scope": "Owned VM source a2a0123 confirmed remove exit0, cluster/unit gone and owner released although backup config cleanup failed. Sentinel deletion was requested by no-backup; defect is false completion/early owner release. Guard/propagation regressions and fresh corrected VM pending."
     }
   },
   "provider_allocator_discovery": {
