@@ -6,7 +6,7 @@ on:
       target:
         description: Dedicated benchmark, disposable VM inventory or native acceptance
         type: choice
-        options: [benchmark, native-preflight, native-vm]
+        options: [benchmark, native-preflight, native-vm, provider-preflight]
         default: benchmark
       evidence_run:
         description: Optional earlier native workflow artifact to republish before native-vm
@@ -39,6 +39,37 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  provider-preflight:
+    if: inputs.target == 'provider-preflight'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Inventory the disposable provider VM
+        run: python3 bench/native_preflight.py
+      - name: Bounded provider allocator capability discovery
+        run: |
+          sudo -n systemd-run --wait --pipe --collect \
+            --unit="g05-provider-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --working-directory="$GITHUB_WORKSPACE" \
+            --property=CPUQuota=50% --property=MemoryMax=256M --property=MemorySwapMax=0 \
+            --property=TasksMax=128 --property=RuntimeMaxSec=360 --property=KillMode=control-group \
+            env GITHUB_ACTIONS="$GITHUB_ACTIONS" RUNNER_ENVIRONMENT="$RUNNER_ENVIRONMENT" \
+              GITHUB_SHA="$GITHUB_SHA" GITHUB_RUN_ID="$GITHUB_RUN_ID" GITHUB_RUN_ATTEMPT="$GITHUB_RUN_ATTEMPT" \
+              python3 bench/provider_capabilities.py
+      - name: Public provider capability evidence only
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: provider-memory-capabilities
+          path: target/stress-g05/native-provider-*-public
+          if-no-files-found: ignore
+          retention-days: 14
+
   native-preflight:
     if: inputs.target == 'native-preflight'
     runs-on: ubuntu-latest

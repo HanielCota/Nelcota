@@ -173,6 +173,24 @@ observer. The host/controller clock and monotonic watchdogs are unchanged.
 This functional control has no endurance/throughput credit and does not claim
 protection against a malicious host clock or physical power loss.
 
+`target=provider-preflight` discovers telemetry capabilities on another
+disposable Ubuntu 24.04 VM, refusing a Docker host with existing containers.
+It uses the exact historical RustFS image digest and a private, nonce/peer
+checked OTLP listener. The parser retains bounded numeric memory gauges/sums
+and allowlisted nonprivate attributes; missing/unavailable values stay absent
+or null. Cumulative allocations never imply current live bytes. No BaaS
+traffic runs, and startup telemetry does not certify reclamation or explain
+the historical anonymous-memory plateau.
+
+The controller's actual systemd budget is 0.5 CPU/256 MiB/128 tasks; the provider
+has another CPU affinity slot, 0.5 CPU/1 GiB/128 tasks. Provider data and its
+writable layer each have a 512-MiB guard, network traffic is bounded to 4 GiB,
+and host reserves remain 10% RAM/15% disk/inodes. An independent watchdog limits
+the control to 300 seconds, with a 360-second systemd backstop. Discovery samples
+for 90 seconds after preparation; lack of allocator export stays `blocked`.
+Only structured public first/last observations and cleanup receipts are
+uploaded; generated credentials, receiver nonce and raw attributes stay private.
+
 `native_case=default-root` follows the documented command from the application
 directory without `-C` or an inherited `NELCOTA_ROOT`. It checks the actual
 systemd environment-file path, `systemd-analyze verify`, activation and verified
