@@ -45,7 +45,7 @@ def run(output):
     thread=threading.Thread(target=heartbeat,daemon=True);thread.start()
     watchdog=subprocess.Popen([sys.executable,str(ROOT/'bench/watchdog.py'),str(root/'ownership.json')],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,start_new_session=True)
     passed=clean=False
-    proof={'scope':'Native counter expiry/retention control with artificial sleep iterations; no application traffic, capacity or endurance certification','certifies_g05':False,'maximum_seconds':240,'cpu_each':.25,'memory_mib_each':128,'traffic_schedule_seconds':136,'counter_protocol':PROTOCOL,'generator_cpu_affinity':cpus[0],'metrics_cpu_affinity':cpus[-1],'startup_disk_mib':2048,'metrics_volume_limit_mib':128,'metrics_retention_mib':16,'metrics_wal_segment_mib':16,'generator_usage_reporting':False,'source_commit':subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),'metrics_source_sha256':hashlib.sha256((ROOT/'bench/metrics.py').read_bytes()).hexdigest(),'counter_source_sha256':hashlib.sha256((ROOT/'bench/arrival_counters.py').read_bytes()).hexdigest()}
+    proof={'scope':'Native counter expiry/retention control with artificial sleep iterations; no application traffic, capacity or endurance certification','certifies_g05':False,'maximum_seconds':240,'cpu_each':.25,'memory_mib_each':128,'traffic_schedule_seconds':6,'post_generator_idle_observation_seconds':130,'minimum_counter_observation_seconds':136,'counter_protocol':PROTOCOL,'generator_cpu_affinity':cpus[0],'metrics_cpu_affinity':cpus[-1],'startup_disk_mib':2048,'metrics_volume_limit_mib':128,'metrics_retention_mib':16,'metrics_wal_segment_mib':16,'generator_usage_reporting':False,'source_commit':subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),'metrics_source_sha256':hashlib.sha256((ROOT/'bench/metrics.py').read_bytes()).hexdigest(),'counter_source_sha256':hashlib.sha256((ROOT/'bench/arrival_counters.py').read_bytes()).hexdigest()}
     proof['resource_sample_seconds']=5
     proof['maximum_resource_gap_seconds']=30
     proof['control_source_sha256']=hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
@@ -58,7 +58,7 @@ def run(output):
       scenarios: { traffic: {
         executor: 'ramping-arrival-rate', startRate: 100, timeUnit: '1s',
         preAllocatedVUs: 1, maxVUs: 1,
-        stages: [{target:100,duration:'5s'},{target:0,duration:'1s'},{target:0,duration:'130s'}]
+        stages: [{target:100,duration:'5s'},{target:0,duration:'1s'}]
       } },
       tags: {run_id:'scheduler-sparse',project:'single'}, systemTags:['scenario']
     };
@@ -83,6 +83,7 @@ def run(output):
         if not ready:raise RuntimeError('Metrics control did not become ready')
         metrics=NativeMetrics(endpoint)
         metrics.begin_phase('scheduler-sparse',['traffic'])
+        observation_began=time.monotonic()
         phase='sparse-counter-control'
         resource_at=time.monotonic()
         command=['docker','run','--rm','--name',generator,'--label',LABEL+'='+identity,*common,'--cpuset-cpus',str(cpus[0]),'--user',str(os.getuid())+':'+str(os.getgid()),'-v',str(script)+':/control.js:ro','-e','GOMEMLIMIT=96MiB','-e','K6_NO_USAGE_REPORT=true','-e','K6_PROMETHEUS_RW_SERVER_URL='+endpoint+'/api/v1/write','-e','K6_PROMETHEUS_RW_PUSH_INTERVAL=1s',K6,'run','--quiet','--summary-mode=disabled','--no-thresholds','--out=experimental-prometheus-rw','/control.js']
@@ -90,11 +91,21 @@ def run(output):
             child=subprocess.Popen(command,stdout=target,stderr=subprocess.STDOUT)
             context={'process':child,'name':generator,'identity':identity,'phase':phase,'started':time.monotonic()}
             positive=False
-            while child.poll() is None:
+            generator_finished=None
+            while True:
                 cycle=time.monotonic()
+                returned=child.poll()
+                if returned is not None:
+                    if returned!=0:raise RuntimeError('Native generator failed')
+                    if generator_finished is None:generator_finished=cycle
+                    # k6 can finish as soon as the arrival rate reaches zero.
+                    # The observer owns the expiry interval after the final flush.
+                    if cycle>=max(observation_began+136,generator_finished+130):break
+                    phase='sparse-counter-idle-observation'
                 if cycle-began>210 or host_reserves(root) or watchdog.poll() is not None:
                     raise RuntimeError('Native control resource/duration stop')
-                observed=generator_observation(context,lambda:context)
+                observed=None
+                if returned is None:observed=generator_observation(context,lambda:context)
                 if observed and observed.get('host_pid') and observed.get('pid_starttime'):
                     atomic_json(root/'generator-process.json',{'identity':identity,'pid':observed['host_pid'],'process_identity':observed['pid_starttime'],'container_id':observed['container_id']})
                 metrics_disk=int(owner('exec',telemetry,'du','-sm','/prometheus').split()[0])
@@ -117,6 +128,8 @@ def run(output):
         atomic_json(root/'final-metrics-raw.json',metrics.snapshot('scheduler-sparse'))
         for path,key in [(ROOT/'bench/metrics.py','metrics_source_sha256'),(ROOT/'bench/arrival_counters.py','counter_source_sha256'),(Path(__file__),'control_source_sha256')]:
             if hashlib.sha256(path.read_bytes()).hexdigest()!=proof[key]:raise RuntimeError('Counter implementation changed during native control')
+        proof['generator_elapsed_before_idle_seconds']=generator_finished-observation_began
+        proof['post_generator_observed_idle_seconds']=time.monotonic()-generator_finished
         proof.update(status='passed',retained_dropped_iterations=retained,end_instant_dropped_iterations=instant,end_120s_range_dropped_iterations=expired_range,closed_evidence=evidence,early_positive_snapshot_sha256=hashlib.sha256((root/'early-positive-metrics.json').read_bytes()).hexdigest(),control_js_sha256=hashlib.sha256(script.read_bytes()).hexdigest(),metrics_source_sha256=hashlib.sha256((ROOT/'bench/metrics.py').read_bytes()).hexdigest(),counter_source_sha256=hashlib.sha256((ROOT/'bench/arrival_counters.py').read_bytes()).hexdigest(),k6_image=K6,prometheus_image=PROMETHEUS,elapsed_seconds=time.monotonic()-began)
         passed=True
     finally:

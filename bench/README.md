@@ -349,7 +349,9 @@ python3 bench/arrival_check.py --output target/stress-oracles/arrivals
 ```
 
 It uses native k6/Prometheus, one sleeping VU, a six-second arrival burst and
-130 seconds without offered arrivals. The final instant query and 120-second
+at least 130 seconds of controller-owned observation after the generator exits.
+An arrival stage ending at zero can exit early; it cannot supply that idle
+coverage. This idle interval is not application stress time. The final instant query and 120-second
 range must expire while the continuously observed total stays positive.
 This artificial control verifies the measurement pipeline, not service capacity
 or effective endurance time. Each container has 0.25 CPU/128 MiB, the controller
