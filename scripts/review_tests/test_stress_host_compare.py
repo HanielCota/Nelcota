@@ -39,7 +39,7 @@ class HostComparison(unittest.TestCase):
             (root/'acceptance-failures.json').write_text('[]')
             intervals=[]
             for index in range(1,4):
-                metrics={'unexpected':{'value':0},'checks':{'fails':0},'overload_rejections':{'count':0},'iterations':{'count':2400},'dropped_iterations':{'count':0}}
+                metrics={'unexpected':{'value':0},'checks':{'fails':0},'overload_rejections':{'count':0},'http_reqs':{'count':2640},'successful_operations':{'count':2400},'expected_rejections':{'count':240},'iterations':{'count':2400},'dropped_iterations':{'count':0}}
                 for operation in host_compare.OPERATIONS:
                     metrics['latency_'+operation]={'p(95)':10,'p(99)':20}
                     metrics['throughput_'+operation]={'rate':4}
@@ -51,6 +51,11 @@ class HostComparison(unittest.TestCase):
 
     def test_equivalent_three_samples_pass(self):
         self.assertTrue(host_compare.compare(self.before,self.after)['gate_passed'])
+
+    def test_missing_401_attempts_cannot_hide_behind_successful_work(self):
+        path=self.after/'balanced-1.json'
+        sample=json.loads(path.read_text());sample['project-0']['metrics']['http_reqs']['count']=2400;path.write_text(json.dumps(sample))
+        with self.assertRaisesRegex(ValueError,'HTTP attempts'):host_compare.compare(self.before,self.after)
 
     def test_missing_arrival_coverage_cannot_hide_behind_a_zero_report(self):
         path=self.after/'balanced-1.json'

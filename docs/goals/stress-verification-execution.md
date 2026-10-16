@@ -1237,3 +1237,63 @@ O smoke não foi promovido a aprovação ou descartado pelo início dessa campan
 Os **18 checks do CI de `93d6723` passaram**, incluindo o perfil de CPU e suas
 regressões; isso não transforma a falha de serviço acima em aprovação.
 [Checks e URLs](results/stress/ci-93d6723.json).
+
+### 2026-10-16 17:00 UTC — interrupção crítica e segunda auditoria dos contadores
+
+`fleet-caddy-5-sharing-final-pass-1-001` foi **interrompido automaticamente**
+na fase noisy-login: a chamada `docker stats` do gerador excedeu 10 segundos.
+Concluiu 2.790 segundos efetivos e 604 observações, sem OOM observado;
+limpeza confirmada. Os degraus de capacidade 8/16/24/32 por projeto, três
+balanced e recarga real do proxy concluíram. Noisy-mixed reprovou 24 gates
+relativos de latência nos quatro projetos saudáveis. A conciliação final de
+identidades/markers não foi alcançada; sua aprovação não é inferida dos
+contadores intermediários. Não há causa de produção confirmada para o timeout.
+[Evidência](results/stress/fleet-5-sharing-final-pass-1.json).
+
+A auditoria adicional confirmou perda de séries raras também em `http_reqs`
+e `expected_rejections`. As três campanhas históricas de quatro horas
+registraram zero rejeições esperadas, mas cada uma contém **3.937** na
+identidade independente: asserções aprovadas menos operações úteis, rejeições
+de sobrecarga e verificações adicionais de corpo. A fórmula foi confrontada
+com 97 relatórios curtos e não apresentou divergências. No S3, 88.528
+requisições HTTP adicionais são redirecionamentos 302 reais; portanto contagem
+lógica não pode substituir os contadores físicos por status/método/workload.
+Os relatórios originais continuam preservados; não se recuperam contadores
+perdidos de dropped iterations que não tenham observação histórica suficiente.
+
+A correção em validação mantém séries por fase, com polling contínuo,
+lookback de 120 segundos, intervalo máximo de 30 segundos e estado limitado.
+Contadores físicos são conciliados com asserções independentes. O gerador
+passa a oferecer leitura real de cgroup após timeout do stream Docker,
+conferindo container, rótulo e identidade do processo, sem ampliar os limites
+de observação. Os 235 testes Python passaram em 13,314 segundos; o controle
+nativo com expiração HTTP e timeout injetado ainda estava em execução neste
+checkpoint. Essas correções de medição exigem novas campanhas afetadas.
+
+A contagem conservadora atual inclui apenas intervalos efetivos completos;
+preparação, warmup, descanso, controles artificiais e intervalos incompletos
+permanecem excluídos. [Checkpoint 008](results/stress/load-time-checkpoint-008.json).
+
+### 2026-10-16 17:17 UTC — controle HTTP nativo aprovado após correção do oráculo
+
+O primeiro controle `sparse-http-native-control-001` reprovou e foi limpo.
+Seu gate exigia que a série instantânea de 200 ainda existisse depois da saída
+do gerador, embora o lookback artificial de 2 segundos possa expirá-la também;
+não salvou todos os valores dessa comparação, limitação preservada. O controle
+foi corrigido para salvar resultados antes do gate e distinguir a expiração
+rara dos 401 da expiração final do tráfego positivo.
+
+`sparse-http-native-control-002` passou em 141,026 segundos: o servidor recebeu
+273 requisições, exatamente 3 com 401 e 270 com 200. A coleta contínua reteve
+273/3; as consultas instantânea e de 120 segundos perderam os 401 e a rejeição
+esperada, enquanto a janela de 120 segundos conservou exatamente os 270
+positivos. A instantânea geral também expirou para zero. Foram 30 observações,
+140,012 segundos de cobertura e intervalo máximo de 6,496 segundos.
+
+Um timeout de `docker stats` foi injetado deliberadamente, sem alterar o daemon
+ou containers alheios: a leitura alternativa encontrou o mesmo container/PID,
+7 tarefas, 12.214.272 bytes e 136.129 microssegundos de CPU, com OOM zero e
+limites nativos de 0,25 CPU/128 MiB conferidos. Limpeza confirmada. O controle
+não usa o backend e não acrescenta tempo efetivo ao G05.
+[Antes/depois](results/stress/native-http-control-before-after.json) e
+[auditoria histórica](results/stress/historical-http-counter-audit.json).

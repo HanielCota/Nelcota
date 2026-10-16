@@ -21,6 +21,7 @@ FIELDS.append('project_cpu_period_micros')
 FIELDS.append('resource_probe_workers')
 FIELDS.append('arrival_counter_protocol')
 FIELDS.append('generator_usage_reporting')
+FIELDS.append('generator_observation_protocol')
 FIELDS.append('project_cpu_allocation')
 
 
@@ -89,6 +90,8 @@ def read_run(root):
                 raise ValueError('Reported host drops disagree with retained scheduler counters')
             if value.get('schema')!=2 or nonnegative(metrics['unexpected']['value'])!=0 or nonnegative(metrics['checks']['fails'])!=0 or nonnegative(metrics['overload_rejections']['count'])!=0:
                 raise ValueError('Unexpected or overloaded traffic cannot certify a nominal baseline')
+            if nonnegative(metrics['http_reqs']['count']) != positive(metrics['successful_operations']['count']) + nonnegative(metrics['expected_rejections']['count']):
+                raise ValueError('Disk host HTTP attempts disagree with successful work and expected rejections')
             expected=profile['nominal_rate_per_project']*profile['seconds_per_step']
             if positive(metrics['iterations']['count'])<expected*.99 or nonnegative(metrics['dropped_iterations']['count'])>expected*.01:
                 raise ValueError('Under-delivered arrivals cannot certify regressions')

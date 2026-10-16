@@ -23,7 +23,7 @@ import urllib.request
 
 from campaign import K6, ResourceCoverage, docker, effective_cpus, free_port, nominal_violations, owns_listener, validate_disk_headroom, validate_storage_filesystem
 from metrics import NativeMetrics, PROMETHEUS
-from observations import generator_observation
+from observations import generator_observation, GENERATOR_PROTOCOL
 from projects import Project
 from watchdog import LABEL, atomic_json, cleanup, host_reserves, process_identity, stop_generator
 from host_resources import snapshot as host_snapshot, owned_cgroup_snapshot, require_no_oom
@@ -199,6 +199,7 @@ def campaign(args):
         profile['resource_probe_workers']=PROBE_WORKERS
         profile['arrival_counter_protocol']=ARRIVAL_COUNTER_PROTOCOL
         profile['generator_usage_reporting']=False
+        profile['generator_observation_protocol']=GENERATOR_PROTOCOL
         profile['container_log_profile']=LOG_PROFILE
         profile['harness_js_sha256']=hashlib.file_digest((ROOT/'bench/campaign.js').open('rb'),'sha256').hexdigest()
         profile['client_initialization']={'maximum_sessions_per_project':128,'bootstrap_concurrency':4,'setup_timeout_seconds':120,'fully_preallocated_arrival_VUs':True,'mix_schedule':'global scenario arrival ordinal','bootstrap_excluded_from_nominal_metrics':True}

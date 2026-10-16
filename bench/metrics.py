@@ -11,14 +11,17 @@ import time
 import urllib.parse
 import urllib.request
 from arrival_counters import ArrivalCounter, phase_label, finite, closed_count
+from http_counters import HttpCounters, closed_counts, FAMILIES
 
 PROMETHEUS = 'prom/prometheus:v3.5.0@sha256:63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996'
 
 
 class NativeMetrics:
-    def __init__(self, endpoint):
+    def __init__(self, endpoint, *, retain_http_counters=False):
         self.endpoint = endpoint
         self.arrivals = {}
+        self.http_counters = {}
+        self.retain_http_counters = retain_http_counters
         self.arrival_lock = threading.RLock()
 
     def begin_phase(self, phase, scenarios):
@@ -27,6 +30,8 @@ class NativeMetrics:
             if phase in self.arrivals or len(self.arrivals) >= 128:
                 raise ValueError('Duplicate phase or arrival-counter state budget exceeded')
             self.arrivals[phase] = ArrivalCounter(phase, scenarios, time.monotonic())
+            if self.retain_http_counters:
+                self.http_counters[phase] = HttpCounters(phase, scenarios, time.monotonic())
             return self.observe_arrivals(phase)
 
     def observe_arrivals(self, phase):
@@ -58,13 +63,32 @@ class NativeMetrics:
                     raise ValueError('Ambiguous scheduler counter scenario')
                 values[scenario] = float(row['value'][1])
             resets = self.value('sum(resets(' + selector + '))', optional=True)
-            return tracker.observe(values, resets, time.monotonic())
+            result = tracker.observe(values, resets, time.monotonic())
+            if phase in self.http_counters:
+                families = {}
+                for family in FAMILIES:
+                    query = 'last_over_time(k6_' + family + '_total{run_id="' + phase + '",project!="bootstrap"}[120s])'
+                    url = self.endpoint + '/api/v1/query?' + urllib.parse.urlencode({'query': query})
+                    with urllib.request.urlopen(url, timeout=10) as response:
+                        body = response.read(524289)
+                    if len(body) > 524288:
+                        raise ValueError('HTTP counter response exceeded its byte budget')
+                    data = json.loads(body)
+                    if data.get('status') != 'success' or data.get('data', {}).get('resultType') != 'vector':
+                        raise ValueError('Invalid HTTP counter response')
+                    families[family] = data['data'].get('result')
+                reset_selector = '{__name__=~"k6_(http_reqs|expected_rejections)_total",run_id="' + phase + '",project!="bootstrap"}[120s]'
+                resets = self.value('sum(resets(' + reset_selector + '))', optional=True)
+                result['http_counters'] = self.http_counters[phase].observe(families, resets, time.monotonic())
+            return result
 
     def finish_phase(self, phase):
         with self.arrival_lock:
             if phase not in self.arrivals:
                 raise ValueError('Arrival-counter phase was not observed from its beginning')
             self.observe_arrivals(phase)
+            if phase in self.http_counters:
+                self.http_counters[phase].close()
             return self.arrivals[phase].close()
 
     def value(self, expression, optional=False):
@@ -149,7 +173,25 @@ class NativeMetrics:
                 raise ValueError('Long phases require continuous scheduler-counter evidence')
             window = str(int(duration) + 120)
             dropped = self.value('sum(last_over_time(k6_dropped_iterations_total' + dropped_selector + '[' + window + 's]))', True)
-        requests = count('http_reqs')
+        http_counts = None
+        scenario = 'traffic'
+        if project is not None:
+            scenario = project
+        with self.arrival_lock:
+            if phase in self.http_counters:
+                http_counts = closed_counts(self.http_counters[phase].snapshot(), phase, scenario, duration)
+        if duration > 300 and http_counts is None:
+            raise ValueError('Long phases require continuous HTTP counter evidence')
+        def short_counter(name, optional=False):
+            return self.value('sum(last_over_time(k6_' + name + '_total' + selector + '[' + str(int(duration)+120) + 's]))', optional)
+        requests = 0
+        expected_rejections = 0
+        if http_counts is not None:
+            requests = http_counts['http_reqs']
+            expected_rejections = http_counts['expected_rejections']
+        if http_counts is None:
+            requests = short_counter('http_reqs')
+            expected_rejections = short_counter('expected_rejections', True)
         iterations = count('iterations')
         successful = count('successful_operations')
         received, sent = count('data_received'), count('data_sent')
@@ -162,7 +204,7 @@ class NativeMetrics:
             'dropped_iterations': {'count': dropped},
             'unexpected': {'value': self.value('max(k6_unexpected_rate' + selector + ')')},
             'checks': {'passes': count('assertions_passed'), 'fails': count('assertions_failed')},
-            'expected_rejections': {'count': count('expected_rejections', True)},
+            'expected_rejections': {'count': expected_rejections},
             'overload_rejections': {'count': count('overload_rejections')},
             'http_req_duration': latency('successful_duration'),
         }
@@ -174,6 +216,14 @@ class NativeMetrics:
                 operations=self.value('sum(k6_successful_operations_total'+operation_selector+')')
                 metrics['throughput_'+name]={'count':operations,'rate':operations/duration}
         report = {'metrics': metrics, 'schema': 2, 'latency_estimator': 'Prometheus native histogram', 'duration_seconds': duration}
+        if http_counts is not None:
+            report['http_counter_evidence'] = self.http_counters[phase].snapshot()
+            statuses = http_counts['status_counts']
+            if metrics['unexpected']['value'] == 0 and metrics['checks']['fails'] == 0:
+                body_checks = sum(metrics.get('throughput_'+name, {}).get('count', 0) for name in ['read','rls','panel','storage','write'])
+                derived_rejections = metrics['checks']['passes'] - successful - metrics['overload_rejections']['count'] - body_checks
+                if derived_rejections != expected_rejections or sum(count for status, count in statuses.items() if status.startswith('2')) != successful or sum(statuses.get(status, 0) for status in ['429','503','504']) != metrics['overload_rejections']['count'] or any(status not in ['401','429','503','504'] and not status.startswith(('2','3')) for status in statuses):
+                    raise ValueError('HTTP outcomes disagree with independent workload assertions')
         with self.arrival_lock:
             if phase in self.arrivals:
                 report['arrival_counter_evidence'] = self.arrivals[phase].snapshot()

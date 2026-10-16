@@ -380,6 +380,28 @@ has a 240-second watchdog, and a polled 128-MiB metrics-volume limit preserves
 host reserves. Startup reserves 2 GiB for image/container preparation. CI retains
 only its structured profiles/completion/proof; raw metric snapshots stay private.
 
+Single-project campaigns also retain physical HTTP attempts per native series
+and sparse expected 401 rejections throughout every phase. A final instant
+query loses rare outcomes after its lookback expires; summing logical operations
+also misses real S3 redirects. The collector preserves bounded per-series
+maxima, checks resets and phase/project labels, and embeds closed polling
+coverage. Successful workloads reconcile status totals and negative probes with
+independent assertion accounting. Long summaries require this coverage;
+diagnostic summaries of at most 300 seconds use a bounded range instead.
+Comparators reject missing coverage or inconsistent counts. Historical summaries
+are preserved and cannot certify the new protocol.
+
+`python3 bench/http_check.py --output target/stress-oracles/http` sends 2 requests
+per second for 136 seconds to an owned loopback responder, with exactly three
+initial 401 responses. It requires both final instant and 120-second queries to
+lose those responses while retained totals still match the server. It also
+injects one Docker stats timeout and verifies the owned generator's actual
+cgroup counters. A timeout fallback never invents Docker CPU percentages:
+kernel CPU time, memory, tasks and OOM evidence remain separately identified.
+Wrong ownership, PID reuse, native-reader failure and the existing 30-second
+observation-gap limit still stop the run. The control has a 300-second watchdog
+and the same 0.25-CPU/128-MiB container bounds; its traffic is not BaaS endurance.
+
 `--final-idle-seconds 180` extends the final resource observation beyond the
 provider allocator's idle reclamation window. The bounded 30..300-second value
 is frozen in the profile and must match in comparisons. Idle/drain observation

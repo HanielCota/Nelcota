@@ -114,6 +114,21 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+      - name: bounded native sparse HTTP counters and generator fallback
+        timeout-minutes: 6
+        run: python3 bench/http_check.py --output target/stress-oracles/http
+      - name: native HTTP counter results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-sparse-http-oracle
+          path: |
+            target/stress-oracles/http/native-http.json
+            target/stress-oracles/http/completion.json
+            target/stress-oracles/http/profile.json
+          if-no-files-found: ignore
+          retention-days: 7
+
   supply-chain:
     runs-on: ubuntu-latest
     steps:

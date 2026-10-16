@@ -38,7 +38,8 @@ from watchdog import LABEL, atomic_json, host_reserves, process_identity, stop_g
 from metrics import NativeMetrics, PROMETHEUS
 from arrival_counters import PROTOCOL as ARRIVAL_COUNTER_PROTOCOL
 from receiver import EventLedger
-from observations import generator_observation
+from observations import generator_observation, GENERATOR_PROTOCOL
+from http_counters import PROTOCOL as HTTP_COUNTER_PROTOCOL
 from objects import S3Inventory, disk_inventory, reconcile
 from host_resources import snapshot as host_snapshot, owned_cgroup_snapshot, require_no_oom
 from ownership import LOG_PROFILE,OwnedDocker
@@ -348,7 +349,7 @@ def campaign(arguments):
                     time.sleep(.1)
             if not metrics_ready:
                 raise RuntimeError("Metrics listener ownership could not be confirmed")
-            native_metrics = NativeMetrics(metrics_url)
+            native_metrics = NativeMetrics(metrics_url, retain_http_counters=True)
             pg_password = secrets.token_urlsafe(32)
             authenticator = secrets.token_urlsafe(32)
             jwt = secrets.token_urlsafe(48)
@@ -710,6 +711,7 @@ def campaign(arguments):
                 "generator_memory_mb": 512,
                 "generator_go_memory_limit_mib": 448,
                 "generator_usage_reporting": False,
+                "generator_observation_protocol": GENERATOR_PROTOCOL,
                 "pg_data": "disposable disk volume",
                 "max_wal_mb": arguments.wal_mib,
                 "max_fixture_disk_mb": arguments.fixture_disk_mib,
@@ -741,6 +743,7 @@ def campaign(arguments):
                 "client_initialization":{"maximum_sessions_per_project":128,"bootstrap_concurrency":4,"setup_timeout_seconds":120,"fully_preallocated_arrival_VUs":True,"mix_schedule":"global scenario arrival ordinal","bootstrap_excluded_from_nominal_metrics":True},
                 "metrics_backend": "native Prometheus histogram; k6 raw TrendSink disabled",
                 "arrival_counter_protocol": ARRIVAL_COUNTER_PROTOCOL,
+                "http_counter_protocol": HTTP_COUNTER_PROTOCOL,
                 "metrics_memory_mb": 512,
                 "metrics_cpus": 0.25,
                 "metrics_cpu_affinity": cpus[-1],

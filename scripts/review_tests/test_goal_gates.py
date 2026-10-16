@@ -14,6 +14,7 @@ COMPARE = ROOT / "bench/compare.py"
 CHECKER = ROOT / "scripts/check-boundaries.py"
 sys.path.insert(0, str(ROOT / 'bench'))
 from arrival_counters import PROTOCOL as ARRIVAL_COUNTER_PROTOCOL
+from http_counters import PROTOCOL as HTTP_COUNTER_PROTOCOL
 
 
 class Comparison(unittest.TestCase):
@@ -97,6 +98,7 @@ class Comparison(unittest.TestCase):
             path=directory/'metadata.json'
             metadata=json.loads(path.read_text());metadata['schema']=2
             metadata['arrival_counter_protocol']=ARRIVAL_COUNTER_PROTOCOL
+            metadata['http_counter_protocol']=HTTP_COUNTER_PROTOCOL
             path.write_text(json.dumps(metadata))
             (directory/'completion.json').write_text(json.dumps({'status':'passed','cleanup_confirmed':True}))
             (directory/'cleanup.json').write_text(json.dumps({'containers':[],'volumes':[],'directory_removed':True}))
@@ -110,12 +112,34 @@ class Comparison(unittest.TestCase):
                 sample['duration_seconds']=30
                 sample['arrival_counter_evidence']={'phase':f'read-{index}','protocol':ARRIVAL_COUNTER_PROTOCOL,'began_monotonic':0,'last_monotonic':30,'maximum_poll_gap_seconds':5,'observations':8,'closed':True,'dropped_by_scenario':{'traffic':0}}
                 sample['metrics']['dropped_iterations']={'count':0}
+                sample['metrics']['expected_rejections']={'count':0}
+                sample['http_counter_evidence']={'phase':f'read-{index}','protocol':HTTP_COUNTER_PROTOCOL,'began_monotonic':0,'last_monotonic':30,'maximum_poll_gap_seconds':5,'observations':8,'closed':True,'tracked_series_count':1,'scenarios':{'traffic':{'project':'single','http_reqs':3000,'expected_rejections':0,'status_counts':{'200':3000}}}}
                 path.write_text(json.dumps(sample))
 
     def test_missing_continuous_counter_protocol_cannot_certify_useful_work(self):
         self.useful_fixture(100)
         for directory in [self.baseline,self.candidate]:
             path=directory/'metadata.json';value=json.loads(path.read_text());value.pop('arrival_counter_protocol');path.write_text(json.dumps(value))
+        code,report=self.compare()
+        self.assertNotEqual(code,0)
+        self.assertEqual(report['campaign_evidence_valid'],[False,False])
+
+    def test_stale_http_or_negative_counts_cannot_certify_useful_work(self):
+        self.useful_fixture(100)
+        path=self.candidate/'read-1.json'
+        sample=json.loads(path.read_text())
+        sample['http_counter_evidence']['scenarios']['traffic']['status_counts']['401']=3
+        sample['http_counter_evidence']['scenarios']['traffic']['http_reqs']=3003
+        sample['http_counter_evidence']['scenarios']['traffic']['expected_rejections']=3
+        path.write_text(json.dumps(sample))
+        code,report=self.compare()
+        self.assertNotEqual(code,0)
+        self.assertFalse(report['rows'][0]['comparable'])
+
+    def test_missing_http_protocol_cannot_certify_useful_work(self):
+        self.useful_fixture(100)
+        for directory in [self.baseline,self.candidate]:
+            path=directory/'metadata.json';value=json.loads(path.read_text());value.pop('http_counter_protocol');path.write_text(json.dumps(value))
         code,report=self.compare()
         self.assertNotEqual(code,0)
         self.assertEqual(report['campaign_evidence_valid'],[False,False])

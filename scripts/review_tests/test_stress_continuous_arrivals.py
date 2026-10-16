@@ -80,11 +80,15 @@ class MetricsArrivalIntegration(unittest.TestCase):
         self.now = 0
         self.rows = []
         self.reset = 0
-        self.metrics = NativeMetrics('http://127.0.0.1:1')
+        self.metrics = NativeMetrics('http://127.0.0.1:1', retain_http_counters=True)
 
     def response(self, url, **kwargs):
         query = urllib.parse.parse_qs(urllib.parse.urlsplit(url).query)['query'][0]
         rows = [{'value': [1, '1']}]
+        if query.startswith('last_over_time(k6_http_reqs_total'):
+            rows = [{'metric':{'run_id':'soak','scenario':'traffic','project':'single','status':'200','method':'GET','workload':'read'},'value':[1,'1']}]
+        if query.startswith('last_over_time(k6_expected_rejections_total'):
+            rows = []
         if 'sum by(scenario)' in query:
             rows = self.rows
         if 'sum(resets(' in query:
