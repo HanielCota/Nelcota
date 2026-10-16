@@ -226,7 +226,11 @@ class HostEvidence(unittest.TestCase):
         with mock.patch.object(reader,'value',side_effect=value):
             reader.summary('balanced-1',300,'project-2')
             self.assertTrue(expressions)
-            self.assertTrue(all('project="project-2"' in expression for expression in expressions))
+            dropped = [expression for expression in expressions if 'k6_dropped_iterations_total' in expression]
+            self.assertEqual(dropped, ['sum(k6_dropped_iterations_total{run_id="balanced-1",scenario="project-2"})'])
+            operations = [expression for expression in expressions if expression not in dropped]
+            self.assertTrue(operations)
+            self.assertTrue(all('project="project-2"' in expression for expression in operations))
             with self.assertRaises(ValueError):
                 reader.summary('balanced-1',300,'project-2"} or vector(1)')
 
