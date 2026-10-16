@@ -1837,3 +1837,46 @@ Dois testes novos provam restauração após falha e rejeição de NaN/bool/TTL
 inadequado antes de qualquer comando na convidada. Com os quinze testes do
 runner/census, **17 passaram em 0,017 s**. A execução real desse cenário ainda
 está pendente e não foi anunciada como aprovada.
+
+### 16/10, 23:28 UTC — migração confirmada, relógio validado e falha Rust preservada
+
+A [repetição com census corrigido](results/stress/native-cwd-migration-after.json)
+passou em `38979033688`, fonte `3b56b25`, binário
+`18769a1f2fae5abee81be42f8de4997e9e700a431eb4bc835630cccd994cd328`.
+Os dois comandos migrate retornaram 0, a tabela e o journal foram observados
+em SQL e a contagem foi **1**. Treze amostras, 67,099 s com preparo e limpeza.
+O [snapshot intermediário](results/stress/native-cwd-migration-census-failure.json)
+permanece reprovado: comandos já retornavam 0, mas o oráculo ainda comparava
+bytes com string e não comprovou presença/contagem. Não foi promovido a passe.
+
+O [controle real de relógio](results/stress/native-clock-drift-pass-1.json)
+também passou, em `38980126695`, fonte `3b56b25`, binário
+`1b8b0c388dd9717a69e30b344c29b14c8050d2090c4326fb2fbe12093d9e2356`.
+Passo planejado de 1.020 s, observado de **1.018,326 s**; access expirado 401,
+serviço autorizado preservado e anônimo negado. Relógio/NTP restaurados,
+offset final **0,471 s**, acesso ordinário recuperado. A remoção real também
+confirmou owner ausente e recusa de `up` no host antigo vazio. Treze amostras,
+66,136 s incluindo preparo, sem guard crítico e com limpeza.
+
+O [CI de `14725d6`](results/stress/ci-native-executable-identity-failure.json)
+reprovou em `updates::runtime::tests::running_native_identity_rejects_replacement_even_with_the_same_hash`.
+O Rust de `3b56b25`, com o mesmo código Rust relevante, passou, mas isso não
+apaga a falha nem demonstra sua causa. A fixture copia/inicia um executável
+temporário; precisam ser investigados o ponto exato e os possíveis races de
+execução/observação, sem enfraquecer a validação de identidade de produção.
+O painel ainda requer o rebuild separado de assets no intervalo seguro.
+
+Foi preparada uma descoberta de telemetria do provedor em **outra VM**,
+com o digest exato do RustFS histórico, controller de 0,5 CPU/256 MiB e
+provider de 0,5 CPU/1 GiB, ambos com 128 tarefas. Há guardas de disco/rede/
+reservas, watchdog de 300 s e limite externo de 360 s. O receptor exige nonce
+privado e IP do container, decodifica somente métricas numéricas limitadas e
+não publica labels privados. Ausência de export fica bloqueada; gauges/sums
+não provam liberação de owners ou explicam retroativamente o plateau de 415 MiB.
+São 90 s de descoberta após preparo, sem tráfego BaaS/crédito de endurance.
+Seis regressões do decoder passaram em 0,026 s; quatro de receiver/transporte
+passaram em 1,012 s. A descoberta real ainda não foi executada.
+
+O monitor local passou para a célula 993. Ele só executa o census agregado
+quando a própria campanha entrar no descanso final de 180 s, mantendo a
+verificação de run/label/phase e recusando qualquer query durante o soak.
