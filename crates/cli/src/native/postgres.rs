@@ -142,10 +142,10 @@ fn password_command() -> Command {
     command
 }
 
-fn validate_password(password: &str) -> anyhow::Result<()> {
-    if password.is_empty()
-        || password.len() > 256
-        || !password.bytes().all(|byte| byte.is_ascii_alphanumeric())
+fn validate_password(candidate: &str) -> anyhow::Result<()> {
+    if candidate.is_empty()
+        || candidate.len() > 256
+        || !candidate.bytes().all(|byte| byte.is_ascii_alphanumeric())
     {
         bail!("native PostgreSQL needs the generated alphanumeric password");
     }
@@ -330,7 +330,7 @@ mod tests {
     fn unsafe_password_is_rejected_before_any_native_operation() {
         assert!(validate_password("").is_err());
         for suffix in ["'", "\n", "\\", "\u{e7}"] {
-            let password = format!("{}{suffix}", crate::util::secret(42));
+            let password = crate::util::secret(42) + suffix;
             let error = configure_postgres("1gb", &password).unwrap_err();
             assert!(
                 error
