@@ -16,6 +16,7 @@ FIELDS.append('webhooks')
 FIELDS.append('ingress')
 FIELDS.append('startup_disk_budget')
 FIELDS.append('project_cpu_period_micros')
+FIELDS.append('resource_probe_workers')
 
 
 def positive(value):
@@ -41,6 +42,8 @@ def read_run(root):
     period=profile.get('project_cpu_period_micros')
     if isinstance(period,bool) or not isinstance(period,int) or period not in (10000,100000):
         raise ValueError('Missing declared project CPU period')
+    if not isinstance(profile.get('resource_probe_workers'),int) or profile['resource_probe_workers']!=4:
+        raise ValueError('Missing bounded fleet observation worker policy')
     if isinstance(projects,bool) or not isinstance(projects,int) or projects not in (1,5,10) or positive(profile.get('seconds_per_step'))<300 or profile.get('certifies_five_minute_steps') is not True or any(field not in profile for field in FIELDS):
         raise ValueError('Missing equivalent profile or full-duration evidence')
     positive(profile['nominal_rate_per_project'])

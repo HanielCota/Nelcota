@@ -852,7 +852,7 @@ valores ausentes, não finitos ou inválidos. Nenhum SLO foi relaxado e nenhum
 resultado anterior reprovado foi reescrito. O efeito da configuração sob
 carga ainda requer campanha nova no artefato congelado.
 
-### 2026-10-16 05:35 UTC — fechamento dos leitores de evidência SQLite
+### 2026-10-16 05:30 UTC — fechamento dos leitores de evidência SQLite
 
 A segunda compactação preservou por SHA-256 os bytes de 44 arquivos concluídos,
 incluindo 35 ledgers SQLite fechados, após `PRAGMA integrity_check` em modo
@@ -875,3 +875,33 @@ por symlink. [Antes/depois](results/stress/sqlite-archive-owner-before-after.jso
 É uma correção do utilitário de evidência do staging; não foi uma falha do
 processo Rust ou dos bancos da aplicação. A próxima compactação utilizará
 o helper corrigido. O espaço continua sujeito ao preflight e à reserva de 15%.
+
+### 2026-10-16 05:59 UTC — watchdog real e gargalo do observador
+
+`fleet-caddy-10-period10-pass-1-001` reprovou: após 900 segundos de carga
+concluída e 68 amostras, uma observação incompleta ultrapassou os 30 segundos
+e o watchdog independente interrompeu o tráfego. A limpeza foi confirmada.
+Os três passos concluídos de 8/16/24 por projeto também reprovaram o SLO
+de refresh; o período menor não recebeu aprovação. Não se atribui melhoria
+a essa configuração. [Evidência](results/stress/fleet-10-serial-observer-stop.json).
+
+O coletor anterior executava em série 22 leituras de cgroup, stats do Docker
+e consultas/tamanhos de dez bancos. O custo real excedeu o intervalo
+de observação. A correção limita o paralelismo a quatro probes, usa somente
+builtins do shell para os arquivos de cgroup (evitando um processo cat por
+arquivo) e registra duração total e de cada probe. O protocolo novo é explícito
+e não pode ser comparado como equivalente ao serial. O caminho padrão dos
+diagnósticos de projeto único continua com o protocolo anterior.
+
+Uma falha em qualquer probe sinaliza a parada antes de aguardar os outros
+owners; o pool termina suas threads e nunca publica um snapshot parcial.
+O limite crítico continua em 30 segundos. Dezessete testes focados passaram,
+incluindo quatro probes avançando ao mesmo tempo, limite máximo de quatro,
+erro sinalizado enquanto outro owner ainda termina, ausência de threads
+retidas e leitura nativa do cgroup com PATH sem nenhum executável externo.
+
+O erro secundário URLError vinha da tentativa de reter métricas depois que
+o watchdog removia o servidor. A retenção agora registra o erro secundário
+e preserva a exceção original. Se não houver falha anterior, a ausência
+do snapshot continua reprovando a campanha. Duas regressões cobrem esses
+casos. O observador corrigido ainda precisa da substituição nativa do perfil.

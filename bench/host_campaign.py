@@ -31,6 +31,7 @@ from ownership import LOG_PROFILE,OwnedDocker
 from disk_usage import container as container_disk_usage
 from fleet_webhooks import FleetWebhooks
 from ingress import Ingress
+from fleet_observer import collect as collect_probes,retain_metrics_snapshot,WORKERS as PROBE_WORKERS
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -170,7 +171,8 @@ def campaign(args):
             profile['scope'] = 'local independent app/PG clusters with verified local Caddy, no public DNS/controller'
             profile['ingress'] = ingress.start(projects, output)
         profile['webhooks'] = {'enabled': args.webhooks, 'receiver': 'owned loopback, verified signatures and durable event identities', 'evidence_limit_mib': 128, 'drain_seconds': 30}
-        profile['resource_protocol']='component cgroup v2 plus host/process owners; allocated du totals count only disappearing child entries'
+        profile['resource_protocol']='component cgroup v2 via shell builtins and bounded parallel owned probes; allocated du totals count only disappearing child entries'
+        profile['resource_probe_workers']=PROBE_WORKERS
         profile['container_log_profile']=LOG_PROFILE
         profile['harness_js_sha256']=hashlib.file_digest((ROOT/'bench/campaign.js').open('rb'),'sha256').hexdigest()
         profile['client_initialization']={'maximum_sessions_per_project':128,'bootstrap_concurrency':4,'setup_timeout_seconds':120,'fully_preallocated_arrival_VUs':True,'mix_schedule':'global scenario arrival ordinal','bootstrap_excluded_from_nominal_metrics':True}
@@ -206,6 +208,23 @@ def campaign(args):
         resource_began = time.monotonic()
         resource_at = resource_began
 
+        def component_snapshot(name):
+            value=owned_cgroup_snapshot(owned,name,shell_builtins=True)
+            try:
+                require_no_oom(value['memory.events'])
+            except (ValueError,RuntimeError):
+                atomic_json(output/'memory-events-violation.json',{name:value['memory.events']})
+                raise
+            return value
+
+        def database_snapshot(project):
+            values = json.loads(project.sql("SELECT json_build_object('connections',count(*),'idle_in_transaction',count(*) FILTER(WHERE state='idle in transaction'),'stuck_idle_transactions',count(*) FILTER(WHERE state='idle in transaction' AND now()-state_change>interval '5 seconds'),'waiting_locks',count(*) FILTER(WHERE wait_event_type='Lock'),'webhook_queue',(SELECT json_build_object('outstanding',outstanding,'retained',retained) FROM nelcota.webhook_queue_usage WHERE singleton),'webhook_work',(SELECT json_build_object('processing',count(*) FILTER(WHERE status='processing'),'oldest_pending_seconds',coalesce(extract(epoch FROM clock_timestamp()-min(created_at)),0)) FROM nelcota.webhook_deliveries WHERE status IN ('pending','processing'))) FROM pg_stat_activity WHERE backend_type='client backend';"))
+            if values['connections'] > 32 or values['stuck_idle_transactions']:
+                raise RuntimeError('Connection or transaction ownership violation')
+            values['disk_observation']=container_disk_usage(owned,project.pg,'/var/lib/postgresql/data',unit='k')
+            values['disk_bytes']=values['disk_observation']['value']*1024
+            return values
+
         def sample():
             nonlocal resource_at
             while not stop.is_set():
@@ -217,43 +236,37 @@ def campaign(args):
                     states = json.loads(owned('inspect', *observed_containers))
                     if any(not state['State']['Running'] or state['State']['OOMKilled'] or state['RestartCount'] or state['State']['Pid'] != process_ids[state['Name']] for state in states):
                         raise RuntimeError('Fixture unexpectedly restarted or OOMed')
-                    memory_events={}
-                    cgroups={}
+                    context=active_generator
+                    probes={'container-stats':lambda:[json.loads(line) for line in owned('stats','--no-stream','--format','{{json .}}',*observed_containers).splitlines()],
+                            'generator':lambda:generator_observation(context,lambda:active_generator),
+                            'webhooks':webhooks.observe}
+                    if ingress is not None:
+                        probes['ingress']=ingress.observe
                     for state in states:
-                        cgroups[state['Name']]=owned_cgroup_snapshot(owned,state['Name'])
-                        events=cgroups[state['Name']]['memory.events']
-                        memory_events[state['Name']]=events
-                        try:
-                            require_no_oom(events)
-                        except (ValueError,RuntimeError):
-                            atomic_json(output/'memory-events-violation.json',memory_events)
-                            raise
-                    stats = [json.loads(line) for line in owned('stats', '--no-stream', '--format', '{{json .}}', *observed_containers).splitlines()]
+                        probes['cgroup:'+state['Name']]=lambda name=state['Name']:component_snapshot(name)
+                    for project in projects:
+                        probes['database:'+project.label]=lambda item=project:database_snapshot(item)
+                    observations=collect_probes(probes,critical.set)
+                    values=observations['values']
+                    cgroups={state['Name']:values['cgroup:'+state['Name']] for state in states}
+                    memory_events={name:value['memory.events'] for name,value in cgroups.items()}
+                    stats=values['container-stats']
                     if len(stats) != len(observed_containers):
                         raise RuntimeError('Incomplete resource observation')
-                    databases = {}
-                    disk_bytes = 0
-                    for project in projects:
-                        values = json.loads(project.sql("SELECT json_build_object('connections',count(*),'idle_in_transaction',count(*) FILTER(WHERE state='idle in transaction'),'stuck_idle_transactions',count(*) FILTER(WHERE state='idle in transaction' AND now()-state_change>interval '5 seconds'),'waiting_locks',count(*) FILTER(WHERE wait_event_type='Lock'),'webhook_queue',(SELECT json_build_object('outstanding',outstanding,'retained',retained) FROM nelcota.webhook_queue_usage WHERE singleton),'webhook_work',(SELECT json_build_object('processing',count(*) FILTER(WHERE status='processing'),'oldest_pending_seconds',coalesce(extract(epoch FROM clock_timestamp()-min(created_at)),0)) FROM nelcota.webhook_deliveries WHERE status IN ('pending','processing'))) FROM pg_stat_activity WHERE backend_type='client backend';"))
-                        if values['connections'] > 32 or values['stuck_idle_transactions']:
-                            raise RuntimeError('Connection or transaction ownership violation')
-                        values['disk_observation']=container_disk_usage(owned,project.pg,'/var/lib/postgresql/data',unit='k')
-                        values['disk_bytes']=values['disk_observation']['value']*1024
-                        disk_bytes += values['disk_bytes']
-                        databases[project.label] = values
+                    databases={project.label:values['database:'+project.label] for project in projects}
+                    disk_bytes=sum(value['disk_bytes'] for value in databases.values())
                     if disk_bytes > args.disk_mib*1024*1024:
                         raise RuntimeError('Aggregate database disk budget exceeded')
-                    webhook_observation = webhooks.observe()
-                    ingress_observation = None
-                    if ingress is not None:
-                        ingress_observation = ingress.observe()
-                    generation = generator_observation(active_generator, lambda: active_generator)
+                    webhook_observation=values['webhooks']
+                    ingress_observation=values.get('ingress')
+                    generation=values['generator']
                     if generation and generation.get('host_pid') and generation.get('pid_starttime'):
                         atomic_json(output/'generator-process.json',{'identity':identity,'pid':generation['host_pid'],'process_identity':generation['pid_starttime'],'container_id':generation['container_id']})
+                    host_observation=host_snapshot(cpus)
                     resource_at = time.monotonic()
                     coverage.observe(resource_at-resource_began)
                     with (output/'resources.jsonl').open('a') as target:
-                        target.write(json.dumps({'monotonic': resource_at, 'phase': phase, 'containers': stats, 'databases': databases, 'generator': generation,'host':host_snapshot(cpus),'memory_events':memory_events,'component_cgroups':cgroups,'webhooks':webhook_observation,'ingress':ingress_observation})+'\n')
+                        target.write(json.dumps({'monotonic': resource_at, 'phase': phase, 'observation_started_monotonic':cycle,'observation_duration_seconds':resource_at-cycle,'probe_durations_seconds':observations['durations_seconds'], 'containers': stats, 'databases': databases, 'generator': generation,'host':host_observation,'memory_events':memory_events,'component_cgroups':cgroups,'webhooks':webhook_observation,'ingress':ingress_observation})+'\n')
                     atomic_json(output/'checkpoint.json', {'phase': phase, 'monotonic': resource_at, 'load_seconds_completed': load_seconds, 'resource_observations': coverage.count})
                 except Exception as error:
                     violations.append({'phase': phase, 'reason': str(error)[-600:], 'type': type(error).__name__})
@@ -301,7 +314,7 @@ def campaign(args):
                     if process.poll() is None:
                         owned('rm', '-f', generator)
                         process.wait(timeout=20)
-                    atomic_json(output/(label+'-metrics-raw.json'), metrics.snapshot(label))
+                    retain_metrics_snapshot(metrics,label,output,failure_in_progress=sys.exception() is not None or process.returncode not in (None,0))
             if process.returncode or elapsed < seconds:
                 raise RuntimeError('Fleet generator failed or ended before its measured interval')
             if not action_completed:

@@ -20,7 +20,7 @@ class HostComparison(unittest.TestCase):
         for root in [self.before,self.after]:
             root.mkdir()
             profile={field:1 for field in host_compare.FIELDS}
-            profile.update(schema=2,projects=1,seconds_per_step=300,nominal_rate_per_project=8,certifies_five_minute_steps=True,project_cpu_period_micros=100000)
+            profile.update(schema=2,projects=1,seconds_per_step=300,nominal_rate_per_project=8,certifies_five_minute_steps=True,project_cpu_period_micros=100000,resource_probe_workers=4)
             (root/'manifest.json').write_text(json.dumps(profile))
             (root/'completion.json').write_text(json.dumps({'status':'passed','cleanup_confirmed':True}))
             (root/'cleanup.json').write_text(json.dumps({'confirmed':True}))
@@ -65,6 +65,15 @@ class HostComparison(unittest.TestCase):
             path.write_text(json.dumps(value))
             with self.subTest(period=period),self.assertRaises(ValueError):
                 host_compare.compare(self.before,self.after)
+
+    def test_serial_observer_cannot_certify_the_parallel_observer_profile(self):
+        path=self.after/'manifest.json'
+        value=json.loads(path.read_text())
+        value['resource_protocol']='another observation protocol'
+        path.write_text(json.dumps(value))
+        result=host_compare.compare(self.before,self.after)
+        self.assertFalse(result['gate_passed'])
+        self.assertIn('resource_protocol',result['fixture_differences'])
 
     def test_one_operation_regression_cannot_hide_in_total_throughput(self):
         for index in range(1,4):

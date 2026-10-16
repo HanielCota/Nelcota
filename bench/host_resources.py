@@ -24,11 +24,14 @@ def parse_counters(text):
 
 CONTAINER_FIELDS=('memory.current','memory.max','memory.peak','memory.events','memory.stat','cpu.max','cpu.stat','pids.current','pids.max')
 CONTAINER_COMMAND='set -eu; for field in '+ ' '.join(CONTAINER_FIELDS)+'; do printf "[%s]\\n" "$field"; cat "/sys/fs/cgroup/$field"; done'
+BUILTIN_CONTAINER_COMMAND='set -eu; for field in '+ ' '.join(CONTAINER_FIELDS)+'; do printf "[%s]\\n" "$field"; while IFS= read -r line; do printf "%s\\n" "$line"; done < "/sys/fs/cgroup/$field"; done'
 
 
-def owned_cgroup_snapshot(owned,name):
+def owned_cgroup_snapshot(owned,name,*,shell_builtins=False):
     """Read the component namespace when its cgroup is outside our mount."""
-    raw=owned('exec',name,'sh','-c',CONTAINER_COMMAND)
+    command=CONTAINER_COMMAND
+    if shell_builtins:command=BUILTIN_CONTAINER_COMMAND
+    raw=owned('exec',name,'sh','-c',command)
     sections={}
     current=None
     for line in raw.splitlines():

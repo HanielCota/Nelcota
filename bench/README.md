@@ -222,6 +222,16 @@ exceptions invalidate the campaign unless the observation crossed its explicit
 server-restart window; cross-restart observations are discarded. The sampler
 must finish before the final evidence gate, so a late failure cannot be hidden.
 
+Independent-project campaigns use at most four concurrent owned observation
+probes. Their cgroup reader uses shell builtins, preserving the numeric fields
+without spawning one `cat` process per file. The manifest records this protocol
+and worker limit; samples retain total and per-probe durations. A failed probe
+signals traffic cancellation before the remaining owners are joined, and no
+partial batch certifies a sample. The 30-second watchdog limit is unchanged.
+Metric-retention errors are recorded without replacing an existing campaign
+failure; absent metrics still fail a previously healthy run. Host comparisons
+reject different observation protocols.
+
 ## Troubleshooting and evidence
 
 Use a fresh output directory and inspect failed/skipped resource gates. A
