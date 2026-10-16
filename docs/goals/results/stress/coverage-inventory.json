@@ -931,10 +931,11 @@
     "scope": "Capability/publication only: 17 exports, 18 samples, three real memory gauges, owned cleanup. Requested bytes explicitly unavailable; live-owner release and historical retention attribution remain unverified."
   },
   "current_ci_failure": {
-    "status": "under investigation",
+    "status": "fixture corrected; original failure retained",
     "evidence": "ci-native-executable-identity-failure.json",
     "test": "updates::runtime::tests::running_native_identity_rejects_replacement_even_with_the_same_hash",
-    "scope": "Original panic at first validation line 863: initial process identity mismatch. Fixture uses bounded real child I/O before observing /proc; production validation unchanged. A thousand real repetitions are pending.",
-    "diagnostic_evidence": "ci-native-executable-panic-location.json"
+    "scope": "Original first-validation identity panic at line 863 preserved. Bounded real child I/O added only to fixture; 1000/1000 real repetitions passed in 9.064s on c98aaaf. Production fail-closed validation unchanged; final whole-CI gates remain separate.",
+    "diagnostic_evidence": "ci-native-executable-panic-location.json",
+    "regression_evidence": "ci-native-executable-identity-after.json"
   }
 }

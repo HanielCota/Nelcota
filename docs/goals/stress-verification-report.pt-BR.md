@@ -209,8 +209,8 @@ reprovou em `14725d6`; Rust em `3b56b25`, com o mesmo código relevante, passou,
 sem comprovar a causa da falha original. O novo downloader seguro recuperou
 [local/categoria do panic](results/stress/ci-native-executable-panic-location.json):
 primeira validação na linha 863, identidade inicial diferente. A fixture agora
-exige I/O real do filho antes de observar /proc; mil repetições reais estão
-pendentes, sem alterar a checagem de produção. Dois diagnósticos remotos limitados anteriores também falharam; o último publicou exit 1
+exige I/O real do filho antes de observar /proc; [mil repetições reais passaram](results/stress/ci-native-executable-identity-after.json)
+em 9,064 s, sem alterar a checagem de produção ou somar crédito de endurance. Dois diagnósticos remotos limitados anteriores também falharam; o último publicou exit 1
 sem código HTTP identificável. Esses recibos não fornecem o diagnóstico
 original de compilação e não foram apresentados como testes aprovados.
 

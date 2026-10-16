@@ -1961,3 +1961,15 @@ continua eliminando a VM inteira no limite; não se alterou produção.
 Duas regressões novas provam restauração após erro e recusa de uma pasta
 preexistente; com os demais testes nativos, 17 passaram em 0,017 s.
 A execução real e qualquer correção de produção seguem pendentes.
+
+### 16/10, 23:48 UTC — mil repetições reais do teste de identidade
+
+O [job isolado](results/stress/ci-native-executable-identity-after.json), fonte
+`c98aaaf`, passou **1.000/1.000** execuções do único teste, em **9,064 s**
+de execução efetiva de regressão. SHA-256 do executável de testes:
+`151c748462ab3f6be46d4928f1627cdddd39283e8e39aec359d3ce49fa6ca137`.
+O controller confirmou os limites reais de kernel, e cada execução comprovou
+que rodou exatamente um teste e publicou sua conclusão. Nenhum output de
+assertion foi exposto. Isso valida a nova prontidão da fixture e a rejeição de
+substituição por mesmo hash; não substitui CI completo, não apaga o panic
+original e não soma nove segundos ao crédito de tráfego BaaS/endurance.
