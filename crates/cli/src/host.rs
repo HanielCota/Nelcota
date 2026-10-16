@@ -21,6 +21,27 @@ use crate::{envfile::EnvFile, naming, project::Project};
 
 pub const MANIFEST: &str = "nelcota-host.json";
 
+/// All host mutations, including the first init, share this deployment lease.
+pub(crate) fn acquire_mutation_lease(root: &Path) -> anyhow::Result<nelcota_deployment::HostLock> {
+    let lease = nelcota_deployment::HostLock::acquire(root)?;
+    nelcota_deployment::management::ensure_idle(root)?;
+    let journal = nelcota_deployment::Journal::open(root)?;
+    if journal
+        .list()?
+        .iter()
+        .any(|job| !job.public.phase.terminal())
+    {
+        bail!("deployment needs recovery: use nelcota updates recover before mutating this host");
+    }
+    let host = Host::new(root);
+    if host.exists() && host.manifest()?.runtime == Runtime::Systemd {
+        // The host lease prevents its owner from being removed while this
+        // command runs; another directory cannot release the durable claim.
+        drop(crate::native::acquire_machine(&host)?);
+    }
+    Ok(lease)
+}
+
 /// How admins sign in to the panels.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, clap::ValueEnum)]
 #[serde(rename_all = "kebab-case")]
@@ -63,7 +84,7 @@ impl ProjectEntry {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Manifest {
     pub version: u32,
     pub panel_login: PanelLogin,

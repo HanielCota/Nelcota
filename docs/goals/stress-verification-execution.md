@@ -1686,3 +1686,57 @@ o diretório escolhido, sem depender do cwd de systemd. O probe real existente
 é a regressão de ponta a ponta: exige caminho absoluto, ativação e HTTPS
 válido, e será repetido com novo binário/VM. Rustfmt e diff-check passaram;
 nenhum teste nativo foi executado contra a máquina local compartilhada.
+
+### 16/10, 22:31 UTC — diretório padrão aprovado; colisão de hosts reproduzida
+
+A [repetição do diretório atual](results/stress/native-default-root-after.json)
+passou em `38974387655`, fonte `b43dc58`, binário
+`5d8fe465c129a68c5ad334d340211c1a099a322b83adfff52f86db7d1f792885`:
+`EnvironmentFile` absoluto, init/up/verify exit 0, HTTPS validado e limpeza
+confirmada. Dezenove amostras, 98,166 s incluindo preparação. Esse protocolo
+verificou ativação; não certificou todas as operações da CLI executadas a
+partir do cwd do host.
+
+O [probe de outra pasta](results/stress/native-host-root-before.json) reprovou
+em `38973642284`, fonte `77d2335`, binário
+`b46e5801ff2f545090cfca27dfae02b1c819d4921458c6980044def4d8615bfa`.
+O segundo init retornou 0, mudou a senha do primeiro PostgreSQL e seu Caddy,
+e criou outro manifesto e outra unit. A linha sentinela permaneceu; isso
+não torna a instalação segura nem prova que novas conexões antigas funcionam.
+Tudo estava em uma convidada descartável, com limpeza confirmada.
+
+A correção adiciona lease global e `owner.json` privado/root-owned em
+`/var/lib/nelcota-native`. A propriedade é persistida antes dos pacotes e
+configuração nativa, fica reservada após erro/interrupção e só é liberada
+após **todas** as etapas de remoção concluídas. O inode do lock permanece.
+Outro diretório, aliases ambíguos, registros corrompidos/grandes e symlinks
+não autorizam tomar a instalação. Reconhecimento de instalação anterior
+exige unit compatível e caminho absoluto do `.env` do próprio host.
+
+A revisão também encontrou uma janela na primeira criação: a seleção da
+lease anterior dependia de o manifesto já existir. Inicializações novas
+agora tomam a lease comum antes de publicar o primeiro manifesto; init existente
+relê o registro sob a lease e rejeita mudança concorrente. Operações do host
+validam a propriedade nativa enquanto mantêm a lease do diretório. Migrate
+congela a escolha entre host e configuração direta, mantendo sua lease pelo
+trabalho, sem transformar um host recém-publicado em alvo sem proteção.
+O teste de corrida usa locks reais e uma barreira enquanto o primeiro owner
+ainda não foi publicado; outros testes cobrem owner durável, troca/corrupção,
+limpeza completa, symlinks, aliases e adoção legada. Os novos testes Rust ainda
+aguardam compilação/execução no CI. Nenhuma reprodução de corrida concorrente
+real na CLI inteira foi afirmada a partir apenas desses testes de primitivas.
+
+O CodeQL de `b43dc58` reprovou novamente, agora com duas anotações de fixture
+([recibo](results/stress/codeql-invalid-fixtures-second-failure.json)). A consulta
+pública `HardcodedCryptographicValueExtensions.qll` identifica argumentos por
+nome do parâmetro (`password`), inclusive em validadores puros; também possui
+barreira de concatenação de dado não constante. O validador passa a chamar sua
+entrada de `candidate`, e o teste concatena uma base aleatória com o caractere
+inválido. As funções que de fato configuram/alteram senha mantêm seu parâmetro
+de credencial e o CodeQL segue habilitado. Isso preserva exatamente os inputs
+malformados e a rejeição específica; novo resultado está pendente.
+
+Doze regressões Python do executor passaram em **0,012 s**, rustfmt,
+fronteiras/checksums de migrations, diff-check e catálogo português passaram.
+Build de painel/binário e suítes pesadas locais continuam adiados até terminar
+o soak congelado, que não teve sua continuidade interrompida por essas alterações.

@@ -450,10 +450,10 @@ def campaign(binary, output, scenario):
                         "Second native host directory modified the first installation")
                 require(evidence["second_init_exit_code"] != 0 and not evidence["second_host_created"] and not evidence["second_unit_created"],
                         "Second native host directory was accepted on the same machine")
+                require(evidence["owner_rejection_reported"], "Second native host failed without the specific ownership rejection")
                 require(evidence["first_sentinel_rows"] == 1, "Second native host directory changed existing fixture data")
-            if scenario == "default-root":
-                certificate = guest.ssh(["sudo", "-n", "cat", "/var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt"]).stdout.decode()
-                Api(guest, certificate).ready()
+            certificate = guest.ssh(["sudo", "-n", "cat", "/var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt"]).stdout.decode()
+            Api(guest, certificate).ready()
             guest.assert_safe()
             report["checks"].append("native installation contract " + scenario)
             report["status"] = "passed"

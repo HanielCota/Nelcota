@@ -57,6 +57,7 @@ def host_root():
     return {"case": "second native init in another owned directory with network checks skipped",
             "first_native_init": first,
             "second_init_exit_code": second.returncode,
+            "owner_rejection_reported": b"native runtime already belongs to another host directory" in second.stdout + second.stderr,
             "first_database_password_changed": before != after,
             "first_caddy_configuration_changed": before_caddy != hashlib.sha256(caddy.read_bytes()).digest(),
             "first_sentinel_rows": count,

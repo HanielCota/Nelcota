@@ -241,7 +241,8 @@ def main():
         require(not Path("/etc/systemd/system/" + UNIT).exists(), "Native unit remained after remove")
         clusters = command(["pg_lsclusters", "--no-header"]).stdout.decode().splitlines()
         require(not any(line.split()[:2] == ["17", "main"] for line in clusters), "Native cluster remained after remove")
-        print(json.dumps({"checks": ["native remove", "native unit and cluster teardown"]}))
+        require(not Path("/var/lib/nelcota-native/owner.json").exists(), "Native machine owner remained after complete removal")
+        print(json.dumps({"checks": ["native remove", "native unit and cluster teardown", "machine ownership released after complete removal"]}))
         return
     # Fixed categories preserve useful failure evidence without publishing logs,
     # generated panel credentials, SQL, tokens or request/response bodies.
