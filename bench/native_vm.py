@@ -445,6 +445,10 @@ def campaign(binary, output, scenario):
                 require(evidence["environment_file_absolute"], "Documented native cwd produced a relative systemd EnvironmentFile")
                 require(evidence["systemd_verify_exit_code"] == 0 and evidence["up_exit_code"] == 0,
                         "Documented native cwd failed actual systemd verification or activation")
+                require(evidence["cwd_migration_exit_code"] == 0 and evidence["root_environment_migration_exit_code"] == 0,
+                        "Native migrations from host cwd or NELCOTA_ROOT failed")
+                require(evidence["fixture_table_created"] and evidence["applied_fixture_migrations"] == 1,
+                        "Native cwd migrations were absent or repeated")
             if scenario == "host-root":
                 require(not evidence["first_database_password_changed"] and not evidence["first_caddy_configuration_changed"],
                         "Second native host directory modified the first installation")

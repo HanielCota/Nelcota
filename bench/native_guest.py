@@ -151,6 +151,15 @@ def install_limits(*, sentinel=False):
     return limits
 
 
+def write_migration():
+    migrations = ROOT / "projects/stress/migrations"
+    (migrations / "V1__native_probe.sql").write_text(
+        "CREATE TABLE public.native_probe (id bigint PRIMARY KEY, owner uuid NOT NULL DEFAULT auth.uid(), value integer NOT NULL);\n"
+        "ALTER TABLE public.native_probe ENABLE ROW LEVEL SECURITY;\n"
+        "CREATE POLICY owner ON public.native_probe FOR ALL TO authenticated USING (owner=auth.uid()) WITH CHECK (owner=auth.uid());\n"
+        "GRANT SELECT, INSERT, UPDATE, DELETE ON public.native_probe TO authenticated, service_role;\n")
+
+
 def prepare():
     require(not ROOT.exists(), "Native project root already exists")
     if shutil.which("pg_lsclusters") is not None:
@@ -159,12 +168,7 @@ def prepare():
         require(not clusters.stdout.strip(), "Guest image already contains PostgreSQL clusters")
     limits = install_limits()
     cli("init", "--local", "--project", PROJECT, "--runtime", "systemd", "--profile", "1gb", "--yes", timeout=600)
-    migrations = ROOT / "projects/stress/migrations"
-    (migrations / "V1__native_probe.sql").write_text(
-        "CREATE TABLE public.native_probe (id bigint PRIMARY KEY, owner uuid NOT NULL DEFAULT auth.uid(), value integer NOT NULL);\n"
-        "ALTER TABLE public.native_probe ENABLE ROW LEVEL SECURITY;\n"
-        "CREATE POLICY owner ON public.native_probe FOR ALL TO authenticated USING (owner=auth.uid()) WITH CHECK (owner=auth.uid());\n"
-        "GRANT SELECT, INSERT, UPDATE, DELETE ON public.native_probe TO authenticated, service_role;\n")
+    write_migration()
     cli("up", timeout=90)
     cli("-p", PROJECT, "migrate", timeout=60)
     cli("-p", PROJECT, "migrate", timeout=60)

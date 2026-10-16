@@ -5,7 +5,7 @@ from pathlib import Path
 import subprocess
 import time
 
-from native_guest import ROOT, PROJECT, UNIT, cli, command, install_limits, prepare, require, sql, unit_state, versions
+from native_guest import ROOT, PROJECT, UNIT, cli, command, install_limits, prepare, require, sql, unit_state, versions, write_migration
 
 
 def environment_is_absolute():
@@ -37,6 +37,17 @@ def default_root():
         result["up_timed_out"] = True
     time.sleep(3)
     result["app_unit"] = unit_state(UNIT)
+    write_migration()
+    for label, environment in [("cwd", ["env", "-u", "NELCOTA_ROOT"]),
+                               ("root_environment", ["env", "NELCOTA_ROOT=" + str(ROOT)])]:
+        migrated = command([*environment, "/usr/local/bin/nelcota", "-p", PROJECT, "migrate"],
+                           cwd=ROOT, check=False, timeout=60)
+        result[label + "_migration_exit_code"] = migrated.returncode
+        result[label + "_migration_lease_busy"] = b"deployment_busy" in migrated.stdout + migrated.stderr
+    result["fixture_table_created"] = sql("SELECT to_regclass('public.native_probe') IS NOT NULL;\n").strip() == "t"
+    result["applied_fixture_migrations"] = None
+    if result["fixture_table_created"]:
+        result["applied_fixture_migrations"] = int(sql("SELECT count(*) FROM nelcota.user_migrations;\n"))
     return result
 
 
@@ -62,6 +73,7 @@ def host_root():
             "first_caddy_configuration_changed": before_caddy != hashlib.sha256(caddy.read_bytes()).digest(),
             "first_sentinel_rows": count,
             "second_host_created": (other / "nelcota-host.json").is_file(),
+            "second_root_directory_created": other.exists(),
             "second_unit_created": Path("/etc/systemd/system/nelcota-other.service").exists(),
             "first_app_after": unit_state(UNIT),
             "scope": "Both roots, the database, credentials and sentinels are generated disposable VM fixtures"}

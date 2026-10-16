@@ -1740,3 +1740,19 @@ Doze regressões Python do executor passaram em **0,012 s**, rustfmt,
 fronteiras/checksums de migrations, diff-check e catálogo português passaram.
 Build de painel/binário e suítes pesadas locais continuam adiados até terminar
 o soak congelado, que não teve sua continuidade interrompida por essas alterações.
+
+### 16/10, 22:35 UTC — repetição de ownership e extensão da verificação de cwd
+
+A correção de ownership está em `f560493`; o probe `host-root` foi disparado
+para uma nova VM com esse código. O runner exige a mensagem específica de
+rejeição, senha/Caddy/linha inalterados e HTTPS válido da primeira instalação.
+O diretório rejeitado pode conter metadados de lease privados; isso não é
+criação de outro manifesto/projeto/unit, e será mostrado separadamente.
+
+A revisão do caminho de migração identificou outra hipótese: um subprocesso
+nativo pode herdar o cwd/NELCOTA_ROOT do host e tentar retomar a lease já
+mantida pelo pai. O probe `default-root` foi ampliado para executar migrate
+real nas duas configurações, verificar a tabela e uma única aplicação da
+migration. O código da aplicação ainda não foi alterado para essa hipótese;
+o resultado da nova VM determinará se existe falha real. O resultado aprovado
+anterior continua válido somente para seu protocolo de ativação/HTTPS.
