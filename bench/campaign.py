@@ -36,6 +36,7 @@ from support import Receiver
 sys.path.insert(0, str(ROOT / "bench"))
 from watchdog import LABEL, atomic_json, host_reserves, process_identity, stop_generator
 from metrics import NativeMetrics, PROMETHEUS
+from latency import PROTOCOL as LATENCY_PROTOCOL
 from arrival_counters import PROTOCOL as ARRIVAL_COUNTER_PROTOCOL
 from receiver import EventLedger
 from observations import generator_observation, GENERATOR_PROTOCOL
@@ -744,6 +745,7 @@ def campaign(arguments):
                 "metrics_backend": "native Prometheus histogram; k6 raw TrendSink disabled",
                 "arrival_counter_protocol": ARRIVAL_COUNTER_PROTOCOL,
                 "http_counter_protocol": HTTP_COUNTER_PROTOCOL,
+                "successful_latency_protocol": LATENCY_PROTOCOL,
                 "metrics_memory_mb": 512,
                 "metrics_cpus": 0.25,
                 "metrics_cpu_affinity": cpus[-1],

@@ -32,6 +32,7 @@ from disk_usage import container as container_disk_usage
 from fleet_webhooks import FleetWebhooks
 from ingress import Ingress
 from fleet_observer import collect as collect_probes,retain_metrics_snapshot,WORKERS as PROBE_WORKERS
+from latency import PROTOCOL as LATENCY_PROTOCOL
 from arrival_counters import PROTOCOL as ARRIVAL_COUNTER_PROTOCOL
 from cpu_policy import allocation as cpu_allocation, verify as verify_cpu_allocation
 
@@ -200,6 +201,7 @@ def campaign(args):
         profile['arrival_counter_protocol']=ARRIVAL_COUNTER_PROTOCOL
         profile['generator_usage_reporting']=False
         profile['generator_observation_protocol']=GENERATOR_PROTOCOL
+        profile['successful_latency_protocol']=LATENCY_PROTOCOL
         profile['container_log_profile']=LOG_PROFILE
         profile['harness_js_sha256']=hashlib.file_digest((ROOT/'bench/campaign.js').open('rb'),'sha256').hexdigest()
         profile['client_initialization']={'maximum_sessions_per_project':128,'bootstrap_concurrency':4,'setup_timeout_seconds':120,'fully_preallocated_arrival_VUs':True,'mix_schedule':'global scenario arrival ordinal','bootstrap_excluded_from_nominal_metrics':True}

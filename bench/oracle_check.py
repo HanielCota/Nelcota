@@ -50,6 +50,21 @@ class Handler(BaseHTTPRequestHandler):
         return {'folders':[],'objects':[{'id':str(uuid.uuid4()),'name':str(index).zfill(8)+'.txt','size':0,'etag':hashlib.sha256(b'').hexdigest()} for index in range(1,21)]}
 
     def do_GET(self):
+        if self.server.mode=='redirect-latency' and self.path=='/storage/v1/object/public/bench/fixture.txt':
+            self.server.redirects+=1
+            time.sleep(.25)
+            self.server.counts['302']=self.server.counts.get('302',0)+1
+            self.send_response(302)
+            self.send_header('Location','/latency-control-final')
+            self.send_header('Content-Length','0')
+            self.end_headers()
+            self.close_connection=True
+            return
+        if self.server.mode=='redirect-latency' and self.path=='/latency-control-final':
+            self.server.reads+=1
+            self.server.operations['storage']+=1
+            self.respond(200,b'"benchmark payload"')
+            return
         if self.path.startswith('/rest/v1/bench_private'):
             if self.headers.get('Authorization')=='Bearer '+self.server.fixture['invalid_access']:
                 self.respond(401,b'{}')
@@ -150,13 +165,14 @@ class Handler(BaseHTTPRequestHandler):
 SEMANTIC_CASES=['empty-read','wrong-read-filter','wrong-read-order','malformed-read','unexpected-read-status','empty-rls','bad-panel','empty-list','bad-upload','wrong-login-user','invalid-refresh-expiry','empty-write']
 
 
-def run(output,baseline=None,semantic_baseline=None):
+def run(output,baseline=None,semantic_baseline=None,latency_baseline=None):
     output=output.resolve()
     if output.exists() and any(output.iterdir()):raise ValueError('Preserve previous evidence')
     output.mkdir(parents=True,exist_ok=True)
     sources=[Path(__file__).with_name('campaign.js')]
     if baseline is not None:sources.append(baseline)
     if semantic_baseline is not None:sources.append(semantic_baseline)
+    if latency_baseline is not None:sources.append(latency_baseline)
     for source in sources:
         if not source.is_file() or not 0<source.stat().st_size<=128*1024:
             raise ValueError('Oracle script must be a bounded local JavaScript file')
@@ -164,6 +180,8 @@ def run(output,baseline=None,semantic_baseline=None):
     identity='nelcota-oracle-'+secrets.token_hex(16)
     owned=OwnedDocker(identity,docker)
     cases=[('candidate-valid','valid',0,'storage','storage'),('candidate-corrupt','corrupt',108,'storage','storage'),('candidate-truncated','truncated',108,'storage','storage'),('candidate-mixed','mixed',0,'mixed','read')]
+    cases.append(('candidate-redirect-latency','redirect-latency',0,'storage','storage'))
+    if latency_baseline is not None:cases.append(('baseline-redirect-latency','redirect-latency',0,'storage','storage'))
     target={'empty-read':'read','wrong-read-filter':'read','wrong-read-order':'read','malformed-read':'read','unexpected-read-status':'read','empty-rls':'rls','bad-panel':'panel','empty-list':'storage','bad-upload':'storage','wrong-login-user':'login','invalid-refresh-expiry':'refresh','empty-write':'write'}
     for mode in SEMANTIC_CASES:
         workload='mixed'
@@ -199,6 +217,10 @@ def run(output,baseline=None,semantic_baseline=None):
     try:
         current=output/'candidate.js'
         shutil.copyfile(Path(__file__).with_name('campaign.js'),current)
+        def with_timing_summary(path):
+            with path.open('a') as target:
+                target.write('\nexport function handleSummary(data) { return {stdout:"\\nNELCOTA_ORACLE_TIMING:"+JSON.stringify(data.metrics.latency_storage.values)+"\\n"}; }\n')
+        with_timing_summary(current)
         fixture={'base':'http://127.0.0.1:'+str(server.server_port),'object_bytes':17,'service':secrets.token_urlsafe(32),'invalid_access':secrets.token_urlsafe(32),'user':str(uuid.uuid4()),'email':'oracle@example.test','password':secrets.token_urlsafe(32),'cookie':'fixture='+secrets.token_urlsafe(32)}
         server.fixture=fixture
         for label,mode,expected,workload,target_operation in cases:
@@ -210,12 +232,19 @@ def run(output,baseline=None,semantic_baseline=None):
             if label.startswith('baseline-semantic-'):
                 source=output/'semantic-baseline.js'
                 shutil.copyfile(semantic_baseline,source)
+            if label=='baseline-redirect-latency':
+                source=output/'latency-baseline.js'
+                shutil.copyfile(latency_baseline,source)
+                with_timing_summary(source)
             server.mode=mode;server.reads=0;server.counts={}
+            server.redirects=0
             server.bootstrap_logins=0;server.runtime_started=False
             server.uploaded=set()
             server.operations={key:0 for key in ['read','rls','panel','storage','login','refresh','write']}
             name=identity+'-'+label
-            owned('run','-d','--name',name,'--label',LABEL+'='+identity,'--network','host','--cpus','.25','--cpuset-cpus',str(sorted(os.sched_getaffinity(0))[-1]),'--memory','128m','--memory-swap','128m','--pids-limit','64','--user',str(os.getuid())+':'+str(os.getgid()),'-v',str(source)+':/campaign.js:ro','-e','K6_NO_USAGE_REPORT=true','-e','FIXTURE','-e','WORKLOAD='+workload,'-e','DURATION=2s','-e','VUS=1',K6,'run','--quiet','--summary-mode=disabled','--no-thresholds','/campaign.js',env={'FIXTURE':json.dumps(fixture)})
+            summary=['--summary-mode=disabled']
+            if mode=='redirect-latency':summary=[]
+            owned('run','-d','--name',name,'--label',LABEL+'='+identity,'--network','host','--cpus','.25','--cpuset-cpus',str(sorted(os.sched_getaffinity(0))[-1]),'--memory','128m','--memory-swap','128m','--pids-limit','64','--user',str(os.getuid())+':'+str(os.getgid()),'-v',str(source)+':/campaign.js:ro','-e','K6_NO_USAGE_REPORT=true','-e','FIXTURE','-e','WORKLOAD='+workload,'-e','DURATION=2s','-e','VUS=1',K6,'run','--quiet',*summary,'--no-thresholds','/campaign.js',env={'FIXTURE':json.dumps(fixture)})
             deadline=time.monotonic()+15
             phase='oracle'
             while True:
@@ -229,6 +258,15 @@ def run(output,baseline=None,semantic_baseline=None):
             result={'case':label,'mode':mode,'expected_exit_code':expected,'actual_exit_code':state['ExitCode'],'positive_object_reads':server.reads,'responses':dict(server.counts),'oom_killed':state['OOMKilled'],'script_sha256':hashlib.sha256(source.read_bytes()).hexdigest()}
             result['operations']=dict(server.operations)
             result['passed']=state['ExitCode']==expected and server.operations[target_operation]>0 and not state['OOMKilled']
+            if mode=='redirect-latency':
+                summaries=[line.removeprefix('NELCOTA_ORACLE_TIMING:') for line in logs.splitlines() if line.startswith('NELCOTA_ORACLE_TIMING:')]
+                if len(summaries)!=1:raise RuntimeError('Missing bounded redirect timing summary')
+                values=json.loads(summaries[0])
+                p95=values.get('p(95)')
+                if isinstance(p95,bool) or not isinstance(p95,(int,float)) or not 0<p95<15000:raise RuntimeError('Invalid redirect timing evidence')
+                result.update(storage_p95_ms=p95,redirect_delay_ms=250,redirects=server.redirects)
+                result['passed']=result['passed'] and server.redirects>=3 and p95>=250
+                if label=='baseline-redirect-latency':result['passed']=state['ExitCode']==0 and not state['OOMKilled'] and server.redirects>=3 and p95<125
             if mode in ('valid','corrupt','truncated'):result['passed']=result['passed'] and server.reads>0
             if mode=='mixed':
                 result['operations']=dict(server.operations)
@@ -260,5 +298,6 @@ if __name__=='__main__':
     parser.add_argument('--output',type=Path,required=True)
     parser.add_argument('--baseline-script',type=Path)
     parser.add_argument('--semantic-baseline-script',type=Path)
+    parser.add_argument('--latency-baseline-script',type=Path)
     args=parser.parse_args()
-    print(json.dumps(run(args.output,args.baseline_script,args.semantic_baseline_script),indent=2))
+    print(json.dumps(run(args.output,args.baseline_script,args.semantic_baseline_script,args.latency_baseline_script),indent=2))

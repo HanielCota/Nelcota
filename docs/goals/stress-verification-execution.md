@@ -1297,3 +1297,32 @@ limites nativos de 0,25 CPU/128 MiB conferidos. Limpeza confirmada. O controle
 não usa o backend e não acrescenta tempo efetivo ao G05.
 [Antes/depois](results/stress/native-http-control-before-after.json) e
 [auditoria histórica](results/stress/historical-http-counter-audit.json).
+
+### 2026-10-16 17:33–17:36 UTC — smoke fechado e latência de redirecionamento corrigida
+
+`disk-http-counter-smoke-001` passou: 605 segundos registrados, **590 efetivos
+sem warmup**, 58 fases com cobertura fechada dos contadores, 151 observações,
+um milhão de linhas por tabela, payload de 1 MiB e limpeza confirmada.
+O perfil inclui calibração curta, sobrecarga e cinco picos/recuperações;
+não substitui etapas de cinco minutos nem endurance de quatro horas.
+[Evidência](results/stress/disk-http-counter-smoke.json).
+
+Um controle nativo independente revelou que `response.timings.duration` do k6
+mede somente a resposta final após redirecionar. Um primeiro hop atrasado em
+250 ms produziu cerca de 5,5 ms no campo final contra 257 ms de duração lógica.
+Isso afeta a medição de downloads S3 e também excluía DNS/conexão/espera.
+A correção usa `execution.instance.currentTestRunDuration`, relógio monotônico
+do k6, antes/depois da requisição completa, com validação de finitude e sinal.
+O protocolo novo é obrigatório nos comparadores: dados anteriores continuam
+preservados e não certificam regressão segundo esse contrato. O backend Rust
+continua idêntico; não se atribui o achado à implementação de produção.
+[Controle da API](results/stress/native-redirect-timing-api.json).
+
+A regressão usa o **workload real** antes/depois, mantendo validação de bytes
+e atraso controlado de 250 ms: p95 anterior **6,165 ms**, corrigido **256,798 ms**,
+8 downloads redirecionados em cada versão. Os 18 casos nativos tiveram os
+resultados esperados, incluindo rejeições intencionais de payloads inválidos;
+limpeza confirmada. Os **237 testes Python passaram em 13,490 segundos**.
+[Antes/depois](results/stress/native-logical-latency-before-after.json).
+Os 18 checks do commit precedente `c276cc3` passaram; o novo commit de latência
+terá CI próprio e campanhas frescas. [CI precedente](results/stress/ci-c276cc3.json).

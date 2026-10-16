@@ -402,6 +402,14 @@ Wrong ownership, PID reuse, native-reader failure and the existing 30-second
 observation-gap limit still stop the run. The control has a 300-second watchdog
 and the same 0.25-CPU/128-MiB container bounds; its traffic is not BaaS endurance.
 
+Successful operation latency uses k6's monotonic test-run clock around the full
+logical request, including DNS, connection/admission waits and redirects. The
+returned response's `timings.duration` describes only its final hop and can
+hide time spent before an S3 redirect. The declared latency protocol must match
+in comparisons. The native response oracle injects a 250-ms redirect delay into
+the actual storage workload and requires its successful p95 to include it;
+`--latency-baseline-script` can also demonstrate the preceding undercount.
+
 `--final-idle-seconds 180` extends the final resource observation beyond the
 provider allocator's idle reclamation window. The bounded 30..300-second value
 is frozen in the profile and must match in comparisons. Idle/drain observation

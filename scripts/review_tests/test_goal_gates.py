@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[2]
 COMPARE = ROOT / "bench/compare.py"
 CHECKER = ROOT / "scripts/check-boundaries.py"
 sys.path.insert(0, str(ROOT / 'bench'))
+from latency import PROTOCOL as LATENCY_PROTOCOL
 from arrival_counters import PROTOCOL as ARRIVAL_COUNTER_PROTOCOL
 from http_counters import PROTOCOL as HTTP_COUNTER_PROTOCOL
 
@@ -99,6 +100,7 @@ class Comparison(unittest.TestCase):
             metadata=json.loads(path.read_text());metadata['schema']=2
             metadata['arrival_counter_protocol']=ARRIVAL_COUNTER_PROTOCOL
             metadata['http_counter_protocol']=HTTP_COUNTER_PROTOCOL
+            metadata['successful_latency_protocol']=LATENCY_PROTOCOL
             path.write_text(json.dumps(metadata))
             (directory/'completion.json').write_text(json.dumps({'status':'passed','cleanup_confirmed':True}))
             (directory/'cleanup.json').write_text(json.dumps({'containers':[],'volumes':[],'directory_removed':True}))
@@ -135,6 +137,14 @@ class Comparison(unittest.TestCase):
         code,report=self.compare()
         self.assertNotEqual(code,0)
         self.assertFalse(report['rows'][0]['comparable'])
+
+    def test_final_hop_latency_protocol_cannot_certify_logical_request_latency(self):
+        self.useful_fixture(100)
+        for directory in [self.baseline,self.candidate]:
+            path=directory/'metadata.json';value=json.loads(path.read_text());value.pop('successful_latency_protocol');path.write_text(json.dumps(value))
+        code,report=self.compare()
+        self.assertNotEqual(code,0)
+        self.assertEqual(report['campaign_evidence_valid'],[False,False])
 
     def test_missing_http_protocol_cannot_certify_useful_work(self):
         self.useful_fixture(100)

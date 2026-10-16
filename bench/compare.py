@@ -5,6 +5,7 @@ import json
 import math
 from pathlib import Path
 import statistics
+from latency import PROTOCOL as LATENCY_PROTOCOL
 from arrival_counters import PROTOCOL as ARRIVAL_COUNTER_PROTOCOL, closed_count
 from http_counters import PROTOCOL as HTTP_COUNTER_PROTOCOL, closed_counts
 
@@ -57,6 +58,7 @@ for index,directory in enumerate([args.baseline,args.candidate]):
             valid=completion.get('status')=='passed' and completion.get('cleanup_confirmed') is True and cleanup.get('containers')==[] and cleanup.get('volumes')==[] and cleanup.get('directory_removed') is True
             valid = valid and metadata[index].get('arrival_counter_protocol') == ARRIVAL_COUNTER_PROTOCOL
             valid = valid and metadata[index].get('http_counter_protocol') == HTTP_COUNTER_PROTOCOL
+            valid = valid and metadata[index].get('successful_latency_protocol') == LATENCY_PROTOCOL
         except (OSError,ValueError,TypeError):
             valid=False
     if 'allocator_observer' in metadata[index]:
@@ -65,7 +67,7 @@ for index,directory in enumerate([args.baseline,args.candidate]):
 for field in ["steady_duration", "workloads", "s3", "schema", "metrics_backend", "metrics_memory_mb", "metrics_cpus", "metrics_cpu_affinity", "effective_cpu_quota", "offered_rate_unit", "nominal_slos_ms", "auth_rate_limit_per_minute", "autovacuum", "webhook_history_maintenance", "storage_filesystem", "physical_seeded_objects", "object_payload_bytes", "max_storage_fixture_disk_mib"]:
     if any(field in value for value in metadata):
         fixture_fields.append(field)
-for field in ['resource_protocol','postgres_observation_settings','soak_fraction','container_log_profile','pressure_rest_seconds','final_idle_seconds','write_steady_rate','harness_sha256','client_initialization','calibration_ceiling_iterations_per_second','session_canary_observation','arrival_counter_protocol','http_counter_protocol','generator_usage_reporting','generator_observation_protocol']:
+for field in ['resource_protocol','postgres_observation_settings','soak_fraction','container_log_profile','pressure_rest_seconds','final_idle_seconds','write_steady_rate','harness_sha256','client_initialization','calibration_ceiling_iterations_per_second','session_canary_observation','arrival_counter_protocol','http_counter_protocol','generator_usage_reporting','generator_observation_protocol','successful_latency_protocol']:
     if any(field in value for value in metadata):
         fixture_fields.append(field)
 fixture_differences = [

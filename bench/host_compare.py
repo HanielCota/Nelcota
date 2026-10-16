@@ -5,6 +5,7 @@ import math
 from pathlib import Path
 import statistics
 from campaign import NOMINAL_SLOS
+from latency import PROTOCOL as LATENCY_PROTOCOL
 from arrival_counters import PROTOCOL as ARRIVAL_COUNTER_PROTOCOL, closed_count
 from cpu_policy import allocation as cpu_allocation, checked as checked_cpu_allocation, validate_proof as validate_cpu_proof
 
@@ -22,6 +23,7 @@ FIELDS.append('resource_probe_workers')
 FIELDS.append('arrival_counter_protocol')
 FIELDS.append('generator_usage_reporting')
 FIELDS.append('generator_observation_protocol')
+FIELDS.append('successful_latency_protocol')
 FIELDS.append('project_cpu_allocation')
 
 
@@ -55,6 +57,8 @@ def read_run(root):
         raise ValueError('Missing bounded fleet observation worker policy')
     if profile.get('arrival_counter_protocol') != ARRIVAL_COUNTER_PROTOCOL:
         raise ValueError('Missing continuous scheduler counter protocol')
+    if profile.get('successful_latency_protocol')!=LATENCY_PROTOCOL:
+        raise ValueError('Missing monotonic logical-request timing protocol')
     declared=profile.get('project_cpu_allocation')
     legacy_one=declared is None and projects==1
     # With one project, the legacy 1/N quota is exactly one CPU. Normalize that

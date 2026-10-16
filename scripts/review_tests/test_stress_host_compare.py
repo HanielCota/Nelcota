@@ -9,6 +9,7 @@ import unittest
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/'bench'))
 import host_compare
+from latency import PROTOCOL as LATENCY_PROTOCOL
 from arrival_counters import PROTOCOL as ARRIVAL_COUNTER_PROTOCOL
 from cpu_policy import allocation as cpu_allocation
 
@@ -31,6 +32,7 @@ class HostComparison(unittest.TestCase):
             profile['cpu_affinity']=[0,1,2]
             profile['project_cpu_allocation']=cpu_allocation(1,[0,1,2],100000,'quota')
             profile['arrival_counter_protocol']=ARRIVAL_COUNTER_PROTOCOL
+            profile['successful_latency_protocol']=LATENCY_PROTOCOL
             (root/'manifest.json').write_text(json.dumps(profile))
             write_cpu_proof(root,profile['project_cpu_allocation'])
             (root/'completion.json').write_text(json.dumps({'status':'passed','cleanup_confirmed':True}))
@@ -51,6 +53,11 @@ class HostComparison(unittest.TestCase):
 
     def test_equivalent_three_samples_pass(self):
         self.assertTrue(host_compare.compare(self.before,self.after)['gate_passed'])
+
+    def test_pre_fix_final_hop_timing_cannot_certify_logical_latency(self):
+        path=self.after/'manifest.json'
+        profile=json.loads(path.read_text());profile.pop('successful_latency_protocol');path.write_text(json.dumps(profile))
+        with self.assertRaisesRegex(ValueError,'logical-request'):host_compare.compare(self.before,self.after)
 
     def test_missing_401_attempts_cannot_hide_behind_successful_work(self):
         path=self.after/'balanced-1.json'

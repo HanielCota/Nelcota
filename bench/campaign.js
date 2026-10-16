@@ -118,16 +118,19 @@ function request(name, method, path, { body = null, token, cookie, prefer } = {}
   if (token) { headers.Authorization = `Bearer ${token}`; }
   if (cookie) { headers.Cookie = cookie; }
   if (prefer) { headers.Prefer = prefer; }
+  const began = execution.instance.currentTestRunDuration;
   const response = http.request(method, base + path, body, { headers, responseType:'text', timeout: '12s', tags: { workload: name } });
+  const logicalDuration = execution.instance.currentTestRunDuration - began;
+  if (!Number.isFinite(logicalDuration) || logicalDuration < 0) { fail('latency_clock', name, response.status); return response; }
   const successStatus = response.status >= 200 && response.status < 300;
   const allowedStatuses = [200];
   if (name === 'storage' && method === 'PUT') { allowedStatuses.push(201); }
   if (successStatus && !allowedStatuses.includes(response.status)) { fail('unexpected_success_status', name, response.status); return response; }
   const ok = allowedStatuses.includes(response.status) && response.error_code === 0;
   if (ok) {
-    timings[name].add(response.timings.duration);
+    timings[name].add(logicalDuration);
     successfulOperations.add(1, { workload: name });
-    successfulDuration.add(response.timings.duration);
+    successfulDuration.add(logicalDuration);
   }
   const bounded = __ENV.OVERLOAD === 'true' && [429, 503, 504].includes(response.status) && [0, 1000 + response.status].includes(response.error_code);
   overloadRejections.add(0);
