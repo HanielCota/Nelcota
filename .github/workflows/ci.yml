@@ -27,7 +27,14 @@ jobs:
       - run: python3 scripts/check-boundaries.py
       - run: cargo clippy --all-targets -- -D warnings
       # Integration tests start Postgres 17 via testcontainers (the runner's Docker).
-      - run: cargo test --all
+      - id: rust-tests
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo test --all 2>&1 | tee "$RUNNER_TEMP/nelcota-rust-test.log"
+      - name: expose failed Rust test identities
+        if: ${{ failure() && steps.rust-tests.outcome == 'failure' }}
+        run: python3 scripts/report-rust-test-failures.py "$RUNNER_TEMP/nelcota-rust-test.log"
       - name: documented Notes onboarding
         timeout-minutes: 5
         run: |
