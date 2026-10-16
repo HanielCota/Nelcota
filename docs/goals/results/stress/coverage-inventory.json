@@ -45,6 +45,12 @@
           "status": "passed",
           "scope": "First full local live-browser/SDK lifecycle pass: three tabs, foreground p95 399.4ms, all 300 disposed test clients collected, actual credential expiry/renewal, byte-verified uploads, real response cancellation and cleanup; independent second pass still pending.",
           "evidence": "browser-pass-1.json"
+        },
+        {
+          "run_id": "s3-pass-1-004",
+          "status": "passed",
+          "scope": "First complete local real-S3 14400-second continuous pass plus prelude: 2934 samples, 249824 signed event identities reconciled, 16 session renewals, two pruning cohorts, byte/multipart invariants and cleanup. Separate provider allocation attribution and independent second pass still pending.",
+          "evidence": "s3-pass-1.json"
         }
       ]
     },
@@ -84,6 +90,12 @@
           "status": "passed",
           "scope": "First complete 14400-second continuous disk pass plus 3585 completed prelude seconds; same processes, 3094 samples, 248381 events reconciled and cleanup confirmed. Second independent pass and remaining row scenarios are still pending.",
           "evidence": "disk-pass-1.json"
+        },
+        {
+          "run_id": "s3-pass-1-004",
+          "status": "passed",
+          "scope": "First complete local real-S3 14400-second continuous pass plus prelude: 2934 samples, 249824 signed event identities reconciled, 16 session renewals, two pruning cohorts, byte/multipart invariants and cleanup. Separate provider allocation attribution and independent second pass still pending.",
+          "evidence": "s3-pass-1.json"
         }
       ]
     },
@@ -177,7 +189,7 @@
       "area": "Real S3-compatible storage and multipart",
       "entrypoints": "bench/campaign.py; crates/server/tests/storage_s3.rs",
       "status": "not run",
-      "scope_or_limit": "Real RustFS mixed smoke passed with full physical inventory; uninterrupted final-artifact four-hour endurance and two full passes are pending. Local compatible provider, not AWS/off-host certification.",
+      "scope_or_limit": "First real local RustFS continuous four-hour pass approved with multipart zero, byte/metadata/event reconciliation and owned cleanup. Independent second pass, large-object cells and provider allocation attribution remain pending; not AWS/off-host certification.",
       "functional_subset": {
         "status": "passed",
         "source_commit": "3203330cf3df2b9b7dd68efebc79412a8564e9fd",
@@ -202,9 +214,14 @@
           "status": "passed",
           "scope": "150 seconds effective real-backend mixed diagnostic, not capacity or endurance certification",
           "evidence": "semantic-real-backend-smokes.json"
+        },
+        {
+          "run_id": "s3-pass-1-004",
+          "status": "passed",
+          "scope": "First complete local real-S3 14400-second continuous pass plus prelude: 2934 samples, 249824 signed event identities reconciled, 16 session renewals, two pruning cohorts, byte/multipart invariants and cleanup. Separate provider allocation attribution and independent second pass still pending.",
+          "evidence": "s3-pass-1.json"
         }
-      ],
-      "in_progress_run_id": "s3-pass-1-004"
+      ]
     },
     {
       "id": "webhooks",
@@ -230,6 +247,12 @@
           "status": "passed",
           "scope": "First complete 14400-second continuous disk pass plus 3585 completed prelude seconds; same processes, 3094 samples, 248381 events reconciled and cleanup confirmed. Second independent pass and remaining row scenarios are still pending.",
           "evidence": "disk-pass-1.json"
+        },
+        {
+          "run_id": "s3-pass-1-004",
+          "status": "passed",
+          "scope": "First complete local real-S3 14400-second continuous pass plus prelude: 2934 samples, 249824 signed event identities reconciled, 16 session renewals, two pruning cohorts, byte/multipart invariants and cleanup. Separate provider allocation attribution and independent second pass still pending.",
+          "evidence": "s3-pass-1.json"
         }
       ]
     },

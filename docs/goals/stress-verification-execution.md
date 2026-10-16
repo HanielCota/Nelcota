@@ -720,3 +720,46 @@ O S3 contínuo segue em execução desde aproximadamente 23:05 UTC: 2h30 neste
 checkpoint, sem OOM ou erro de assinatura e com as duas coortes de retenção
 removidas. A campanha só poderá ser aprovada após quatro horas, repouso final,
 reconciliação e limpeza.
+
+### 2026-10-16 03:08 UTC — primeiro S3 contínuo aprovado
+
+`s3-pass-1-004` passou: 14.400 segundos ininterruptos após as fases de carga,
+17.985 segundos registrados pelo executor, 2.934 amostras (2.297 no endurance)
+e gap máximo de 11,5 segundos. O contador conservador exclui também o warmup:
+[o checkpoint 003](results/stress/load-time-checkpoint-003.json) totaliza
+56.489 segundos, **15h41m29s efetivas concluídas**, sem preparação, repousos
+ou intervalos incompletos. O binário continua 75c44c85, fonte 2efede8c.
+
+A taxa de 280/s corresponde a 70% dos 400/s qualificados em passos repetidos
+de cinco minutos, sem alegar capacidade máxima. Foram 4.031.965 operações
+úteis, zero drops, erros inesperados ou rejeições por sobrecarga. Os p95/p99
+em ms foram: leitura 5,72/11,08; RLS 4,71/10,62; login 42,03/56,33;
+refresh 16,10/24,20; storage 24,13/37,08; escrita 12,15/19,76. Houve
+16 renovações reais e duas coortes efetivamente removidas por retenção/GC.
+
+A reconciliação encontrou 249.824 eventos/deliveries únicos, sem perda, extra
+ou duplicata; 129 objetos com bytes conferidos mais 10.000 objetos físicos
+vazios, zero multipart abandonado e zero chave órfã. A fila zerou; o banco
+terminou com 15 conexões, zero transação ociosa e zero lock esperando.
+Aplicação e PostgreSQL preservaram CIDs/PIDs/inícios. A reconexão breve do
+terminal não reiniciou componentes; seu checkpoint foi preservado.
+
+Após o repouso, aplicação voltou a 24 descritores, quatro tarefas e 18 sockets.
+O PID1 do RustFS caiu de 114 descritores/176 tarefas/99 sockets no começo
+para 18/172/6. A memória anônima do provedor, entretanto, passou de mediana
+de 353,4 MiB na primeira janela a 415,4 MiB na última; ficou em cerca de
+407 MiB no repouso. Não se atribui esse crescimento a cache ou allocator
+sem evidência de ownership. A fonte associada à revisão declarada na imagem
+usa MiMalloc; isso não equivale a prova de alocação do executável fornecido.
+O diagnóstico glibc do Nelcota não mede esse allocator do provedor.
+
+Zero OOM, RSS máximo da aplicação 49,875 MiB, banco até 431 MiB em disco,
+limpeza confirmada. [Evidência](results/stress/s3-pass-1.json). A segunda
+passada independente e os demais critérios de G05 permanecem pendentes.
+
+Os controles malloc/free de 64 MiB e arena secundária de 32 MiB passaram
+também na imagem Ubuntu exata do staging, isolados, sem rede, 96 MiB RAM,
+0,125 CPU, PID/capacidade/duração limitados e watchdog independente. Ambos
+produziram 11 amostras e retornaram ao uso inicial; nenhuma OOM e limpeza
+confirmada. [Evidência](results/stress/allocation-target-controls.json).
+O smoke instrumentado do backend está em execução; não certifica desempenho.
