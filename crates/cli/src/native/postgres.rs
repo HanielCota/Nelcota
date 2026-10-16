@@ -328,16 +328,17 @@ mod tests {
 
     #[test]
     fn unsafe_password_is_rejected_before_any_native_operation() {
-        for password in [
-            "",
-            "quote'",
-            "line\nbreak",
-            "back\\slash",
-            "non-ascii\u{e7}",
-        ] {
-            assert!(configure_postgres("1gb", password).is_err());
+        assert!(validate_password("").is_err());
+        for suffix in ["'", "\n", "\\", "\u{e7}"] {
+            let password = format!("{}{suffix}", crate::util::secret(42));
+            let error = configure_postgres("1gb", &password).unwrap_err();
+            assert!(
+                error
+                    .to_string()
+                    .contains("generated alphanumeric password")
+            );
         }
-        assert!(validate_password(&"a".repeat(257)).is_err());
-        validate_password(&"a9Z".repeat(14)).unwrap();
+        assert!(validate_password(&crate::util::secret(257)).is_err());
+        validate_password(&crate::util::secret(42)).unwrap();
     }
 }
