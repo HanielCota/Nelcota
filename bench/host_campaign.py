@@ -22,7 +22,7 @@ import time
 import urllib.request
 
 from campaign import K6, ResourceCoverage, docker, effective_cpus, free_port, nominal_violations, owns_listener, validate_disk_headroom, validate_storage_filesystem
-from metrics import NativeMetrics, PROMETHEUS
+from metrics import NativeMetrics, PROMETHEUS, STORAGE_PROFILE, storage_arguments
 from observations import generator_observation, GENERATOR_PROTOCOL
 from projects import Project
 from watchdog import LABEL, atomic_json, cleanup, host_reserves, process_identity, stop_generator
@@ -196,12 +196,13 @@ def campaign(args):
             profile['scope'] = 'local independent app/PG clusters with verified local Caddy, no public DNS/controller'
             profile['ingress'] = ingress.start(projects, output)
         profile['webhooks'] = {'enabled': args.webhooks, 'receiver': 'owned loopback, verified signatures and durable event identities', 'evidence_limit_mib': 128, 'drain_seconds': 30}
-        profile['resource_protocol']='component cgroup v2 via shell builtins and bounded parallel owned probes; allocated du totals count only disappearing child entries'
+        profile['resource_protocol']='component cgroup v2 via shell builtins, metrics disk and bounded parallel owned probes; allocated du totals count only disappearing child entries'
         profile['resource_probe_workers']=PROBE_WORKERS
         profile['arrival_counter_protocol']=ARRIVAL_COUNTER_PROTOCOL
         profile['generator_usage_reporting']=False
         profile['generator_observation_protocol']=GENERATOR_PROTOCOL
         profile['successful_latency_protocol']=LATENCY_PROTOCOL
+        profile['metrics_storage_profile']=STORAGE_PROFILE.copy()
         profile['container_log_profile']=LOG_PROFILE
         profile['harness_js_sha256']=hashlib.file_digest((ROOT/'bench/campaign.js').open('rb'),'sha256').hexdigest()
         profile['client_initialization']={'maximum_sessions_per_project':128,'bootstrap_concurrency':4,'setup_timeout_seconds':120,'fully_preallocated_arrival_VUs':True,'mix_schedule':'global scenario arrival ordinal','bootstrap_excluded_from_nominal_metrics':True}
@@ -219,7 +220,7 @@ def campaign(args):
         config.write_text('global:\n  scrape_interval: 15s\nscrape_configs: []\n')
         config.chmod(0o444)
         owned('volume', 'create', '--label', LABEL+'='+identity, telemetry_volume)
-        owned('run', '-d', '--name', telemetry, '--label', LABEL+'='+identity, '--pids-limit', '128', '--network', 'host', '--cpus', '.25', '--cpuset-cpus', str(cpus[-1]), '--memory', '512m', '--memory-swap', '512m', '--user', '65534:65534', '--cap-drop', 'ALL', '--read-only', '--security-opt', 'no-new-privileges', '--mount', f'type=volume,source={telemetry_volume},destination=/prometheus', '-v', str(config)+':/etc/prometheus/prometheus.yml:ro', PROMETHEUS, '--config.file=/etc/prometheus/prometheus.yml', '--web.listen-address=127.0.0.1:'+str(metrics_port), '--web.enable-remote-write-receiver', '--enable-feature=native-histograms', '--storage.tsdb.retention.time=1h', '--storage.tsdb.retention.size=128MB', '--storage.tsdb.wal-segment-size=16MB', '--storage.tsdb.min-block-duration=15m', '--storage.tsdb.max-block-duration=15m')
+        owned('run', '-d', '--name', telemetry, '--label', LABEL+'='+identity, '--pids-limit', '128', '--network', 'host', '--cpus', '.25', '--cpuset-cpus', str(cpus[-1]), '--memory', '512m', '--memory-swap', '512m', '--user', '65534:65534', '--cap-drop', 'ALL', '--read-only', '--security-opt', 'no-new-privileges', '--mount', f'type=volume,source={telemetry_volume},destination=/prometheus', '-v', str(config)+':/etc/prometheus/prometheus.yml:ro', PROMETHEUS, '--config.file=/etc/prometheus/prometheus.yml', '--web.listen-address=127.0.0.1:'+str(metrics_port), '--web.enable-remote-write-receiver', '--enable-feature=native-histograms', *storage_arguments())
         for _ in range(120):
             try:
                 if owns_listener(owned.require(telemetry), metrics_port):
@@ -267,7 +268,8 @@ def campaign(args):
                     if any(not state['State']['Running'] or state['State']['OOMKilled'] or state['RestartCount'] or state['State']['Pid'] != process_ids[state['Name']] for state in states):
                         raise RuntimeError('Fixture unexpectedly restarted or OOMed')
                     context=active_generator
-                    probes={'container-stats':lambda:[json.loads(line) for line in owned('stats','--no-stream','--format','{{json .}}',*observed_containers).splitlines()],
+                    probes={'metrics-disk':lambda:container_disk_usage(owned,telemetry,'/prometheus'),
+                            'container-stats':lambda:[json.loads(line) for line in owned('stats','--no-stream','--format','{{json .}}',*observed_containers).splitlines()],
                             'generator':lambda:generator_observation(context,lambda:active_generator),
                             'webhooks':webhooks.observe,
                             'arrival-counters':lambda:metrics.observe_arrivals(phase)}
@@ -281,6 +283,10 @@ def campaign(args):
                     values=observations['values']
                     cgroups={state['Name']:values['cgroup:'+state['Name']] for state in states}
                     memory_events={name:value['memory.events'] for name,value in cgroups.items()}
+                    metric_disk=values['metrics-disk']
+                    if metric_disk['value']>STORAGE_PROFILE['monitored_disk_limit_mib']:
+                        violations.append({'phase':phase,'component':'metrics','observed_mib':metric_disk['value'],'limit_mib':STORAGE_PROFILE['monitored_disk_limit_mib'],'observed_monotonic':time.monotonic()})
+                        raise RuntimeError('Fleet metrics fixture exceeded its declared disk budget')
                     stats=values['container-stats']
                     if len(stats) != len(observed_containers):
                         raise RuntimeError('Incomplete resource observation')
@@ -297,7 +303,7 @@ def campaign(args):
                     resource_at = time.monotonic()
                     coverage.observe(resource_at-resource_began)
                     with (output/'resources.jsonl').open('a') as target:
-                        target.write(json.dumps({'monotonic': resource_at, 'phase': phase, 'observation_started_monotonic':cycle,'observation_duration_seconds':resource_at-cycle,'probe_durations_seconds':observations['durations_seconds'], 'containers': stats, 'databases': databases, 'generator': generation,'host':host_observation,'memory_events':memory_events,'component_cgroups':cgroups,'webhooks':webhook_observation,'ingress':ingress_observation,'arrival_counters':values['arrival-counters']})+'\n')
+                        target.write(json.dumps({'monotonic': resource_at, 'phase': phase, 'observation_started_monotonic':cycle,'observation_duration_seconds':resource_at-cycle,'probe_durations_seconds':observations['durations_seconds'], 'containers': stats, 'metrics_disk':metric_disk, 'databases': databases, 'generator': generation,'host':host_observation,'memory_events':memory_events,'component_cgroups':cgroups,'webhooks':webhook_observation,'ingress':ingress_observation,'arrival_counters':values['arrival-counters']})+'\n')
                     atomic_json(output/'checkpoint.json', {'phase': phase, 'monotonic': resource_at, 'load_seconds_completed': load_seconds, 'resource_observations': coverage.count})
                 except Exception as error:
                     violations.append({'phase': phase, 'reason': str(error)[-600:], 'type': type(error).__name__})

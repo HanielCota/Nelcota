@@ -410,6 +410,25 @@ in comparisons. The native response oracle injects a 250-ms redirect delay into
 the actual storage workload and requires its successful p95 to include it;
 `--latency-baseline-script` can also demonstrate the preceding undercount.
 
+The metrics receiver keeps a 512-MiB monitored disk budget. Its common storage
+profile also bounds compacted block chunks to 16 MiB: Prometheus otherwise
+preallocates a 512-MiB chunk segment before truncation, independently of the
+128-MiB retention target and 16-MiB WAL segments. Campaigns record this profile
+and comparisons require it. Fleet sampling checks metrics disk use as well.
+`python3 bench/compaction_check.py --output target/stress-oracles/compaction`
+verifies the actual receiver flags, preserves a synthetic counter and forces
+four real head snapshots with compacted block metadata. Its admin API is enabled
+only in the owned loopback control. Synthetic traffic does not count as BaaS
+stress or endurance. The physical guard and other retention settings stay fixed.
+
+After confirmed teardown, `python3 bench/export_series.py RUN OUTPUT.csv.gz`
+projects a closed single-project resource log into a bounded numeric CSV and
+an index with source/content hashes. Run it from the repository root and retain
+the private raw inputs. The allowlist exports resource owners, connections,
+queues, disk and cgroup counters; raw SQL, request URLs and payloads are omitted.
+Rounded resource timestamps and sampled maxima remain distinct from the traffic
+ledger and separately recorded critical budget observations.
+
 `--final-idle-seconds 180` extends the final resource observation beyond the
 provider allocator's idle reclamation window. The bounded 30..300-second value
 is frozen in the profile and must match in comparisons. Idle/drain observation

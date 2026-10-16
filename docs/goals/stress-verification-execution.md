@@ -1373,3 +1373,50 @@ Os **244 testes Python passaram em 13,247 segundos**, e os 18 checks de
 O [checkpoint 010](results/stress/load-time-checkpoint-010.json) mantém somente
 carga efetiva concluída; os diagnósticos artificiais de retenção não entram na
 contagem de stress do BaaS. Endurance no novo protocolo ainda não foi aprovado.
+
+### 2026-10-16 19:23–19:38 UTC — limite de compactação das métricas corrigido
+
+`disk-final-pass-1-001` **reprovou** no início do endurance: o guard capturou
+**522 MiB** no armazenamento do Prometheus, acima do limite de **512 MiB**.
+Concluiu 4.305 segundos registrados/**4.290 efetivos sem warmup**, 833
+observações e limpeza. A parte contínua interrompida não recebe crédito de
+quatro horas; a conciliação final não foi alcançada. Os 61 relatórios completos
+anteriores mantêm cobertura fechada de HTTP/arrivals, capacidade qualificada
+400/s e teto pré-declarado; o mix fechado medido foi 665,5/s, sem alegação de
+capacidade máxima. O endurance pretendido era 280/s.
+[Evidência reprovada](results/stress/disk-final-pass-1-failed.json).
+
+O valor de 522 MiB foi registrado pelo guard antes da interrupção; as linhas
+completas de recursos registraram no máximo 10 MiB, pois a alocação foi
+transitória. Não se substitui o pico do guard pela série amostrada.
+[Série numérica filtrada](results/stress/timeseries/disk-final-pass-1-failed.csv.gz)
+e [índice/limites](results/stress/timeseries/disk-final-pass-1-failed.csv.index.json).
+
+A causa é a pré-alocação do writer de blocos: no Prometheus 3.5.0,
+`DefaultChunkSegmentSize` é 512 MiB. O segmento inteiro é reservado antes
+de ser truncado ao tamanho dos dados, independentemente da retenção de 128 MiB
+e dos segmentos WAL de 16 MiB já configurados. A correção estabelece
+`--storage.tsdb.max-block-chunk-segment-size=16MB` e o caminho explícito
+`/prometheus`. **O guard continua em 512 MiB**, sem aumentar CPU/RAM/retenção.
+O perfil comum é registrado nos dois executores/comparadores; o fleet também
+passa a observar o disco das métricas em cada ciclo. Futuros estouros registram
+o instante monotônico junto ao valor e ao limite.
+
+O controle nativo 001 reprovou por assumir o caminho de dados sem explicitá-lo;
+o resultado foi preservado e a limpeza confirmada. O 002 passou com o caminho
+explícito. O **003 passou na versão final do gerador de argumentos**, em
+3,867 segundos: a API confirmou 16 MiB, os 2.000 incrementos foram preservados
+e quatro snapshots reais geraram blocos com 1.004 séries/amostras/chunks
+cada. Pico **amostrado** de 1 MiB, sem OOM ou violação observada; esse valor não
+é anunciado como pico físico absoluto. A API administrativa foi habilitada
+somente no controle próprio em loopback, não nas campanhas ordinárias.
+[Antes/depois e código de referência](results/stress/native-metrics-compaction-before-after.json).
+
+Os **246 testes Python passaram em 13,399 segundos** na versão final do
+builder (`python-checks-023.log`); a execução anterior em 13,472 segundos
+também foi preservada. O controle 004 repetiu os quatro snapshots com
+verificação da propriedade do listener antes da prontidão e de cada snapshot,
+e também passou com limpeza confirmada. Os 18 checks de `c769934` passaram antes desta
+correção; o novo commit terá CI próprio. [CI anterior](results/stress/ci-c769934.json).
+O [checkpoint 011](results/stress/load-time-checkpoint-011.json) exclui a fase
+contínua interrompida e todos os controles sintéticos.

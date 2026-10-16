@@ -14,6 +14,22 @@ from arrival_counters import ArrivalCounter, phase_label, finite, closed_count
 from http_counters import HttpCounters, closed_counts, FAMILIES
 
 PROMETHEUS = 'prom/prometheus:v3.5.0@sha256:63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996'
+STORAGE_PROFILE = {'data_path':'/prometheus', 'retention_seconds':3600, 'retention_size_mib':128, 'wal_segment_mib':16,
+                   'block_chunk_segment_mib':16, 'block_duration_seconds':900,
+                   'monitored_disk_limit_mib':512}
+
+
+def storage_arguments():
+    # Block writers preallocate the entire segment before truncating it. The
+    # default 512 MiB alone consumes the receiver's complete fixture budget.
+    profile = STORAGE_PROFILE
+    return ['--storage.tsdb.path='+profile['data_path'],
+            '--storage.tsdb.retention.time='+str(profile['retention_seconds'])+'s',
+            '--storage.tsdb.retention.size='+str(profile['retention_size_mib'])+'MB',
+            '--storage.tsdb.wal-segment-size='+str(profile['wal_segment_mib'])+'MB',
+            '--storage.tsdb.min-block-duration='+str(profile['block_duration_seconds'])+'s',
+            '--storage.tsdb.max-block-duration='+str(profile['block_duration_seconds'])+'s',
+            '--storage.tsdb.max-block-chunk-segment-size='+str(profile['block_chunk_segment_mib'])+'MB']
 
 
 class NativeMetrics:

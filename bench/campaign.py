@@ -35,7 +35,7 @@ sys.path.insert(0, str(ROOT / "scripts/upgrade"))
 from support import Receiver
 sys.path.insert(0, str(ROOT / "bench"))
 from watchdog import LABEL, atomic_json, host_reserves, process_identity, stop_generator
-from metrics import NativeMetrics, PROMETHEUS
+from metrics import NativeMetrics, PROMETHEUS, STORAGE_PROFILE, storage_arguments
 from latency import PROTOCOL as LATENCY_PROTOCOL
 from arrival_counters import PROTOCOL as ARRIVAL_COUNTER_PROTOCOL
 from receiver import EventLedger
@@ -334,7 +334,7 @@ def campaign(arguments):
             config.write_text("global:\n  scrape_interval: 15s\nscrape_configs: []\n")
             config.chmod(0o444)
             owned("volume", "create", "--label", LABEL + "=" + identity, telemetry_volume)
-            owned("run", "-d", *labels, "--name", telemetry, "--network", "host", "--cpus", "0.25", "--cpuset-cpus", str(cpus[-1]), "--memory", "512m", "--memory-swap", "512m", "--user", "65534:65534", "--cap-drop", "ALL", "--read-only", "--security-opt", "no-new-privileges", "--mount", f"type=volume,source={telemetry_volume},destination=/prometheus", "-v", str(config) + ":/etc/prometheus/prometheus.yml:ro", PROMETHEUS, "--config.file=/etc/prometheus/prometheus.yml", "--web.listen-address=127.0.0.1:" + str(metrics_port), "--web.enable-remote-write-receiver", "--enable-feature=native-histograms", "--storage.tsdb.retention.time=1h", "--storage.tsdb.retention.size=128MB", "--storage.tsdb.wal-segment-size=16MB", "--storage.tsdb.min-block-duration=15m", "--storage.tsdb.max-block-duration=15m")
+            owned("run", "-d", *labels, "--name", telemetry, "--network", "host", "--cpus", "0.25", "--cpuset-cpus", str(cpus[-1]), "--memory", "512m", "--memory-swap", "512m", "--user", "65534:65534", "--cap-drop", "ALL", "--read-only", "--security-opt", "no-new-privileges", "--mount", f"type=volume,source={telemetry_volume},destination=/prometheus", "-v", str(config) + ":/etc/prometheus/prometheus.yml:ro", PROMETHEUS, "--config.file=/etc/prometheus/prometheus.yml", "--web.listen-address=127.0.0.1:" + str(metrics_port), "--web.enable-remote-write-receiver", "--enable-feature=native-histograms", *storage_arguments())
             metrics_ready = False
             for attempt in range(100):
                 try:
@@ -747,6 +747,7 @@ def campaign(arguments):
                 "http_counter_protocol": HTTP_COUNTER_PROTOCOL,
                 "successful_latency_protocol": LATENCY_PROTOCOL,
                 "metrics_memory_mb": 512,
+                "metrics_storage_profile": STORAGE_PROFILE.copy(),
                 "metrics_cpus": 0.25,
                 "metrics_cpu_affinity": cpus[-1],
                 "nominal_slos_ms": NOMINAL_SLOS,
@@ -827,13 +828,13 @@ def campaign(arguments):
                             disk_observations['storage']=container_disk_usage(owned,s3,'/data')
                             storage_disk=disk_observations['storage']['value']
                         if storage_disk>arguments.storage_fixture_disk_mib:
-                            resource_violations.append({'phase':phase,'component':'storage','observed_mib':storage_disk,'limit_mib':arguments.storage_fixture_disk_mib})
+                            resource_violations.append({'phase':phase,'component':'storage','observed_mib':storage_disk,'limit_mib':arguments.storage_fixture_disk_mib,'observed_monotonic':time.monotonic()})
                             raise RuntimeError('Storage fixture exceeded its declared disk budget')
                         if metrics_disk > 512:
-                            resource_violations.append({'phase':phase,'component':'metrics','observed_mib':metrics_disk,'limit_mib':512})
+                            resource_violations.append({'phase':phase,'component':'metrics','observed_mib':metrics_disk,'limit_mib':512,'observed_monotonic':time.monotonic()})
                             raise RuntimeError("Metrics fixture exceeded its 512-MiB disk budget")
                         if disk > arguments.fixture_disk_mib:
-                            resource_violations.append({"pg_disk_mib": disk,"limit_mib":arguments.fixture_disk_mib,"phase":phase})
+                            resource_violations.append({"pg_disk_mib": disk,"limit_mib":arguments.fixture_disk_mib,"phase":phase,"observed_monotonic":time.monotonic()})
                             raise RuntimeError(
                                 "Fixture exceeded its declared disk budget"
                             )
