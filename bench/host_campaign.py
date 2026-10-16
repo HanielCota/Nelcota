@@ -194,6 +194,7 @@ def campaign(args):
         profile['resource_protocol']='component cgroup v2 via shell builtins and bounded parallel owned probes; allocated du totals count only disappearing child entries'
         profile['resource_probe_workers']=PROBE_WORKERS
         profile['arrival_counter_protocol']=ARRIVAL_COUNTER_PROTOCOL
+        profile['generator_usage_reporting']=False
         profile['container_log_profile']=LOG_PROFILE
         profile['harness_js_sha256']=hashlib.file_digest((ROOT/'bench/campaign.js').open('rb'),'sha256').hexdigest()
         profile['client_initialization']={'maximum_sessions_per_project':128,'bootstrap_concurrency':4,'setup_timeout_seconds':120,'fully_preallocated_arrival_VUs':True,'mix_schedule':'global scenario arrival ordinal','bootstrap_excluded_from_nominal_metrics':True}
@@ -313,6 +314,7 @@ def campaign(args):
             if ingress is not None:
                 position = command.index(K6)
                 command[position:position] = ['-v', str(ingress.bundle)+':/verified-ca.pem:ro', '-e', 'SSL_CERT_FILE=/verified-ca.pem']
+            command[command.index(K6):command.index(K6)] = ['-e', 'K6_NO_USAGE_REPORT=true']
             print('Running', label, rates, hot, flush=True)
             start = time.monotonic()
             with (output/(label+'.log')).open('w') as target:

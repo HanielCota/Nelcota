@@ -215,7 +215,7 @@ def run(output,baseline=None,semantic_baseline=None):
             server.uploaded=set()
             server.operations={key:0 for key in ['read','rls','panel','storage','login','refresh','write']}
             name=identity+'-'+label
-            owned('run','-d','--name',name,'--label',LABEL+'='+identity,'--network','host','--cpus','.25','--cpuset-cpus',str(sorted(os.sched_getaffinity(0))[-1]),'--memory','128m','--memory-swap','128m','--pids-limit','64','--user',str(os.getuid())+':'+str(os.getgid()),'-v',str(source)+':/campaign.js:ro','-e','FIXTURE','-e','WORKLOAD='+workload,'-e','DURATION=2s','-e','VUS=1',K6,'run','--quiet','--summary-mode=disabled','--no-thresholds','/campaign.js',env={'FIXTURE':json.dumps(fixture)})
+            owned('run','-d','--name',name,'--label',LABEL+'='+identity,'--network','host','--cpus','.25','--cpuset-cpus',str(sorted(os.sched_getaffinity(0))[-1]),'--memory','128m','--memory-swap','128m','--pids-limit','64','--user',str(os.getuid())+':'+str(os.getgid()),'-v',str(source)+':/campaign.js:ro','-e','K6_NO_USAGE_REPORT=true','-e','FIXTURE','-e','WORKLOAD='+workload,'-e','DURATION=2s','-e','VUS=1',K6,'run','--quiet','--summary-mode=disabled','--no-thresholds','/campaign.js',env={'FIXTURE':json.dumps(fixture)})
             deadline=time.monotonic()+15
             phase='oracle'
             while True:

@@ -19,6 +19,7 @@ FIELDS.append('startup_disk_budget')
 FIELDS.append('project_cpu_period_micros')
 FIELDS.append('resource_probe_workers')
 FIELDS.append('arrival_counter_protocol')
+FIELDS.append('generator_usage_reporting')
 
 
 def positive(value):

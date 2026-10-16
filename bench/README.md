@@ -338,6 +338,10 @@ protocol. Diagnostic one-shot summaries of at most five minutes use a bounded
 range query and remain distinct
 from comparable campaign evidence.
 
+Owned k6 runners explicitly disable anonymous usage reporting with
+`K6_NO_USAGE_REPORT=true`. This keeps generator reporting within the declared
+local metrics destination; the disabled setting is recorded in run profiles.
+
 `--final-idle-seconds 180` extends the final resource observation beyond the
 provider allocator's idle reclamation window. The bounded 30..300-second value
 is frozen in the profile and must match in comparisons. Idle/drain observation
