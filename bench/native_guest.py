@@ -246,7 +246,11 @@ def main():
         clusters = command(["pg_lsclusters", "--no-header"]).stdout.decode().splitlines()
         require(not any(line.split()[:2] == ["17", "main"] for line in clusters), "Native cluster remained after remove")
         require(not Path("/var/lib/nelcota-native/owner.json").exists(), "Native machine owner remained after complete removal")
-        print(json.dumps({"checks": ["native remove", "native unit and cluster teardown", "machine ownership released after complete removal"]}))
+        empty_up = cli("up", timeout=20, check=False)
+        require(empty_up.returncode != 0 and b"no single native project" in empty_up.stderr + empty_up.stdout,
+                "Empty native host was allowed to mutate machine resources")
+        require(not Path("/var/lib/nelcota-native/owner.json").exists(), "Empty native host reclaimed machine ownership")
+        print(json.dumps({"checks": ["native remove", "native unit and cluster teardown", "machine ownership released after complete removal", "empty old host cannot reclaim machine resources"]}))
         return
     # Fixed categories preserve useful failure evidence without publishing logs,
     # generated panel credentials, SQL, tokens or request/response bodies.

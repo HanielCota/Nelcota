@@ -265,7 +265,7 @@ fn create_host(host: &Host, args: &InitArgs) -> anyhow::Result<CreatedHost> {
 
 fn lock_new_host(host: &Host) -> anyhow::Result<nelcota_deployment::HostLock> {
     std::fs::create_dir_all(host.root())?;
-    let lease = crate::host::acquire_mutation_lease(host.root())?;
+    let lease = crate::host::acquire_host_lease(host.root())?;
     if host.exists() {
         bail!("host was created by another initializer; retry using its current registry");
     }
@@ -276,7 +276,7 @@ fn lock_existing_host(
     host: &Host,
     expected: &Manifest,
 ) -> anyhow::Result<nelcota_deployment::HostLock> {
-    let lease = crate::host::acquire_mutation_lease(host.root())?;
+    let lease = crate::host::acquire_host_lease(host.root())?;
     if host.require()? != *expected {
         bail!("host registry changed during initialization; retry using its current registry");
     }
@@ -378,6 +378,20 @@ mod tests {
         assert!(error.to_string().contains("registry changed"));
         assert_eq!(host.require().unwrap(), current);
         drop(lock_existing_host(&host, &current).unwrap());
+    }
+
+    #[test]
+    fn an_empty_native_host_cannot_reclaim_machine_ownership_through_up() {
+        let temporary = tempfile::tempdir().unwrap();
+        let host = Host::new(&temporary.path().join("host"));
+        let mut manifest = fixture_manifest();
+        manifest.runtime = Runtime::Systemd;
+        host.save(&manifest).unwrap();
+        let error = crate::host::acquire_mutation_lease(host.root())
+            .err()
+            .unwrap();
+        assert!(error.to_string().contains("no single native project"));
+        drop(lock_existing_host(&host, &manifest).unwrap());
     }
 
     #[test]

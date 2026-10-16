@@ -22,7 +22,7 @@ use crate::{envfile::EnvFile, naming, project::Project};
 pub const MANIFEST: &str = "nelcota-host.json";
 
 /// All host mutations, including the first init, share this deployment lease.
-pub(crate) fn acquire_mutation_lease(root: &Path) -> anyhow::Result<nelcota_deployment::HostLock> {
+pub(crate) fn acquire_host_lease(root: &Path) -> anyhow::Result<nelcota_deployment::HostLock> {
     let lease = nelcota_deployment::HostLock::acquire(root)?;
     nelcota_deployment::management::ensure_idle(root)?;
     let journal = nelcota_deployment::Journal::open(root)?;
@@ -33,8 +33,17 @@ pub(crate) fn acquire_mutation_lease(root: &Path) -> anyhow::Result<nelcota_depl
     {
         bail!("deployment needs recovery: use nelcota updates recover before mutating this host");
     }
+    Ok(lease)
+}
+
+pub(crate) fn acquire_mutation_lease(root: &Path) -> anyhow::Result<nelcota_deployment::HostLock> {
+    let lease = acquire_host_lease(root)?;
     let host = Host::new(root);
-    if host.exists() && host.manifest()?.runtime == Runtime::Systemd {
+    let manifest = host.require()?;
+    if manifest.runtime == Runtime::Systemd {
+        if manifest.projects.len() != 1 {
+            bail!("no single native project is configured; use init before mutating this host");
+        }
         // The host lease prevents its owner from being removed while this
         // command runs; another directory cannot release the durable claim.
         drop(crate::native::acquire_machine(&host)?);

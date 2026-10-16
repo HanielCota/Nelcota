@@ -1756,3 +1756,19 @@ real nas duas configurações, verificar a tabela e uma única aplicação da
 migration. O código da aplicação ainda não foi alterado para essa hipótese;
 o resultado da nova VM determinará se existe falha real. O resultado aprovado
 anterior continua válido somente para seu protocolo de ativação/HTTPS.
+
+### 16/10, 22:38 UTC — revisão da liberação da propriedade nativa
+
+A revisão do código recém-adicionado encontrou um caso de lifecycle que
+precisava de proteção: após remove liberar o owner, `up` no host vazio antigo
+não pode criar outra reivindicação nem alterar recursos globais. A lease
+básica do diretório foi separada da validação de mutação nativa; init continua
+permitido em um host vazio, enquanto os demais comandos exigem um único
+projeto nativo antes de reivindicar/verificar a máquina. A regressão usa um
+manifesto vazio próprio e verifica a rejeição específica e a lease de init.
+
+O runner nativo passa a executar esse `up` após remove e confirmar que o
+owner segue ausente. Esse refinamento veio da revisão do fluxo, sem alegar
+uma falha observada numa campanha inteira já executada. A nova regressão
+Rust/VM ainda está pendente. Rustfmt, fronteiras/checksums e diff-check passaram;
+o soak local continua no mesmo binário e processos.
