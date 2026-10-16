@@ -98,8 +98,11 @@
     "final_idle_seconds": 180,
     "fixture_disk_mib": 2048,
     "wal_mib": 256,
-    "storage_fixture_disk_mib": 1024,
-    "scope": "Additional larger-payload/data cell; its ten-minute soak does not replace mandatory ordinary four-hour disk/S3 endurance."
+    "scope": "Additional larger-payload/data cell; its ten-minute soak does not replace mandatory ordinary four-hour disk/S3 endurance.",
+    "storage_fixture_disk_mib_by_backend": {
+      "disk": 1024,
+      "s3": 4096
+    }
   },
   "other_required_repetitions": [
     "second complete browser/SDK pass",
@@ -107,5 +110,22 @@
     "final-protocol comparable regression checks",
     "remaining functional/stress matrix mapping and actual deployment blockers"
   ],
-  "approval_thresholds_reduced": false
+  "approval_thresholds_reduced": false,
+  "amendments": [
+    {
+      "declared_utc": "2026-10-16T17:54:41.168450+00:00",
+      "trigger": "s3-http-latency-smoke-001 failed the original 1024-MiB physical store bound during one-MiB overwrites; original failure retained",
+      "change": "Only the larger real-S3 profile receives a predeclared 4096-MiB physical storage budget; disk remains 1024 MiB and ordinary 17-byte endurance remains 1024 MiB",
+      "reason": "A provider-only diagnostic observed zero logical API objects while deleted payloads remained physically in its internal trash. Associated source uses a five-minute automatic cleanup interval; completion/namespace proof is pending. Physical capacity must account for this retention instead of treating logical live bytes as total disk use.",
+      "conditions": [
+        "Confirm automatic cleanup without forcing it",
+        "Pass host-reserve preflight with the larger physical quota",
+        "Relocate only verified rebuildable compiler caches if additional disk headroom is needed",
+        "Retain default provider cleanup policy and one-MiB request sizes",
+        "Run both larger-S3 passes with the same declared profile"
+      ],
+      "approval_slos_or_integrity_thresholds_reduced": false,
+      "ordinary_four_hour_disk_and_s3_criteria_unchanged": true
+    }
+  ]
 }

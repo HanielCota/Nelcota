@@ -827,11 +827,13 @@ def campaign(arguments):
                             disk_observations['storage']=container_disk_usage(owned,s3,'/data')
                             storage_disk=disk_observations['storage']['value']
                         if storage_disk>arguments.storage_fixture_disk_mib:
+                            resource_violations.append({'phase':phase,'component':'storage','observed_mib':storage_disk,'limit_mib':arguments.storage_fixture_disk_mib})
                             raise RuntimeError('Storage fixture exceeded its declared disk budget')
                         if metrics_disk > 512:
+                            resource_violations.append({'phase':phase,'component':'metrics','observed_mib':metrics_disk,'limit_mib':512})
                             raise RuntimeError("Metrics fixture exceeded its 512-MiB disk budget")
                         if disk > arguments.fixture_disk_mib:
-                            resource_violations.append({"pg_disk_mib": disk})
+                            resource_violations.append({"pg_disk_mib": disk,"limit_mib":arguments.fixture_disk_mib,"phase":phase})
                             raise RuntimeError(
                                 "Fixture exceeded its declared disk budget"
                             )

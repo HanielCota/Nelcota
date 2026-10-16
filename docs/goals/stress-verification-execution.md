@@ -1326,3 +1326,50 @@ limpeza confirmada. Os **237 testes Python passaram em 13,490 segundos**.
 [Antes/depois](results/stress/native-logical-latency-before-after.json).
 Os 18 checks do commit precedente `c276cc3` passaram; o novo commit de latência
 terá CI próprio e campanhas frescas. [CI precedente](results/stress/ci-c276cc3.json).
+
+### 2026-10-16 17:40–17:59 UTC — limite S3, retenção física e auditoria do provedor
+
+`s3-http-latency-smoke-001` **reprovou** durante fresh-storage-3: o uso físico
+ultrapassou o limite declarado de 1.024 MiB. Concluiu 95 segundos registrados,
+**80 efetivos sem warmup**, com 16 observações. A última amostra persistida
+registrou 999 MiB; o valor exato que acionou o guard não foi salvo. O coletor
+foi corrigido para persistir valor observado, limite, componente e fase antes
+de interromper futuros testes por orçamento de disco. Não houve OOM observado;
+limpeza confirmada. A conciliação final não foi alcançada.
+[Evidência reprovada](results/stress/s3-http-latency-smoke-failed.json).
+
+No diagnóstico isolado do RustFS, 16 uploads de 1 MiB seguidos de DELETE
+deixaram a API com zero objetos/multipart, mas os bytes continuaram na lixeira
+física. A fonte associada à imagem declara coleta automática a cada 300
+segundos; essa associação não constitui atestado independente do build.
+O diagnóstico observou o ciclo real, **sem forçar GC**, e sua limpeza.
+
+Os oráculos privados originais também falharam: a tentativa 002 exigia zero
+KiB, ignorando blocos do diretório vazio; a 003 presumiu uma entrada física por
+objeto lógico, embora o provedor mantenha dados/metadados separados e lixo
+transitório de inicialização. Ambos os veredictos reprovados continuam intactos.
+A auditoria corrigida foi executada separadamente sobre os dados congelados,
+com regressões para diretório vazio, lixo inicial, múltiplas entradas, dados
+residuais e evidência ausente/não finita. Não reescreve o veredicto do produtor.
+
+Na 003, o início tinha 1 MiB e uma entrada transitória; após o DELETE,
+17 MiB/49 entradas; ao final, **1 MiB/zero entradas**, 4 KiB do diretório vazio
+e API ainda sem objetos ou multipart. A análise confirmou liberação de 16.712
+KiB e 49 entradas em 330,374 segundos de observação após DELETE, sem OOM
+observado. Isso explica retenção física temporária deste experimento, sem
+certificar ausência absoluta de vazamentos ou atribuir todo crescimento de
+memória do provedor a essa causa.
+[Dados originais e análise separada](results/stress/native-s3-trash-reclamation.json).
+
+O perfil futuro de objetos grandes S3 recebe orçamento físico de **4.096 MiB**,
+pré-declarado antes da próxima execução e condicionado ao preflight/reservas.
+O disco local e o endurance ordinário com objetos de 17 bytes continuam com
+1.024 MiB. Payload, taxas declaradas, SLOs e integridade permanecem iguais;
+a tentativa anterior de 1 GiB não é promovida. Não se altera a coleta do
+provedor. [Plano atualizado](results/stress/final-campaign-plan.json).
+
+Os **244 testes Python passaram em 13,247 segundos**, e os 18 checks de
+`b82699f` passaram. [CI](results/stress/ci-b82699f.json).
+O [checkpoint 010](results/stress/load-time-checkpoint-010.json) mantém somente
+carga efetiva concluída; os diagnósticos artificiais de retenção não entram na
+contagem de stress do BaaS. Endurance no novo protocolo ainda não foi aprovado.
