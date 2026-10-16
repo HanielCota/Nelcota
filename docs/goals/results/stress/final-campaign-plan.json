@@ -1,0 +1,111 @@
+{
+  "declared_utc": "2026-10-16T15:39:26.204776+00:00",
+  "status": "predeclared; new profiles require local regressions and native controls before execution",
+  "certifies_g05": false,
+  "scope": "Fresh controlled replacements and experimental CPU allocation; all earlier failures remain retained. No production deployment or maximum-capacity certification.",
+  "binary_sha256": "75c44c85a85db26195166aa1d2c6caf481e3db476801ec8131525ef62adf1be0",
+  "backend_source": "2efede8c27ee12119142170e8bd9742ff7cb900e",
+  "sequential_execution": true,
+  "minimum_free_filesystem_fraction": 0.15,
+  "minimum_available_host_memory_fraction": 0.1,
+  "maximum_resource_observation_gap_seconds": 30,
+  "ordinary_endurance": {
+    "fresh_passes_each_backend": 2,
+    "backends": [
+      "disk",
+      "real local RustFS S3"
+    ],
+    "continuous_soak_seconds": 14400,
+    "steady_seconds_each_sample": 60,
+    "steady_samples_each_workload": 3,
+    "steady_duration_reason": "Predeclare longer equivalent nominal samples before replacement measurements to improve run-to-run characterization; all p95/throughput regression thresholds remain unchanged.",
+    "workloads": [
+      "read",
+      "rls",
+      "panel",
+      "storage",
+      "login",
+      "refresh",
+      "write",
+      "mixed"
+    ],
+    "write_steady_iterations_per_second": 50,
+    "capacity_step_seconds": 300,
+    "capacity_and_spikes": true,
+    "soak_fraction": 0.7,
+    "calibration_ceiling_iterations_per_second": 400,
+    "calibration_ceiling_is_maximum_capacity_claim": false,
+    "fixture_disk_mib": 1024,
+    "wal_mib": 256,
+    "s3_memory_mib": 1024,
+    "final_idle_seconds": 180
+  },
+  "host_profiles": [
+    {
+      "projects": 1,
+      "policy": "quota",
+      "seconds_per_step": 300,
+      "provisional_rate_per_project": 32,
+      "fallback_rate_per_project": 8,
+      "fresh_passes": 2,
+      "scope": "First current fixed-counter run already active; the new optional sharing capability leaves its default CPU limits unchanged."
+    },
+    {
+      "projects": 5,
+      "policy": "shared",
+      "seconds_per_step": 300,
+      "provisional_rate_per_project": 32,
+      "fallback_rate_per_project": 8,
+      "fresh_passes": 2
+    },
+    {
+      "projects": 10,
+      "policy": "shared",
+      "seconds_per_step": 300,
+      "provisional_rate_per_project": 8,
+      "fallback_rate_per_project": 4,
+      "fresh_passes": 2,
+      "scope": "Conservative predeclared operating band for a distinct sharing allocation; not a comparison against failed fractional-quota campaigns or an absolute capacity maximum."
+    }
+  ],
+  "host_cpu_sharing": {
+    "app_logical_cpu_slots": 1,
+    "postgres_logical_cpu_slots": 1,
+    "per_container_ceiling_cpu": 1,
+    "sum_of_configured_quotas_per_role_equals_projects": true,
+    "oversubscription_is_explicit": true,
+    "generator_distinct_slot": true,
+    "native_single_slot_census_required": true,
+    "memory_disk_and_slos_unchanged": true,
+    "healthy_throughput_minimum_ratio": 0.9,
+    "healthy_p95_maximum_ratio": 1.2,
+    "webhook_drain_deadline_seconds": 30,
+    "new_baseline_and_candidate_must_use_same_policy": true
+  },
+  "larger_fixture": {
+    "products_rows": 1000000,
+    "private_rows": 1000000,
+    "object_payload_bytes": 1048576,
+    "fresh_full_passes_each_backend": 2,
+    "steady_seconds_each_sample": 30,
+    "steady_samples_each_workload": 3,
+    "steady_iterations_per_second": 20,
+    "write_steady_iterations_per_second": 10,
+    "capacity_step_seconds": 300,
+    "calibration_ceiling_iterations_per_second": 20,
+    "capacity_and_spikes": true,
+    "soak_seconds": 600,
+    "final_idle_seconds": 180,
+    "fixture_disk_mib": 2048,
+    "wal_mib": 256,
+    "storage_fixture_disk_mib": 1024,
+    "scope": "Additional larger-payload/data cell; its ten-minute soak does not replace mandatory ordinary four-hour disk/S3 endurance."
+  },
+  "other_required_repetitions": [
+    "second complete browser/SDK pass",
+    "second complete fault/recovery pass",
+    "final-protocol comparable regression checks",
+    "remaining functional/stress matrix mapping and actual deployment blockers"
+  ],
+  "approval_thresholds_reduced": false
+}

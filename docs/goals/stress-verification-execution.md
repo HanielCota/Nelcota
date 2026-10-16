@@ -1125,3 +1125,115 @@ segundos**, após a correção do controle (`python-checks-015.log`). O check
 estavam em andamento neste registro. A tentativa 2 de Rust no SHA anterior
 `3e3e92b` terminou com sucesso; a falha original e sua causa não identificada
 continuam preservadas, sem declarar que um defeito Rust foi corrigido.
+
+### 2026-10-16 15:08 UTC — integração e fixture maior
+
+`large-disk-counter-smoke-001`, congelado em `196e0e4`, passou com um milhão
+de linhas em cada tabela de produtos/privada e payload de 1.048.576 bytes.
+Foram 330 segundos de carga concluída após excluir o warmup de 15 segundos,
+79 amostras e lacuna máxima de 11,1 segundos. As 41 fases concluídas têm
+cobertura fechada do contador corrigido, lacuna máxima de 8,857 segundos
+e zero descartes retidos. A validação final conferiu 29 objetos publicados,
+30.408.704 bytes físicos, além dos 10.000 objetos vazios, sem chaves órfãs;
+1.660 eventos/entregas, sem perdas, extras ou duplicatas. Pico de banco
+631 MiB, armazenamento 30 MiB e zero OOM observado. Limpeza confirmada.
+As calibrações de cinco segundos e soak de 60 segundos são funcionais,
+não qualificam capacidade de cinco minutos ou endurance de quatro horas.
+[Evidência do smoke](results/stress/large-disk-smoke.json).
+
+Os **18 checks de CI passaram em `196e0e4`**, incluindo o controle nativo
+corrigido. O PR continua em rascunho, sem merge ou deploy. Esse resultado
+não aprova os cenários de stress ainda pendentes.
+[Checks e URLs](results/stress/ci-196e0e4.json).
+
+A campanha `fleet-caddy-1-final-pass-1-001` iniciou a primeira passagem
+completa do protocolo corrigido em um projeto independente. Perfil pré-declarado:
+etapas de 300 segundos, teto provisório de 32 iterações/s por projeto,
+Caddy com TLS local verificado, webhooks reais e orçamento de banco de
+2.048 MiB. As campanhas permanecem sequenciais nos limites deste ambiente.
+
+### 2026-10-16 15:45–15:49 UTC — primeira campanha completa de um projeto
+
+`fleet-caddy-1-final-pass-1-001`, congelado em `196e0e4`, passou com 2.490
+segundos de carga, 506 amostras e lacuna máxima de 5,119 segundos. Qualificou
+32 iterações/s como limite inferior dentro do teto declarado e usou 25/s
+nominal; as três amostras balanceadas de 300 segundos, sobrecargas e o reload
+real do Caddy passaram. A configuração inválida foi rejeitada; a restauração
+recuperou sondas positivas e 401 em 0,043 segundo, mantendo o mesmo processo
+do proxy e verificação TLS. Foram 2.928 eventos/entregas conciliados, sem
+ausentes, extras, duplicatas, pendências ou erros de assinatura. Zero OOM
+observado e limpeza confirmada. A segunda passagem independente permanece
+necessária. [Evidência](results/stress/fleet-1-final-pass-1.json).
+
+O checkpoint 007 soma **92.024 segundos (25h33m44s)** de carga efetiva
+conservadora. Controles artificiais e preparação não foram adicionados.
+[Contagem](results/stress/load-time-checkpoint-007.json).
+
+Foi preparado um perfil experimental de CPU para investigar as reprovações
+com quotas fracionadas: aplicações compartilham um único CPU lógico e bancos
+compartilham outro, mantendo o gerador em um terceiro. Cada contêiner pode
+usar a folga do seu grupo, mas a afinidade limita o grupo inteiro a um CPU.
+A soma das quotas individuais é explicitamente sobrealocada dentro desse
+único CPU; não é aumento oculto do orçamento físico do grupo. Memória, disco,
+SLOs, 90% de throughput, 20% de p95 e drenagem de 30 segundos permanecem iguais.
+É um novo perfil com baseline e repetição próprios, sem promover as duas
+reprovações anteriores de dez projetos ou declarar correção de produção.
+
+A implementação e seus guards passaram **27 testes focados em 0,032 segundo**
+e **220 testes Python em 12,759 segundos**. O leitor do relatório real anterior
+de um projeto passou por normalização da geometria exata 1/1; a autocomparação
+foi somente um controle de compatibilidade, sem substituir campanhas distintas.
+O commit `93d6723` mantém o perfil de quota como padrão, confere afinidade e
+quota reais de todos os contêineres antes de oferecer tráfego e exige censo
+completo nos comparadores de novos perfis.
+
+O primeiro lançamento do controle nativo foi recusado antes de criar recursos:
+o controlador já estava fixado em um CPU ao verificar o ambiente. A invocação
+foi corrigida para registrar os CPUs disponíveis antes de fixar somente o
+controlador no CPU reservado. A tentativa continua preservada. A repetição
+`cpu-sharing-native-002` passou em 36,085 segundos, com 32 contêineres
+auxiliares descartáveis nas topologias 1/5/10, no máximo 20 simultâneos.
+Cada um teve afinidade/quota reais conferidas, 32 MiB, 16 processos, rede
+desabilitada, root somente leitura e nenhuma capability; limpeza confirmada.
+Esses auxiliares inertes validam recursos, sem substituir aplicações/bancos
+reais ou acrescentar horas de stress.
+[Controle nativo](results/stress/cpu-sharing-native-controls.json).
+
+As próximas campanhas e seus parâmetros foram
+[pré-declarados](results/stress/final-campaign-plan.json). As substituições
+ordinárias de disco/S3 terão duas passagens frescas de quatro horas por backend
+e amostras nominais de 60 segundos, definidas antes das novas medições para
+caracterizar melhor a variação; os limites de regressão de 10% permanecem iguais.
+O smoke de cinco aplicações/bancos reais com compartilhamento iniciou após
+o controle nativo; seu resultado ainda está pendente neste registro.
+
+### 2026-10-16 15:57–16:07 UTC — smoke de cinco projetos reprovado
+
+`fleet-caddy-5-sharing-smoke-001` concluiu 270 segundos de carga, 85 amostras
+e limpeza confirmada, mas **reprovou** os cinco cenários concentrados: 6/23/14/11/8
+achados de gate em mixed/login/read/storage/write. Sob login intenso, RLS
+teve p95 de 217,638 ms em três projetos saudáveis, acima do limite absoluto
+de 200 ms. Cada saudável teve 61 operações úteis e 12 observações de RLS;
+os histogramas nativos têm rótulos de projeto/cenário distintos e contêm
+o outlier real, sem mistura de métricas entre projetos. Não foi atribuída
+causa raiz ou declarada correção de produção.
+
+O kernel confirmou o novo limite de cada um dos dez contêineres reais. Não
+houve OOM, falha de recursos, erro de assinatura ou perda/duplicação de evento:
+1.129 identidades/entregas conciliadas e zero pendências. A fase observada
+de login também registrou 250.000 microssegundos de throttling no proxy e
+zero nos grupos de apps/bancos. Essa janela de recursos inclui bootstrap
+do k6 e não estabelece causalidade com uma amostra individual de latência.
+Os resultados reprovados e seus denominadores permanecem públicos.
+[Achados](results/stress/fleet-5-sharing-smoke-findings.json) e
+[evidência completa](results/stress/fleet-5-sharing-smoke.json).
+
+Após confirmar a limpeza e a ausência de paradas críticas, iniciou
+`fleet-caddy-5-sharing-final-pass-1-001`: cinco clusters novos, etapas de
+300 segundos, teto provisório de 32/s por projeto, mesmos limites absolutos,
+90%/20% de interferência e drenagem de 30 segundos, conforme a pré-declaração.
+O smoke não foi promovido a aprovação ou descartado pelo início dessa campanha.
+
+Os **18 checks do CI de `93d6723` passaram**, incluindo o perfil de CPU e suas
+regressões; isso não transforma a falha de serviço acima em aprovação.
+[Checks e URLs](results/stress/ci-93d6723.json).

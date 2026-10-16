@@ -64,6 +64,12 @@
           "recorded_status": "passed",
           "scope": "Completed physical four-hour disk investigation with unchanged application/database processes and final data/resource reconciliation. The frozen original counter protocol fails corrected arrival-evidence requirements; this is not a corrected-harness certification or a maximum-capacity claim.",
           "evidence": "disk-pass-2-diagnostic.json"
+        },
+        {
+          "run_id": "large-disk-counter-smoke-001",
+          "status": "passed",
+          "scope": "Million-row products/private tables and 1-MiB payload functional smoke: 330 completed seconds excluding warmup, 41 closed counter phases, verified bytes/events and cleanup; short calibration is not capacity/endurance certification.",
+          "evidence": "large-disk-smoke.json"
         }
       ]
     },
@@ -72,7 +78,7 @@
       "area": "REST, RPC, RLS and statistics",
       "entrypoints": "bench/campaign.py; crates/server/tests/api.rs; rls.rs; hardening.rs",
       "status": "not run",
-      "scope_or_limit": "Strict 100k-row read/filter/order/RLS oracles passed short diagnostics; million-row and final continuous campaigns remain pending.",
+      "scope_or_limit": "Strict 100k-row and million-row read/filter/order/RLS diagnostics passed. Full larger-fixture and corrected-protocol continuous campaigns remain pending.",
       "functional_subset": {
         "status": "passed",
         "source_commit": "3203330cf3df2b9b7dd68efebc79412a8564e9fd",
@@ -122,6 +128,12 @@
           "recorded_status": "passed",
           "scope": "Completed physical four-hour disk investigation with unchanged application/database processes and final data/resource reconciliation. The frozen original counter protocol fails corrected arrival-evidence requirements; this is not a corrected-harness certification or a maximum-capacity claim.",
           "evidence": "disk-pass-2-diagnostic.json"
+        },
+        {
+          "run_id": "large-disk-counter-smoke-001",
+          "status": "passed",
+          "scope": "Million-row products/private tables and 1-MiB payload functional smoke: 330 completed seconds excluding warmup, 41 closed counter phases, verified bytes/events and cleanup; short calibration is not capacity/endurance certification.",
+          "evidence": "large-disk-smoke.json"
         }
       ]
     },
@@ -223,6 +235,12 @@
           "recorded_status": "passed",
           "scope": "Completed physical four-hour disk investigation with unchanged application/database processes and final data/resource reconciliation. The frozen original counter protocol fails corrected arrival-evidence requirements; this is not a corrected-harness certification or a maximum-capacity claim.",
           "evidence": "disk-pass-2-diagnostic.json"
+        },
+        {
+          "run_id": "large-disk-counter-smoke-001",
+          "status": "passed",
+          "scope": "Million-row products/private tables and 1-MiB payload functional smoke: 330 completed seconds excluding warmup, 41 closed counter phases, verified bytes/events and cleanup; short calibration is not capacity/endurance certification.",
+          "evidence": "large-disk-smoke.json"
         }
       ]
     },
@@ -311,6 +329,12 @@
           "recorded_status": "passed",
           "scope": "Completed physical four-hour disk investigation with unchanged application/database processes and final data/resource reconciliation. The frozen original counter protocol fails corrected arrival-evidence requirements; this is not a corrected-harness certification or a maximum-capacity claim.",
           "evidence": "disk-pass-2-diagnostic.json"
+        },
+        {
+          "run_id": "large-disk-counter-smoke-001",
+          "status": "passed",
+          "scope": "Million-row products/private tables and 1-MiB payload functional smoke: 330 completed seconds excluding warmup, 41 closed counter phases, verified bytes/events and cleanup; short calibration is not capacity/endurance certification.",
+          "evidence": "large-disk-smoke.json"
         }
       ]
     },
@@ -422,7 +446,7 @@
       "area": "Independent 1/5/10-project capacity and fairness",
       "entrypoints": "bench/host_campaign.py",
       "status": "failed",
-      "scope_or_limit": "The initial complete-step ten-project attempt provisioned ten independent clusters and passed 90 cross-project preflight rejections, but failed its first 19/s nominal sample: refresh p95 233.01/234.27 ms in two projects versus 200 ms. It did not reach final fairness/reconciliation. A separately declared 10-ms CPU-period experiment preserves aggregate bandwidth; backend improvement has not yet been demonstrated.",
+      "scope_or_limit": "First complete one-project fixed-counter profile passed. Two historical fractional-quota ten-project attempts failed fairness and drain. A separate CPU-sharing profile has passed kernel controls, with application campaigns still pending; no 1/5/10-host certification.",
       "native_diagnostics": [
         {
           "run_id": "fleet-caddy-1-smoke-003",
@@ -452,6 +476,18 @@
           "status": "failed",
           "scope": "1590 completed load seconds, 124 observations, no resource violation/OOM/drop/unexpected error, first nominal refresh SLO failed in two projects, owned cleanup confirmed. Later phases and final event identities were not run.",
           "evidence": "fleet-10-default-cpu-period.json"
+        },
+        {
+          "run_id": "fleet-caddy-1-final-pass-1-001",
+          "status": "passed",
+          "scope": "First complete fixed-counter one-project profile: 2490 load seconds, five-minute steps, three balanced samples, verified local HTTPS proxy reload, signed event reconciliation and cleanup; second pass and 5/10-project gates remain pending.",
+          "evidence": "fleet-1-final-pass-1.json"
+        },
+        {
+          "run_id": "fleet-caddy-5-sharing-smoke-001",
+          "status": "failed",
+          "scope": "Short CPU-sharing profile failed absolute and relative latency gates, including 217.638-ms healthy RLS p95; kernel limits, event identities, drain and owned cleanup passed. Fresh full-duration campaign remains pending.",
+          "evidence": "fleet-5-sharing-smoke.json"
         }
       ]
     },
@@ -570,5 +606,10 @@
     }
   ],
   "scope_note": "Row verdicts remain incomplete until their required stress scenarios pass; a passed functional subset cannot promote the row or G05. Historical disk/S3 recorded passes do not certify arrival delivery: see sparse-drop-staleness-finding.json; raw results remain unchanged.",
-  "certifies_g05": false
+  "certifies_g05": false,
+  "cpu_policy_native_control": {
+    "status": "passed",
+    "scope": "Only real Linux cgroup affinity/quota/memory/PID census of inert owned helpers for 1/5/10 groups; no application traffic, effective load credit or host performance certification.",
+    "evidence": "cpu-sharing-native-controls.json"
+  }
 }
