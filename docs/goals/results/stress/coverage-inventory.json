@@ -8,7 +8,7 @@
       "area": "Authentication and independent consumers",
       "entrypoints": "crates/server/tests/auth.rs; concurrency.rs; scripts/test-auth-package.py",
       "status": "not run",
-      "scope_or_limit": "Strict real login/refresh identity/expiry oracles passed short mixed disk/S3 diagnostics; prolonged expiry/pruning validation and independent-consumer load remain pending.",
+      "scope_or_limit": "Real login/refresh/expiry and independent browser consumers have scoped evidence; historical four-hour counter verdicts were withdrawn. Final-protocol continuous replacements and second browser pass remain pending.",
       "functional_subset": {
         "status": "passed",
         "source_commit": "3203330cf3df2b9b7dd68efebc79412a8564e9fd",
@@ -19,7 +19,15 @@
           "https://github.com/Nelcota/Nelcota/actions/runs/38767539229/job/116534551527"
         ],
         "scope": "Existing real-PostgreSQL auth, independent consumers, rotation/revocation, recovery links and bounded password-worker cancellation; release-load endurance still pending.",
-        "test_count": null
+        "test_count": null,
+        "latest_confirmed_ci": {
+          "source_commit": "1f391594dd8db6cccac54d6720d90c33d461d1f1",
+          "evidence": "ci-1f39159.json",
+          "checks": [
+            "check"
+          ],
+          "scope": "Existing functional subset repeated in matching CI; no new load/topology or production certification."
+        }
       },
       "native_diagnostics": [
         {
@@ -70,6 +78,18 @@
           "status": "passed",
           "scope": "Million-row products/private tables and 1-MiB payload functional smoke: 330 completed seconds excluding warmup, 41 closed counter phases, verified bytes/events and cleanup; short calibration is not capacity/endurance certification.",
           "evidence": "large-disk-smoke.json"
+        },
+        {
+          "run_id": "disk-http-counter-smoke-001",
+          "status": "passed",
+          "scope": "590 completed real-backend load seconds, 58 closed HTTP/arrival phases and final identity/file/queue checks. This predates whole-logical-request timing and is not final-protocol endurance.",
+          "evidence": "disk-http-counter-smoke.json"
+        },
+        {
+          "run_id": "disk-final-pass-1-001",
+          "status": "failed",
+          "scope": "4290 completed load seconds and 833 samples. Stopped safely on 522-MiB transient metrics disk reservation against unchanged 512-MiB guard. Partial soak/final invariants not approved; cleanup confirmed.",
+          "evidence": "disk-final-pass-1-failed.json"
         }
       ]
     },
@@ -89,7 +109,15 @@
           "https://github.com/Nelcota/Nelcota/actions/runs/38767539229/job/116534551527"
         ],
         "scope": "Existing REST/RPC/RLS, paging, admission and catalog regressions on real PostgreSQL; native million-row load profile still pending.",
-        "test_count": null
+        "test_count": null,
+        "latest_confirmed_ci": {
+          "source_commit": "1f391594dd8db6cccac54d6720d90c33d461d1f1",
+          "evidence": "ci-1f39159.json",
+          "checks": [
+            "check"
+          ],
+          "scope": "Existing functional subset repeated in matching CI; no new load/topology or production certification."
+        }
       },
       "native_diagnostics": [
         {
@@ -134,6 +162,24 @@
           "status": "passed",
           "scope": "Million-row products/private tables and 1-MiB payload functional smoke: 330 completed seconds excluding warmup, 41 closed counter phases, verified bytes/events and cleanup; short calibration is not capacity/endurance certification.",
           "evidence": "large-disk-smoke.json"
+        },
+        {
+          "run_id": "disk-http-counter-smoke-001",
+          "status": "passed",
+          "scope": "590 completed real-backend load seconds, 58 closed HTTP/arrival phases and final identity/file/queue checks. This predates whole-logical-request timing and is not final-protocol endurance.",
+          "evidence": "disk-http-counter-smoke.json"
+        },
+        {
+          "run_id": "disk-final-pass-1-001",
+          "status": "failed",
+          "scope": "4290 completed load seconds and 833 samples. Stopped safely on 522-MiB transient metrics disk reservation against unchanged 512-MiB guard. Partial soak/final invariants not approved; cleanup confirmed.",
+          "evidence": "disk-final-pass-1-failed.json"
+        },
+        {
+          "run_id": "s3-http-latency-smoke-001",
+          "status": "failed",
+          "scope": "80 completed seconds in larger million-row/one-MiB profile before physical S3 storage exceeded original 1024-MiB budget. Final integrity not reached; cleanup confirmed.",
+          "evidence": "s3-http-latency-smoke-failed.json"
         }
       ]
     },
@@ -153,7 +199,15 @@
           "https://github.com/Nelcota/Nelcota/actions/runs/38767539229/job/116534551527"
         ],
         "scope": "Existing concurrent password/account/storage mutations and rollback regressions. The new native discarded post-COMMIT reply campaign is not certified by this subset.",
-        "test_count": null
+        "test_count": null,
+        "latest_confirmed_ci": {
+          "source_commit": "1f391594dd8db6cccac54d6720d90c33d461d1f1",
+          "evidence": "ci-1f39159.json",
+          "checks": [
+            "check"
+          ],
+          "scope": "Existing functional subset repeated in matching CI; no new load/topology or production certification."
+        }
       },
       "native_diagnostics": [
         {
@@ -169,7 +223,7 @@
       "area": "Catalog, DDL and refresh recovery",
       "entrypoints": "crates/server/tests/architecture.rs; admin/migrations.rs",
       "status": "not run",
-      "scope_or_limit": "Existing real-service tests must run on this candidate.",
+      "scope_or_limit": "Existing real-service committed-DDL/refresh/migration/cancellation regressions passed in confirmed CI; combined sustained catalog stress remains incomplete.",
       "functional_subset": {
         "status": "passed",
         "source_commit": "3203330cf3df2b9b7dd68efebc79412a8564e9fd",
@@ -180,7 +234,15 @@
           "https://github.com/Nelcota/Nelcota/actions/runs/38767539229/job/116534551527"
         ],
         "scope": "Existing committed DDL, failed catalog refresh, concurrent migration export and cancellation regressions.",
-        "test_count": null
+        "test_count": null,
+        "latest_confirmed_ci": {
+          "source_commit": "1f391594dd8db6cccac54d6720d90c33d461d1f1",
+          "evidence": "ci-1f39159.json",
+          "checks": [
+            "check"
+          ],
+          "scope": "Existing functional subset repeated in matching CI; no new load/topology or production certification."
+        }
       }
     },
     {
@@ -199,7 +261,15 @@
           "https://github.com/Nelcota/Nelcota/actions/runs/38767539229/job/116534551527"
         ],
         "scope": "Existing real-file storage API, paths, listings, quotas, concurrent replacements and cancellation cases; continuous disk endurance still pending.",
-        "test_count": null
+        "test_count": null,
+        "latest_confirmed_ci": {
+          "source_commit": "1f391594dd8db6cccac54d6720d90c33d461d1f1",
+          "evidence": "ci-1f39159.json",
+          "checks": [
+            "check"
+          ],
+          "scope": "Existing functional subset repeated in matching CI; no new load/topology or production certification."
+        }
       },
       "native_diagnostics": [
         {
@@ -241,6 +311,18 @@
           "status": "passed",
           "scope": "Million-row products/private tables and 1-MiB payload functional smoke: 330 completed seconds excluding warmup, 41 closed counter phases, verified bytes/events and cleanup; short calibration is not capacity/endurance certification.",
           "evidence": "large-disk-smoke.json"
+        },
+        {
+          "run_id": "disk-http-counter-smoke-001",
+          "status": "passed",
+          "scope": "590 completed real-backend load seconds, 58 closed HTTP/arrival phases and final identity/file/queue checks. This predates whole-logical-request timing and is not final-protocol endurance.",
+          "evidence": "disk-http-counter-smoke.json"
+        },
+        {
+          "run_id": "disk-final-pass-1-001",
+          "status": "failed",
+          "scope": "4290 completed load seconds and 833 samples. Stopped safely on 522-MiB transient metrics disk reservation against unchanged 512-MiB guard. Partial soak/final invariants not approved; cleanup confirmed.",
+          "evidence": "disk-final-pass-1-failed.json"
         }
       ]
     },
@@ -260,7 +342,15 @@
           "https://github.com/Nelcota/Nelcota/actions/runs/38767539229/job/116534551527"
         ],
         "scope": "Explicit storage_s3 ignored tests were run against real RustFS, including multipart, grant expiry, timeout/cancel cleanup. A continuous four-hour release campaign is a separate gate.",
-        "test_count": null
+        "test_count": null,
+        "latest_confirmed_ci": {
+          "source_commit": "1f391594dd8db6cccac54d6720d90c33d461d1f1",
+          "evidence": "ci-1f39159.json",
+          "checks": [
+            "check"
+          ],
+          "scope": "Existing functional subset repeated in matching CI; no new load/topology or production certification."
+        }
       },
       "native_diagnostics": [
         {
@@ -283,6 +373,12 @@
           "recorded_status": "passed",
           "historical_scope": "First complete local real-S3 14400-second continuous pass plus prelude: 2934 samples, 249824 signed event identities reconciled, 16 session renewals, two pruning cohorts, byte/multipart invariants and cleanup. Separate provider allocation attribution and independent second pass still pending.",
           "counter_erratum_evidence": "sparse-drop-staleness-finding.json"
+        },
+        {
+          "run_id": "s3-http-latency-smoke-001",
+          "status": "failed",
+          "scope": "80 completed seconds in larger million-row/one-MiB profile before physical S3 storage exceeded original 1024-MiB budget. Final integrity not reached; cleanup confirmed.",
+          "evidence": "s3-http-latency-smoke-failed.json"
         }
       ]
     },
@@ -291,7 +387,7 @@
       "area": "Signatures, committed identities, queue and retries",
       "entrypoints": "bench/campaign.py; crates/server/tests/webhooks",
       "status": "not run",
-      "scope_or_limit": "Signed positive traffic and identity ledger active; competing workers/retries and cap boundaries pending.",
+      "scope_or_limit": "Real signatures, retries/leases/workers and full retained-history admission passed their functional subsets. Historical event ledgers reconcile, but corrected endurance and final concentrated-load drain remain incomplete or failed.",
       "functional_subset": {
         "status": "passed",
         "source_commit": "3203330cf3df2b9b7dd68efebc79412a8564e9fd",
@@ -302,7 +398,15 @@
           "https://github.com/Nelcota/Nelcota/actions/runs/38767539229/job/116534551527"
         ],
         "scope": "Existing real HTTP receivers, signatures/retries/leases/workers and the full 100000-event retained-history boundary. 99999 history fixtures are explicitly cancelled, not claimed network deliveries.",
-        "test_count": null
+        "test_count": null,
+        "latest_confirmed_ci": {
+          "source_commit": "1f391594dd8db6cccac54d6720d90c33d461d1f1",
+          "evidence": "ci-1f39159.json",
+          "checks": [
+            "check"
+          ],
+          "scope": "Existing functional subset repeated in matching CI; no new load/topology or production certification."
+        }
       },
       "native_diagnostics": [
         {
@@ -335,6 +439,18 @@
           "status": "passed",
           "scope": "Million-row products/private tables and 1-MiB payload functional smoke: 330 completed seconds excluding warmup, 41 closed counter phases, verified bytes/events and cleanup; short calibration is not capacity/endurance certification.",
           "evidence": "large-disk-smoke.json"
+        },
+        {
+          "run_id": "disk-http-counter-smoke-001",
+          "status": "passed",
+          "scope": "590 completed real-backend load seconds, 58 closed HTTP/arrival phases and final identity/file/queue checks. This predates whole-logical-request timing and is not final-protocol endurance.",
+          "evidence": "disk-http-counter-smoke.json"
+        },
+        {
+          "run_id": "disk-final-pass-1-001",
+          "status": "failed",
+          "scope": "4290 completed load seconds and 833 samples. Stopped safely on 522-MiB transient metrics disk reservation against unchanged 512-MiB guard. Partial soak/final invariants not approved; cleanup confirmed.",
+          "evidence": "disk-final-pass-1-failed.json"
         }
       ]
     },
@@ -343,7 +459,7 @@
       "area": "SQL/export admission and cancellation",
       "entrypoints": "crates/server/tests/architecture.rs; admin/sql.rs; hardening.rs",
       "status": "not run",
-      "scope_or_limit": "Existing real-service cancellation/budget suites pending.",
+      "scope_or_limit": "Existing real-PostgreSQL export/admission/slow-consumer cancellation/deadline regressions passed CI. Panel load samples exist; complete sustained combined admin/API pressure remains incomplete.",
       "functional_subset": {
         "status": "passed",
         "source_commit": "3203330cf3df2b9b7dd68efebc79412a8564e9fd",
@@ -354,8 +470,30 @@
           "https://github.com/Nelcota/Nelcota/actions/runs/38767539229/job/116534551527"
         ],
         "scope": "Existing real-PostgreSQL SQL/export limits, slow/unpolled consumer cancellation, deadlines and role/connection recovery.",
-        "test_count": null
-      }
+        "test_count": null,
+        "latest_confirmed_ci": {
+          "source_commit": "1f391594dd8db6cccac54d6720d90c33d461d1f1",
+          "evidence": "ci-1f39159.json",
+          "checks": [
+            "check"
+          ],
+          "scope": "Existing functional subset repeated in matching CI; no new load/topology or production certification."
+        }
+      },
+      "native_diagnostics": [
+        {
+          "run_id": "disk-http-counter-smoke-001",
+          "status": "passed",
+          "scope": "590 completed real-backend load seconds, 58 closed HTTP/arrival phases and final identity/file/queue checks. This predates whole-logical-request timing and is not final-protocol endurance.",
+          "evidence": "disk-http-counter-smoke.json"
+        },
+        {
+          "run_id": "disk-final-pass-1-001",
+          "status": "failed",
+          "scope": "4290 completed load seconds and 833 samples. Stopped safely on 522-MiB transient metrics disk reservation against unchanged 512-MiB guard. Partial soak/final invariants not approved; cleanup confirmed.",
+          "evidence": "disk-final-pass-1-failed.json"
+        }
+      ]
     },
     {
       "id": "browser",
@@ -373,7 +511,15 @@
           "https://github.com/Nelcota/Nelcota/actions/runs/38767539229/job/116534550866"
         ],
         "scope": "Existing Vite browser suites and memory regressions with explicit endpoint/response doubles. This is not a measured release-panel visual p95 under native traffic.",
-        "test_count": null
+        "test_count": null,
+        "latest_confirmed_ci": {
+          "source_commit": "1f391594dd8db6cccac54d6720d90c33d461d1f1",
+          "evidence": "ci-1f39159.json",
+          "checks": [
+            "admin-ui"
+          ],
+          "scope": "Existing functional subset repeated in matching CI; no new load/topology or production certification."
+        }
       },
       "native_diagnostics": [
         {
@@ -409,7 +555,7 @@
       "area": "TypeScript/Rust SDK runtime, cancellation and refresh",
       "entrypoints": "sdk/typescript; sdk/rust; crates/server/tests/sdk_rust.rs",
       "status": "not run",
-      "scope_or_limit": "Existing runtime/contract/memory suites pending.",
+      "scope_or_limit": "Existing runtime/package/memory and browser/server contracts passed confirmed CI. First live three-tab/independent-consumer pass passed; second complete load pass and final comparison remain pending.",
       "functional_subset": {
         "status": "passed",
         "source_commit": "3203330cf3df2b9b7dd68efebc79412a8564e9fd",
@@ -430,7 +576,20 @@
           "https://github.com/Nelcota/Nelcota/actions/runs/38767539228/job/116534551357"
         ],
         "scope": "Existing TypeScript/Rust package, runtime, memory and server/browser contracts on documented CI runtimes; no VPS load envelope follows from these functional checks.",
-        "test_count": null
+        "test_count": null,
+        "latest_confirmed_ci": {
+          "source_commit": "1f391594dd8db6cccac54d6720d90c33d461d1f1",
+          "evidence": "ci-1f39159.json",
+          "checks": [
+            "sdk / sdk",
+            "sdk / sdk-node (22)",
+            "sdk / sdk-node (26)",
+            "sdk-rust (ubuntu-latest)",
+            "sdk-rust (macos-latest)",
+            "sdk-rust (windows-latest)"
+          ],
+          "scope": "Existing functional subset repeated in matching CI; no new load/topology or production certification."
+        }
       },
       "native_diagnostics": [
         {
@@ -446,7 +605,7 @@
       "area": "Independent 1/5/10-project capacity and fairness",
       "entrypoints": "bench/host_campaign.py",
       "status": "failed",
-      "scope_or_limit": "First complete one-project fixed-counter profile passed. Two historical fractional-quota ten-project attempts failed fairness and drain. A separate CPU-sharing profile has passed kernel controls, with application campaigns still pending; no 1/5/10-host certification.",
+      "scope_or_limit": "Earlier one-project baseline passed within its original timing/telemetry profile. Both fractional-quota ten-project runs failed fairness/drain. Shared five-project smoke failed fairness, and its full run stopped on a generator observation timeout after earlier latency failures. Final-protocol two-pass 1/5/10 profiles remain pending.",
       "native_diagnostics": [
         {
           "run_id": "fleet-caddy-1-smoke-003",
@@ -488,6 +647,12 @@
           "status": "failed",
           "scope": "Short CPU-sharing profile failed absolute and relative latency gates, including 217.638-ms healthy RLS p95; kernel limits, event identities, drain and owned cleanup passed. Fresh full-duration campaign remains pending.",
           "evidence": "fleet-5-sharing-smoke.json"
+        },
+        {
+          "run_id": "fleet-caddy-5-sharing-final-pass-1-001",
+          "status": "failed",
+          "scope": "2790 completed load seconds, 604 samples, 24 prior noisy-mixed latency failures, then 10-second Docker stats timeout. Final invariants not reached; cleanup confirmed.",
+          "evidence": "fleet-5-sharing-final-pass-1.json"
         }
       ]
     },
@@ -507,7 +672,15 @@
           "https://github.com/Nelcota/Nelcota/actions/runs/38767539229/job/116534551527"
         ],
         "scope": "Isolated root Docker lifecycle, paired backup/restore and recovery with explicit provenance/DNS/TLS/proxy doubles, plus actual 255-receipt and 256-identity boundaries.",
-        "test_count": null
+        "test_count": null,
+        "latest_confirmed_ci": {
+          "source_commit": "1f391594dd8db6cccac54d6720d90c33d461d1f1",
+          "evidence": "ci-1f39159.json",
+          "checks": [
+            "check"
+          ],
+          "scope": "Existing functional subset repeated in matching CI; no new load/topology or production certification."
+        }
       }
     },
     {
@@ -515,7 +688,7 @@
       "area": "Update activation, interruption and compatibility",
       "entrypoints": "scripts/test-upgrade.py; crates/cli/src/updates",
       "status": "not run",
-      "scope_or_limit": "Existing safe acceptance/regression cases pending; no production activation.",
+      "scope_or_limit": "Existing upgrade/rollback acceptance passed confirmed CI. Native/public deployment, loss of guest/host state during activation and remaining operation combinations are not certified.",
       "functional_subset": {
         "status": "passed",
         "source_commit": "3203330cf3df2b9b7dd68efebc79412a8564e9fd",
@@ -526,7 +699,15 @@
           "https://github.com/Nelcota/Nelcota/actions/runs/38767539229/job/116534551290"
         ],
         "scope": "Existing upgrade/rollback acceptance against published v0.3.1 and v0.4.0 and the checkout. Public deployment/power-loss acceptance remains separate.",
-        "test_count": null
+        "test_count": null,
+        "latest_confirmed_ci": {
+          "source_commit": "1f391594dd8db6cccac54d6720d90c33d461d1f1",
+          "evidence": "ci-1f39159.json",
+          "checks": [
+            "upgrade"
+          ],
+          "scope": "Existing functional subset repeated in matching CI; no new load/topology or production certification."
+        }
       }
     },
     {
@@ -534,7 +715,7 @@
       "area": "Local paired snapshots and restored integrity",
       "entrypoints": "bench/fault_campaign.py; scripts/test-host-management.py",
       "status": "not run",
-      "scope_or_limit": "Live-writer local snapshot restored to a fresh owned target (RTO2.636s, RPOupper17.997s) with user/file/token isolation; off-host/PITR/native deployment remain blocked.",
+      "scope_or_limit": "First live-writer local snapshot restored into a fresh owned local target with RTO 2.636s/RPO upper bound 17.997s. Second fault pass is pending; first real native campaign failed before backup. Off-host/PITR remain unconfigured.",
       "functional_subset": {
         "status": "passed",
         "source_commit": "3203330cf3df2b9b7dd68efebc79412a8564e9fd",
@@ -545,7 +726,15 @@
           "https://github.com/Nelcota/Nelcota/actions/runs/38767539229/job/116534551527"
         ],
         "scope": "Existing owned Docker paired snapshots and restored files/database integrity. Off-host/PITR and power loss are not established.",
-        "test_count": null
+        "test_count": null,
+        "latest_confirmed_ci": {
+          "source_commit": "1f391594dd8db6cccac54d6720d90c33d461d1f1",
+          "evidence": "ci-1f39159.json",
+          "checks": [
+            "check"
+          ],
+          "scope": "Existing functional subset repeated in matching CI; no new load/topology or production certification."
+        }
       },
       "native_diagnostics": [
         {
@@ -572,7 +761,15 @@
           "https://github.com/Nelcota/Nelcota/actions/runs/38767539229/job/116534551527"
         ],
         "scope": "Existing malformed input, bounded API/storage/admin admission, peer identity, webhook destination/redirect and signature regressions; public ingress stress remains separate.",
-        "test_count": null
+        "test_count": null,
+        "latest_confirmed_ci": {
+          "source_commit": "1f391594dd8db6cccac54d6720d90c33d461d1f1",
+          "evidence": "ci-1f39159.json",
+          "checks": [
+            "check"
+          ],
+          "scope": "Existing functional subset repeated in matching CI; no new load/topology or production certification."
+        }
       },
       "native_diagnostics": [
         {
@@ -587,8 +784,8 @@
       "id": "deployment",
       "area": "Public DNS/ACME/TLS, native systemd and power loss",
       "entrypoints": "docs/host-management.md; scripts/acceptance-systemd.sh",
-      "status": "blocked",
-      "scope_or_limit": "No disposable VM with external observer, public DNS enrollment or systemd deployment target is configured. Process kill cannot certify power loss."
+      "status": "not run",
+      "scope_or_limit": "A real disposable GitHub-hosted outer VM and KVM guest are now available. First native run passed provisioning, actual kernel limits and verified TLS, then failed a signup-status oracle; its retry is active. No full native/guest power-cut verdict yet; public DNS/ACME and physical host power loss remain separate unavailable targets."
     },
     {
       "id": "offhost",
@@ -605,11 +802,23 @@
       "scope_or_limit": "This measured host is x86_64; no isolated ARM64 load target is configured."
     }
   ],
-  "scope_note": "Row verdicts remain incomplete until their required stress scenarios pass; a passed functional subset cannot promote the row or G05. Historical disk/S3 recorded passes do not certify arrival delivery: see sparse-drop-staleness-finding.json; raw results remain unchanged.",
+  "scope_note": "Each whole-row stress verdict remains incomplete until all required scenarios and repetitions have evidence. Passed functional subsets do not promote rows or G05. Historical arrival, HTTP-negative and final-hop latency defects invalidate final-protocol performance approval; raw originals remain unchanged.",
   "certifies_g05": false,
   "cpu_policy_native_control": {
     "status": "passed",
     "scope": "Only real Linux cgroup affinity/quota/memory/PID census of inert owned helpers for 1/5/10 groups; no application traffic, effective load credit or host performance certification.",
     "evidence": "cpu-sharing-native-controls.json"
+  },
+  "current_counter_latency_and_metrics_evidence": [
+    "native-arrival-control-before-after.json",
+    "native-http-control-before-after.json",
+    "native-logical-latency-before-after.json",
+    "native-metrics-compaction-before-after.json"
+  ],
+  "native_vm_capacity": {
+    "status": "passed",
+    "evidence": "native-vm-capacity-001.json",
+    "scope": "Read-only capacity inventory only. Separate native functional campaign first failed; fresh repetition active. No guest power-cut or native recovery approval yet.",
+    "active_workflow_run": "https://github.com/Nelcota/Nelcota/actions/runs/38963816198"
   }
 }
