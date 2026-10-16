@@ -1210,7 +1210,7 @@ o controle nativo; seu resultado ainda está pendente neste registro.
 ### 2026-10-16 15:57–16:07 UTC — smoke de cinco projetos reprovado
 
 `fleet-caddy-5-sharing-smoke-001` concluiu 270 segundos de carga, 85 amostras
-e limpeza confirmada, mas **reprovou** os cinco cenários concentrados: 6/23/14/11/8
+e limpeza confirmada, mas **reprovou** os cinco cenários concentrados: 6/22/14/11/8
 achados de gate em mixed/login/read/storage/write. Sob login intenso, RLS
 teve p95 de 217,638 ms em três projetos saudáveis, acima do limite absoluto
 de 200 ms. Cada saudável teve 61 operações úteis e 12 observações de RLS;
