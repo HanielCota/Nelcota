@@ -1,10 +1,19 @@
 # G05 — Registro técnico da execução
 
-Status: em execução. O mínimo solicitado de oito horas efetivas e os endurances
-de quatro horas por backend ainda não foram concluídos. Preparação, compilação,
-esperas e verificações estáticas não contam como tempo de carga.
+Status: em execução. O checkpoint conservador 004 registra 17h34m14s de
+intervalos de carga concluídos, acima do mínimo de oito horas; campanhas
+posteriores ainda serão somadas. A primeira passagem de endurance passou
+quatro horas contínuas em disco e quatro em S3 real local. A segunda passagem,
+a matriz completa e os critérios de aprovação do G05 ainda estão pendentes.
+Preparação, compilação, esperas, trechos interrompidos e verificações estáticas
+não contam nesse total. Falhas de fairness/drenagem continuam reprovadas.
 
 ## Identidade e ambiente
+
+Os limites abaixo descrevem o perfil inicial. Os manifestos de cada execução
+e os checkpoints posteriores registram alterações declaradas antes da carga,
+incluindo o perfil final de S3 com 1.024 MiB para o provider; não se comparam
+perfis diferentes como equivalentes.
 
 - Branch: `test/g05-stress-verification`.
 - Base do backend: `2efede8c27ee12119142170e8bd9742ff7cb900e`.
@@ -935,3 +944,43 @@ como capacidade máxima nem o período experimental menor como melhoria.
 O conjunto relacionado após o ajuste do fluxo e do comparador passou: **154
 testes em 10,343 segundos**. O snapshot parcial de um cenário não substitui
 a aprovação da campanha inteira. Checkpoint registrado em 2026-10-16 06:30 UTC.
+
+### 2026-10-16 08:05 UTC — interferência completa e descartes do scheduler
+
+`fleet-caddy-10-bounded-pass-1-001` terminou reprovado, com 3.990 segundos
+de carga concluída, 1.042 amostras e limpeza confirmada. O observador corrigido
+atingiu mediana de 5,000 segundos, máximo de 6,235 e nenhuma ocorrência de OOM.
+Os passos de 2/4/6 iterações/s por projeto passaram; 8/s reprovou refresh.
+A taxa nominal adaptativa foi 4/s, não o argumento de fallback de 6/s.
+As três amostras balanceadas e a falha/recuperação real de reload do Caddy
+passaram. Isso não certifica o restante da topologia.
+
+Os cinco cenários concentrando 80% da carga oferecida no projeto zero
+reprovaram o limite relativo de p95 dos projetos saudáveis: 23/29/32/33/33
+achados para mixed/login/read/storage/write, respectivamente. A drenagem
+de webhooks também reprovou o prazo existente de 30 segundos; a última
+observação durante a drenagem ainda registrava 5.834 pendências no projeto
+zero e zero nos outros nove. A reconciliação final de identidades e marcadores
+não foi alcançada; não se declara ausência de perda a partir dessa campanha.
+[Evidência por fase/projeto](results/stress/fleet-10-bounded-pass-1.json).
+
+A inspeção do snapshot bruto confirmou um defeito adicional do executor:
+`dropped_iterations` é emitido pelo scheduler com `scenario=project-0` e
+`project=single`, pois uma chegada descartada não executa VU para receber
+a tag dinâmica. O filtro antigo por projeto inventava zero. Na escrita
+concentrada foram 35.226 descartes reais e 7.975 iterações concluídas,
+contra o resumo anterior de zero descartes. A consulta corrigida usa o
+cenário somente para esse contador e mantém o filtro de operações/latências.
+Quatro regressões passaram, incluindo isolamento por projeto/fase e exclusão
+do canário na campanha de projeto único. O caminho de projeto único já
+filtrava por cenário e permanece equivalente. Os bytes brutos e os resultados
+históricos não foram reescritos; a evidência pública distingue o valor
+incorreto original do total recuperado. Os resultados antigos de frota
+não recebem aprovação de geração de tráfego a partir do contador incorreto.
+
+Uma segunda execução fresca do mesmo perfil congelado anterior está em curso
+para verificar a reprodução dos problemas de serviço/interferência. A correção
+do contador requer controle nativo e validação nos próximos perfis; não torna
+a campanha em curso uma execução do executor corrigido. Nenhum prazo ou SLO
+foi ampliado. O limite de 128 VUs do gerador é agregado entre os dez projetos;
+sob a carga concentrada o gerador não entrega toda a taxa oferecida.

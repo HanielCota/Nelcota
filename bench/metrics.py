@@ -69,6 +69,11 @@ class NativeMetrics:
             if not isinstance(project, str) or not re.fullmatch(r'project-[0-9]', project):
                 raise ValueError('Invalid project metrics selector')
             selector = '{run_id="' + phase + '",project="' + project + '"}'
+        # Dropped arrivals have no executing VU, so k6 cannot apply the
+        # project's dynamic VU tag. Its scheduler still supplies the scenario.
+        dropped_selector = selector
+        if project is not None:
+            dropped_selector = '{run_id="' + phase + '",scenario="' + project + '"}'
 
         def count(name, optional=False):
             return self.value('sum(k6_' + name + '_total' + selector + ')', optional)
@@ -87,7 +92,7 @@ class NativeMetrics:
             'successful_operations': {'count': successful, 'rate': successful / duration},
             'data_received': {'bytes':received,'bytes_per_second':received/duration},
             'data_sent': {'bytes':sent,'bytes_per_second':sent/duration},
-            'dropped_iterations': {'count': count('dropped_iterations', True)},
+            'dropped_iterations': {'count': self.value('sum(k6_dropped_iterations_total' + dropped_selector + ')', True)},
             'unexpected': {'value': self.value('max(k6_unexpected_rate' + selector + ')')},
             'checks': {'passes': count('assertions_passed'), 'fails': count('assertions_failed')},
             'expected_rejections': {'count': count('expected_rejections', True)},
