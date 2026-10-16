@@ -905,3 +905,33 @@ o watchdog removia o servidor. A retenção agora registra o erro secundário
 e preserva a exceção original. Se não houver falha anterior, a ausência
 do snapshot continua reprovando a campanha. Duas regressões cobrem esses
 casos. O observador corrigido ainda precisa da substituição nativa do perfil.
+
+### 2026-10-16 06:26 UTC — observador validado em serviços reais
+
+`fleet-observer-1-smoke-001` passou com 120 segundos de carga, 27 amostras,
+protocolo paralelo de quatro workers, aplicação/PostgreSQL reais, Caddy com
+TLS verificado, falha de reload injetada, eventos reconciliados e limpeza.
+A mediana entre amostras foi 5.000 s e o máximo 5.049 s;
+a duração mediana da coleta foi 2.570 s.
+É validação nativa do observador em um projeto; não aprova capacidade nem
+fairness de dez projetos. [Evidência](results/stress/fleet-parallel-observer-smoke.json).
+
+O executor também passa a registrar todas as falhas não críticas de fairness
+e continuar os demais cenários de interferência e a reconciliação final.
+Qualquer falha mantém o resultado global reprovado; o comparador exige
+a lista de falhas vazia independentemente do completion. Um baseline
+balanceado inválido interrompe antes dessa fase, e violações de integridade,
+ownership ou recursos continuam interrompendo o tráfego. Os testes cobrem
+os cinco cenários após uma reprovação relativa, interrupção em erro crítico
+e rejeição de evidência incompleta.
+
+A próxima tentativa completa de dez projetos usará novamente o período
+padrão de 100 ms, observador paralelo e teto de qualificação declarado de
+8 iterações/s por projeto. Esse ponto mais baixo será requalificado em
+passos de 300 segundos após a falha nominal a 19/s; os SLOs absolutos e
+as exigências de fairness continuam iguais. Não se apresenta esse teto
+como capacidade máxima nem o período experimental menor como melhoria.
+
+O conjunto relacionado após o ajuste do fluxo e do comparador passou: **154
+testes em 10,343 segundos**. O snapshot parcial de um cenário não substitui
+a aprovação da campanha inteira. Checkpoint registrado em 2026-10-16 06:30 UTC.

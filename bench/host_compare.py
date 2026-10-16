@@ -36,6 +36,9 @@ def read_run(root):
     completion=json.loads((root/'completion.json').read_text())
     cleanup=json.loads((root/'cleanup.json').read_text())
     violations=json.loads((root/'resource-violations.json').read_text())
+    acceptance=json.loads((root/'acceptance-failures.json').read_text())
+    if not isinstance(acceptance,list) or acceptance:
+        raise ValueError('Failed interference gates cannot certify host regressions')
     if completion.get('status')!='passed' or completion.get('cleanup_confirmed') is not True or cleanup.get('confirmed') is not True or violations:
         raise ValueError('Failed or incomplete run cannot certify host regressions')
     projects=profile.get('projects')

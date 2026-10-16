@@ -96,6 +96,24 @@ def median_baseline(samples):
     return result
 
 
+def observe_noisy_phases(run,projects,nominal_rate,seconds,baseline,output):
+    """Collect every safe interference case without hiding a failed gate."""
+    if set(baseline)!={'project-'+str(index) for index in range(projects)}:
+        raise ValueError('Incomplete balanced baseline for interference phases')
+    failures=[]
+    for hot in ['mixed','login','read','storage','write']:
+        phase='noisy-'+hot
+        reports=run(phase,[4*(projects-1)*nominal_rate]+[nominal_rate]*(projects-1),hot)
+        if set(reports)!=set(baseline):
+            raise ValueError('Incomplete project evidence in interference phase')
+        found=fairness_violations(baseline,reports,nominal_rate,seconds)
+        atomic_json(output/(phase+'-gates.json'),found)
+        if found:
+            failures.append({'phase':phase,'failures':found})
+            atomic_json(output/'acceptance-failures.json',failures)
+    return failures
+
+
 def campaign(args):
     output = args.output.resolve()
     if output.exists() and any(output.iterdir()):
@@ -133,6 +151,7 @@ def campaign(args):
     stop = threading.Event()
     critical = threading.Event()
     violations = []
+    acceptance_failures = []
     active_generator = None
     heartbeat_thread = sampler = watchdog = None
     status = 'failed'
@@ -178,6 +197,7 @@ def campaign(args):
         profile['client_initialization']={'maximum_sessions_per_project':128,'bootstrap_concurrency':4,'setup_timeout_seconds':120,'fully_preallocated_arrival_VUs':True,'mix_schedule':'global scenario arrival ordinal','bootstrap_excluded_from_nominal_metrics':True}
         profile.update({'schema':2,'cpu_affinity':cpus[:3],'metrics_cpu_affinity':cpus[-1],'capacity_qualification':args.capacity,'provisional_rate_per_project':args.provisional_rate,'max_connections_each':32,'pool_each':4,'generator_memory_mib':512,'metrics_memory_mib':512,'images':{image:json.loads(owned('image','inspect',image))[0]['RepoDigests'] for image in ['ubuntu:24.04','postgres:17-alpine',K6,PROMETHEUS]}})
         atomic_json(output/'manifest.json',profile)
+        atomic_json(output/'acceptance-failures.json',[])
         for project in projects:
             for foreign in fixtures:
                 if foreign['label'] != project.label:
@@ -379,12 +399,7 @@ def campaign(args):
             if failures:
                 raise RuntimeError('Proxy reload fault violated nominal service gates')
         if args.projects > 1:
-            for hot in ['mixed','login','read','storage','write']:
-                reports = run('noisy-'+hot, [4*(args.projects-1)*nominal_rate]+[nominal_rate]*(args.projects-1), hot)
-                failures = fairness_violations(baseline,reports,nominal_rate,args.seconds)
-                atomic_json(output/('noisy-'+hot+'-gates.json'), failures)
-                if failures:
-                    raise RuntimeError('Healthy-project fairness failed: '+hot)
+            acceptance_failures=observe_noisy_phases(run,args.projects,nominal_rate,args.seconds,baseline,output)
         if args.webhooks:
             phase = 'webhook-drain'
             atomic_json(output/'webhook-invariants.json', webhooks.reconcile())
@@ -402,6 +417,8 @@ def campaign(args):
             violations.extend(failures)
             raise RuntimeError('Fleet resource evidence incomplete')
         status = 'passed'
+        if acceptance_failures:
+            status = 'failed'
     finally:
         if sys.exception() is not None:
             atomic_json(output/'error.json', {'type':type(sys.exception()).__name__})
@@ -432,7 +449,7 @@ def campaign(args):
         signal.signal(signal.SIGTERM,previous)
         atomic_json(output/'completion.json',{'status':status,'projects':args.projects,'load_seconds':load_seconds,'resource_observations':coverage.count,'cleanup_confirmed':clean,'error_type':type(sys.exception()).__name__})
         if status != 'passed' and sys.exception() is None:
-            raise RuntimeError('Fleet final cleanup failed')
+            raise RuntimeError('Fleet did not meet its acceptance or cleanup gates')
 
 
 def main():

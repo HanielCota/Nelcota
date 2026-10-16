@@ -25,6 +25,7 @@ class HostComparison(unittest.TestCase):
             (root/'completion.json').write_text(json.dumps({'status':'passed','cleanup_confirmed':True}))
             (root/'cleanup.json').write_text(json.dumps({'confirmed':True}))
             (root/'resource-violations.json').write_text('[]')
+            (root/'acceptance-failures.json').write_text('[]')
             intervals=[]
             for index in range(1,4):
                 metrics={'unexpected':{'value':0},'checks':{'fails':0},'overload_rejections':{'count':0},'iterations':{'count':2400},'dropped_iterations':{'count':0}}
@@ -38,6 +39,10 @@ class HostComparison(unittest.TestCase):
 
     def test_equivalent_three_samples_pass(self):
         self.assertTrue(host_compare.compare(self.before,self.after)['gate_passed'])
+
+    def test_failed_interference_cannot_hide_behind_a_passed_completion(self):
+        (self.after/'acceptance-failures.json').write_text(json.dumps([{'phase':'noisy-login','failures':[{'p95':'more than 20% worse'}]}]))
+        with self.assertRaises(ValueError):host_compare.compare(self.before,self.after)
 
     def test_webhook_workers_cannot_be_silently_absent_on_one_side(self):
         path=self.after/'manifest.json'

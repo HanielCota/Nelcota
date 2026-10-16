@@ -184,6 +184,13 @@ public webhook destination policy. Request owners are joined before closing
 their ledgers. Comparisons reject different webhook profiles. A run without
 this option does not cover noisy webhook workers.
 
+Once all three balanced samples pass, noncritical fairness findings are retained
+while the remaining noisy cases and final ledger reconciliation run. Any failed
+fairness gate still fails the complete campaign and the comparator independently
+rejects a nonempty `acceptance-failures.json`. An invalid balanced baseline stops
+before interference measurements; correctness, resource and ownership failures
+always stop further offered traffic.
+
 `--caddy` routes each project through a real shared Caddy container and a distinct
 unprivileged loopback HTTPS port. Pull `caddy:2-alpine` before the campaign; the
 fixture records its digest and runs that immutable image ID. It reserves another
