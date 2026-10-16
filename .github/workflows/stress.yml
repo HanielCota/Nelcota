@@ -6,7 +6,7 @@ on:
       target:
         description: Dedicated benchmark, disposable VM inventory or native acceptance
         type: choice
-        options: [benchmark, native-preflight, native-vm, provider-preflight]
+        options: [benchmark, native-preflight, native-vm, provider-preflight, native-identity]
         default: benchmark
       evidence_run:
         description: Optional earlier native workflow artifact to republish before native-vm
@@ -39,6 +39,45 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  native-identity:
+    if: inputs.target == 'native-identity'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CARGO_BUILD_JOBS: 2
+      RUST_TEST_THREADS: 1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d
+        with:
+          toolchain: '1.99.0'
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - name: Build the exact filtered CLI unit artifact
+        timeout-minutes: 24
+        run: |
+          mkdir -p target
+          nice -n19 ionice -c3 cargo test --locked -p nelcota-cli --lib --no-run --message-format=json > target/native-identity-build.jsonl
+      - name: Repeat real native executable identity checks
+        timeout-minutes: 5
+        run: |
+          sudo -n systemd-run --wait --pipe --collect \
+            --unit="g05-identity-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --uid="$(id -u)" --working-directory="$GITHUB_WORKSPACE" \
+            --property=CPUQuota=200% --property=MemoryMax=4G --property=MemorySwapMax=0 \
+            --property=TasksMax=128 --property=RuntimeMaxSec=300 --property=KillMode=control-group \
+            env GITHUB_ACTIONS="$GITHUB_ACTIONS" RUNNER_ENVIRONMENT="$RUNNER_ENVIRONMENT" GITHUB_SHA="$GITHUB_SHA" \
+              python3 scripts/repeat-native-identity.py
+      - name: Public identity repetition evidence only
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-identity-repetitions
+          path: target/native-identity-public.json
+          if-no-files-found: ignore
+          retention-days: 14
+
   provider-preflight:
     if: inputs.target == 'provider-preflight'
     runs-on: ubuntu-24.04

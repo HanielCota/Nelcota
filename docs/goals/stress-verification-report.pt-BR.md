@@ -1,7 +1,7 @@
 # G05 — relatório técnico de stress
 
 **Estado: em execução, sem aprovação do G05.** Este relatório é atualizado
-durante as campanhas. Data deste checkpoint: 16/10/2026, 22:40 UTC.
+durante as campanhas. Data deste checkpoint: 16/10/2026, 23:40 UTC.
 Não houve merge nem deploy de produção. O trabalho está na branch
 `test/g05-stress-verification`, no [PR #90](https://github.com/Nelcota/Nelcota/pull/90),
 mantido como rascunho para revisão.
@@ -24,7 +24,7 @@ O tempo parcial das campanhas ainda abertas não está somado nesse checkpoint.
 | Primeira execução nativa separada | [Actions 38962480993](https://github.com/Nelcota/Nelcota/actions/runs/38962480993), código congelado `e80770b3f6aa1f64d011a3d62f8ebf0f1201bdac`; reprovada no oráculo de signup antes do backup |
 | Primeiro fluxo nativo completo | [Evidência](results/stress/native-vm-runtime-pass-1.json), código `7e1bd25b20a706c66d0be549c6f85851b6db843f`; aprovado no escopo funcional declarado |
 | Candidato nativo com correção PostgreSQL | [Evidência](results/stress/native-vm-runtime-candidate-pass-1.json), código `6f8a3e727b85b869318c2a2712982293c0724125`; binário `0cccc84840b5d09ee76b1ab2005b52e7d702bd44c9f9c7662df5c6bde82e110f`, verificado dentro da VM |
-| Correção de cwd, ativação nativa | [Antes](results/stress/native-default-root-before.json)/[depois](results/stress/native-default-root-after.json), código posterior `b43dc5802d6d236a3ed5b8c0253122ee12b8ae5e`; valida init/up/HTTPS, com migrações no cwd ainda em probe separado |
+| Correção de cwd, ativação nativa | [Antes](results/stress/native-default-root-before.json)/[depois](results/stress/native-default-root-after.json), código posterior `b43dc5802d6d236a3ed5b8c0253122ee12b8ae5e`; valida init/up/HTTPS; a migração no cwd/`NELCOTA_ROOT` teve defeito próprio corrigido e repetição com SQL confirmada |
 | Propriedade de um host nativo por máquina | [Antes](results/stress/native-host-root-before.json)/[depois](results/stress/native-host-root-after.json), código posterior `f560493ae6bcd8c4c94d51b6d7d049a608b30de0`; binário `27a7fb004db277ec59bd071f0cba8f009e31f416d710cda7880daa3bc5c844ae` |
 
 A execução local em andamento preserva o binário anterior como baseline.
@@ -50,8 +50,8 @@ O backend de produção continua um único binário Rust, sem Node ou Python.
 | 7 | Quatro horas contínuas em disco e S3 no artefato final | Pendente | Três execuções completaram fisicamente quatro horas, mas a aprovação dos contadores foi retirada após auditoria. Nenhuma substituta final foi aprovada neste checkpoint. |
 | 8 | Falhas, drain, restart, restore e deployment aplicável | Parcial | Primeiro fault passou com reconciliação de ACKs e restore local novo. Dois fluxos nativos passaram no escopo de restore no mesmo alvo e perda da RAM da convidada. Repetição final, atualização operacional, DNS/ACME públicos e recuperação fora do host continuam incompletos. |
 | 9 | Recursos, invariantes de dados/arquivos/eventos e regressão | Parcial | Invariantes locais e plateaus observados; precisam das campanhas finais comparáveis. Retenção anônima do provedor ainda exige atribuição. |
-| 10 | Correções focadas e regressões dos defeitos confirmados | Verificado nos defeitos já reproduzidos; revisão continua | Antes/depois de seleção de cluster, caminho relativo da unit e colisão de outro diretório nativo. Regressões de corrida/liberação foram adicionadas; sua execução final ainda está pendente. Fairness não recebeu causa de produção inventada. |
-| 11 | Rust/UI/SDK/lint/CI correspondentes ao SHA testado | Parcial | [18 checks de `1f39159`](results/stress/ci-1f39159.json) passaram. O [CodeQL corrigido](results/stress/codeql-invalid-fixtures-before-after.json) passou em `f560493`; testes Rust novos e CI final ainda em andamento. `dist` continua pendente de rebuild separado. Falhas anteriores permanecem registradas. |
+| 10 | Correções focadas e regressões dos defeitos confirmados | Verificado nos defeitos já reproduzidos; revisão continua | Antes/depois em quatro defeitos reais: cluster incorreto, unit relativa, outro host nativo e lease aninhado na migração. Os cenários específicos passaram em VMs novas. Uma falha intermitente Rust de identidade de executável segue sob investigação; o passe posterior não demonstra sua causa. Fairness não recebeu causa de produção inventada. |
+| 11 | Rust/UI/SDK/lint/CI correspondentes ao SHA testado | Parcial | [18 checks de `1f39159`](results/stress/ci-1f39159.json) passaram. O [CodeQL corrigido](results/stress/codeql-invalid-fixtures-before-after.json) passou em `f560493`; Rust de `3b56b25` e CodeQL de `14725d6` passaram em seus próprios SHAs, mas a falha Rust de `14725d6` permanece registrada e sob investigação. CI final ainda incompleto. `dist` continua pendente de rebuild separado. Falhas anteriores permanecem registradas. |
 | 12 | Relatório, limites e todos os testes falhos/bloqueados/não executados | Em consolidação | Este relatório e o [registro detalhado](stress-verification-execution.md) preservam os resultados; ainda há campanhas abertas. |
 
 ## Staging e limites
@@ -102,8 +102,13 @@ de desempenho do backend de produção por essa correção de segurança.
 | Novo oráculo nativo esperava o status incorreto no signup | VM real retornou o `201` documentado, mas o executor exigia o `200` genérico e parou | Exigência exata de `201`, token presente e identidade correta, com regressão de respostas HTTP. Repetição em VM nova aprovada; não se alterou a API. [Antes](results/stress/native-vm-runtime-first-failure.json), [depois](results/stress/native-vm-runtime-pass-1.json). |
 | Resultado nativo foi truncado na anotação do Actions | Mensagem cortada em 4.096 caracteres; uma primeira fragmentação também excedeu dez anotações por step | Transporte gzip/base64, no máximo nove fragmentos mais resumo, SHA-256 e regressões de reconstrução. Os relatórios originais foram recuperados integralmente pelo workflow, preservando os veredictos. Download local de artifacts continua indisponível. |
 | Administração nativa podia alterar outro cluster PostgreSQL | Com `17/main:5433` e `17/sentinel:5432`, `init` retornou sucesso e mudou a senha do cluster sentinela | Preflight rejeita layout incompatível antes de pacotes/host/config; clientes administrativos são vinculados a `17/main` e ao socket/porta esperados; senha segue por stdin. Seis regressões Rust e a [VM antes](results/stress/native-postgres-collision-before.json)/[depois](results/stress/native-postgres-collision-after.json) comprovam a fronteira. Fluxo nativo normal corrigido também passou. |
-| Instalação no diretório atual gerava unit inválida em runtime | `init` exit 0, `EnvironmentFile` relativo, `up` timeout e 14 reinícios, apesar de `systemd-analyze verify` exit 0 | Diretório resolvido antes de gerar configuração. VM nova confirmou caminho absoluto, init/up/verify exit 0 e HTTPS válido; 98,166 s com preparo, 19 amostras e limpeza. O novo probe de migrações nesse cwd ainda não terminou. |
-| Outro diretório podia tomar a instalação nativa | Segundo init com `--skip-checks` exit 0 mudou senha/Caddy e criou outro manifesto/unit | Lease da máquina e owner persistente antes de provisionar; fronteira de diretório e liberação somente após remoção completa. Na VM nova: rejeição específica exit 1, senha/Caddy/linha inalterados, nenhum segundo manifesto/unit; 72,177 s com preparo, 14 amostras e limpeza. As regressões novas de corrida/liberação seguem em CI. |
+| Instalação no diretório atual gerava unit inválida em runtime | `init` exit 0, `EnvironmentFile` relativo, `up` timeout e 14 reinícios, apesar de `systemd-analyze verify` exit 0 | Diretório resolvido antes de gerar configuração. VM nova confirmou caminho absoluto, init/up/verify exit 0 e HTTPS válido; 98,166 s com preparo, 19 amostras e limpeza. A extensão de migrações revelou um quarto defeito, descrito abaixo; o caminho de ativação permanece validado no escopo original. |
+| Outro diretório podia tomar a instalação nativa | Segundo init com `--skip-checks` exit 0 mudou senha/Caddy e criou outro manifesto/unit | Lease da máquina e owner persistente antes de provisionar; fronteira de diretório e liberação somente após remoção completa. Na VM nova: rejeição específica exit 1, senha/Caddy/linha inalterados, nenhum segundo manifesto/unit; 72,177 s com preparo, 14 amostras e limpeza. Rust de `f560493`/`3b56b25` passou; remoção real confirmou owner liberado e recusa de `up` no host vazio. |
+
+
+| Migração nativa no cwd/`NELCOTA_ROOT` tentava adquirir o próprio lease | Dois comandos reais retornavam exit 1/`deployment_busy`, com o lease externo corretamente mantido | Filho nativo recebe `--dir` explícito do projeto, preservando o lease do host no pai. [Antes](results/stress/native-cwd-migration-before.json)/[depois](results/stress/native-cwd-migration-after.json): ambos exit 0, tabela e journal presentes, uma linha em SQL. [Errata](results/stress/native-cwd-migration-census-erratum.json) retira a alegação antiga de ausência de tabela, pois o primeiro census comparava bytes/string; não retira os exits 1/busy observados. |
+| Census nativo podia negar presença SQL válida | Repetição já tinha migrate exit 0, mas o oráculo interpretava `b"t"` como falso e não contava linhas | Parser de bytes estrito, presença de tabela/journal separada e COUNT decimal limitado. Três regressões; VM nova passou com COUNT 1. A [execução intermediária](results/stress/native-cwd-migration-census-failure.json) continua reprovada. |
+| Descoberta de alocador ignorava o prefixo real e não publicava arquivo legível | 17 exports reais continham `rustfs_memory_allocator_`, mas o controle contou zero; uploader falhou no JSON 0600 | Prefixo corrigido, disponibilidade explícita separada de valor e publicação validada 0644. [Primeira falha](results/stress/provider-memory-discovery-first-failure.json) preservada; repetição está em andamento. Bytes solicitados vivos continuam indisponíveis e owners não verificados. |
 
 Outras mudanças de propriedade, filesystem, fault injection, inicialização
 de clientes, browser, ingress e teardown estão descritas por commit no
@@ -126,7 +131,8 @@ uma análise posterior não reescreve seus veredictos.
 | Browser/SDK 1 | Três abas, 511 navegações reais; p95 visual de 399,4 ms; 300 clientes descartados coletados; upload/cancelamento/renovação reais | Primeira passagem Chromium local, sem sandbox interno do Chromium; segunda passagem pendente. Isolamento externo do container permanece ativo. |
 | Fault/recovery 1 | 53.049 ACKs reconciliados, 2.938 respostas reais pós-COMMIT descartadas; zero ACK perdido/corrupção observada | Primeira passagem; respostas ambíguas foram consultadas, sem retry automático de mutações. |
 | Runtime nativo corrigido | Inicialização, migrations repetíveis, HTTPS validado, RLS, backup/restore e boot após interrupção da VM; 30 ACKs externos reconciliados sem perdas/duplicações/extras | 168,203 s incluindo preparo, 32 amostras, limpeza confirmada. Restore no mesmo alvo de 2,108 s e recuperação da convidada de 16,367 s; sem escrita em andamento no corte e sem alegação de durabilidade fora do host. |
-| Contratos de instalação nativa | Caminho de ativação no cwd e recusa de outro diretório passaram em VMs próprias | Não substituem a repetição completa de runtime após todas as correções; o probe de migrações no cwd está ativo. |
+| Relógio em VM descartável | Passo observado de 1.018,326 s, JWT expirado 401, serviço preservado/anônimo negado; relógio/NTP restaurados, offset final 0,471 s e acesso ordinário recuperado | [Evidência](results/stress/native-clock-drift-pass-1.json), sem alterar o relógio do host/controlador e sem crédito de endurance. |
+| Contratos de instalação nativa | Caminho de ativação no cwd e recusa de outro diretório passaram em VMs próprias | Não substituem a repetição completa de runtime após todas as correções; cwd/`NELCOTA_ROOT` migrate agora passou com tabela, journal e contagem SQL confirmados. |
 
 No fault pass, o restore em alvo local novo levou **2,636 s**, com RPO
 superior medido de **17,997 s**. O snapshot tinha 49.692 operações contra
@@ -150,7 +156,12 @@ reclamação automática até 1 MiB com namespace de trash vazio após mais de
 330 s. As falhas originais dos oráculos 002/003 foram preservadas; o
 [verificador posterior](results/stress/native-s3-trash-reclamation.json)
 validou as observações congeladas sem forçar GC. Essa conclusão física não
-explica toda a retenção de memória anônima.
+explica toda a retenção de memória anônima. A descoberta remota com o digest
+exato recebeu 17 exports OTLP autenticados e observou gauges MiMalloc de
+reserved/committed/page-committed. A flag
+`malloc_requested_bytes_available = 0` impede interpretar requested-total como
+bytes vivos. O próprio controle teve duas falhas e está sendo repetido após
+correção; o relatório original permanece bloqueado e o job original vermelho.
 
 ## Commits de referência, validação e pendências
 
@@ -169,6 +180,10 @@ explica toda a retenção de memória anônima.
 | `6767e15` / `dec797d` / `6f8a3e7` / `77d2335` | Reprodução real da colisão, evidências recuperáveis e verificadas, retenção do binário e probes dos contratos de instalação. |
 | `b43dc58` | Correção do caminho absoluto do host, com regressão real de ativação aprovada. |
 | `f560493` / `76af3a4` | Propriedade nativa persistente e leases de criação/mutação; revisão da liberação por hosts vazios. |
+| `14725d6` / `96c875d` | Migração nativa por diretório do projeto e census SQL tipado; antes/depois e falha intermediária preservados. |
+| `3b56b25` | Controle real de clock drift com restauração em finally e watchdog monotônico. |
+| `9e1f236` / `4ffad18` | Descoberta limitada do alocador real; prefixo, disponibilidade e permissão do artefato corrigidos. |
+| `a9bb8c2` | Diagnóstico CI HTTPS limitado, sem encaminhamento de token nem publicação de assertions. |
 | `e4e89d3` / `5abdf2a` | Fixtures aleatórias e distinção entre candidato de validação e credencial efetiva; segunda falha preservada e CodeQL posterior aprovado. |
 
 Os 246 testes Python anteriores ao executor nativo passaram em 13,399 s.
@@ -189,7 +204,10 @@ HTTP 403, portanto não se afirmou uma contagem de todos os alertas da branch.
 Uma falha anterior de Rust no CI e a repetição bem-sucedida no
 mesmo SHA foram preservadas; downloads de logs retornaram HTTP 403, por isso
 não se atribuiu uma causa nem se inventou contagem de testes daquele job.
-Dois diagnósticos remotos limitados também falharam; o último publicou exit 1
+O teste `running_native_identity_rejects_replacement_even_with_the_same_hash`
+reprovou em `14725d6`; Rust em `3b56b25`, com o mesmo código relevante, passou,
+sem comprovar a causa da falha original. Um novo downloader seguro buscará
+somente local/categoria do panic. Dois diagnósticos remotos limitados anteriores também falharam; o último publicou exit 1
 sem código HTTP identificável. Esses recibos não fornecem o diagnóstico
 original de compilação e não foram apresentados como testes aprovados.
 
@@ -202,9 +220,9 @@ testes aprovados a partir de smokes, CI funcional ou resultados históricos.
 AWS/S3 remoto, restauração fora do host, PITR configurado, ARM64, gerador em
 outra máquina e DNS/ACME públicos seguem sem alvo configurado. A VM KVM
 tem uma execução inicial reprovada por oráculo, dois fluxos completos
-aprovados em seus próprios hashes, três defeitos reproduzidos com regressões
-aprovadas em seus escopos e outras verificações em andamento. A repetição
-completa do candidato final e as migrações no cwd ainda estão pendentes.
+aprovados em seus próprios hashes, quatro defeitos reais reproduzidos com regressões
+aprovadas em seus escopos, controle real de relógio aprovado e outras verificações em andamento. A repetição
+completa do candidato final continua pendente.
 A perda de RAM da convidada não certifica perda de energia do host físico. Nenhum desses
 impedimentos foi substituído silenciosamente por mock ou critério menor.
 

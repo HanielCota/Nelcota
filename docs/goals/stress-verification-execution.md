@@ -1918,3 +1918,32 @@ Cinco regressões passaram em 0,002 s. Uma primeira execução das regressões
 falhou pela expectativa textual `byte budget` versus `file budget`; a asserção
 foi corrigida, preservando o limite de 8 MiB. O teste de identidade original
 segue reprovado até recuperar o diagnóstico e reproduzir/corrigir sua causa.
+
+### 16/10, 23:44 UTC — categoria original recuperada e prontidão da fixture
+
+O [diagnóstico remoto limitado](results/stress/ci-native-executable-panic-location.json)
+passou: o job original `117231644395`, fonte `14725d6`, tem panic na linha
+**863:64**, primeira validação, categoria `running_executable_identity_mismatch`.
+Não foi falha no `spawn`, no hash ou no teste posterior de troca do arquivo.
+Isso localiza a corrida de observação imediatamente após o aviso de exec do
+spawn. O teste agora copia `/bin/cat` e exige um round-trip real de seis bytes
+por UnixStream com leitura/escrita limitadas a cinco segundos antes de
+consultar /proc. O processo próprio continua sendo terminado e recolhido em
+Drop inclusive em panic. A checagem de segurança de produção não foi alterada
+nem recebeu retries; a substituição pelo mesmo hash continua obrigatoriamente
+rejeitada. Rustfmt passou. A execução Rust corrigida ainda precisa passar.
+
+Foi preparado um job em outra VM para **1.000 repetições reais** do único
+teste compilado, com duas CPUs/4 GiB/128 tarefas, sem swap, timeout por teste
+de dez segundos, duração interna de 240 s e limite externo de 300 s. Ele
+recusa zero testes, para na primeira falha, retém apenas local/categoria do
+panic e não atribui crédito de carga. Três regressões do controle passaram
+em 0,002 s; elas não substituem as mil repetições reais ainda pendentes.
+
+A [descoberta corrigida do provider](results/stress/provider-memory-discovery-after.json)
+passou em `38982447143`, fonte `4ffad18`: 18 amostras, 17 exports, 18 pontos
+numéricos de alocador, três gauges de memória reais, publicação/limpeza
+confirmadas, 96,148 s incluindo preparo. `requested_bytes_available` continua
+**false**; `live_owner_release` continua **not verified**. Isso aprova apenas
+a capacidade de observar o provider, sem promover os 415 MiB históricos a
+cache ou ausência de vazamento. A primeira falha permanece inalterada.

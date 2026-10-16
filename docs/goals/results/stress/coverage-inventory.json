@@ -907,6 +907,29 @@
       "status": "not run",
       "source": "76af3a45b8b8cd057711148dd9352595c34947b7",
       "scope": "Production guard and regression added after reviewing complete removal; new runtime VM and final-artifact repetition remain pending."
+    },
+    "cwd_migration": {
+      "status": "passed",
+      "source": "3b56b250407c8c1074ff256e05d589cec713c546",
+      "evidence": "native-cwd-migration-after.json",
+      "scope": "Both cwd and NELCOTA_ROOT migrations exit zero; typed read-only SQL proves table, journal and COUNT 1. Intermediate census failure and before-census erratum retained; not complete runtime or endurance."
+    },
+    "clock_drift": {
+      "status": "passed",
+      "evidence": "native-clock-drift-pass-1.json",
+      "scope": "Owned guest clock only; 1018.326s observed advance, expired access denied, service/anonymous canaries correct, original clock/NTP restored within 0.471s. External host unchanged; no load-time credit."
     }
+  },
+  "provider_allocator_discovery": {
+    "status": "failed",
+    "evidence": "provider-memory-discovery-first-failure.json",
+    "repeat": "in progress",
+    "scope": "Original report blocked on wrong metric prefix and uploader failed on root-owned 0600 JSON. Actual 17 OTLP exports include MiMalloc gauges; requested-bytes availability flag is zero. No live-owner or historical retention conclusion."
+  },
+  "current_ci_failure": {
+    "status": "under investigation",
+    "evidence": "ci-native-executable-identity-failure.json",
+    "test": "updates::runtime::tests::running_native_identity_rejects_replacement_even_with_the_same_hash",
+    "scope": "Later same-relevant-source Rust pass is not a cause or fix for the original failure; bounded panic-location retrieval pending."
   }
 }
