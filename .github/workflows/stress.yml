@@ -119,6 +119,7 @@ jobs:
         with:
           toolchain: '1.99.0'
       - name: Build the frozen native artifact
+        id: native_build
         timeout-minutes: 25
         run: nice -n19 ionice -c3 cargo build --locked --release -p nelcota-server
       - name: Bounded native VM acceptance with an external observer
@@ -138,6 +139,14 @@ jobs:
           name: native-vm-acceptance
           path: target/stress-g05/native-vm-*-public
           if-no-files-found: ignore
+          retention-days: 14
+      - name: Retain the native candidate binary for reproducibility
+        if: always() && steps.native_build.outcome == 'success'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-candidate-binary-${{ github.run_id }}-${{ github.run_attempt }}
+          path: target/release/nelcota
+          if-no-files-found: error
           retention-days: 14
 
   stress:

@@ -23,7 +23,12 @@ def api(path, *, logs=False):
     with tempfile.TemporaryFile() as output, tempfile.TemporaryFile() as errors:
         result = subprocess.run(["gh", "api", "--hostname", "github.com", "repos/Nelcota/Nelcota/" + path],
                                 stdout=output, stderr=errors, timeout=45, preexec_fn=limited_output)
-        require(result.returncode == 0, "GitHub diagnostic download failed; URL and raw stderr remain private")
+        if result.returncode != 0:
+            errors.seek(0)
+            text = errors.read(16384).decode(errors="replace")
+            codes = re.findall(r"HTTP(?:/[0-9.]+)?\s+([1-5][0-9]{2})", text)
+            raise RuntimeError("GitHub diagnostic download failed: exit " + str(result.returncode) +
+                               "; HTTP codes " + ",".join(codes[:3]) + "; URLs and raw stderr remain private")
         require(output.tell() <= 8 * 1024 ** 2, "Diagnostic exceeded its eight-MiB file budget")
         output.seek(0)
         content = output.read()
@@ -70,4 +75,11 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as error:
+        failure = {"status": "failed", "failure_type": type(error).__name__}
+        if isinstance(error, RuntimeError):
+            failure["reason"] = str(error)[:512]
+        print("::notice title=Bounded CI diagnostic failure::" + json.dumps(failure, separators=(",", ":")), flush=True)
+        raise SystemExit(1)
