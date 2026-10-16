@@ -715,7 +715,7 @@
       "area": "Local paired snapshots and restored integrity",
       "entrypoints": "bench/fault_campaign.py; scripts/test-host-management.py",
       "status": "not run",
-      "scope_or_limit": "First live-writer local snapshot restored into a fresh owned local target with RTO 2.636s/RPO upper bound 17.997s. Second fault pass is pending; first real native campaign failed before backup. Off-host/PITR remain unconfigured.",
+      "scope_or_limit": "First live-writer snapshot restored into a fresh local target with RTO 2.636s/RPO upper bound 17.997s; two native runtimes passed same-target database/file restore and guest restart. Second final fault/candidate repetitions, off-host restore and configured PITR remain incomplete.",
       "functional_subset": {
         "status": "passed",
         "source_commit": "3203330cf3df2b9b7dd68efebc79412a8564e9fd",
@@ -742,6 +742,18 @@
           "status": "passed",
           "scope": "complete local fault pass at 79.167% of qualified RPC rate, 1580 effective load seconds; second independent pass and external deployment targets remain pending",
           "evidence": "fault-pass-1.json"
+        },
+        {
+          "run_id": "native-vm-38963816198-1",
+          "status": "passed",
+          "evidence": "native-vm-runtime-pass-1.json",
+          "scope": "First complete owned native lifecycle: real systemd and verified TLS/RLS, same-target backup/restore, guest RAM loss and 30 external ACKs reconciled; no physical host power loss, concurrent cut write or off-host certification."
+        },
+        {
+          "run_id": "native-vm-38970590208-1",
+          "status": "passed",
+          "evidence": "native-vm-runtime-candidate-pass-1.json",
+          "scope": "Native PostgreSQL candidate: exact guest binary SHA verified; normal init/migrate, RLS/file bytes, same-target restore and restart of the same guest disk preserve 30 externally recorded ACKs. 168.203009496s including preparation, 32 samples, owned cleanup confirmed."
         }
       ]
     },
@@ -785,7 +797,33 @@
       "area": "Public DNS/ACME/TLS, native systemd and power loss",
       "entrypoints": "docs/host-management.md; scripts/acceptance-systemd.sh",
       "status": "not run",
-      "scope_or_limit": "A real disposable GitHub-hosted outer VM and KVM guest are now available. First native run passed provisioning, actual kernel limits and verified TLS, then failed a signup-status oracle; its retry is active. No full native/guest power-cut verdict yet; public DNS/ACME and physical host power loss remain separate unavailable targets."
+      "scope_or_limit": "Real disposable KVM native lifecycle passed before and after a confirmed PostgreSQL cluster-routing fix. Wrong-cluster mutation reproduced and fixed with a fresh VM negative regression. Current-directory and second-host-directory installation probes are pending. Native updates, final repetitions, public DNS/ACME and physical host power loss remain incomplete or unavailable.",
+      "native_diagnostics": [
+        {
+          "run_id": "native-vm-38963816198-1",
+          "status": "passed",
+          "evidence": "native-vm-runtime-pass-1.json",
+          "scope": "First complete owned native lifecycle: real systemd and verified TLS/RLS, same-target backup/restore, guest RAM loss and 30 external ACKs reconciled; no physical host power loss, concurrent cut write or off-host certification."
+        },
+        {
+          "run_id": "native-vm-38970590208-1",
+          "status": "passed",
+          "evidence": "native-vm-runtime-candidate-pass-1.json",
+          "scope": "Native PostgreSQL candidate: exact guest binary SHA verified; normal init/migrate, RLS/file bytes, same-target restore and restart of the same guest disk preserve 30 externally recorded ACKs. 168.203009496s including preparation, 32 samples, owned cleanup confirmed."
+        },
+        {
+          "run_id": "native-vm-38965444222-1",
+          "status": "failed",
+          "evidence": "native-postgres-collision-before.json",
+          "scope": "Confirmed production bug: named native cluster on 5433 while unrelated owned sentinel uses 5432; init exit 0 altered the unrelated cluster password."
+        },
+        {
+          "run_id": "native-vm-38969205271-1",
+          "status": "passed",
+          "evidence": "native-postgres-collision-after.json",
+          "scope": "Fixed native PostgreSQL layout is rejected specifically before host/config writes; unrelated owned password and one-row sentinel unchanged. Exact guest artifact verified, cleanup confirmed."
+        }
+      ]
     },
     {
       "id": "offhost",
@@ -818,7 +856,19 @@
   "native_vm_capacity": {
     "status": "passed",
     "evidence": "native-vm-capacity-001.json",
-    "scope": "Read-only capacity inventory only. Separate native functional campaign first failed; fresh repetition active. No guest power-cut or native recovery approval yet.",
-    "active_workflow_run": "https://github.com/Nelcota/Nelcota/actions/runs/38963816198"
+    "scope": "Read-only capacity inventory only. Separate structured native reports now document actual lifecycle/recovery and a before/after PostgreSQL isolation fix; the capacity inventory alone certifies none of those behaviors."
+  },
+  "current_native_probes": {
+    "source": "77d2335e898830689babf4ef73107008f0fa873c",
+    "default_root": {
+      "status": "not run",
+      "workflow_run": "https://github.com/Nelcota/Nelcota/actions/runs/38973154487",
+      "scope": "Active isolated workflow; no completed verdict yet"
+    },
+    "host_root": {
+      "status": "not run",
+      "workflow_run": "https://github.com/Nelcota/Nelcota/actions/runs/38973642284",
+      "scope": "Queued isolated workflow; no completed verdict yet"
+    }
   }
 }

@@ -1629,3 +1629,40 @@ As próximas campanhas nativas passam a registrar versões efetivas de
 PostgreSQL/client/Caddy/systemd, kernel/libc e Python. Doze testes rápidos
 do executor passaram em 0,011 s; nenhum build ou suíte pesada local foi
 iniciado junto ao soak em andamento.
+
+### 16/10, 22:06 UTC — checkpoint técnico e pendência CodeQL explícita
+
+O relatório português e a matriz foram atualizados com os resultados nativos
+já concluídos, sem promover linhas inteiras nem o G05. A repetição do fluxo
+nativo corrigido preservou seus 30 ACKs, bytes e identidades após reiniciar
+a convidada. A colisão PostgreSQL tem reprodução antes/depois e o fluxo
+normal corrigido também passou. O tempo efetivo consolidado continua
+100.044 s; a campanha aberta não foi somada parcialmente.
+
+Os probes de diretório padrão (`38973154487`) e segundo host em outra pasta
+(`38973642284`) usam VMs novas do Actions, serializadas no mesmo grupo de
+concorrência. O segundo ainda estava na fila; nenhum desses cenários foi
+anunciado como aprovado ou como defeito confirmado.
+
+O CI de `6f8a3e7` passou em Rust/Clippy, upgrade, SDKs, lint e supply chain.
+O painel reprovou somente no guard `versioned dist is up to date`; o build
+separado será feito no intervalo local seguro. O check agregado do CodeQL
+**também reprovou**, apesar dos três jobs de análise concluídos com sucesso:
+a anotação `Hard-coded cryptographic value` apontou a lista de senhas inválidas
+no teste de `native/postgres.rs`. O endpoint de alertas continua HTTP 403,
+mas a anotação do check forneceu arquivo, linha e mensagem.
+
+A fixture foi alterada para gerar uma base aleatória com o mesmo gerador
+seguro do projeto e acrescentar cada caractere inválido; o teste agora exige
+o erro específico do validador, evitando aceitar uma falha posterior de
+provisionamento como sucesso da regressão. Vazio/tamanho continuam cobertos
+no validador. A regra de segurança não foi desligada nem o alerta dispensado.
+Rustfmt passou após aplicar a quebra de linha exigida; testes Rust e novo
+CodeQL ainda dependem do CI, sem build pesado local junto ao soak.
+
+O segundo diagnóstico remoto limitado (`38973148545`) reprovou com exit 1
+sem código HTTP extraível. O recibo foi preservado, sem concluir uma causa
+que a evidência não identifica e sem publicar URLs assinadas ou stderr bruto.
+No monitor local às 22:05:45: soak ativo há aproximadamente 65 min,
+1.423 amostras, idade de 1,1 s, app RSS 46.320 KiB, banco 320 MiB,
+zero erros de assinatura e zero OOMs observados.
