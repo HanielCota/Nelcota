@@ -1772,3 +1772,29 @@ owner segue ausente. Esse refinamento veio da revisão do fluxo, sem alegar
 uma falha observada numa campanha inteira já executada. A nova regressão
 Rust/VM ainda está pendente. Rustfmt, fronteiras/checksums e diff-check passaram;
 o soak local continua no mesmo binário e processos.
+
+### 16/10, 22:45 UTC — migração nativa no cwd reprovada; ownership e CodeQL aprovados
+
+A [nova verificação de migrações](results/stress/native-cwd-migration-before.json)
+reprovou na VM `38976562183`, fonte `f3c8d49`, binário
+`e81f861e7a5f4b4c9979a3be678e1a7a7b42cd4aab01daf734029293f12ca7be`.
+Init/up/verify passaram e o arquivo de ambiente era absoluto, mas **as duas
+migrações retornaram exit 1 com `deployment_busy`**. Nenhuma tabela de fixture
+foi criada. Catorze amostras, 70,139 s com preparo, limpeza confirmada.
+
+A CLI nativa criava seu subprocesso com a configuração do projeto, mas sem
+selecionar seu diretório. Ele herdava o cwd/NELCOTA_ROOT do host e tentava
+a mesma lease já mantida pelo pai. O subprocesso agora recebe explicitamente
+`--dir <projeto>`; a configuração direta de banco continua sob a operação
+do pai. O teste real exige ambos os modos, tabela criada e uma única
+migration registrada. Nova VM precisa confirmar o resultado; não se inferiu
+sucesso apenas da alteração de argumentos. Rustfmt/fronteiras/diff-check passaram.
+
+O [probe de propriedade](results/stress/native-host-root-after.json) passou
+em `38976428540`, fonte `f560493`, binário
+`27a7fb004db277ec59bd071f0cba8f009e31f416d710cda7880daa3bc5c844ae`:
+segunda pasta recusada com a mensagem específica, senha/Caddy/linha originais
+inalterados, nenhum segundo manifesto/unit, HTTPS válido e limpeza. Catorze
+amostras, 72,177 s incluindo preparo. O [CodeQL](results/stress/codeql-invalid-fixtures-before-after.json)
+agregado e a análise Rust desse SHA também passaram. O job Rust de regressões
+completo ainda estava em andamento; não se anunciou a matriz inteira aprovada.
