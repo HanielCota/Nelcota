@@ -322,6 +322,21 @@ counters only when events happen, so an instant query can miss valid renewals
 after the default five-minute lookback. Missing/non-finite range evidence still
 fails. The continuous-client iteration and minimum-renewal gates remain in force;
 this observation protocol must match across compared campaigns.
+
+Scheduler drops need continuous observation: a drop early in a four-hour phase
+can expire from both the instant query and the one-hour telemetry store. Before
+traffic starts, the runner opens a bounded phase counter; the resource sampler
+then reads sparse scenario totals with a 120-second lookback and preserves
+their previous values when a series expires. Counter resets, regressions,
+unknown scenarios and polling gaps over 30 seconds invalidate the evidence.
+The final report embeds closed beginning/end coverage and exact retained totals.
+State is limited to 128 phases and 11 scenarios per phase. Comparators require
+this declared protocol and reject missing coverage or totals that disagree with
+the report; an absent sparse series cannot manufacture a zero. Historical
+endurance summaries using only the final instant query do not certify this
+protocol. Diagnostic one-shot summaries of at most five minutes remain distinct
+from comparable campaign evidence.
+
 `--final-idle-seconds 180` extends the final resource observation beyond the
 provider allocator's idle reclamation window. The bounded 30..300-second value
 is frozen in the profile and must match in comparisons. Idle/drain observation

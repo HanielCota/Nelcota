@@ -12,6 +12,8 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parents[2]
 COMPARE = ROOT / "bench/compare.py"
 CHECKER = ROOT / "scripts/check-boundaries.py"
+sys.path.insert(0, str(ROOT / 'bench'))
+from arrival_counters import PROTOCOL as ARRIVAL_COUNTER_PROTOCOL
 
 
 class Comparison(unittest.TestCase):
@@ -94,6 +96,7 @@ class Comparison(unittest.TestCase):
         for directory in [self.baseline,self.candidate]:
             path=directory/'metadata.json'
             metadata=json.loads(path.read_text());metadata['schema']=2
+            metadata['arrival_counter_protocol']=ARRIVAL_COUNTER_PROTOCOL
             path.write_text(json.dumps(metadata))
             (directory/'completion.json').write_text(json.dumps({'status':'passed','cleanup_confirmed':True}))
             (directory/'cleanup.json').write_text(json.dumps({'containers':[],'volumes':[],'directory_removed':True}))
@@ -102,6 +105,27 @@ class Comparison(unittest.TestCase):
                 rate=candidate_rate
             for index in range(1,4):
                 self.change_sample(directory,index,lambda metrics:metrics.update(successful_operations={'rate':rate,'count':rate*30}))
+                path=directory/f'read-{index}.json'
+                sample=json.loads(path.read_text())
+                sample['duration_seconds']=30
+                sample['arrival_counter_evidence']={'phase':f'read-{index}','protocol':ARRIVAL_COUNTER_PROTOCOL,'began_monotonic':0,'last_monotonic':30,'maximum_poll_gap_seconds':5,'observations':8,'closed':True,'dropped_by_scenario':{'traffic':0}}
+                sample['metrics']['dropped_iterations']={'count':0}
+                path.write_text(json.dumps(sample))
+
+    def test_missing_continuous_counter_protocol_cannot_certify_useful_work(self):
+        self.useful_fixture(100)
+        for directory in [self.baseline,self.candidate]:
+            path=directory/'metadata.json';value=json.loads(path.read_text());value.pop('arrival_counter_protocol');path.write_text(json.dumps(value))
+        code,report=self.compare()
+        self.assertNotEqual(code,0)
+        self.assertEqual(report['campaign_evidence_valid'],[False,False])
+
+    def test_stale_zero_disagrees_with_a_retained_drop_and_cannot_pass(self):
+        self.useful_fixture(100)
+        path=self.candidate/'read-1.json';sample=json.loads(path.read_text());sample['arrival_counter_evidence']['dropped_by_scenario']['traffic']=7;path.write_text(json.dumps(sample))
+        code,report=self.compare()
+        self.assertNotEqual(code,0)
+        self.assertFalse(report['rows'][0]['comparable'])
 
     def test_rejected_requests_cannot_mask_twenty_percent_loss_of_useful_work(self):
         self.useful_fixture(80)

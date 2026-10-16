@@ -5,6 +5,7 @@ import math
 from pathlib import Path
 import statistics
 from campaign import NOMINAL_SLOS
+from arrival_counters import PROTOCOL as ARRIVAL_COUNTER_PROTOCOL, closed_count
 
 FIELDS=['schema','scope','projects','rows_per_project','shared_user_id','cpu_effective','cpu_affinity','metrics_cpu_affinity','app_aggregate_cpus','postgres_aggregate_cpus','generator_cpus','metrics_cpus','app_memory_mib_each','postgres_memory_mib_each','generator_memory_mib','metrics_memory_mib','max_connections_each','pool_each','fixture_disk_mib','storage_filesystem','seconds_per_step','capacity_qualification','provisional_rate_per_project','nominal_rate_per_project','images']
 OPERATIONS=['read','rls','panel','storage','login','refresh','write']
@@ -17,6 +18,7 @@ FIELDS.append('ingress')
 FIELDS.append('startup_disk_budget')
 FIELDS.append('project_cpu_period_micros')
 FIELDS.append('resource_probe_workers')
+FIELDS.append('arrival_counter_protocol')
 
 
 def positive(value):
@@ -47,6 +49,8 @@ def read_run(root):
         raise ValueError('Missing declared project CPU period')
     if not isinstance(profile.get('resource_probe_workers'),int) or profile['resource_probe_workers']!=4:
         raise ValueError('Missing bounded fleet observation worker policy')
+    if profile.get('arrival_counter_protocol') != ARRIVAL_COUNTER_PROTOCOL:
+        raise ValueError('Missing continuous scheduler counter protocol')
     if isinstance(projects,bool) or not isinstance(projects,int) or projects not in (1,5,10) or positive(profile.get('seconds_per_step'))<300 or profile.get('certifies_five_minute_steps') is not True or any(field not in profile for field in FIELDS):
         raise ValueError('Missing equivalent profile or full-duration evidence')
     positive(profile['nominal_rate_per_project'])
@@ -61,8 +65,11 @@ def read_run(root):
             raise ValueError('Missing completed five-minute traffic interval')
         if set(report)!=labels or gates:
             raise ValueError('Balanced samples are missing, failed or use another topology')
-        for value in report.values():
+        for label, value in report.items():
             metrics=value['metrics']
+            dropped=closed_count(value.get('arrival_counter_evidence'),'balanced-'+str(index),label,value.get('duration_seconds'))
+            if dropped != metrics['dropped_iterations']['count']:
+                raise ValueError('Reported host drops disagree with retained scheduler counters')
             if value.get('schema')!=2 or nonnegative(metrics['unexpected']['value'])!=0 or nonnegative(metrics['checks']['fails'])!=0 or nonnegative(metrics['overload_rejections']['count'])!=0:
                 raise ValueError('Unexpected or overloaded traffic cannot certify a nominal baseline')
             expected=profile['nominal_rate_per_project']*profile['seconds_per_step']

@@ -36,6 +36,7 @@ from support import Receiver
 sys.path.insert(0, str(ROOT / "bench"))
 from watchdog import LABEL, atomic_json, host_reserves, process_identity, stop_generator
 from metrics import NativeMetrics, PROMETHEUS
+from arrival_counters import PROTOCOL as ARRIVAL_COUNTER_PROTOCOL
 from receiver import EventLedger
 from observations import generator_observation
 from objects import S3Inventory, disk_inventory, reconcile
@@ -738,6 +739,7 @@ def campaign(arguments):
                 "write_steady_rate":arguments.write_steady_rate,
                 "client_initialization":{"maximum_sessions_per_project":128,"bootstrap_concurrency":4,"setup_timeout_seconds":120,"fully_preallocated_arrival_VUs":True,"mix_schedule":"global scenario arrival ordinal","bootstrap_excluded_from_nominal_metrics":True},
                 "metrics_backend": "native Prometheus histogram; k6 raw TrendSink disabled",
+                "arrival_counter_protocol": ARRIVAL_COUNTER_PROTOCOL,
                 "metrics_memory_mb": 512,
                 "metrics_cpus": 0.25,
                 "metrics_cpu_affinity": cpus[-1],
@@ -888,6 +890,8 @@ def campaign(arguments):
                             cleared, _ = request(base, "/admin/api/webhooks/deliveries", headers={"Cookie": fixture["cookie"], "Origin": base}, method="DELETE")
                             with (output / "history-maintenance.jsonl").open("a") as target:
                                 target.write(json.dumps({"elapsed": time.monotonic() - started, "deleted": cleared["deleted"], "phase": phase}) + "\n")
+                        sample_step = 'sparse_arrival_counters'
+                        arrival_observation = native_metrics.observe_arrivals(phase)
                         elapsed = round(time.monotonic() - started, 1)
                         coverage.observe(elapsed)
                         ownership = owned("exec", app, "sh", "-c", "printf 'fds '; ls /proc/1/fd | wc -l; printf 'tasks '; ls /proc/1/task | wc -l; printf 'sockets '; ls -l /proc/1/fd | grep -c 'socket:'")
@@ -905,6 +909,7 @@ def campaign(arguments):
                                     json.loads(line) for line in stats.splitlines()
                                 ],
                                 "generator": generator_stats,
+                                "arrival_counters": arrival_observation,
                                 "database": json.loads(activity),
                                 "postgres_statistics":database_statistics,
                                 "queue": json.loads(queue),
@@ -978,6 +983,7 @@ def campaign(arguments):
                 nonlocal phase, load_seconds, soak_started, active_generator, soak_processes
                 if critical.is_set():
                     raise RuntimeError("Campaign resource guard stopped traffic")
+                native_metrics.begin_phase(label, ['traffic', 'session-canary'])
                 phase = label
                 command = [
                     "docker",
@@ -1108,6 +1114,7 @@ def campaign(arguments):
                     owned("rm", "-f", app)
                     start()
                     relogin()
+                native_metrics.finish_phase(label)
                 report = native_metrics.summary(label, int(duration[:-1]))
                 if label=='soak':
                     final_processes={name:component_identity(json.loads(owned('inspect',name))[0]) for name in [app,pg]}

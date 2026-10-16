@@ -5,6 +5,7 @@ import json
 import math
 from pathlib import Path
 import statistics
+from arrival_counters import PROTOCOL as ARRIVAL_COUNTER_PROTOCOL, closed_count
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("baseline", type=Path)
@@ -53,6 +54,7 @@ for index,directory in enumerate([args.baseline,args.candidate]):
             completion=json.loads((directory/'completion.json').read_text())
             cleanup=json.loads((directory/'cleanup.json').read_text())
             valid=completion.get('status')=='passed' and completion.get('cleanup_confirmed') is True and cleanup.get('containers')==[] and cleanup.get('volumes')==[] and cleanup.get('directory_removed') is True
+            valid = valid and metadata[index].get('arrival_counter_protocol') == ARRIVAL_COUNTER_PROTOCOL
         except (OSError,ValueError,TypeError):
             valid=False
     if 'allocator_observer' in metadata[index]:
@@ -61,7 +63,7 @@ for index,directory in enumerate([args.baseline,args.candidate]):
 for field in ["steady_duration", "workloads", "s3", "schema", "metrics_backend", "metrics_memory_mb", "metrics_cpus", "metrics_cpu_affinity", "effective_cpu_quota", "offered_rate_unit", "nominal_slos_ms", "auth_rate_limit_per_minute", "autovacuum", "webhook_history_maintenance", "storage_filesystem", "physical_seeded_objects", "object_payload_bytes", "max_storage_fixture_disk_mib"]:
     if any(field in value for value in metadata):
         fixture_fields.append(field)
-for field in ['resource_protocol','postgres_observation_settings','soak_fraction','container_log_profile','pressure_rest_seconds','final_idle_seconds','write_steady_rate','harness_sha256','client_initialization','calibration_ceiling_iterations_per_second','session_canary_observation']:
+for field in ['resource_protocol','postgres_observation_settings','soak_fraction','container_log_profile','pressure_rest_seconds','final_idle_seconds','write_steady_rate','harness_sha256','client_initialization','calibration_ceiling_iterations_per_second','session_canary_observation','arrival_counter_protocol']:
     if any(field in value for value in metadata):
         fixture_fields.append(field)
 fixture_differences = [
@@ -84,6 +86,8 @@ def valid_metrics(metrics):
         http_rate=metrics['http_reqs']['rate']
         http_count=metrics['http_reqs']['count']
         failures=[metrics['unexpected']['value'],metrics['checks']['fails']]
+        if throughput_metric == 'successful_operations':
+            failures.append(metrics['dropped_iterations']['count'])
         if not all(
             isinstance(value, (int, float))
             and not isinstance(value, bool)
@@ -108,10 +112,18 @@ def valid_metrics(metrics):
 for workload in args.workloads:
     measurements = []
     for directory in [args.baseline, args.candidate]:
-        values = [
-            json.loads((directory / f"{workload}-{i}.json").read_text())["metrics"]
-            for i in range(1, 4)
-        ]
+        values = []
+        for i in range(1, 4):
+            try:
+                sample = json.loads((directory / f"{workload}-{i}.json").read_text())
+                metrics = sample['metrics']
+                if throughput_metric == 'successful_operations':
+                    dropped = closed_count(sample.get('arrival_counter_evidence'), f'{workload}-{i}', 'traffic', sample.get('duration_seconds'))
+                    if dropped != metrics['dropped_iterations']['count']:
+                        raise ValueError('Reported arrivals disagree with retained scheduler evidence')
+                values.append(metrics)
+            except (OSError, ValueError, KeyError, TypeError):
+                values.append(None)
         valid = [metrics for metrics in values if valid_metrics(metrics)]
         measurement = {
             "successful_runs": len(valid),

@@ -2,9 +2,13 @@
 
 Status: em execução. O checkpoint conservador 004 registra 17h34m14s de
 intervalos de carga concluídos, acima do mínimo de oito horas; campanhas
-posteriores ainda serão somadas. A primeira passagem de endurance passou
-quatro horas contínuas em disco e quatro em S3 real local. A segunda passagem,
-a matriz completa e os critérios de aprovação do G05 ainda estão pendentes.
+posteriores ainda serão somadas. As primeiras execuções completaram quatro
+horas contínuas em disco e quatro em S3 real local, com completion histórico
+`passed`, integridade e continuidade registradas. A auditoria posterior
+confirmou que seus totais finais de descartes não foram medidos corretamente;
+elas não certificam o protocolo de contadores corrigido e exigem substituição.
+As passagens independentes, a matriz completa e a aprovação do G05 continuam
+pendentes. A errata de contadores abaixo prevalece sobre os checkpoints antigos.
 Preparação, compilação, esperas, trechos interrompidos e verificações estáticas
 não contam nesse total. Falhas de fairness/drenagem continuam reprovadas.
 
@@ -1027,3 +1031,46 @@ O checkpoint 005 soma **71.234 segundos (19h47m14s)** de carga efetiva
 conservadora, sem preparação, rest, intervalos interrompidos ou duplicação
 de janelas concorrentes. Esse total inclui testes reprovados com tráfego
 real e não implica aprovação de seus critérios.
+
+### 2026-10-16 11:38 UTC — errata: descartes esparsos no endurance
+
+A revisão dos snapshots e logs confirmou outro defeito de medição. k6 só
+publica o contador de descartes quando há descartes; a consulta instantânea
+deixa de enxergar a série após cinco minutos, e o Prometheus da fixture
+retém uma hora. Consultar apenas ao final de quatro horas pode fabricar zero.
+Os logs dos primeiros endurances de disco/S3 registram falta de VUs, embora
+seus snapshots finais não tenham nenhuma série de descartes. **Os totais
+históricos de zero descartes não estão sustentados e ficam retirados.**
+Seus totais exatos não podem ser recuperados após o teardown do Prometheus.
+A continuidade física de quatro horas, os contadores de trabalho útil,
+os bytes/eventos reconciliados e os demais resultados originais continuam
+registrados com seu escopo; não se aprova o protocolo corrigido a partir deles.
+
+O segundo disco iniciou endurance aproximadamente às 10:43 UTC, no executor
+congelado anterior. Uma consulta enquanto todo seu prefixo ainda cabia na
+retenção recuperou **607 descartes**, sem reset observado. Um observador
+suplementar somente de leitura acompanha esse contador para investigar a
+falha sem alterar o tráfego ou reiniciar o serviço. Ele começou durante a
+campanha e não a transforma em uma execução do executor corrigido. A primeira
+tentativa de iniciar esse observador falhou antes da coleta: o limite de
+address space herdado impedia o cliente Docker em Go de reservar sua arena
+virtual. A tentativa seguinte preservou esse diagnóstico e iniciou a coleta
+com estado/payloads limitados, afinidade e prazo próprios.
+
+A correção permanente abre o contador antes de cada gerador, coleta o total
+por cenário durante as observações, conserva os valores quando a série
+expira e fecha a cobertura após a saída do gerador. Estado limitado a 128
+fases/11 cenários, lookback de 120 segundos e lacuna máxima de 30 segundos;
+reset, regressão, número inválido ou cenário desconhecido reprova a coleta.
+Os relatórios incluem a cobertura fechada e os comparadores passam a exigi-la.
+Os SLOs, o limite de 1% de descartes e a entrega mínima de 99% permanecem iguais.
+
+O controle real do comparador antigo aprovava oito workloads ao comparar
+o primeiro disco consigo mesmo, apesar da ausência dessa evidência. O
+comparador corrigido reprovou os oito e marcou ambas as evidências inválidas.
+**47 testes focados passaram em 1,020 segundo**, incluindo simulação de quatro
+horas com um descarte esparso inicial, resets, lacunas, isolamento por cenário,
+contadores inconsistentes e rejeição por ambos os comparadores. A validação
+nativa do novo protocolo e as campanhas de substituição ainda estão pendentes;
+as quatro horas em curso não serão promovidas como se tivessem começado nele.
+[Achado e reprodução](results/stress/sparse-drop-staleness-finding.json).

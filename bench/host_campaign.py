@@ -32,6 +32,7 @@ from disk_usage import container as container_disk_usage
 from fleet_webhooks import FleetWebhooks
 from ingress import Ingress
 from fleet_observer import collect as collect_probes,retain_metrics_snapshot,WORKERS as PROBE_WORKERS
+from arrival_counters import PROTOCOL as ARRIVAL_COUNTER_PROTOCOL
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -192,6 +193,7 @@ def campaign(args):
         profile['webhooks'] = {'enabled': args.webhooks, 'receiver': 'owned loopback, verified signatures and durable event identities', 'evidence_limit_mib': 128, 'drain_seconds': 30}
         profile['resource_protocol']='component cgroup v2 via shell builtins and bounded parallel owned probes; allocated du totals count only disappearing child entries'
         profile['resource_probe_workers']=PROBE_WORKERS
+        profile['arrival_counter_protocol']=ARRIVAL_COUNTER_PROTOCOL
         profile['container_log_profile']=LOG_PROFILE
         profile['harness_js_sha256']=hashlib.file_digest((ROOT/'bench/campaign.js').open('rb'),'sha256').hexdigest()
         profile['client_initialization']={'maximum_sessions_per_project':128,'bootstrap_concurrency':4,'setup_timeout_seconds':120,'fully_preallocated_arrival_VUs':True,'mix_schedule':'global scenario arrival ordinal','bootstrap_excluded_from_nominal_metrics':True}
@@ -259,7 +261,8 @@ def campaign(args):
                     context=active_generator
                     probes={'container-stats':lambda:[json.loads(line) for line in owned('stats','--no-stream','--format','{{json .}}',*observed_containers).splitlines()],
                             'generator':lambda:generator_observation(context,lambda:active_generator),
-                            'webhooks':webhooks.observe}
+                            'webhooks':webhooks.observe,
+                            'arrival-counters':lambda:metrics.observe_arrivals(phase)}
                     if ingress is not None:
                         probes['ingress']=ingress.observe
                     for state in states:
@@ -286,7 +289,7 @@ def campaign(args):
                     resource_at = time.monotonic()
                     coverage.observe(resource_at-resource_began)
                     with (output/'resources.jsonl').open('a') as target:
-                        target.write(json.dumps({'monotonic': resource_at, 'phase': phase, 'observation_started_monotonic':cycle,'observation_duration_seconds':resource_at-cycle,'probe_durations_seconds':observations['durations_seconds'], 'containers': stats, 'databases': databases, 'generator': generation,'host':host_observation,'memory_events':memory_events,'component_cgroups':cgroups,'webhooks':webhook_observation,'ingress':ingress_observation})+'\n')
+                        target.write(json.dumps({'monotonic': resource_at, 'phase': phase, 'observation_started_monotonic':cycle,'observation_duration_seconds':resource_at-cycle,'probe_durations_seconds':observations['durations_seconds'], 'containers': stats, 'databases': databases, 'generator': generation,'host':host_observation,'memory_events':memory_events,'component_cgroups':cgroups,'webhooks':webhook_observation,'ingress':ingress_observation,'arrival_counters':values['arrival-counters']})+'\n')
                     atomic_json(output/'checkpoint.json', {'phase': phase, 'monotonic': resource_at, 'load_seconds_completed': load_seconds, 'resource_observations': coverage.count})
                 except Exception as error:
                     violations.append({'phase': phase, 'reason': str(error)[-600:], 'type': type(error).__name__})
@@ -304,6 +307,7 @@ def campaign(args):
                 seconds = args.seconds
             if critical.is_set():
                 raise RuntimeError('Fleet resource guard stopped traffic')
+            metrics.begin_phase(label, [project.label for project in projects])
             phase = label
             command = ['docker', 'run', '--rm', '--name', generator, '--label', LABEL+'='+identity, '--pids-limit', '128', '--network', 'host', '--cpus', '1', '--cpuset-cpus', str(cpus[2]), '--memory', '512m', '--memory-swap', '512m', '--user', f'{os.getuid()}:{os.getgid()}', '-v', str(ROOT/'bench/campaign.js')+':/campaign.js:ro', '-e', 'FIXTURE', '-e', 'FLEET=true', '-e', 'PROJECT_RATES='+','.join(map(str,rates)), '-e', 'WORKLOAD=mixed', '-e', 'HOT_WORKLOAD='+hot, '-e', 'DURATION='+str(seconds)+'s', '-e', 'RUN_ID='+label, '-e', 'OVERLOAD='+str(bool(hot) or overload).lower(), '-e', 'GOMEMLIMIT=448MiB', '-e', 'K6_PROMETHEUS_RW_SERVER_URL='+metrics_url+'/api/v1/write', '-e', 'K6_PROMETHEUS_RW_TREND_AS_NATIVE_HISTOGRAM=true', '-e', 'K6_PROMETHEUS_RW_PUSH_INTERVAL=2s', K6, 'run', '--quiet', '--summary-mode=disabled', '--no-thresholds', '--out=experimental-prometheus-rw', '/campaign.js']
             if ingress is not None:
@@ -339,6 +343,7 @@ def campaign(args):
                 raise RuntimeError('Fleet generator failed or ended before its measured interval')
             if not action_completed:
                 raise RuntimeError('Fleet fault was not injected during positive traffic')
+            metrics.finish_phase(label)
             reports = {project.label:metrics.summary(label,seconds,project.label) for project in projects}
             atomic_json(output/(label+'.json'), reports)
             load_seconds += seconds

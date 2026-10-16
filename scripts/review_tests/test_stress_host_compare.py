@@ -9,6 +9,7 @@ import unittest
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/'bench'))
 import host_compare
+from arrival_counters import PROTOCOL as ARRIVAL_COUNTER_PROTOCOL
 
 
 class HostComparison(unittest.TestCase):
@@ -21,6 +22,7 @@ class HostComparison(unittest.TestCase):
             root.mkdir()
             profile={field:1 for field in host_compare.FIELDS}
             profile.update(schema=2,projects=1,seconds_per_step=300,nominal_rate_per_project=8,certifies_five_minute_steps=True,project_cpu_period_micros=100000,resource_probe_workers=4)
+            profile['arrival_counter_protocol']=ARRIVAL_COUNTER_PROTOCOL
             (root/'manifest.json').write_text(json.dumps(profile))
             (root/'completion.json').write_text(json.dumps({'status':'passed','cleanup_confirmed':True}))
             (root/'cleanup.json').write_text(json.dumps({'confirmed':True}))
@@ -32,13 +34,24 @@ class HostComparison(unittest.TestCase):
                 for operation in host_compare.OPERATIONS:
                     metrics['latency_'+operation]={'p(95)':10,'p(99)':20}
                     metrics['throughput_'+operation]={'rate':4}
-                (root/('balanced-'+str(index)+'.json')).write_text(json.dumps({'project-0':{'schema':2,'metrics':metrics}}))
+                counters={'phase':'balanced-'+str(index),'protocol':ARRIVAL_COUNTER_PROTOCOL,'began_monotonic':0,'last_monotonic':300,'maximum_poll_gap_seconds':5,'observations':62,'closed':True,'dropped_by_scenario':{'project-0':0}}
+                (root/('balanced-'+str(index)+'.json')).write_text(json.dumps({'project-0':{'schema':2,'metrics':metrics,'duration_seconds':300,'arrival_counter_evidence':counters}}))
                 (root/('balanced-'+str(index)+'-gates.json')).write_text('[]')
                 intervals.append({'phase':'balanced-'+str(index),'completed':True,'requested_seconds':300,'elapsed_seconds':301})
             (root/'traffic-ledger.jsonl').write_text(''.join(json.dumps(item)+'\n' for item in intervals))
 
     def test_equivalent_three_samples_pass(self):
         self.assertTrue(host_compare.compare(self.before,self.after)['gate_passed'])
+
+    def test_missing_arrival_coverage_cannot_hide_behind_a_zero_report(self):
+        path=self.after/'balanced-1.json'
+        sample=json.loads(path.read_text());sample['project-0'].pop('arrival_counter_evidence');path.write_text(json.dumps(sample))
+        with self.assertRaises(ValueError):host_compare.compare(self.before,self.after)
+
+    def test_arrival_polling_gap_cannot_certify_comparable_host_samples(self):
+        path=self.after/'balanced-1.json'
+        sample=json.loads(path.read_text());sample['project-0']['arrival_counter_evidence']['maximum_poll_gap_seconds']=31;path.write_text(json.dumps(sample))
+        with self.assertRaises(ValueError):host_compare.compare(self.before,self.after)
 
     def test_failed_interference_cannot_hide_behind_a_passed_completion(self):
         (self.after/'acceptance-failures.json').write_text(json.dumps([{'phase':'noisy-login','failures':[{'p95':'more than 20% worse'}]}]))
