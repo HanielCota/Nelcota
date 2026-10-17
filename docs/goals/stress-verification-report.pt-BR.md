@@ -2,7 +2,7 @@
 
 **Estado: em execução, sem aprovação do G05.** Este relatório é atualizado
 durante as campanhas. Checkpoint de carga consolidada: 17/10/2026, 13:07 UTC.
-Atualização da investigação: 17/10/2026, 14:45 UTC.
+Atualização da investigação: 17/10/2026, 18:14 UTC.
 Não houve merge nem deploy de produção. O trabalho está na branch
 `test/g05-stress-verification`, no [PR #90](https://github.com/Nelcota/Nelcota/pull/90),
 mantido como rascunho para revisão.
@@ -37,8 +37,9 @@ O tempo parcial das campanhas ainda abertas não está somado nesse checkpoint.
 Os binários anteriores e o baseline permanecem preservados. A correção mais
 recente, no SDK, já tem novo build release e exige repetição das campanhas
 afetadas. Campanhas interrompidas continuam registradas com seus resultados
-originais e sem crédito do soak parcial. O baseline maior em disco encerrou;
-a campanha candidata seguinte foi parada antes de criar a fixture.
+originais e sem crédito do soak parcial. Após o baseline maior em disco, uma
+tentativa candidata anterior foi parada antes da fixture. A sequência final007
+está ativa; sua primeira endurance em disco ainda precisa encerrar.
 
 Cada campanha preserva manifesto de propriedade, limites, configuração,
 hashes das ferramentas/imagens, fases, timestamps monotônicos, métricas e
@@ -51,19 +52,19 @@ O backend de produção continua um único binário Rust, sem Node ou Python.
 | # | Critério do G05 | Situação neste checkpoint | Evidência ou impedimento |
 |---|---|---|---|
 | 1 | Inventário, baseline imutável e SLOs declarados | Atendido para o staging local | [Inventário](results/stress/coverage-inventory.json), [plano](results/stress/final-campaign-plan.json), manifestos por execução. A matriz registra os cenários ainda incompletos. |
-| 2 | Calibração, unidades, amostragem e oráculos | Controles focados aprovados; nova repetição real da matriz pendente | Controles nativos de bytes, redirects, contadores esparsos, cgroups e compactação; campanhas finais ainda precisam terminar. |
+| 2 | Calibração, unidades, amostragem e oráculos | Duas matrizes reais corrigidas aprovadas; fechamento ordinário pendente | [Duas passagens](results/stress/matrix-sdk007-two-corrected-passes-001.json): degraus de 300 s em 16/32/48/64 iterações/s, oráculos completos, 43 controles por passagem, sem chegadas perdidas. Não prova capacidade máxima nem fecha os demais perfis. |
 | 3 | Cancelamento, watchdogs, redação e limpeza restrita | Demonstrado nos escopos local e nativo executados | [Controle nativo de guardas/pidfd](results/stress/native-guards-pidfd.json), interrupções reais e recibos de limpeza. A VM própria também confirmou limpeza e limites reais de kernel, sem guard crítico disparado nas execuções aprovadas. |
 | 4 | Duas passagens de steady/staircase/picos/descanso | Em execução no candidato007 | Primeira campanha nova em disco iniciada às13:34:48UTC. A sequência prevê duas passagens completas por backend e para em qualquer falha; início de campanha não é aprovação. |
 | 5 | Toda a matriz funcional, de segurança e concorrência | Parcial | Duas matrizes completas do backend passaram no ELF anterior, com variação de calibração ainda investigada. Um ciclo browser/auth passou no oráculo anterior; a repetição revelou a nona falha. Novo oráculo prova sobreposição real e exige novas passagens. CI funcional e subconjuntos não substituem os demais cenários. |
 | 6 | Isolamento/fairness em 1/5/10 projetos e controle responsivo | Reprovado/incompleto | Cinco/dez projetos tiveram falhas anteriores de fairness/drain. Novo smoke compartilhado falhou com 101 registros, incluindo 8 SLOs absolutos. Smoke de cotas de 10ms falhou com 106 registros relativos, sem falhas absolutas; 1.381 eventos íntegros e limpeza completa. Nenhum smoke substitui os passos obrigatórios de cinco minutos. |
 | 7 | Quatro horas contínuas em disco e S3 no artefato final | Pendente | Três execuções históricas completaram fisicamente quatro horas, com aprovação de contadores retirada. Uma nova campanha em disco passou no protocolo atual, como baseline; correções posteriores invalidaram as campanhas afetadas do candidato. Nenhuma campanha do próximo candidato, com as dez correções, foi aprovada até aqui. |
-| 8 | Falhas, drain, restart, restore e deployment aplicável | Parcial | Primeiro fault passou com reconciliação de ACKs e restore local novo. Dois fluxos nativos passaram no escopo de restore no mesmo alvo e perda da RAM da convidada. Repetição final de faults/carga, atualização operacional, DNS/ACME públicos e recuperação fora do host continuam incompletos. |
+| 8 | Falhas, drain, restart, restore e deployment aplicável | Parcial | Duas matrizes finais restauraram alvo local novo com bytes/usuário e rejeição JWT verificados; RTO 2,597/2,500 s. A suíte nativa final passou duas vezes, com cortes após ACKs. Os novos cortes com write observado em voo, faults completos, atualização operacional, DNS/ACME públicos e recuperação fora do host permanecem incompletos. |
 | 9 | Recursos, invariantes de dados/arquivos/eventos e regressão | Parcial | Invariantes locais e plateaus observados; precisam das campanhas finais comparáveis. Retenção anônima do provedor ainda exige atribuição. |
 | 10 | Correções focadas e regressões dos defeitos confirmados | Dez defeitos reproduzidos; regressões focadas aprovadas, campanhas finais pendentes | Cinco falhas na CLI, três de SQL/export e duas no SDK. A nova falha bloqueava clientes independentes no servidor: 202 aprovados/2 reprovados antes, 204/204 aprovados depois. A falha nativa original e a fairness ainda exigem investigação. |
-| 11 | Rust/UI/SDK/lint/CI correspondentes ao SHA testado | CI ordinário e nativo aprovados no produto007; campanhas pendentes | [CI18/18](results/stress/ci-sdk007-final-product-trees.json), SDK204/204 e [native12/12](results/stress/native-final-suite/index.json). O merge sintético realmente checado tem árvore completa igual ao head; as seis árvores de produto correspondem ao build congelado. Isso não aprova os cenários de stress restantes. |
+| 11 | Rust/UI/SDK/lint/CI correspondentes ao SHA testado | Produto007 e executor 3cc1b83 aprovados; preflight e campanhas finais pendentes | [CI 3cc18/18](results/stress/ci-host-private-files-product-trees.json), SDK204/204 e [native12/12](results/stress/native-final-suite/index.json). O merge realmente checado tem árvore completa de 3cc e seis árvores de produto do build. A extensão tem 55 controles focados e descoberta Python completa aprovada, sem contagem inferida; seu preflight real ainda precisa executar. |
 | 12 | Relatório, limites e todos os testes falhos/bloqueados/não executados | Em consolidação | Este relatório e o [registro detalhado](stress-verification-execution.md) preservam os resultados; ainda há campanhas abertas. |
 
-## Reprovação atual do navegador: SLO de refresh
+## Falha original do navegador: SLO de refresh ainda sem causa confirmada
 
 A [primeira repetição final007](results/stress/browser-sdk007-refresh-slo-first-failure-001.json)
 falhou em `g05_auth_refresh_slo`, após27guardas aprovadas. O teste antigo
@@ -91,7 +92,9 @@ sem crescimento final de DOM/listeners; heap cresceu menos de2,3MiB por aba,
 abaixo do limite de8MiB. Expiração real900s observada por1082,2s, com401no
 acesso expirado e400no refresh revogado. A causa da primeira falha continua
 aberta; não há comparação numérica antes/depois contra valores perdidos.
-A segunda passagem independente ainda precisa concluir. Os
+A [segunda passagem independente](results/stress/browser-sdk007-two-measured-passes-001.json)
+também passou com as mesmas quotas e SLOs. A causa da primeira falha permanece
+aberta. Os
 [18checks do head80d29c8](results/stress/ci-sdk007-auth-metrics-product-trees.json)
 passaram e têm prova da árvore completa do merge realmente usado no CI.
 
@@ -106,7 +109,9 @@ máxima de64/s e as durações permanecem iguais; degraus não qualificados não
 são removidos do relatório. As36guardas focadas passaram, incluindo três
 regressões novas. A primeira tentativa do wrapper de descoberta falhou antes
 dos testes e continua registrada. A matriz remota em andamento usa a revisão
-antiga e mantém seu resultado; duas passagens reais corrigidas são pendentes.
+antiga e mantém seu resultado. Na atualização seguinte, as [duas passagens
+reais corrigidas](results/stress/matrix-sdk007-two-corrected-passes-001.json)
+passaram; o relatório original reprovado permanece preservado.
 Essa falha de medição não é uma nova correção de produto nem prova a causa
 da variação histórica32→16/s.
 
@@ -1123,3 +1128,48 @@ passaram, incluindo a rejeição do orçamento auxiliar antigo nos arquivos de
 cgroup. Nenhuma execução real ocorreu com o perfil anterior. O plano remoto
 D4 ainda não iniciado foi substituído antes de criar sua ref; a nova fonte
 precisa de CI próprio. Os dois casos nativos EC preparados continuam válidos.
+
+
+## Oito reproduções nativas encerradas — 17:54 UTC
+
+As [oito reproduções de startup e recuperação](results/stress/native-final007-startup-reproductions-001/index.json)
+passaram em VMs novas, com limpeza e a mesma imagem da falha original. Cada uma
+preservou 30 identidades reconhecidas e os bytes privados após perda da RAM da
+convidada. Restore: 1,644620–2,533694 s; recuperação: 13,660860–17,987902 s.
+São oito ELFs distintos, construídos nas mesmas seis árvores de produto007;
+não são medições de performance do ELF comum retido. Os cortes aconteceram
+após as escritas concluídas; os dois novos casos EC com escrita observada em
+voo permanecem separados e ainda não executados. A falha original continua sem
+causa confirmada por falta de journal/exit status, mesmo com essas repetições
+aprovadas. O segundo browser medido está ativo. Zero crédito adicional de tempo
+local por sobreposição remota.
+
+
+O [CI ordinário de 3cc1b83](results/stress/ci-host-private-files-product-trees.json)
+encerrou em 18/18, incluindo descoberta Python completa e 204 testes SDK.
+O merge SDK realmente verificado, `d2c68f3e`, tem a árvore completa de 3cc1b83
+e as seis árvores de produto do candidato007. Isso valida a fonte da extensão,
+sem aprovar o preflight real ou os cenários ainda não executados.
+
+
+## Segunda passagem medida do navegador aprovada — 18:14 UTC
+
+A [segunda execução real](results/stress/browser-sdk007-measured-auth-pass-2-001.json)
+encerrou com 31 controles remotos, limpeza, cinco ciclos com métricas completas,
+560 respostas e 40 usuários sem sessões restantes. O p95 de refresh variou de
+89,5 a 145,3 ms; o pior p99 foi 145,5 ms. Foram 766 navegações com p95 visual de
+285 ms, 2.508 leituras RLS pelo SDK, 219 amostras e intervalo máximo de 5,313925 s.
+A observação durou 1.082,209894 s, com expiração real de 900 s, acesso expirado
+401 e refresh revogado 400. Quarenta e oito chamadas sobrepostas fizeram apenas
+uma renovação. Os sete plateaus registram deltas finais de heap por aba de
+900.632, 2.604.988 e 2.500.336 bytes, abaixo de 8 MiB, sem aumento de DOM/listeners.
+Os números não certificam ausência absoluta de vazamento nem explicam o SLO
+original perdido. [Comparação de escopo e dois recibos](results/stress/browser-sdk007-two-measured-passes-001.json).
+
+A sequência remota anterior fechou 11 casos aprovados. Após conferir fila vazia,
+CI EC 18/18, script selado e árvores de produto, iniciei os dois casos adicionais
+com escrita bloqueada em voo; o primeiro é o workflow `39057126426`. Eles ainda
+não têm resultado aprovado. O preflight real de arquivos privados permanece
+preparado, aguardando esses dois encerramentos. A endurance local em disco
+continua; intervalos remotos sobrepostos e soak parcial não aumentam o piso
+consolidado de 39h53m54s. O PR continua draft, sem merge ou deploy de produção.

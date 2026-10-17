@@ -3434,3 +3434,54 @@ full-CPU controller budget. Prior focused proofs stay tied to their actual sourc
 [Amended source and budget evidence](results/stress/host-private-file-preflight-guards-002.json).
 The unstarted D4 remote008 plan is superseded before ref creation or dispatch;
 its CI cannot certify this subsequent code. Native EC remote007 is unaffected.
+
+
+### 2026-10-17, 17:54 UTC — eight native startup reproductions closed
+
+All eight bounded fresh guest runtime reproductions passed on the same final007
+product trees, with their eight separately recorded actual ELF hashes and owned
+cleanup. Each preserves thirty externally acknowledged identities and private
+file bytes after guest RAM loss. Restore takes 1.644620–2.533694 seconds; guest
+recovery takes 13.660860–17.987902 seconds. The guest image SHA matches the
+original failed af01678 run. No cut coincides with an observed unfinished write;
+these do not replace the separate EC runtime-inflight controls or the twelve-case
+common-ELF suite. All remote overlap earns zero local load credit.
+
+The historical startup failure remains failed and unexplained: its missing
+service journal/exit status prevents cause attribution, and eight successes do
+not establish a fix. The remote owner now runs the second measured browser/auth
+pass. [Original reports, hashes and scope](results/stress/native-final007-startup-reproductions-001/index.json).
+
+
+At 18:09 UTC all eighteen ordinary source3cc1b83 checks closed successfully,
+including the whole Python discovery step. Its exact count is not inferred.
+The actual SDK merge d2c68f3e has the full source root and all six final007 product
+trees; the public unit notice proves204passed/zero failed/pending. This closes
+the new preflight source CI prerequisite, without certifying unrun real fixtures.
+[CI/provenance](results/stress/ci-host-private-files-product-trees.json).
+
+
+### 2026-10-17, 18:14 UTC — second measured browser passed; actual in-flight VM stage started
+
+The second full measured browser/auth pass closed successfully in workflow
+39055648776/job117462952642, with31guards and cleanup. All five112-request cycles
+retain their actual numeric measurements:560responses,400positive/160expected
+negative,40users and zero remaining sessions. Refresh p95 values are145.3,89.5,
+89.5,108.7,119.7ms; worst p99 is145.5ms. There are766navigations with285.0ms p95
+visual feedback,2,508SDK RLS reads,219resource samples/gap5.313925seconds, actual
+900-second token expiry over1082.209894seconds,401expired/400revoked responses,
+48overlapping callers/one real refresh and seven owner plateaus. Final heap deltas
+are900,632/2,604,988/2,500,336bytes, below the existing8MiB gate; DOM/listeners do
+not increase. This does not prove absence of every leak or explain the original
+failed SLO, whose numeric timings were lost. Both receipts use the exact retained
+final007 Actions ELF and matching declared budgets; the VMs are distinct.
+[Both original measured passes](results/stress/browser-sdk007-two-measured-passes-001.json).
+
+Remote005 closed all eleven passing/cleaned cases. After verifying the empty
+manual queue, all eighteen EC checks, the sealed script and six product trees,
+create the fresh immutable owned EC ref and start remote007. Its first actual
+runtime-inflight VM is workflow39057126426; no successful result is claimed yet.
+Both additional guest cases require the live blocked-write witness, thirty ACKs,
+31row values, rollback/lock cleanup and actual post-recovery401/empty RLS/404.
+The new optional host-file real preflight still waits for both cases and queue
+cleanup. No local load-time credit, deployment or merge occurs.
