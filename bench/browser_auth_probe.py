@@ -12,6 +12,7 @@ import sys
 import time
 
 from browser_auth import PROFILE, complete, validate_failure_receipt
+from browser_diagnostics import validate as validate_diagnostics
 from campaign import docker
 from matrix_probe import export_resources, input_artifact, kernel_budget, read_receipt, require
 from native_evidence import notices
@@ -88,6 +89,12 @@ def main():
         report['status']='passed'
     except Exception as error:
         report['failure']={'type':type(error).__name__}
+        diagnostic=output/'browser-diagnostics.json'
+        if diagnostic.exists():
+            try:
+                report['checks']['failure_diagnostics']=validate_diagnostics(read_receipt(diagnostic))
+            except Exception:
+                report['checks']['failure_diagnostics_invalid']=True
         original = output/'browser-failure.json'
         if original.exists():
             try:

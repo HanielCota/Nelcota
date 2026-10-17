@@ -14,6 +14,7 @@ import threading
 import time
 
 from browser_runtime import prepare
+from browser_diagnostics import collect as failure_diagnostics
 from browser_auth import PROFILE as AUTH_PROFILE, complete as auth_pressure_complete, failure_receipt
 from campaign import ResourceCoverage, docker, effective_cpus, owns_listener, validate_disk_headroom, validate_storage_filesystem
 from disk_usage import host as disk_usage, container as container_disk_usage
@@ -152,16 +153,20 @@ def campaign(args):
             nonlocal resource_at
             while not stop.is_set():
                 cycle = time.monotonic()
+                probe = 'host-reserves'
                 try:
                     reason = host_reserves(output)
                     if reason:
                         raise RuntimeError(reason)
+                    probe = 'components'
                     states = json.loads(owned('inspect', *components))
                     if any(not item['State']['Running'] or item['State']['OOMKilled'] or item['State']['Pid'] != identities[item['Name']] for item in states):
                         raise RuntimeError('Unexpected browser target restart or OOM')
+                    probe = 'cgroups'
                     cgroups = {name:owned_cgroup_snapshot(owned, name) for name in components}
                     for value in cgroups.values():
                         require_no_oom(value['memory.events'])
+                    probe = 'driver'
                     generation = generator_observation(active, lambda:active)
                     if generation and generation.get('host_pid') and generation.get('pid_starttime'):
                         atomic_json(output/'generator-process.json', {'identity':identity, 'pid':generation['host_pid'], 'process_identity':generation['pid_starttime'], 'container_id':generation['container_id']})
@@ -176,9 +181,11 @@ def campaign(args):
                         if generation:
                             require_no_oom(observed['memory.events'])
                             cgroups['browser'] = observed
+                    probe = 'database'
                     database = json.loads(source.sql("SELECT json_build_object('connections',count(*),'stuck_idle_transactions',count(*) FILTER(WHERE state='idle in transaction' AND clock_timestamp()-state_change>interval '5 seconds'),'waiting_locks',count(*) FILTER(WHERE wait_event_type='Lock')) FROM pg_stat_activity WHERE backend_type='client backend'"))
                     if database['connections'] > 32 or database['stuck_idle_transactions']:
                         raise RuntimeError('Browser database owner budget')
+                    probe = 'disk'
                     database_disk = container_disk_usage(owned, source.pg, '/var/lib/postgresql/data')
                     if database_disk['value'] > 512:
                         raise RuntimeError('Browser database disk budget')
@@ -188,6 +195,7 @@ def campaign(args):
                     allocated = disk_usage(directory)
                     if allocated['value'] > 3072:
                         raise RuntimeError('Browser fixture disk budget')
+                    probe = 'append'
                     resource_at = time.monotonic()
                     coverage.observe(resource_at-resource_began)
                     with (output/'resources.jsonl').open('a') as stream:
@@ -197,7 +205,7 @@ def campaign(args):
                                     'host':host_snapshot(cpus)})+'\n')
                     atomic_json(output/'checkpoint.json', {'phase':phase, 'monotonic':resource_at, 'resource_observations':coverage.count})
                 except Exception as error:
-                    violations.append({'phase':phase, 'type':type(error).__name__})
+                    violations.append({'phase':phase, 'probe':probe, 'type':type(error).__name__})
                     critical.set()
                     stop_generator(manifest)
                     return
@@ -302,6 +310,11 @@ def campaign(args):
     except Exception as error:
         failure = failure_receipt(checkpoint, error)
         atomic_json(output/'browser-failure.json', failure)
+        try:
+            diagnostic = failure_diagnostics(output, source, consumer, owned, generator, violations)
+            atomic_json(output/'browser-diagnostics.json', diagnostic)
+        except Exception:
+            atomic_json(output/'browser-diagnostics-unavailable.json', {'available':False})
         raise
     finally:
         phase = 'teardown'

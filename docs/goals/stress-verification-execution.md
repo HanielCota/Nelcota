@@ -2774,3 +2774,21 @@ published.5privacy/boundary regressions passed, bringing focused matrix guards
 to19. [Checkpoint016](results/stress/load-time-checkpoint-016.json) records
 134814completed local load seconds(37h26m54s), excluding the entire still-active
 CPU diagnostic and all overlapping remote windows.
+
+The [cold-cache browser repeat](results/stress/browser-auth-image-preflight-failure-003.json)
+prepared all three previously absent images, then failed at untrusted-browser
+after22.439s;14focused guards passed and cleanup confirmed. Thus the missing
+Caddy prerequisite is corrected, but the browser driver still needs diagnosis.
+Capture fixed component state, marker booleans, bounded log-category counts,
+exact driver source line numbers and resource-probe categories before cleanup.
+Never publish raw command logs or exception values.25focused browser tests
+passed locally, including4new diagnostic privacy/boundary regressions.
+
+The [10ms quota smoke](results/stress/host10-quota10ms-smoke-failure-001.json)
+completed480load seconds/414samples and reconciled1381signed unique events,
+with90cross-project rejections and complete cleanup. All5noisy phases still
+failed relative fairness(106records); no absolute SLO failures were recorded
+in this repeat. The changed staging quota did not establish isolation approval.
+Keep both quota-policy failures; neither proves a product root cause. Independent
+million-row/1MiB-object retained-baseline and final005candidate campaigns began
+at09:57:26UTC, serially, under the previously declared limits.
