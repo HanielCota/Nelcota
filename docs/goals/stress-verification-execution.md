@@ -1,16 +1,14 @@
 # G05 — Registro técnico da execução
 
-Status: em execução. O checkpoint conservador 004 registra 17h34m14s de
-intervalos de carga concluídos, acima do mínimo de oito horas; campanhas
-posteriores ainda serão somadas. As primeiras execuções completaram quatro
-horas contínuas em disco e quatro em S3 real local, com completion histórico
-`passed`, integridade e continuidade registradas. A auditoria posterior
-confirmou que seus totais finais de descartes não foram medidos corretamente;
-elas não certificam o protocolo de contadores corrigido e exigem substituição.
-As passagens independentes, a matriz completa e a aprovação do G05 continuam
-pendentes. A errata de contadores abaixo prevalece sobre os checkpoints antigos.
-Preparação, compilação, esperas, trechos interrompidos e verificações estáticas
-não contam nesse total. Falhas de fairness/drenagem continuam reprovadas.
+Status: em execução, G05 sem aprovação. O checkpoint conservador 018 registra
+38h44min24s de intervalos de carga efetiva concluídos. O mínimo de oito horas
+foi atingido; as campanhas afetadas no candidato final006 ainda precisam
+terminar. O relatório em português contém a situação atual dos 12 critérios.
+As passagens históricas de quatro horas com contadores incompletos continuam
+sem aprovação. O baseline posterior em disco passou no protocolo corrigido;
+isso não certifica o candidato final. Preparação, aquecimento, espera, descanso,
+fases interrompidas e tempo remoto sobreposto não contam no checkpoint.
+Resultados históricos abaixo mantêm a fonte, o escopo e as falhas originais.
 
 ## Identidade e ambiente
 
@@ -2868,3 +2866,77 @@ not available through the checks API while the job is in progress; preserve
 the original detailed report after closure. A brief GitHubHTTP401 incident
 affected reads/writes around10:28UTC; scoped API access recovered by10:30UTC,
 without changing credentials or environment bindings. Local traffic continued.
+
+
+### 2026-10-17, 11:44 UTC — ninth production finding and candidate006
+
+The second full browser/auth owner pass failed in the original live-browser
+singleflight assertion after 26.509 seconds. Its original failed report and
+cleanup are retained in [the public evidence](results/stress/browser-auth-owner-pass-2-failure-006.json).
+A deterministic native-browser SDK reproducer then observed two rotations when
+two callers entered while another client held the Web Lock during refresh.
+`current()` awaited that same lock before capturing the comparison snapshot.
+The fix captures the visible native session before waiting while retaining every
+authoritative journal/reservation/revocation check inside the lock.
+
+[Test-only commit 7979f60](https://github.com/Nelcota/Nelcota/commit/7979f60)
+failed both warm/cold regressions on the old SDK. The focused fix is `3bceca6`;
+`6bb3262` contains only regenerated embedded panel assets. The controlled built
+SDK before/after recorded two versus one rotation. Subsequent explicit rotations
+remain independent, including a caller with a stale in-memory cache. The first
+complete SDK run passed 201 tests and failed one reservation fault-injection
+case because counting the third IndexedDB open no longer targeted reservation.
+Injecting at the actual reservation boundary preserved the zero-HTTP assertion;
+the repeated complete suite passed 202/202. Fifteen type tests, check, build,
+unchanged size budgets, package, runtime and memory checks passed. The first
+package attempt failed ENOENT for an absent npm cache; the documented writable
+workspace cache fixed the setup. Original failures remain recorded in
+[the finding evidence](results/stress/sdk-native-overlapping-refresh-before-after-001.json).
+
+The former browser oracle used concurrent page evaluation without proving that
+calls entered before the first real HTTP response completed. The new oracle
+holds verified real HTTPS response headers for at most five seconds, starts
+16 callers in each of three tabs and requires one held/two queued matching Web
+Locks before release. It records counters before asserting. The real old-SDK
+reproduction established overlap and observed two refresh HTTP requests. Equal
+access JWT digests within one second did not imply a single rotation. Thirty-four
+local browser harness tests and all 300 stress harness regressions passed.
+Full repaired-SDK browser passes remain required.
+
+Candidate006 was built cleanly from `860d2f990949bfc5c8c612de3341c65a39e8d259`
+with the declared release flags/four-job ceiling in 90.048 seconds, producing
+30,480,704 bytes and SHA-256
+`c7e3d25467823c9d44157aca762761c23a49cd81f8ee96915b468f7bc3d119a4`.
+The prior [f40774e provenance](results/stress/final-local-candidate-f40774e.json)
+is preserved. Fresh native common-ELF suite 39029580219 is in progress. The six
+product-tree identity guard remains strict; historical native evidence cannot
+be promoted to the new source. Guide translations match, panel checks report
+zero errors/warnings, 37 guide tests pass and tracked assets were rebuilt in
+the separate build commit. The existing large-reference-chunk warning remains.
+
+The retained million-row disk baseline passed: 4,185 closed load seconds,
+4,170 effective seconds after excluding warmup, 836 samples, 10.900-second
+maximum gap and 7,811 unique signed webhook events without missing/extra/
+duplicate identities. Fresh post-load SQL census retained one million rows in
+each fixture table, 10,129 objects and zero idle transactions. The candidate
+that followed was stopped at a pre-start gate before fixture creation after
+the SDK defect was confirmed. Its load did not start. The retained million-row
+S3 baseline began at 11:44 UTC on the unchanged baseline binary. Neither its
+open time nor remote overlapping time contributes to checkpoint018:
+**139,464 completed effective seconds (38h44m24s)**.
+
+The second complete supplemental matrix also passed its stated scope, with
+34,902 acknowledged writes reconciled, RTO 1.536 seconds and conservative RPO
+upper bound 17.998 seconds. Qualification was 16 iterations/s versus 32 in the
+first matrix: this 50% variation is unresolved, not averaged into capacity.
+Earlier reports omitted failed qualification steps. The next executor retains
+all four five-minute steps and phase-boundary process/current-cgroup CPU and
+host steal endpoints to investigate scheduling, without asserting a cause or
+changing SLO/delivery gates. Three new ownership/privacy checks pass. Both
+original recovered numeric resource gzip series retain their exact checksums.
+
+No final-candidate four-hour endurance pass is approved. Fresh candidate006
+IDs preserve the original rates, datasets, SLOs, reserves and durations; after
+new source verification the four disk/S3 endurance passes take priority over
+remaining larger/topology profiles. G05 and draft PR90 remain open. No merge,
+release or production deployment was performed.
