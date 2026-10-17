@@ -184,6 +184,13 @@ describe('refresh', () => {
       expect(rotations).toBe(1);
       expect(results.every(result => result.error === null)).toBe(true);
       expect(results.map(result => result.data?.refresh_token)).toEqual(['refresh-2', 'refresh-2', 'refresh-2']);
+      const subsequent = await clients[1]!.auth.refreshSession();
+      expect(rotations).toBe(2);
+      expect(subsequent.data?.refresh_token).toBe('refresh-3');
+      // A stale per-client cache must not suppress a later explicit refresh.
+      const following = await clients[0]!.auth.refreshSession();
+      expect(rotations).toBe(3);
+      expect(following.data?.refresh_token).toBe('refresh-4');
     } finally {
       releaseFirst();
       clients.forEach(client => client.dispose());
