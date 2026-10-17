@@ -1,12 +1,13 @@
 # G05 — Registro técnico da execução
 
-Status: em execução, G05 sem aprovação. O checkpoint conservador 019 registra
-39h53min54s de intervalos de carga efetiva concluídos. O mínimo de oito horas
+Status: em execução, G05 sem aprovação. O checkpoint conservador 020 registra
+45h05min24s de intervalos de carga efetiva concluídos. O mínimo de oito horas
 foi atingido; as campanhas afetadas no candidato final007 ainda precisam
 terminar. O relatório em português contém a situação atual dos 12 critérios.
 As passagens históricas de quatro horas com contadores incompletos continuam
 sem aprovação. O baseline posterior em disco passou no protocolo corrigido;
-isso não certifica o candidato final. Preparação, aquecimento, espera, descanso,
+a primeira passagem final007 em disco também passou, com oito comparações equivalentes.
+S3 e segundas passagens continuam pendentes. Preparação, aquecimento, espera, descanso,
 fases interrompidas e tempo remoto sobreposto não contam no checkpoint.
 Resultados históricos abaixo mantêm a fonte, o escopo e as falhas originais.
 
@@ -3558,3 +3559,46 @@ that fixture preserved the production validator/pins. The failed result/log hash
 is retained, and the new source still requires ordinary CI and a fresh real run.
 No target rate, SLO, delivery/fairness gate or resource budget is reduced.
 [Guards and original fixture failure](results/stress/host-required-images-guards-001.json).
+
+
+### 2026-10-17, 19:13 UTC — primeira endurance final007 em disco fechada; coleta host corrigida
+
+Checkpoint020:162.324 segundos efetivos/45h05min24s, acréscimo de18.690 segundos
+concluídos, sem aquecimento, descanso, preparo, parciais ou tempo remoto
+sobreposto. A primeira final007 em disco passou no workload, invariantes,
+recursos, limpeza e oito comparações de três steadies equivalentes. O soak
+solicitou14.400s e mediu14.403,997s, 4.031.997 iterações úteis e quatro chegadas
+perdidas dentro do gate original; zero rejeições por overload.2.476 amostras
+no soak, gap11,1s, zero OOM e mesmas identidades app/PG.257.626 eventos distintos
+e129 pequenos objetos íntegros, duas coortes de pruning,16 renovações.
+Seis plateaus24FD/4tasks/18sockets; anon26,81→28,60MiB ainda exige atribuição.
+Série fechada gzip verificou checksum antes de remover somente raw reconstruível.
+[Resumo](results/stress/disk-final007-pass-1-001.json),
+[comparação](results/stress/disk-final007-pass-1-comparison-001.json),
+[archive](results/stress/disk-final007-pass-1-resource-archive-001.json).
+S3 começou após cleanup e está ativa; não rodar controles CPU3 durante provider.
+
+Todos18checks de2c8e10c passaram, SDK204 e descoberta Python completa sem
+contagem inferida. O merge SDK real1c51c019 tem rootbfd5c3ad igual à fonte e
+as seis árvores de produto35f4a9. [Prova](results/stress/ci-host-bootstrap-and-native-pitr-product-trees.json).
+
+Host012/workflow39060575768/job117477526617 falhou. As quatro imagens foram
+preparadas e N1 passou180s/38observações/5grafos privados, sem falhas nos
+gates originais; exportação de recursos e parada do watchdog falharam.
+Cleanup confirmado, N5 não executado, zero crédito adicional de tempo local.
+[Relatório original completo](results/stress/host-private-files-resource-publication-failure-002.json).
+Dockerinspect usa Name com barra; host_campaign preserva a chave e o exportador
+rejeitava esse formato. Uma leitura exata da app própria confirmou o contrato.
+O exportador agora aceita uma barra opcional e continua rejeitando duplicatas.
+Stop_watch verifica Id/LoadState/Description; not-found coletado não exige
+Description personalizada, loaded exige descrição e identidade próprias.
+Novos testes não rodaram localmente; CI e VM nova obrigatórios. Estado/série
+originais não foram exportados e downloads falharam; nenhuma causa exclusiva
+ou aprovação da falha é inferida.
+
+Após revisar cleanup/falha original e fila vazia, criar a ref própria
+test/g05-pitr-error-final007-001 em2c8e10c e iniciar owner013 (PID4153147,
+geracao32786632, máximo2h). Workflow39061394536 executa um único
+runtime-pitr-error com adaptador fixo que só escreve marcador inerte antes
+de falhar; não modifica arquivos PG nem certifica PITR/S3 real. Hipótese de
+reabertura após erro continua não confirmada até o resultado real.

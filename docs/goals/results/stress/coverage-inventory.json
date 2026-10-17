@@ -148,6 +148,12 @@
           "status": "passed",
           "evidence": "matrix-sdk007-corrected-generator-pass-1-001.json",
           "scope": "First corrected full final007 remote matrix only: four300s rates16/32/48/64 qualified, five120s foreground scenarios at51/s,71874ACKs zero loss/corruption,3993lost real commit replies reconciled without mutation retry,371samples/gap5.237s,cleanup; second pass and all other row clauses remain separate."
+        },
+        {
+          "run_id": "disk-candidate-pass-1-006",
+          "status": "passed",
+          "scope": "First final007 small-object100k-row disk campaign:18690effective seconds including continuous4h; resource/integrity/cleanup/eight equivalent comparisons passed. Broader row and independent second/S3 passes still pending.",
+          "evidence": "disk-final007-pass-1-001.json"
         }
       ],
       "current_final007_measured_browser_subset": {
@@ -270,6 +276,12 @@
           "status": "passed",
           "evidence": "large-s3-retained-baseline-001.json",
           "scope": "Retained-source baseline only:1Mrows/table,1MiBobjects,7612signedevents0missing/extra/duplicate,4170effective seconds,786samples,maxgap11.6s,cleanup.600ssoak does not satisfy4h; separate postprocessing duplicate-compression refusal preserved."
+        },
+        {
+          "run_id": "disk-candidate-pass-1-006",
+          "status": "passed",
+          "scope": "First final007 small-object100k-row disk campaign:18690effective seconds including continuous4h; resource/integrity/cleanup/eight equivalent comparisons passed. Broader row and independent second/S3 passes still pending.",
+          "evidence": "disk-final007-pass-1-001.json"
         }
       ]
     },
@@ -412,7 +424,7 @@
       "area": "Disk bytes, quotas, collisions and paths",
       "entrypoints": "bench/campaign.py; bench/fault_campaign.py; crates/server/tests/storage.rs; concurrency.rs",
       "status": "not run",
-      "scope_or_limit": "Historical continuous four-hour disk workload and final byte/event reconciliation are preserved. Sparse arrival accounting failed audit; final-protocol replacements, comparable regressions and the broader storage matrix remain pending.",
+      "scope_or_limit": "First final007 disk ordinary4h passed with corrected counters, four within-gate dropped arrivals, bytes/events/pruning and clean OS ownership plateaus; eight comparable regressions passed. Allocator attribution, large fixtures and independent second pass pending. Earlier failed historical verdicts preserved.",
       "functional_subset": {
         "status": "passed",
         "source_commit": "3203330cf3df2b9b7dd68efebc79412a8564e9fd",
@@ -494,6 +506,12 @@
           "status": "failed",
           "evidence": "disk-candidate-before-sql-fix-interruption.json",
           "scope": "Intentionally interrupted after confirmed SQL admission bug;1559samples,4290closed effective seconds outside checkpoint014, partial soak uncredited,cleanup confirmed. New artifact and fresh replacements required."
+        },
+        {
+          "run_id": "disk-candidate-pass-1-006",
+          "status": "passed",
+          "scope": "First final007 small-object100k-row disk campaign:18690effective seconds including continuous4h; resource/integrity/cleanup/eight equivalent comparisons passed. Broader row and independent second/S3 passes still pending.",
+          "evidence": "disk-final007-pass-1-001.json"
         }
       ]
     },
@@ -502,7 +520,7 @@
       "area": "Real S3-compatible storage and multipart",
       "entrypoints": "bench/campaign.py; crates/server/tests/storage_s3.rs",
       "status": "not run",
-      "scope_or_limit": "Historical continuous four-hour local RustFS workload and final byte/event reconciliation are preserved. Sparse arrival accounting failed audit; corrected-protocol replacements, provider allocation attribution and the broader S3 matrix remain pending.",
+      "scope_or_limit": "First final007 real-S3 ordinary campaign active, no partial-time/pass credit. Historical sparse-counter failures, provider allocation attribution and full S3 fault/large/second passes remain required.",
       "functional_subset": {
         "status": "passed",
         "source_commit": "3203330cf3df2b9b7dd68efebc79412a8564e9fd",
@@ -656,6 +674,12 @@
           "status": "passed",
           "evidence": "large-s3-retained-baseline-001.json",
           "scope": "Retained-source baseline only:1Mrows/table,1MiBobjects,7612signedevents0missing/extra/duplicate,4170effective seconds,786samples,maxgap11.6s,cleanup.600ssoak does not satisfy4h; separate postprocessing duplicate-compression refusal preserved."
+        },
+        {
+          "run_id": "disk-candidate-pass-1-006",
+          "status": "passed",
+          "scope": "First final007 small-object100k-row disk campaign:18690effective seconds including continuous4h; resource/integrity/cleanup/eight equivalent comparisons passed. Broader row and independent second/S3 passes still pending.",
+          "evidence": "disk-final007-pass-1-001.json"
         }
       ]
     },
@@ -771,6 +795,12 @@
           "status": "passed",
           "evidence": "matrix-sdk007-corrected-generator-pass-1-001.json",
           "scope": "First corrected full final007 remote matrix only: four300s rates16/32/48/64 qualified, five120s foreground scenarios at51/s,71874ACKs zero loss/corruption,3993lost real commit replies reconciled without mutation retry,371samples/gap5.237s,cleanup; second pass and all other row clauses remain separate."
+        },
+        {
+          "run_id": "disk-candidate-pass-1-006",
+          "status": "passed",
+          "scope": "First final007 small-object100k-row disk campaign:18690effective seconds including continuous4h; resource/integrity/cleanup/eight equivalent comparisons passed. Broader row and independent second/S3 passes still pending.",
+          "evidence": "disk-final007-pass-1-001.json"
         }
       ],
       "current_final007_subset": {
@@ -946,6 +976,12 @@
           "status": "passed",
           "evidence": "browser-sdk006-genuine-overlap-pass-2-008.json",
           "scope": "Complete historical candidate006 genuine-overlap browser pass, one refresh for48callers,sevenownerplateaus,cleanup. NewSDKisolation correction requires final-source repetitions."
+        },
+        {
+          "run_id": "disk-candidate-pass-1-006",
+          "status": "passed",
+          "scope": "First final007 small-object100k-row disk campaign:18690effective seconds including continuous4h; resource/integrity/cleanup/eight equivalent comparisons passed. Broader row and independent second/S3 passes still pending.",
+          "evidence": "disk-final007-pass-1-001.json"
         }
       ],
       "current_final007_measured_browser_subset": {
@@ -960,7 +996,7 @@
       "area": "Independent 1/5/10-project capacity and fairness",
       "entrypoints": "bench/host_campaign.py",
       "status": "failed",
-      "scope_or_limit": "Earlier fractional quota and shared five-project fairness/drain failures remain. Final005 ten-project shared and10msquota diagnostic smokes also fail relativefairness; only the sharedrepeat has8absoluteSLOfailures. Alloriginals preserved; full300s1/5/10two-passprofiles remain pending.",
+      "scope_or_limit": "Earlier fractional quota and shared five-project fairness/drain failures remain. Final005 ten-project shared and10msquota diagnostic smokes also fail relativefairness; only the sharedrepeat has8absoluteSLOfailures. Alloriginals preserved; full300s1/5/10two-passprofiles remain pending. Actual new host-files N1 pressure/private graphs passed180s, but collector/watchdog close failed and N5 not run. Corrections require CI/fresh VM; original failures preserved.",
       "native_diagnostics": [
         {
           "run_id": "fleet-caddy-1-smoke-003",
@@ -1452,7 +1488,20 @@
       26.66796875,
       29.2421875
     ],
-    "scope": "OS owner counts recover identically; ordinary final repeats and conditional four-hour allocator diagnostic must distinguish live use from allocator retention. No absolute leak absence claim."
+    "scope": "OS owner counts recover identically; ordinary final repeats and conditional four-hour allocator diagnostic must distinguish live use from allocator retention. No absolute leak absence claim.",
+    "current_final007_disk": {
+      "evidence": "disk-final007-pass-1-001.json",
+      "first_last_15m_medians_mib": [
+        26.8125,
+        28.59765625
+      ],
+      "idle_plateaus_FD_tasks_sockets": [
+        24,
+        4,
+        18
+      ],
+      "status": "OS owners recovered identically; live/allocator attribution remains incomplete"
+    }
   },
   "frozen_final_candidate": {
     "source_commit": "7e68fd21430ac93125149f60927f8676b077811d",
@@ -1527,11 +1576,11 @@
     "harness_head_CI_status": "All18ordinary source3cc1b83 checks and whole Python discovery passed; actual private-file preflight not run."
   },
   "current_campaign_checkpoint": {
-    "checkpoint": "load-time-checkpoint-019.json",
-    "effective_local_load_seconds": 143634,
-    "active_local_at_recording": "disk-candidate-pass-1-006",
-    "recorded_utc": "2026-10-17T14:45:04.319630+00:00",
-    "scope": "019conservative completed local load floor; current final007 disk soak is incomplete/uncredited. Two corrected remote matrices, eight native startup reproductions and both measured browser passes now passed. Two additional in-flight guest controls active. Remote overlap earns zero local time credit."
+    "checkpoint": "load-time-checkpoint-020.json",
+    "effective_local_load_seconds": 162324,
+    "active_local_at_recording": "s3-candidate-pass-1-006",
+    "recorded_utc": "2026-10-17T19:14:32.694794+00:00",
+    "scope": "First final007 disk workload/integrity/resources/cleanup/eight comparisons passed,18690new effective seconds. S3 active and uncredited, second passes pending. All remote overlap excluded; G05 not approved."
   },
   "native_inflight_cut": {
     "status": "passed scoped control twice",
@@ -1546,26 +1595,26 @@
     "evidence": "native-final007-inflight-controls-001/index.json"
   },
   "private_file_host_preflight": {
-    "status": "failed during preparation; corrective harness change not yet revalidated on real services",
+    "status": "second actual real preflight failed resource publication/watchdog close after passing N1; N5 not executed",
     "evidence": "host-private-file-preflight-guards-002.json",
-    "source_CI": "new corrected bootstrap source pending CI and actual fresh rerun; old source3ccproof does not cover it",
+    "source_CI": "2c8all18PASS; subsequent resource/collected-unit correction pending CI",
     "focused_guards_passed": 57,
-    "actual_Docker_systemd_functionality": "not run",
+    "actual_Docker_systemd_functionality": "N1 workload/gates and five private graphs passed; overall failed evidence close, Docker cleanup confirmed. Fresh corrected rerun pending.",
     "previous_preflight_source_commit": "d4bfc60dc8e87bfe2c5f3786251134a4bba9870b",
     "source_file_sha256": {
       "bench/host_campaign.py": "a5ccac34e56d47ff167d57385d1b435e8821a5188c18fedfc6d5cd91d4574cde",
       "bench/host_file_probe.py": "5e5408c9fc224299c37998a93047a0a192f5e706138e9e31b0fbe7c730166169",
       "scripts/review_tests/test_stress_host_file_probe.py": "77dc81ff2f4df9160c68ddf70db120132adaf8213849cd9e407330e72934a82d"
     },
-    "source_commit": "3cc1b83bfb83a7daa4747cfbd8119d95d2615550",
-    "CI_evidence": "ci-host-private-files-product-trees.json",
-    "failed_evidence": "host-private-files-bootstrap-failure-001.json",
-    "workload_effective_seconds": 0,
-    "resource_samples": 0,
-    "scope": "One-project initial owner/anonymous/metadata graph passed. Later preparation failed and owned cleanup passed; five-project and pressure stages did not run. Original exact failing stage was not exported. A cold dependency gap is reproduced separately; no sole-cause claim or relaxed gate.",
-    "corrective_evidence": "host-required-images-guards-001.json"
+    "source_commit": "2c8e10c4e3e7cf899380194e2bea1cef2fb89e94",
+    "CI_evidence": "ci-host-bootstrap-and-native-pitr-product-trees.json",
+    "failed_evidence": "host-private-files-resource-publication-failure-002.json",
+    "workload_effective_seconds": 180,
+    "resource_samples": 38,
+    "scope": "Prior bootstrap failure retained. Current correction has not run local tests during S3; requires source CI/new immutable owned VM. Original overall FAILED retained, no five-project/private-file/300s fairness certificate.",
+    "corrective_evidence": "host-resource-and-collected-watchdog-correction-001.json"
   },
-  "latest_inventory_update_utc": "2026-10-17T18:14:34.893203+00:00",
+  "latest_inventory_update_utc": "2026-10-17T19:14:32.694823+00:00",
   "native_startup_reproductions": {
     "status": "passed scoped repetitions; original failure unresolved",
     "count": 8,
@@ -1573,11 +1622,13 @@
     "scope": "Separate actual ELFs on the same final007product trees, same guest image, completedACKcuts only. Additional in-flight controls not run."
   },
   "native_pitr_error_hypothesis": {
-    "status": "not run; source hypothesis unconfirmed",
+    "status": "actual controlled native VM running; hypothesis not yet confirmed",
     "evidence": "native-pitr-error-control-predeclaration-001.json",
     "focused_native_and_control_tests_passed": 44,
     "real_adapter_process_controls": "passed only on isolated temporary marker fixtures",
     "confirmed_production_defects": 10,
-    "scope": "New controlled actual-CLI adapter-error case prepared, no actual PITR/S3/corruption certificate or production change."
+    "scope": "New controlled actual-CLI adapter-error case prepared, no actual PITR/S3/corruption certificate or production change.",
+    "workflow_run_id": 39061394536,
+    "source_commit": "2c8e10c4e3e7cf899380194e2bea1cef2fb89e94"
   }
 }

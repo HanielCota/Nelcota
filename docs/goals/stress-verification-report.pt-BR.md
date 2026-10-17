@@ -1,16 +1,16 @@
 # G05 — relatório técnico de stress
 
 **Estado: em execução, sem aprovação do G05.** Este relatório é atualizado
-durante as campanhas. Checkpoint de carga consolidada: 17/10/2026, 13:07 UTC.
-Atualização da investigação: 17/10/2026, 18:14 UTC.
+durante as campanhas. Checkpoint de carga consolidada: 17/10/2026, 18:57 UTC.
+Atualização da investigação: 17/10/2026, 19:13 UTC.
 Não houve merge nem deploy de produção. O trabalho está na branch
 `test/g05-stress-verification`, no [PR #90](https://github.com/Nelcota/Nelcota/pull/90),
 mantido como rascunho para revisão.
 
 ## Tempo efetivo e artefatos
 
-O [checkpoint 019](results/stress/load-time-checkpoint-019.json) registra
-**143.634 segundos, ou 39h53min54s, de carga efetiva concluída**. O cálculo
+O [checkpoint 020](results/stress/load-time-checkpoint-020.json) registra
+**162.324 segundos, ou 45h05min24s, de carga efetiva concluída**. O cálculo
 conservador exclui preparação, aquecimento, descanso, fases interrompidas,
 controles artificiais e dupla contagem de janelas simultâneas. Tempo mínimo
 de oito horas atingido não significa aprovação dos demais critérios.
@@ -20,7 +20,7 @@ O tempo parcial das campanhas ainda abertas não está somado nesse checkpoint.
 |---|---|
 | Código após as correções de cancelamento SQL/export e de exportação grande não consumida | Regressões reais aprovadas; [último antes/depois](results/stress/export-large-unpolled-deadline-after.json) inclui 17 testes. Binário final reconstruído; campanhas afetadas continuam pendentes |
 | SHA-256 do binário de baseline preservado | `75c44c85a85db26195166aa1d2c6caf481e3db476801ec8131525ef62adf1be0` |
-| Último candidato local congelado (007) | `35f4a9725d7edcf571f91084c555c127e7323653`; SHA-256 `96811748f1f45ad4894114188642f9343df661c750ad22768eaf2275659081b1`; 30.484.800 bytes; build release de 93,286 s. [Proveniência](results/stress/final-local-candidate.json). Inclui as dez correções e os guias reconstruídos. Checkout limpo antes/depois do build. Smoke HTTP real dos cinco cenários aprovado; primeira nova campanha de endurance iniciada. CI18/18 e suíte nativa12/12 passaram nas mesmas árvores de produto; campanhas finais e comparações ainda precisam encerrar |
+| Último candidato local congelado (007) | `35f4a9725d7edcf571f91084c555c127e7323653`; SHA-256 `96811748f1f45ad4894114188642f9343df661c750ad22768eaf2275659081b1`; 30.484.800 bytes; build release de 93,286 s. [Proveniência](results/stress/final-local-candidate.json). Inclui as dez correções e os guias reconstruídos. Checkout limpo antes/depois do build. Smoke HTTP real dos cinco cenários aprovado; primeira endurance final em disco e oito comparações aprovadas. CI18/18 e suíte nativa12/12 passaram nas mesmas árvores de produto; primeira campanha S3 em execução, segundas passagens pendentes |
 | Candidato006 preservado | Fonte `860d2f9`; ELF `c7e3d254...`; [proveniência histórica](results/stress/final-local-candidate-860d2f9.json). CI18/18, native12/12 e dois ciclos browser com sobreposição real passaram nesse produto. A décima correção posterior exige novas verificações |
 | Candidato anterior preservado | Fonte `f40774e`; ELF `9cc6cbf0...`; [proveniência histórica](results/stress/final-local-candidate-f40774e.json). CI ordinário 18/18 e suíte nativa 12/12 passaram nesse produto; esses resultados não certificam a correção posterior do SDK |
 | Candidato nativo anterior do Actions | Mesma fonte histórica de produto `f40774e`; ELF `872c3b1efc71e0118386cdd3caf36bae0de26cb213307b91396fe30c0af83d75`, 30.463.736 bytes. [12 relatórios históricos](results/stress/native-final-suite-f40774e/index.json) aprovados no mesmo ELF; diferença entre hosts registrada, sem alegar build byte a byte reproduzível |
@@ -39,7 +39,7 @@ recente, no SDK, já tem novo build release e exige repetição das campanhas
 afetadas. Campanhas interrompidas continuam registradas com seus resultados
 originais e sem crédito do soak parcial. Após o baseline maior em disco, uma
 tentativa candidata anterior foi parada antes da fixture. A sequência final007
-está ativa; sua primeira endurance em disco ainda precisa encerrar.
+está ativa; a primeira endurance em disco passou e a primeira campanha S3 está em execução.
 
 Cada campanha preserva manifesto de propriedade, limites, configuração,
 hashes das ferramentas/imagens, fases, timestamps monotônicos, métricas e
@@ -54,14 +54,14 @@ O backend de produção continua um único binário Rust, sem Node ou Python.
 | 1 | Inventário, baseline imutável e SLOs declarados | Atendido para o staging local | [Inventário](results/stress/coverage-inventory.json), [plano](results/stress/final-campaign-plan.json), manifestos por execução. A matriz registra os cenários ainda incompletos. |
 | 2 | Calibração, unidades, amostragem e oráculos | Duas matrizes reais corrigidas aprovadas; fechamento ordinário pendente | [Duas passagens](results/stress/matrix-sdk007-two-corrected-passes-001.json): degraus de 300 s em 16/32/48/64 iterações/s, oráculos completos, 43 controles por passagem, sem chegadas perdidas. Não prova capacidade máxima nem fecha os demais perfis. |
 | 3 | Cancelamento, watchdogs, redação e limpeza restrita | Demonstrado nos escopos local e nativo executados | [Controle nativo de guardas/pidfd](results/stress/native-guards-pidfd.json), interrupções reais e recibos de limpeza. A VM própria também confirmou limpeza e limites reais de kernel, sem guard crítico disparado nas execuções aprovadas. |
-| 4 | Duas passagens de steady/staircase/picos/descanso | Em execução no candidato007 | Primeira campanha nova em disco iniciada às13:34:48UTC. A sequência prevê duas passagens completas por backend e para em qualquer falha; início de campanha não é aprovação. |
-| 5 | Toda a matriz funcional, de segurança e concorrência | Parcial | Duas matrizes completas do backend passaram no ELF anterior, com variação de calibração ainda investigada. Um ciclo browser/auth passou no oráculo anterior; a repetição revelou a nona falha. Novo oráculo prova sobreposição real e exige novas passagens. CI funcional e subconjuntos não substituem os demais cenários. |
+| 4 | Duas passagens de steady/staircase/picos/descanso | Primeira passagem em disco aprovada; demais pendentes | [Disco final007](results/stress/disk-final007-pass-1-001.json) concluiu 4.290 s de fases prévias e 14.400 s de endurance; oito comparações aprovadas. A primeira S3 está ativa; a sequência para em qualquer falha. |
+| 5 | Toda a matriz funcional, de segurança e concorrência | Parcial | Duas matrizes completas e dois ciclos browser/auth medidos passaram no produto007. O browser provou sobreposição real e expiração. Falhas históricas continuam preservadas; SMTP/OAuth e os demais cenários não executados não recebem aprovação por inferência. |
 | 6 | Isolamento/fairness em 1/5/10 projetos e controle responsivo | Reprovado/incompleto | Cinco/dez projetos tiveram falhas anteriores de fairness/drain. Novo smoke compartilhado falhou com 101 registros, incluindo 8 SLOs absolutos. Smoke de cotas de 10ms falhou com 106 registros relativos, sem falhas absolutas; 1.381 eventos íntegros e limpeza completa. Nenhum smoke substitui os passos obrigatórios de cinco minutos. |
-| 7 | Quatro horas contínuas em disco e S3 no artefato final | Pendente | Três execuções históricas completaram fisicamente quatro horas, com aprovação de contadores retirada. Uma nova campanha em disco passou no protocolo atual, como baseline; correções posteriores invalidaram as campanhas afetadas do candidato. Nenhuma campanha do próximo candidato, com as dez correções, foi aprovada até aqui. |
-| 8 | Falhas, drain, restart, restore e deployment aplicável | Parcial | Duas matrizes finais restauraram alvo local novo com bytes/usuário e rejeição JWT verificados; RTO 2,597/2,500 s. A suíte nativa final passou duas vezes, com cortes após ACKs. Os novos cortes com write observado em voo, faults completos, atualização operacional, DNS/ACME públicos e recuperação fora do host permanecem incompletos. |
-| 9 | Recursos, invariantes de dados/arquivos/eventos e regressão | Parcial | Invariantes locais e plateaus observados; precisam das campanhas finais comparáveis. Retenção anônima do provedor ainda exige atribuição. |
+| 7 | Quatro horas contínuas em disco e S3 no artefato final | Disco: primeira passagem aprovada; S3 e segundas passagens pendentes | [Disco final007](results/stress/disk-final007-pass-1-001.json): 14.403,997 s reais para 14.400 s solicitados, mesmos processos, 4 chegadas perdidas dentro do limite original e zero rejeições por sobrecarga. Primeira S3 em execução. Resultados históricos com contadores incompletos continuam reprovados. |
+| 8 | Falhas, drain, restart, restore e deployment aplicável | Parcial | Duas matrizes finais restauraram alvo local novo; RTO 2,597/2,500 s. [Dois cortes com write realmente observado em voo](results/stress/native-final007-inflight-controls-001/index.json) passaram, com reconciliação e canários reais. Probe de erro PITR em execução, sem defeito confirmado. Faults completos, atualização operacional, DNS/ACME e recuperação fora do host permanecem incompletos. |
+| 9 | Recursos, invariantes de dados/arquivos/eventos e regressão | Primeira passagem em disco aprovada no escopo medido; atribuição de memória incompleta | [Disco final007](results/stress/disk-final007-pass-1-001.json): 257.626 eventos distintos íntegros, 129 objetos byte a byte, zero OOM; seis plateaus com 24 descritores/4 tarefas/18 sockets. Mediana anônima 26,81→28,60 MiB ainda exige atribuição, assim como o provedor. [Oito comparações](results/stress/disk-final007-pass-1-comparison-001.json) passaram. |
 | 10 | Correções focadas e regressões dos defeitos confirmados | Dez defeitos reproduzidos; regressões focadas aprovadas, campanhas finais pendentes | Cinco falhas na CLI, três de SQL/export e duas no SDK. A nova falha bloqueava clientes independentes no servidor: 202 aprovados/2 reprovados antes, 204/204 aprovados depois. A falha nativa original e a fairness ainda exigem investigação. |
-| 11 | Rust/UI/SDK/lint/CI correspondentes ao SHA testado | Produto007 e executor 3cc1b83 aprovados; preflight e campanhas finais pendentes | [CI 3cc18/18](results/stress/ci-host-private-files-product-trees.json), SDK204/204 e [native12/12](results/stress/native-final-suite/index.json). O merge realmente checado tem árvore completa de 3cc e seis árvores de produto do build. A extensão tem 55 controles focados e descoberta Python completa aprovada, sem contagem inferida; seu preflight real ainda precisa executar. |
+| 11 | Rust/UI/SDK/lint/CI correspondentes ao SHA testado | Produto007 e executor 2c8e10c aprovados; correção posterior de coleta ainda sem CI | [CI 2c818/18](results/stress/ci-host-bootstrap-and-native-pitr-product-trees.json), SDK204/204 e [native12/12](results/stress/native-final-suite/index.json). Checkout real do SDK tem a árvore completa de 2c8 e seis árvores de produto do build. A segunda tentativa real de arquivos falhou na publicação/encerramento após N1; a correção do executor exige CI e nova VM. |
 | 12 | Relatório, limites e todos os testes falhos/bloqueados/não executados | Em consolidação | Este relatório e o [registro detalhado](stress-verification-execution.md) preservam os resultados; ainda há campanhas abertas. |
 
 ## Falha original do navegador: SLO de refresh ainda sem causa confirmada
@@ -1218,3 +1218,44 @@ na fixture nova ao montar o RepoDigest de referências já fixadas por digest; o
 resultado e o hash do log permanecem registrados. Corrigi a fixture, preservando
 o validador e os pins reais. A repetição real ainda não executou; as taxas, fases,
 quotas e gates permanecem iguais. O G05 não foi aprovado por esses controles.
+
+
+## Disco final007 concluído e nova falha de coleta — 19:13 UTC
+
+A [primeira passagem final007 em disco](results/stress/disk-final007-pass-1-001.json)
+aprovou 18.690 segundos efetivos: 4.290 de fases prévias e 14.400 contínuos de
+endurance. Foram 4.031.997 iterações úteis no soak, 4 chegadas perdidas dentro
+do limite original, zero rejeições por sobrecarga e 2.476 amostras no período,
+com gap máximo de 11,1 s. Aplicação e PostgreSQL preservaram suas identidades.
+O encerramento verificou 257.626 eventos/entregas distintos, sem duplicatas,
+ausências, excedentes ou assinaturas inválidas; 129 objetos pequenos foram
+conferidos byte a byte. Não é certificação de objetos grandes. Houve duas
+coortes reais de pruning e 16 renovações do canário de sessão.
+
+Após 180 segundos de descanso, a fila estava vazia, com 15 conexões PostgreSQL,
+zero transações ociosas presas e seis plateaus idênticos de 24 descritores,
+4 tarefas e 18 sockets. A mediana anônima de 15 minutos passou de 26,8125 a
+28,5977 MiB, quase estável depois de 75 minutos. Esse comportamento ainda
+precisa de atribuição entre alocador e objetos vivos; não prova ausência de
+vazamento. As [oito comparações equivalentes](results/stress/disk-final007-pass-1-comparison-001.json)
+passaram; razões de p95 entre 0,649 e 1,025 não identificam, sozinhas, a causa
+de uma melhora. A [série fechada](results/stress/disk-final007-pass-1-resource-archive-001.json)
+foi comprimida sem perdas e verificada antes de remover somente o original
+reconstruível. S3 iniciou depois da limpeza, sem sobreposição de carga local.
+
+A [segunda tentativa de arquivos privados](results/stress/host-private-files-resource-publication-failure-002.json)
+preparou as quatro imagens e executou N1 durante 180 segundos. Os cinco grafos
+privados e os gates originais passaram, com 38 observações de recursos e
+limpeza Docker confirmada. O veredito geral permaneceu **failed**: o exportador
+de recursos lançou RuntimeError e o encerramento do watchdog também falhou.
+N5 não executou; o tempo remoto sobreposto não foi somado ao checkpoint.
+
+A [correção do executor](results/stress/host-resource-and-collected-watchdog-correction-001.json)
+aceita precisamente a barra inicial de Name do Docker, preserva unicidade e
+valida Id/LoadState antes de encerrar uma unidade. Uma unidade já coletada
+não é confundida com uma unidade estrangeira por sua Description padrão.
+Não houve testes locais adicionais durante S3; os novos controles aguardam
+CI e nova execução real. A causa exclusiva dos dois erros da VM anterior
+não é afirmada sem a série/estado originais. A mesma limpeza revisada permitiu
+uma nova VM independente para o probe de erro do adaptador PITR; esse caso
+ainda não tem resultado e não confirma um décimo primeiro defeito.
