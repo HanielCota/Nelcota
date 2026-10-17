@@ -424,7 +424,7 @@
       "area": "Disk bytes, quotas, collisions and paths",
       "entrypoints": "bench/campaign.py; bench/fault_campaign.py; crates/server/tests/storage.rs; concurrency.rs",
       "status": "not run",
-      "scope_or_limit": "First final007 disk ordinary4h passed with corrected counters, four within-gate dropped arrivals, bytes/events/pruning and clean OS ownership plateaus; eight comparable regressions passed. Allocator attribution, large fixtures and independent second pass pending. Earlier failed historical verdicts preserved.",
+      "scope_or_limit": "First final007 disk ordinary4h passed with corrected counters, four within-gate dropped arrivals, bytes/events/pruning and clean OS ownership plateaus; eight comparable regressions passed. Allocator attribution, large fixtures and independent second pass pending. Earlier failed historical verdicts preserved. Subsequent actualPITRCLIdefect requires008rebuild/affectedrepetition;007pass does not certify008.",
       "functional_subset": {
         "status": "passed",
         "source_commit": "3203330cf3df2b9b7dd68efebc79412a8564e9fd",
@@ -520,7 +520,7 @@
       "area": "Real S3-compatible storage and multipart",
       "entrypoints": "bench/campaign.py; crates/server/tests/storage_s3.rs",
       "status": "not run",
-      "scope_or_limit": "First final007 real-S3 ordinary campaign active, no partial-time/pass credit. Historical sparse-counter failures, provider allocation attribution and full S3 fault/large/second passes remain required.",
+      "scope_or_limit": "007S3prelude safely stopped/cleanup after11thproductiondefect; no4h/partialtimecredit. Fresh008realS3campaigns, providerattribution, fullfault/large/secondpasses required.",
       "functional_subset": {
         "status": "passed",
         "source_commit": "3203330cf3df2b9b7dd68efebc79412a8564e9fd",
@@ -1154,7 +1154,7 @@
       "area": "Local paired snapshots and restored integrity",
       "entrypoints": "bench/fault_campaign.py; scripts/test-host-management.py",
       "status": "not run",
-      "scope_or_limit": "Two final007 supplemental fresh local restores passed with identical physical bytes/user and foreign JWT401: RTO2.596884/2.499754seconds, RPO upper about18seconds, intentional snapshot rewind868rows. Full final fault passes and off-host/PITR remain incomplete.",
+      "scope_or_limit": "Two final007 supplemental fresh local restores passed with identical physical bytes/user and foreign JWT401: RTO2.596884/2.499754seconds, RPO upper about18seconds, intentional snapshot rewind868rows. Full final fault passes and off-host/PITR remain incomplete. Actualmarker-onlyPITRerrorprobe confirmedunsafeautostart. FocusedRustfix passed6tests; newnativeVMrequired. No realPGcorruptionorrealPITRrestoreclaim.",
       "functional_subset": {
         "status": "passed",
         "source_commit": "3203330cf3df2b9b7dd68efebc79412a8564e9fd",
@@ -1578,9 +1578,9 @@
   "current_campaign_checkpoint": {
     "checkpoint": "load-time-checkpoint-020.json",
     "effective_local_load_seconds": 162324,
-    "active_local_at_recording": "s3-candidate-pass-1-006",
+    "active_local_at_recording": null,
     "recorded_utc": "2026-10-17T19:14:32.694794+00:00",
-    "scope": "First final007 disk workload/integrity/resources/cleanup/eight comparisons passed,18690new effective seconds. S3 active and uncredited, second passes pending. All remote overlap excluded; G05 not approved."
+    "scope": "Checkpoint020 retains162324completed effective seconds. New actual PITR defect11requires008product.007disk pass preserved;007S3partial stopped/cleaned and zero added time.008campaigns not started."
   },
   "native_inflight_cut": {
     "status": "passed scoped control twice",
@@ -1595,10 +1595,10 @@
     "evidence": "native-final007-inflight-controls-001/index.json"
   },
   "private_file_host_preflight": {
-    "status": "second actual real preflight failed resource publication/watchdog close after passing N1; N5 not executed",
+    "status": "actualN1collector/closefailure retained;62focusedcorrectedguardspassed; freshVMpending",
     "evidence": "host-private-file-preflight-guards-002.json",
     "source_CI": "2c8all18PASS; subsequent resource/collected-unit correction pending CI",
-    "focused_guards_passed": 57,
+    "focused_guards_passed": 62,
     "actual_Docker_systemd_functionality": "N1 workload/gates and five private graphs passed; overall failed evidence close, Docker cleanup confirmed. Fresh corrected rerun pending.",
     "previous_preflight_source_commit": "d4bfc60dc8e87bfe2c5f3786251134a4bba9870b",
     "source_file_sha256": {
@@ -1612,9 +1612,10 @@
     "workload_effective_seconds": 180,
     "resource_samples": 38,
     "scope": "Prior bootstrap failure retained. Current correction has not run local tests during S3; requires source CI/new immutable owned VM. Original overall FAILED retained, no five-project/private-file/300s fairness certificate.",
-    "corrective_evidence": "host-resource-and-collected-watchdog-correction-001.json"
+    "corrective_evidence": "host-resource-and-collected-watchdog-correction-001.json",
+    "latest_focused_evidence": "host-Docker-name-and-watchdog-guards-001.json"
   },
-  "latest_inventory_update_utc": "2026-10-17T19:14:32.694823+00:00",
+  "latest_inventory_update_utc": "2026-10-17T19:23:42.825367+00:00",
   "native_startup_reproductions": {
     "status": "passed scoped repetitions; original failure unresolved",
     "count": 8,
@@ -1622,13 +1623,22 @@
     "scope": "Separate actual ELFs on the same final007product trees, same guest image, completedACKcuts only. Additional in-flight controls not run."
   },
   "native_pitr_error_hypothesis": {
-    "status": "actual controlled native VM running; hypothesis not yet confirmed",
-    "evidence": "native-pitr-error-control-predeclaration-001.json",
+    "status": "confirmed11thproductiondefect; actualVM andRust reproduced unsafe reopening; focused fix passed, newVM pending",
+    "evidence": "pitr-restore-unknown-state-correction-001.json",
     "focused_native_and_control_tests_passed": 44,
     "real_adapter_process_controls": "passed only on isolated temporary marker fixtures",
-    "confirmed_production_defects": 10,
+    "confirmed_production_defects": 11,
     "scope": "New controlled actual-CLI adapter-error case prepared, no actual PITR/S3/corruption certificate or production change.",
     "workflow_run_id": 39061394536,
-    "source_commit": "2c8e10c4e3e7cf899380194e2bea1cef2fb89e94"
+    "source_commit": "2c8e10c4e3e7cf899380194e2bea1cef2fb89e94",
+    "actual_native_failed_original": "native-pitr-unknown-state-reopening-before-001.json",
+    "Rust_after_tests_passed": 6
+  },
+  "next_final_candidate": {
+    "identity": "008",
+    "status": "production fix/guide assets complete; source freeze, releasebuild, actualnativeandaffectedcampaigns pending",
+    "confirmed_production_defects": 11,
+    "evidence": "pitr-restore-unknown-state-correction-001.json",
+    "scope": "ProductchangedafteractualPITRerrorrepro;007doesnotcertify008. No active local load."
   }
 }

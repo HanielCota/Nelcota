@@ -1,0 +1,72 @@
+{
+  "utc": "2026-10-17T19:22:55.112125+00:00",
+  "status": "11thproductiondefect reproduced on actual nativeVM and focusedRust; focused correction passed; new release/actualnative repetition pending",
+  "certifies_g05": false,
+  "native_before_evidence": "native-pitr-unknown-state-reopening-before-001.json",
+  "Rust_before_evidence": "pitr-error-rust-regression-before-001.json",
+  "Rust_after_evidence": "pitr-error-rust-regression-after-001.json",
+  "source_sha256": {
+    "crates/cli/src/pitr/restore.rs": "5e02e0465dc131169914e0239961982c6a4c509110c156d0567e0e59b38290c6",
+    "crates/cli/src/pitr/restore/tests.rs": "221905e45fd6d066f878be9c48dec9ece3b5942bd170ebae5e99f21c07bc5853"
+  },
+  "root_cause": "The failed pgBackRest--delta result was treated as proof that restoration had not run; error path automatically started Postgres and app even when the adapter had already modified an owned marker in the data directory. Nonzero exit alone cannot distinguish untouched from partially rewritten state.",
+  "fix": "Remove error-path automatic start; preserve original restore error under explicit potentially modified data warning and leave both previously stopped services stopped until recovery is verified. Successful restore sequence unchanged.",
+  "actual_native_before": {
+    "workflow_run_id": 39061394536,
+    "job_id": 117479935555,
+    "unknown_state_kept_stopped": false,
+    "owned_marker_written_before_adapter_failure": true,
+    "real_PG_files_modified": false,
+    "restore_exit_code": 1,
+    "post_error_app_active": true,
+    "post_error_PG_active": true,
+    "explicit_fixture_recovery_and_cleanup_passed": true
+  },
+  "focused_before_after": {
+    "before": "0passed/1failed; actual unsafe restart marker",
+    "after": "6PITRtests passed,0failed,0ignored; child PATH isolation and original error context verified"
+  },
+  "old_final007_S3_stop": {
+    "utc": "2026-10-17T19:17:50.729783+00:00",
+    "run_id": "s3-candidate-pass-1-006",
+    "wrapper_pid": 4047871,
+    "process_identity": "32674621",
+    "signal": "SIGTERM",
+    "signal_count": 1,
+    "reason": "Actual native VM reproduced11thproductiondefect: unknown failed restore automatically restarted app andPG. Stop current old007S3 wrapper once, let existing owned cleanup/watchdog close and parent fail before next campaign. Preserve partial intervals/no continuous4h or finalartifact credit; next product build/gates require new identity.",
+    "original_native_failure": "native-pitr-unknown-state-reopening-before-001.json",
+    "current_heartbeat": {
+      "monotonic": 328235.205178077,
+      "phase": "mixed-1",
+      "resource_monotonic": 328235.050728609,
+      "load_seconds_completed": 1365.0,
+      "resource_observations": 218
+    },
+    "parent_chain_completed": [
+      {
+        "run_id": "disk-candidate-pass-1-006",
+        "summary_sha256": "deddc656b7cd80fd3b737c1de2008d3ee107742497ed4886588d759bbcf9668e",
+        "comparison_sha256": "6c8e6d5d4a5e1c714c30f00df0c7c195535af41639ea33de6fb569af85fea7dd",
+        "continuous_seconds": 14400,
+        "anonymous_memory_still_requires_attribution": true
+      }
+    ],
+    "completion": {
+      "status": "failed",
+      "load_seconds": 1365.0,
+      "resource_observations": 219,
+      "soak_seconds": 14400,
+      "binary_sha256": "96811748f1f45ad4894114188642f9343df661c750ad22768eaf2275659081b1",
+      "cleanup_confirmed": true,
+      "error_type": "RuntimeError"
+    },
+    "cleanup": {
+      "containers": [],
+      "volumes": [],
+      "directory_removed": true
+    },
+    "effective_time_additional_credit_seconds": 0,
+    "continuous_endurance_pass": false
+  },
+  "artifact_limit": "007disk pass and all original suites retained as source-bound results. Production CLI change requires fresh008ELF and affected campaigns. No claim that historical007results certify008, no production action or merge."
+}

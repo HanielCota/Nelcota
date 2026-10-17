@@ -2,12 +2,12 @@
 
 Status: em execução, G05 sem aprovação. O checkpoint conservador 020 registra
 45h05min24s de intervalos de carga efetiva concluídos. O mínimo de oito horas
-foi atingido; as campanhas afetadas no candidato final007 ainda precisam
-terminar. O relatório em português contém a situação atual dos 12 critérios.
+foi atingido; um décimo primeiro defeito PITR foi reproduzido e corrigido.
+O candidato008 e suas campanhas afetadas ainda precisam executar. O relatório em português contém a situação atual dos 12 critérios.
 As passagens históricas de quatro horas com contadores incompletos continuam
 sem aprovação. O baseline posterior em disco passou no protocolo corrigido;
 a primeira passagem final007 em disco também passou, com oito comparações equivalentes.
-S3 e segundas passagens continuam pendentes. Preparação, aquecimento, espera, descanso,
+S3 parcial007 encerrou com limpeza; o novo008 exige repetição. Preparação, aquecimento, espera, descanso,
 fases interrompidas e tempo remoto sobreposto não contam no checkpoint.
 Resultados históricos abaixo mantêm a fonte, o escopo e as falhas originais.
 
@@ -3602,3 +3602,36 @@ geracao32786632, máximo2h). Workflow39061394536 executa um único
 runtime-pitr-error com adaptador fixo que só escreve marcador inerte antes
 de falhar; não modifica arquivos PG nem certifica PITR/S3 real. Hipótese de
 reabertura após erro continua não confirmada até o resultado real.
+
+
+### 2026-10-17, 19:23 UTC — erro PITR real confirmou reabertura insegura; regressão antes/depois
+
+Workflow39061394536/job117479935555 reprovou unknown_state_kept_stopped:false.
+O adaptador fixo escreveu somente marcador inerte e retornou72; CLI1 religou
+PG/app com PIDs6416/6441 antes da recuperação explícita. Arquivos reaisPG não
+modificados; rows preservadas, remoção do fault e401/RLSvazio/404 aprovados.
+13amostras,66,142s incluindo preparo, cleanuptrue, sem guard crítico.
+[Original completo](results/stress/native-pitr-unknown-state-reopening-before-001.json).
+
+Corrigir o décimo primeiro defeito: remover start no erro de commands::restore,
+explicar diretório potencialmente modificado e manter serviços parados até
+recuperação verificada. Teste real de sequência CLI usa PATH apenas no filho,
+sem DB real. Antes002:1falha/0passou, restart marker observado. Depois001:
+6PITR testes passaram; fmt passou. Tentativa antes001 não iniciou cargo no
+PATH da reconexão(exit127); campo fixture_marker_observed dessa tentativa
+privada é inválido por construção e explicitamente retirado como evidência.
+Nenhum tempo dessa preparação entra no checkpoint.
+[Antes/depois](results/stress/pitr-restore-unknown-state-correction-001.json).
+
+Sinalizar uma vez wrapperS3pid4047871/identidadeverificada porpidfd: parent007
+encerra no retorno não zero, sem iniciar próxima campanha. Completionfailed,
+1365s registradas/219amostras, cleanup app/PG/provider/volumes/diretório vazio
+confirmado. Sem crédito adicional e sem aprovação de soak parcial. Novo008
+requer build e repetição de campanhas afetadas; resultado007disco preservado
+como histórico válido no seu próprio ELF.
+
+Após cleanup,62controles focados host/fleet/compare passaram0falhas/0skip
+em.083s. Guia e tradução atualizados; build inicial bloqueado por marked
+ausente (node_modules previamente removido). Npmci pelo lockfile, pending,
+check e rebuild posterior passaram,19,452s incluindo instalação. Assets
+gerados terão commit próprio. Não há deploy ou merge.

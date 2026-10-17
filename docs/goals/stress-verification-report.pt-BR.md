@@ -2,7 +2,7 @@
 
 **Estado: em execução, sem aprovação do G05.** Este relatório é atualizado
 durante as campanhas. Checkpoint de carga consolidada: 17/10/2026, 18:57 UTC.
-Atualização da investigação: 17/10/2026, 19:13 UTC.
+Atualização da investigação: 17/10/2026, 19:23 UTC.
 Não houve merge nem deploy de produção. O trabalho está na branch
 `test/g05-stress-verification`, no [PR #90](https://github.com/Nelcota/Nelcota/pull/90),
 mantido como rascunho para revisão.
@@ -20,7 +20,7 @@ O tempo parcial das campanhas ainda abertas não está somado nesse checkpoint.
 |---|---|
 | Código após as correções de cancelamento SQL/export e de exportação grande não consumida | Regressões reais aprovadas; [último antes/depois](results/stress/export-large-unpolled-deadline-after.json) inclui 17 testes. Binário final reconstruído; campanhas afetadas continuam pendentes |
 | SHA-256 do binário de baseline preservado | `75c44c85a85db26195166aa1d2c6caf481e3db476801ec8131525ef62adf1be0` |
-| Último candidato local congelado (007) | `35f4a9725d7edcf571f91084c555c127e7323653`; SHA-256 `96811748f1f45ad4894114188642f9343df661c750ad22768eaf2275659081b1`; 30.484.800 bytes; build release de 93,286 s. [Proveniência](results/stress/final-local-candidate.json). Inclui as dez correções e os guias reconstruídos. Checkout limpo antes/depois do build. Smoke HTTP real dos cinco cenários aprovado; primeira endurance final em disco e oito comparações aprovadas. CI18/18 e suíte nativa12/12 passaram nas mesmas árvores de produto; primeira campanha S3 em execução, segundas passagens pendentes |
+| Candidato local007 preservado; novo008 obrigatório | `35f4a9725d7edcf571f91084c555c127e7323653`; SHA-256 `96811748f1f45ad4894114188642f9343df661c750ad22768eaf2275659081b1`; 30.484.800 bytes; build release de 93,286 s. [Proveniência](results/stress/final-local-candidate.json). Inclui as dez correções e os guias reconstruídos. Checkout limpo antes/depois do build. Smoke HTTP real dos cinco cenários aprovado; primeira endurance final em disco e oito comparações aprovadas. CI18/18 e suíte nativa12/12 passaram nas mesmas árvores de produto; primeira campanha S3 em execução, segundas passagens pendentes |
 | Candidato006 preservado | Fonte `860d2f9`; ELF `c7e3d254...`; [proveniência histórica](results/stress/final-local-candidate-860d2f9.json). CI18/18, native12/12 e dois ciclos browser com sobreposição real passaram nesse produto. A décima correção posterior exige novas verificações |
 | Candidato anterior preservado | Fonte `f40774e`; ELF `9cc6cbf0...`; [proveniência histórica](results/stress/final-local-candidate-f40774e.json). CI ordinário 18/18 e suíte nativa 12/12 passaram nesse produto; esses resultados não certificam a correção posterior do SDK |
 | Candidato nativo anterior do Actions | Mesma fonte histórica de produto `f40774e`; ELF `872c3b1efc71e0118386cdd3caf36bae0de26cb213307b91396fe30c0af83d75`, 30.463.736 bytes. [12 relatórios históricos](results/stress/native-final-suite-f40774e/index.json) aprovados no mesmo ELF; diferença entre hosts registrada, sem alegar build byte a byte reproduzível |
@@ -39,7 +39,10 @@ recente, no SDK, já tem novo build release e exige repetição das campanhas
 afetadas. Campanhas interrompidas continuam registradas com seus resultados
 originais e sem crédito do soak parcial. Após o baseline maior em disco, uma
 tentativa candidata anterior foi parada antes da fixture. A sequência final007
-está ativa; a primeira endurance em disco passou e a primeira campanha S3 está em execução.
+encerrou após a reprodução do décimo primeiro defeito de produto. Sua primeira
+endurance em disco passou no escopo007; S3 foi interrompido com limpeza
+confirmada e sem crédito do trecho parcial. O novo candidato008 exige build
+e repetição das campanhas afetadas.
 
 Cada campanha preserva manifesto de propriedade, limites, configuração,
 hashes das ferramentas/imagens, fases, timestamps monotônicos, métricas e
@@ -54,14 +57,14 @@ O backend de produção continua um único binário Rust, sem Node ou Python.
 | 1 | Inventário, baseline imutável e SLOs declarados | Atendido para o staging local | [Inventário](results/stress/coverage-inventory.json), [plano](results/stress/final-campaign-plan.json), manifestos por execução. A matriz registra os cenários ainda incompletos. |
 | 2 | Calibração, unidades, amostragem e oráculos | Duas matrizes reais corrigidas aprovadas; fechamento ordinário pendente | [Duas passagens](results/stress/matrix-sdk007-two-corrected-passes-001.json): degraus de 300 s em 16/32/48/64 iterações/s, oráculos completos, 43 controles por passagem, sem chegadas perdidas. Não prova capacidade máxima nem fecha os demais perfis. |
 | 3 | Cancelamento, watchdogs, redação e limpeza restrita | Demonstrado nos escopos local e nativo executados | [Controle nativo de guardas/pidfd](results/stress/native-guards-pidfd.json), interrupções reais e recibos de limpeza. A VM própria também confirmou limpeza e limites reais de kernel, sem guard crítico disparado nas execuções aprovadas. |
-| 4 | Duas passagens de steady/staircase/picos/descanso | Primeira passagem em disco aprovada; demais pendentes | [Disco final007](results/stress/disk-final007-pass-1-001.json) concluiu 4.290 s de fases prévias e 14.400 s de endurance; oito comparações aprovadas. A primeira S3 está ativa; a sequência para em qualquer falha. |
+| 4 | Duas passagens de steady/staircase/picos/descanso | Primeira007 em disco aprovada; final008 pendente | [Disco final007](results/stress/disk-final007-pass-1-001.json) concluiu 4.290 s de fases prévias e 14.400 s de endurance; oito comparações aprovadas. S3 foi encerrado com limpeza após o novo defeito PITR; campanhas008 precisam executar. |
 | 5 | Toda a matriz funcional, de segurança e concorrência | Parcial | Duas matrizes completas e dois ciclos browser/auth medidos passaram no produto007. O browser provou sobreposição real e expiração. Falhas históricas continuam preservadas; SMTP/OAuth e os demais cenários não executados não recebem aprovação por inferência. |
 | 6 | Isolamento/fairness em 1/5/10 projetos e controle responsivo | Reprovado/incompleto | Cinco/dez projetos tiveram falhas anteriores de fairness/drain. Novo smoke compartilhado falhou com 101 registros, incluindo 8 SLOs absolutos. Smoke de cotas de 10ms falhou com 106 registros relativos, sem falhas absolutas; 1.381 eventos íntegros e limpeza completa. Nenhum smoke substitui os passos obrigatórios de cinco minutos. |
-| 7 | Quatro horas contínuas em disco e S3 no artefato final | Disco: primeira passagem aprovada; S3 e segundas passagens pendentes | [Disco final007](results/stress/disk-final007-pass-1-001.json): 14.403,997 s reais para 14.400 s solicitados, mesmos processos, 4 chegadas perdidas dentro do limite original e zero rejeições por sobrecarga. Primeira S3 em execução. Resultados históricos com contadores incompletos continuam reprovados. |
-| 8 | Falhas, drain, restart, restore e deployment aplicável | Parcial | Duas matrizes finais restauraram alvo local novo; RTO 2,597/2,500 s. [Dois cortes com write realmente observado em voo](results/stress/native-final007-inflight-controls-001/index.json) passaram, com reconciliação e canários reais. Probe de erro PITR em execução, sem defeito confirmado. Faults completos, atualização operacional, DNS/ACME e recuperação fora do host permanecem incompletos. |
+| 7 | Quatro horas contínuas em disco e S3 no artefato final |007disco aprovado; novo008 ainda sem endurance | [Disco final007](results/stress/disk-final007-pass-1-001.json): 14.403,997 s reais para 14.400 s solicitados, mesmos processos, 4 chegadas perdidas dentro do limite original e zero rejeições por sobrecarga. S3 parcial007 interrompido, sem aprovação. Repetição008 obrigatória. Resultados históricos com contadores incompletos continuam reprovados. |
+| 8 | Falhas, drain, restart, restore e deployment aplicável | Parcial | Duas matrizes finais restauraram alvo local novo; RTO 2,597/2,500 s. [Dois cortes com write realmente observado em voo](results/stress/native-final007-inflight-controls-001/index.json) passaram, com reconciliação e canários reais. Probe PITR confirmou reabertura indevida; regressão passou após correção, nova VM pendente. Faults completos, atualização operacional, DNS/ACME e recuperação fora do host permanecem incompletos. |
 | 9 | Recursos, invariantes de dados/arquivos/eventos e regressão | Primeira passagem em disco aprovada no escopo medido; atribuição de memória incompleta | [Disco final007](results/stress/disk-final007-pass-1-001.json): 257.626 eventos distintos íntegros, 129 objetos byte a byte, zero OOM; seis plateaus com 24 descritores/4 tarefas/18 sockets. Mediana anônima 26,81→28,60 MiB ainda exige atribuição, assim como o provedor. [Oito comparações](results/stress/disk-final007-pass-1-comparison-001.json) passaram. |
-| 10 | Correções focadas e regressões dos defeitos confirmados | Dez defeitos reproduzidos; regressões focadas aprovadas, campanhas finais pendentes | Cinco falhas na CLI, três de SQL/export e duas no SDK. A nova falha bloqueava clientes independentes no servidor: 202 aprovados/2 reprovados antes, 204/204 aprovados depois. A falha nativa original e a fairness ainda exigem investigação. |
-| 11 | Rust/UI/SDK/lint/CI correspondentes ao SHA testado | Produto007 e executor 2c8e10c aprovados; correção posterior de coleta ainda sem CI | [CI 2c818/18](results/stress/ci-host-bootstrap-and-native-pitr-product-trees.json), SDK204/204 e [native12/12](results/stress/native-final-suite/index.json). Checkout real do SDK tem a árvore completa de 2c8 e seis árvores de produto do build. A segunda tentativa real de arquivos falhou na publicação/encerramento após N1; a correção do executor exige CI e nova VM. |
+| 10 | Correções focadas e regressões dos defeitos confirmados | Onze defeitos reproduzidos; regressões focadas aprovadas, novas campanhas pendentes | Seis falhas na CLI, três de SQL/export e duas no SDK. A nova falha religava serviços após erro potencialmente modificador no restore: VM real e Rust reprovados antes; seis testes PITR aprovados depois. Nova VM008 e campanhas afetadas obrigatórias. Startup original e fairness continuam abertos. |
+| 11 | Rust/UI/SDK/lint/CI correspondentes ao SHA testado | Produto007 e executor2c8e10c aprovados; produto008 ainda precisa CI | [CI 2c818/18](results/stress/ci-host-bootstrap-and-native-pitr-product-trees.json), SDK204/204 e [native12/12](results/stress/native-final-suite/index.json). Checkout real do SDK tem a árvore completa de 2c8 e seis árvores de produto do build. A segunda tentativa real de arquivos falhou na publicação/encerramento após N1; a correção do executor exige CI e nova VM. |
 | 12 | Relatório, limites e todos os testes falhos/bloqueados/não executados | Em consolidação | Este relatório e o [registro detalhado](stress-verification-execution.md) preservam os resultados; ainda há campanhas abertas. |
 
 ## Falha original do navegador: SLO de refresh ainda sem causa confirmada
@@ -1259,3 +1262,49 @@ CI e nova execução real. A causa exclusiva dos dois erros da VM anterior
 não é afirmada sem a série/estado originais. A mesma limpeza revisada permitiu
 uma nova VM independente para o probe de erro do adaptador PITR; esse caso
 ainda não tem resultado e não confirma um décimo primeiro defeito.
+
+
+## Décimo primeiro defeito: reabertura após erro de restore — 19:23 UTC
+
+A [VM real39061394536](results/stress/native-pitr-unknown-state-reopening-before-001.json)
+reproduziu a falha: o adaptador pgBackRest escreveu o marcador inerte permitido
+e retornou erro; a CLI saiu com código1, mas PostgreSQL e aplicação estavam
+ativos com PIDs novos antes de qualquer recuperação explícita. O oráculo
+unknown_state_kept_stopped foi false. A injeção não alterou arquivos PostgreSQL
+reais. Depois da remoção do adaptador/marcador, os dados foram reconciliados
+e os canários reais retornaram401/RLS vazio/arquivo privado404. A limpeza
+foi confirmada; o veredito original **failed** permanece preservado.
+
+A causa era o tratamento de qualquer erro de pgBackRest como prova de que
+a restauração não tinha executado. Essa conclusão não é válida para --delta
+parcial. A [correção](results/stress/pitr-restore-unknown-state-correction-001.json)
+remove o restart automático desse caminho, preserva o erro original e informa
+que o diretório pode ter mudado e os serviços permanecem parados até verificar
+a recuperação. A sequência de uma restauração bem-sucedida foi preservada.
+
+A regressão executa a sequência real da CLI com adaptador Docker exclusivo
+de um processo filho, sem alterar PATH global nem o PostgreSQL compartilhado.
+[Antes](results/stress/pitr-error-rust-regression-before-001.json):0 aprovados,
+1 reprovado pelo reinício indevido.
+[Depois](results/stress/pitr-error-rust-regression-after-001.json):6 testes PITR
+aprovados, zero falhas/ignorados, incluindo preservação do erro e ausência
+de comando de restart. A primeira tentativa local nem executou testes porque
+a reconexão perdeu cargo no PATH; a tentativa bloqueada ficou registrada.
+A instalação Rust existente no workspace foi reutilizada.
+
+Os [62 controles do executor](results/stress/host-Docker-name-and-watchdog-guards-001.json)
+também passaram após o encerramento seguro de S3. O guia canônico e a tradução
+explicam o novo comportamento. A [primeira geração de assets](results/stress/pitr-error-guide-assets-missing-dependencies-001.json)
+parou por falta de dependências, sem executar o build; a instalação pelo
+lockfile, guides:pending, guides:check e
+[build posterior](results/stress/pitr-error-guide-assets-build-001.json) passaram.
+Esses runtimes são apenas ferramentas de desenvolvimento.
+
+A campanha S3 parcial007 foi encerrada uma vez pelo pidfd do wrapper próprio;
+o owner parou antes de avançar.219 observações,1.365 segundos registrados
+pelo executor e limpeza confirmada foram preservados, mas nenhum segundo
+adicional foi incluído no checkpoint e não houve soak de4h aprovado.
+O produto mudou: um novo008ELF e novas campanhas afetadas são obrigatórios.
+As aprovações007 continuam válidas somente para o produto007 identificado;
+não aprovam o artefato novo. Nenhuma perda/corrupção real nem PITR/S3 operacional
+é alegada a partir desse teste controlado.

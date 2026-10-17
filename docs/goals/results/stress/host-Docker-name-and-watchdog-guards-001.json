@@ -1,0 +1,13 @@
+{
+  "tests": 62,
+  "failed": 0,
+  "errors": 0,
+  "skipped": 0,
+  "successful": true,
+  "elapsed_seconds": 0.08273873699363321,
+  "operator_exit_code": 0,
+  "operator_elapsed_seconds": 0.31508408597437665,
+  "observed_utc": "2026-10-17T19:21:16.642519+00:00",
+  "log_sha256": "43c04f932d5d44336a5ab34c827188600102f193ee2d83251264f9d6d8f57c47",
+  "scope": "Focused private-file/host-compare/DockerName/collected-watchdog guards after safe old007campaign close; no actual service or load-time credit."
+}
