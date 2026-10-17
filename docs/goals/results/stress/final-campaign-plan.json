@@ -622,10 +622,13 @@
       "sdk-independent-server-clients-built-before-after-001.json"
     ],
     "functional_smoke": "matrix-sdk007-auth-links-functional-smoke-001.json",
-    "ordinary_CI_evidence": "ci-sdk007-final-product-trees.json",
+    "ordinary_CI_evidence": "ci-sdk007-auth-metrics-product-trees.json",
     "ordinary_CI_checks_passed": 18,
     "native_suite_evidence": "native-final-suite/index.json",
-    "native_cases_passed": 12
+    "native_cases_passed": 12,
+    "current_browser_passes": 1,
+    "current_browser_evidence": "browser-sdk007-measured-auth-pass-1-001.json",
+    "original_browser_failure": "browser-sdk007-refresh-slo-first-failure-001.json"
   },
   "additional_browser_auth_pressure": {
     "status": "First corrected full pass005 passed; two further fresh owner-metric receipts are predeclared before execution. No full G05 approval.",
@@ -717,10 +720,13 @@
       "sdk-independent-server-clients-built-before-after-001.json"
     ],
     "functional_smoke": "matrix-sdk007-auth-links-functional-smoke-001.json",
-    "ordinary_CI_evidence": "ci-sdk007-final-product-trees.json",
+    "ordinary_CI_evidence": "ci-sdk007-auth-metrics-product-trees.json",
     "ordinary_CI_checks_passed": 18,
     "native_suite_evidence": "native-final-suite/index.json",
-    "native_cases_passed": 12
+    "native_cases_passed": 12,
+    "current_browser_passes": 1,
+    "current_browser_evidence": "browser-sdk007-measured-auth-pass-1-001.json",
+    "original_browser_failure": "browser-sdk007-refresh-slo-first-failure-001.json"
   },
   "historical_candidate006": {
     "source_commit": "860d2f990949bfc5c8c612de3341c65a39e8d259",
@@ -911,5 +917,17 @@
       }
     ],
     "approval_thresholds_reduced": false
+  },
+  "final007_browser_auth": {
+    "same_profile_passed": 1,
+    "same_profile_failed": 1,
+    "passing_evidence": "browser-sdk007-measured-auth-pass-1-001.json",
+    "original_failed_evidence": "browser-sdk007-refresh-slo-first-failure-001.json",
+    "actual_numeric_measurement_cycles": 5,
+    "completed_requests": 560,
+    "positive_responses": 400,
+    "expected_negative_responses": 160,
+    "scope": "Only the metric publication changed before the passing repetition. Original failed percentiles were not exported; no causal or before/after performance claim. Second independent final pass still required.",
+    "latest_ordinary_CI": "ci-sdk007-auth-metrics-product-trees.json"
   }
 }

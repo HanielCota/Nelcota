@@ -1341,7 +1341,9 @@
     "SDK_projection_tests": 3,
     "stress_elapsed_seconds": 13.611865555052646,
     "skipped": 0,
-    "scope": "All308 stress harness and3 fixed SDK projection regressions passed before load; first real owned HTTP five-case smoke passed with cleanup. Full120second matrix repetitions remain required."
+    "scope": "Last complete stress suite308 passed before the four new browser failure-publication cases. All38affected browser controls passed after those changes; remote focused31 passed and the real numeric bridge completed all five cycles. No repeated full Rust/UI/Python suite beside the local ordinary load; SDK projection3unchanged.",
+    "focused_browser_tests_after_numeric_publication": 38,
+    "focused_browser_evidence": "browser-auth-failed-slo-publication-regressions-001.json"
   },
   "unattributed_app_anonymous_growth": {
     "status": "under investigation",
@@ -1409,18 +1411,20 @@
     "source_commit": "35f4a9725d7edcf571f91084c555c127e7323653",
     "binary_sha256": "96811748f1f45ad4894114188642f9343df661c750ad22768eaf2275659081b1",
     "functional_smoke": "matrix-sdk007-auth-links-functional-smoke-001.json",
-    "CI_evidence": "ci-sdk007-final-product-trees.json",
+    "CI_evidence": "ci-sdk007-auth-metrics-product-trees.json",
     "ordinary_CI_checks_passed": 18,
     "native_evidence": "native-final-suite/index.json",
     "native_cases_passed": 12,
-    "browser_final007_status": "first final007 repetition failed its nominal refresh SLO; original numeric latency was not exported; new measurement publication validated in38focused controls, real repeat pending",
-    "browser_final007_failure": "browser-sdk007-refresh-slo-first-failure-001.json"
+    "browser_final007_status": "One full same-profile final007 repetition passed after the numeric publication change; first refresh-SLO failure remains failed/unexplained. Second independent browser pass and full matrix still pending.",
+    "browser_final007_failure": "browser-sdk007-refresh-slo-first-failure-001.json",
+    "browser_final007_passed_evidence": "browser-sdk007-measured-auth-pass-1-001.json",
+    "browser_final007_full_passes": 1
   },
   "current_campaign_checkpoint": {
     "checkpoint": "load-time-checkpoint-019.json",
     "effective_local_load_seconds": 143634,
     "active_local_at_recording": "disk-candidate-pass-1-006",
-    "recorded_utc": "2026-10-17T13:36:46.806603+00:00",
-    "scope": "019 conservative completed-interval count; final007 ordinary disk still active. Remote controller stopped at its first refresh-SLO failure and confirmed cleanup. Actual late-overlap singleflight passed; no cause or nominal approval inferred."
+    "recorded_utc": "2026-10-17T14:45:04.319630+00:00",
+    "scope": "019 conservative completed-interval count. Local final007 disk capacity/overload sequence still active. Remote first failed SLO retained; one same-profile full browser repetition now passed with400positive/160expected negative responses. Two full five-case backend matrices/eight native startup repetitions now run under a bounded serial owner; no overlapping local time credit."
   }
 }

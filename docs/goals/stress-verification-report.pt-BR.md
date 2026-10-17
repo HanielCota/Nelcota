@@ -2,7 +2,7 @@
 
 **Estado: em execução, sem aprovação do G05.** Este relatório é atualizado
 durante as campanhas. Checkpoint de carga consolidada: 17/10/2026, 13:07 UTC.
-Atualização da investigação: 17/10/2026, 14:13 UTC.
+Atualização da investigação: 17/10/2026, 14:45 UTC.
 Não houve merge nem deploy de produção. O trabalho está na branch
 `test/g05-stress-verification`, no [PR #90](https://github.com/Nelcota/Nelcota/pull/90),
 mantido como rascunho para revisão.
@@ -80,6 +80,20 @@ as mesmas taxas, budgets e SLOs. Quatro regressões novas passaram entre38
 controles focados; o [registro](results/stress/browser-auth-failed-slo-publication-regressions-001.json)
 explicita que a ponte real e o problema de latência ainda precisam repetir.
 Não é uma décima primeira correção confirmada de produto.
+
+A [repetição completa seguinte](results/stress/browser-sdk007-measured-auth-pass-1-001.json)
+passou sem mudar produto, carga, quotas ou SLOs:560requisições concluídas,
+400respostas positivas e160rejeições esperadas,40usuários e zero sessões
+restantes dessas contas. As cinco medições antes dos asserts foram gravadas.
+O p95 de refresh variou de106,6a183,1ms; pior p99 de187,7ms. Foram219amostras,
+gap máximo5,389s e sete plateaus. O p95 visual foi308,4ms em706navegações,
+sem crescimento final de DOM/listeners; heap cresceu menos de2,3MiB por aba,
+abaixo do limite de8MiB. Expiração real900s observada por1082,2s, com401no
+acesso expirado e400no refresh revogado. A causa da primeira falha continua
+aberta; não há comparação numérica antes/depois contra valores perdidos.
+A segunda passagem independente ainda precisa concluir. Os
+[18checks do head80d29c8](results/stress/ci-sdk007-auth-metrics-product-trees.json)
+passaram e têm prova da árvore completa do merge realmente usado no CI.
 
 ## Décima correção: isolamento do SDK no servidor
 

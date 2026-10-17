@@ -3137,3 +3137,38 @@ time/memory limits; no Rust/UI/build workload or stress-time credit. The
 [focused proof](results/stress/browser-auth-failed-slo-publication-regressions-001.json)
 is not evidence that the live bridge or the original latency problem is fixed.
 A fresh immutable remote repetition is required to obtain actual measurements.
+
+
+### 2026-10-17, 14:45 UTC — first final007 measured browser repetition passes
+
+Run39040099470/job117417640973 completed the unchanged full browser/auth
+profile on the exact common final007 ELF with cleanup and31focused guards.
+The five pre-SLO bridge receipts were actually observed as cycles0..4. All
+560requests completed:400positive responses and160expected400rejections,
+not560useful operations. All40generated users were accounted for and zero
+of their sessions remained unrevoked. Five auth cycles kept every original
+SLO: refresh p95 ranged106.6..183.1ms and worst p99 was187.7ms.
+
+The report retains219resource observations, maximum gap5.389s, seven owner
+plateaus and heap deltas790,844/2,372,448/2,367,876B across three tabs, below
+the unchanged8MiB bound; final DOM/listener growth was nonpositive. The
+706authoritative navigations had p95visual feedback308.4ms,2505SDKRLSreads
+and zero page errors. Actual900s expiry was observed for1082.201s, expired
+access rejected401, and revoked refresh rejected400.
+[Complete checksummed report](results/stress/browser-sdk007-measured-auth-pass-1-001.json).
+
+This is one passing repetition, not a confirmed correction of the original
+refresh-SLO failure. No product/rate/budget/SLO changed; the first failed
+percentiles remain unknown. The initial private reconciliation mistakenly
+labeled all560completed responses as successful_auth_requests. Its preserved
+replacement002 distinguishes400positive and160expected negative responses;
+no raw report, gate, useful-throughput or time evidence changed.
+
+All18ordinary checks on the actual80d29c8head passed. Its actual SDK checkout
+`e69f71c` has the complete root tree of that head, and the six product trees
+match local build35f4a. [New CI proof](results/stress/ci-sdk007-auth-metrics-product-trees.json).
+The bounded remote owner003 now runs two full five-case backend matrices and
+eight separate native startup reproductions on immutable source80d29c8, ref
+`test/g05-remaining-final007-001`. It stops at any failure. A second complete
+browser repetition remains separate. The local ordinary final007 disk campaign
+is still active, so no full final endurance/comparison result is inferred.
