@@ -845,3 +845,36 @@ trailing streams and excessive decoded/encoded data. It preserves the original
 source, artifact digest, status and cleanup verdict; republication cannot approve
 a failed campaign. Original resource files larger than the18KiB notice boundary
 remain in their provider artifact and require direct download.
+
+
+### Private files across independent projects
+
+`host_campaign.py --private-file-isolation` adds the complete directed foreign-JWT
+GET/PUT graph against one distinct private fixture in each project. Every foreign
+write rejection is followed by owner-byte and anonymous-denial checks; final
+metadata must match. Graphs run before/after and after actual positive k6 work
+inside each balanced, noisy, capacity and proxy phase of at least 60 seconds.
+Each request waits at least 1/64 second after the previous response closes.
+Traffic, bytes, response sizes, graph deadlines and the separate controller CPU
+are explicit in `fleet_private_files.PROFILE`. Auxiliary work never counts as
+k6 useful throughput. Comparisons require the same enabled protocol, CPU layout
+and complete source-bound cumulative receipts on both sides. Legacy evidence
+without this option only certifies its original scope.
+
+The manual `host-files` Actions target first validates this optional harness on
+a fresh empty hosted four-slot VM with the retained final007 Actions executable.
+It declares one project at 4 iterations/s and five at 1 iteration/s each, using
+60-second phases, direct owned loopback HTTP and a 1536-MiB aggregate PostgreSQL
+disk ceiling. Those rates are functional preflight settings, not the full host
+capacity profile or five-minute fairness approval. All existing short-profile
+absolute and relative gates still apply; any failed gate stays failed.
+
+The controller has 1 CPU/512 MiB/no swap/128 tasks and a 2700-second systemd
+ceiling. Each case has a tighter 1200-second lease. A separate transient systemd
+watchdog, outside the controller cgroup, has 5 percent CPU/128 MiB/no swap/32 tasks
+and a 1500-second expiry. It retains the existing host reserves, owner generation,
+30-second resource gap and PID-bound traffic stop. A lost watcher stops
+qualification. Teardown retains original failed counts and attempts every owned
+cleanup step even if publication fails; an incomplete cleanup retains the guard.
+Only validated fixed receipts and numeric component projections are public.
+Full host1/5/10 baselines and two candidate passes remain separately required.

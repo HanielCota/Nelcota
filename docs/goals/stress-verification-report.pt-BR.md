@@ -1049,7 +1049,7 @@ transitória; o acesso voltou às 10:30 sem trocar credenciais ou bindings,
 enquanto a carga local continuou.
 
 
-## Atualização de 17 de outubro, 17:40 UTC — matriz repetida e isolamento de arquivos
+## Atualização de 17 de outubro, 17:30 UTC — matriz repetida e isolamento de arquivos
 
 As [duas matrizes completas corrigidas](results/stress/matrix-sdk007-two-corrected-passes-001.json)
 passaram em VMs descartáveis distintas, usando o mesmo ELF final007 do Actions.
@@ -1098,3 +1098,14 @@ ou notices. A primeira endurance final007 em disco segue em andamento.
 O piso consolidado continua 39h53m54s de carga efetiva no checkpoint 019,
 excluindo preparação, intervalos parciais e sobreposição remota. G05 continua
 aberto, e o PR permanece draft, sem merge ou deploy de produção.
+
+
+O preflight real de arquivos foi preparado para uma VM descartável independente:
+1 projeto a 4 iterações/s e 5 projetos a 1 iteração/s cada, com fases de 60 segundos.
+Esses parâmetros servem à validação funcional do executor, sem certificar as
+etapas completas de 300 segundos ou a capacidade final. Os gates originais
+continuam ativos. Um watchdog systemd separado do controller conserva a parada
+por limite mesmo se o grupo do controller morrer. As [53 regressões focadas](results/stress/host-private-file-preflight-guards-001.json)
+passaram, incluindo 13 controles novos de propriedade, encerramento, privacidade
+e evidência. São testes com stubs; a execução real permanece não realizada,
+aguardando os casos remotos anteriores e o CI da nova fonte.

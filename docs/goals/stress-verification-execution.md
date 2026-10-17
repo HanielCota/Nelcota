@@ -3333,7 +3333,7 @@ The prepared49add63remote006 has not started and its ref was never created;
 supersede it before dispatch so both actual new VM cases include these probes.
 
 
-### 2026-10-17, 17:40 UTC — second corrected matrix and private-file pressure predeclaration
+### 2026-10-17, 17:30 UTC — second corrected matrix and private-file pressure predeclaration
 
 Both corrected full matrix passes now have original checksummed reports from
 independent disposable VMs, the same retained final007 Actions ELF and image
@@ -3392,3 +3392,24 @@ two-runner restore; credentials or payloads will not be exposed through public
 inputs/notices. Off-host/PITR recovery remains blocked, not passed.
 [Capability receipt](results/stress/offhost-private-transport-capability-001.json).
 The current disk soak remains incomplete; no partial soak time is consolidated.
+
+
+### 2026-10-17, 17:38 UTC — disposable real-service preflight prepared
+
+The new optional `host-files` dispatch will exercise one project at 4 iterations/s
+and five at 1 iteration/s each for 60-second phases. It retains all original
+short-profile acceptance gates, explicitly without five-minute capacity/fairness
+certification. The same private-file protocol is checked against the exact
+retained final007 Actions ELF on a fresh empty hosted Docker VM. A separately
+leased systemd watchdog survives the controller cgroup deadline and stops only
+owned traffic/resources. Its activity is checked during load. Publication errors
+cannot prevent owned cleanup, and failed partial graph counts remain visible.
+The aggregate 1-CPU controller plus independent 5-percent watchdog budgets and
+all duration/memory/disk limits are predeclared. Fifty-three focused tests passed
+with zero skips (0.074062 seconds framework/0.266363 seconds operator), including
+thirteen preflight boundary controls; these use stubs and do not prove real
+Docker/systemd behavior. YAML parsing also passed. Dispatch remains not run and
+waits for the current eleven-case remote sequence, both native in-flight controls,
+empty global queue and its own ordinary CI. This preflight creates no local fixtures; remote overlap time never enters
+the local checkpoint.
+[Source hashes, bounds and exact scope](results/stress/host-private-file-preflight-guards-001.json).
