@@ -1,0 +1,67 @@
+{
+  "utc": "2026-10-17T18:45:33.812955+00:00",
+  "status": "cold-image dependency gap corrected in harness; fresh real preflight not run",
+  "certifies_g05": false,
+  "original_failed_preflight": "host-private-files-bootstrap-failure-001.json",
+  "dependency_before_after": "host-required-images-before-after-001.json",
+  "focused_result": {
+    "tests": 57,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "successful": true,
+    "elapsed_seconds": 0.06321349402423948
+  },
+  "operator": {
+    "utc": "2026-10-17T18:41:09.841740+00:00",
+    "command": [
+      "timeout",
+      "--signal=TERM",
+      "--kill-after=3s",
+      "15s",
+      "taskset",
+      "-c",
+      "3",
+      "nice",
+      "-n",
+      "19",
+      "ionice",
+      "-c3",
+      "prlimit",
+      "--as=134217728:134217728",
+      "--cpu=3:3",
+      "--",
+      "python3",
+      "target/stress-g05/artifacts/run-host-private-focused-010.py"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.21484331000829116,
+    "source_sha256": {
+      "bench/host_campaign.py": "a5ccac34e56d47ff167d57385d1b435e8821a5188c18fedfc6d5cd91d4574cde",
+      "bench/host_file_probe.py": "5e5408c9fc224299c37998a93047a0a192f5e706138e9e31b0fbe7c730166169",
+      "scripts/review_tests/test_stress_host_file_probe.py": "77dc81ff2f4df9160c68ddf70db120132adaf8213849cd9e407330e72934a82d"
+    },
+    "log_sha256": "2bbbe9cf9ddc66c94975dc2e38a44437677a2c60735f6fc4bc62626541030788",
+    "scope": "Focused host-file/comparison/bootstrap guards only on idle providerCPU3 during DISK; per-process128MiBAS/3CPU-s/15s low priority. No actual Docker, VM or effective load credit."
+  },
+  "previous_focused_failure": {
+    "result": {
+      "tests": 57,
+      "failed": 0,
+      "errors": 1,
+      "skipped": 0,
+      "successful": false,
+      "elapsed_seconds": 0.07607323495903984
+    },
+    "operator_log_sha256": "b91bdc143b3518df1523a653cc18f178150dbcf170babed75665b899c93038a3",
+    "diagnosis": "The new fake inventory incorrectly derived RepoDigests from tag-plus-digest image refs. Strip the pinned digest before the tag in the test fixture. The production validator and pins were not weakened."
+  },
+  "changes": [
+    "Canonical host REQUIRED_IMAGES shared by preparation and profile inspection; include the exact already pinned k6/Prometheus refs.",
+    "Pull and validate all four required image identities/sizes/repo digests before fixture creation; never publish image Config/env.",
+    "Export a fixed last_preparation_stage in host completion so later failures can be attributed without private logs."
+  ],
+  "unchanged": "Actual retained ELF, product trees, rates, sixty-second functional phases, half-CPU controller and all absolute/relative/delivery/resource gates. Full300second host campaigns remain required.",
+  "attribution_limit": "The original VM did not export exact failing stage. Original-AST cold-inventory control proves a real missing-image dependency gap, but not the exclusive cause of that VM failure. Fresh real rerun is required.",
+  "preconditions": "Freeze newly committed source, all18ordinaryCI PASS, globalmanualqueueEMPTY. Prior ECnative010bothactualin-flightcases passed/cleanup. New unique workflow/run IDs only."
+}

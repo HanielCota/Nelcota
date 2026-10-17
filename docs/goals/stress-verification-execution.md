@@ -3533,3 +3533,28 @@ reproduced separately, but the original failed VM did not export its exact
 preparation stage, so sole-cause attribution remains unproven. A new image/stage
 fix and another real preflight are required; no acceptance gate is waived.
 [Original failed preflight](results/stress/host-private-files-bootstrap-failure-001.json).
+
+
+### 2026-10-17, 18:46 UTC — reproduce and correct the fresh-host image dependency gap
+
+The original host preflight pulled Ubuntu/PostgreSQL only, while the actual
+host profile also inspected the pinned k6 and Prometheus images before starting
+their containers. Execute the exact original pull-loop/profile-comprehension AST
+against a deterministic empty inventory: it fails on the pinned k6 reference.
+Prepare all four canonical images, then execute the same original comprehension:
+it succeeds. This establishes a real bootstrap dependency gap without asserting
+the unexported original VM failure stage. The original14.697989-second failed
+preflight, zero offered load and owned cleanup remain unchanged.
+[Before/after](results/stress/host-required-images-before-after-001.json).
+
+The preflight and host profile now share REQUIRED_IMAGES; preparation validates
+all four public image IDs/sizes/digests without exposing Config/env. Completion
+adds a fixed preparation-stage label for future diagnosis. Fifty-seven focused
+controls pass with zero skips,0.063213seconds framework/0.214843seconds operator
+on idle providerCPU3 during disk soak, with128MiB address-space/3CPU-second/
+15-second bounds. The first57-test attempt had one fake-inventory error because
+its RepoDigest construction mishandled existing tag-plus-digest pins; correcting
+that fixture preserved the production validator/pins. The failed result/log hash
+is retained, and the new source still requires ordinary CI and a fresh real run.
+No target rate, SLO, delivery/fairness gate or resource budget is reduced.
+[Guards and original fixture failure](results/stress/host-required-images-guards-001.json).

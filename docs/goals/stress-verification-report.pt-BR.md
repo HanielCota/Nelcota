@@ -1203,3 +1203,18 @@ não executou ainda. Não há nova falha de produto ou corrupção confirmada.
 O total continua em dez defeitos corrigidos; PITR/S3 real e off-host continuam
 com seus vereditos separados. A reconexão do ambiente preservou os processos e
 as amostras recentes; a validação final de continuidade ainda precisa fechar.
+
+
+A [reprodução do bootstrap vazio](results/stress/host-required-images-before-after-001.json)
+executou o AST original: o loop baixa duas imagens, mas o manifesto inspeciona
+quatro e falha na imagem fixada do k6. Preparar as quatro permite a mesma inspeção
+original. O executor agora compartilha a lista canônica, valida IDs/tamanhos/
+digests e publica uma etapa fixa de preparação, sem expor env/logs privados.
+Isso confirma a lacuna, sem provar que foi a única causa da VM antiga.
+
+Os [57 controles focados](results/stress/host-required-images-guards-001.json)
+passaram sem skips, em 0,063213 s de framework. A tentativa anterior teve um erro
+na fixture nova ao montar o RepoDigest de referências já fixadas por digest; o
+resultado e o hash do log permanecem registrados. Corrigi a fixture, preservando
+o validador e os pins reais. A repetição real ainda não executou; as taxas, fases,
+quotas e gates permanecem iguais. O G05 não foi aprovado por esses controles.

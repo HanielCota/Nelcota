@@ -55,6 +55,38 @@ class HostFilePreflight(unittest.TestCase):
                 probe.main()
         docker.assert_not_called()
 
+    def test_fresh_VM_prepares_every_image_inspected_by_the_host_campaign(self):
+        pulled = set()
+
+        def docker(*arguments):
+            image = arguments[-1]
+            if arguments[0] == "pull":
+                pulled.add(image)
+                return ""
+            self.assertEqual(arguments[:2], ("image", "inspect"))
+            if image not in pulled:
+                raise RuntimeError("Required image is missing")
+            repository = image.split("@", 1)[0].rsplit(":", 1)[0]
+            return json.dumps([{"Id": "sha256:" + "a" * 64, "Size": 1024,
+                                "RepoDigests": [repository + "@sha256:" + "b" * 64],
+                                "Config": {"Env": ["private value must never be published"]}}])
+
+        with patch.object(probe, "docker", side_effect=docker):
+            images = probe.prepare_images()
+        self.assertEqual(pulled, set(probe.REQUIRED_IMAGES))
+        self.assertEqual(len(images), 4)
+        self.assertTrue(any("grafana/k6" in name for name in images))
+        self.assertTrue(any("prom/prometheus" in name for name in images))
+        self.assertTrue(all(set(value) == {"id", "size_bytes", "repo_digests"} for value in images.values()))
+        self.assertNotIn("private value", json.dumps(images))
+
+    def test_invalid_or_incomplete_required_image_evidence_stops_preparation(self):
+        good = {"Id": "sha256:" + "a" * 64, "Size": 1024, "RepoDigests": ["ubuntu@sha256:" + "b" * 64]}
+        for bad in [[], [good, good], [{**good, "Size": True}], [{**good, "Size": float("nan")}],
+                    [{**good, "RepoDigests": []}], [{**good, "RepoDigests": ["private"]}], [{**good, "Id": None}]]:
+            with self.subTest(bad=bad), patch.object(probe, "docker", side_effect=["", json.dumps(bad)]), self.assertRaises(RuntimeError):
+                probe.prepare_images()
+
     def test_lease_only_tightens_a_fresh_owned_case_deadline(self):
         original = self.manifest()
         actual = self.lease(original)

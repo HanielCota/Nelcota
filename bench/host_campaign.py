@@ -38,6 +38,7 @@ from cpu_policy import allocation as cpu_allocation, verify as verify_cpu_alloca
 from fleet_private_files import DISABLED as PRIVATE_FILES_DISABLED, PROFILE as PRIVATE_FILES_PROFILE, PrivateFiles
 
 ROOT = Path(__file__).resolve().parents[1]
+REQUIRED_IMAGES = ("ubuntu:24.04", "postgres:17-alpine", K6, PROMETHEUS)
 
 
 def startup_disk_budget(images, projects, caddy=False):
@@ -137,7 +138,7 @@ def campaign(args):
         os.sched_setaffinity(0, {cpus[-1]})
         if os.sched_getaffinity(0) != {cpus[-1]}:
             raise RuntimeError('Private-file controller did not retain its separate telemetry/OS slot')
-    fixture_images = [json.loads(docker('image', 'inspect', name))[0] for name in ['ubuntu:24.04', 'postgres:17-alpine']]
+    fixture_images = [json.loads(docker('image', 'inspect', name))[0] for name in REQUIRED_IMAGES[:2]]
     startup_budget = startup_disk_budget(fixture_images, args.projects, args.caddy)
     atomic_json(output/'preflight-budget.json', {**startup_budget, 'separate_database_data_mib':args.disk_mib,
                 'minimum_free_disk_fraction':.15, 'resource_creation_started':False})
@@ -169,6 +170,7 @@ def campaign(args):
     heartbeat_thread = sampler = watchdog = None
     private_files = None
     status = 'failed'
+    preparation_stage = 'owned-manifest'
     manifest = {'identity': identity, 'output': str(output), 'reserve_path': str(output), 'pid': os.getpid(), 'process_identity': process_identity(os.getpid()), 'started_monotonic': began, 'maximum_seconds': 7200, 'preparation_seconds': 900, 'containers': [telemetry, generator, *[item.app for item in projects], *[item.pg for item in projects]], 'volumes': [telemetry_volume, *[item.volume for item in projects]]}
     if ingress is not None:
         manifest['containers'].append(ingress.name)
@@ -192,11 +194,13 @@ def campaign(args):
     try:
         watchdog = subprocess.Popen([sys.executable, str(ROOT/'bench/watchdog.py'), str(output/'ownership.json')], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
         atomic_json(output/'manifest.json', {'schema': 1, 'scope': 'local independent app/PG clusters, no proxy/controller', 'projects': args.projects, 'rows_per_project': 1000, 'shared_user_id': '00000000-0000-4000-8000-000000000001', 'binary_sha256': hashlib.file_digest(args.binary.open('rb'), 'sha256').hexdigest(), 'cpu_effective': effective_cpus(cpus), 'app_aggregate_cpus': 1, 'postgres_aggregate_cpus': 1, 'generator_cpus': 1, 'metrics_cpus': .25, 'app_memory_mib_each': 128, 'postgres_memory_mib_each': 256, 'max_arrival_rate': 10000, 'fixture_disk_mib': args.disk_mib, 'storage_filesystem': filesystem, 'seconds_per_step': args.seconds, 'project_cpu_period_micros':args.cpu_period_micros, 'certifies_five_minute_steps': args.seconds >= 300, 'base_rate_per_project': args.rate, 'SLOs': 'G05 unchanged'})
+        preparation_stage = 'project-fixtures'
         fixtures = [project.create() for project in projects]
         initial = json.loads((output/'manifest.json').read_text())
         initial['private_file_isolation'] = private_profile
         initial['private_file_controller_cpu_affinity'] = None
         if private_profile['enabled']:
+            preparation_stage = 'private-files-before'
             initial['private_file_controller_cpu_affinity'] = cpus[-1]
         atomic_json(output/'manifest.json', initial)
         if private_profile['enabled']:
@@ -212,10 +216,12 @@ def campaign(args):
             private_files = PrivateFiles(projects, output, private_guard, owns_listener, abort_private)
             private_files.seed()
             private_files.graph('before')
+        preparation_stage = 'CPU-allocation-proof'
         atomic_json(output/'cpu-allocation.json', verify_cpu_allocation(owned, projects, declared_cpu))
         if args.webhooks:
             for project in projects:
                 webhooks.attach(project)
+        preparation_stage = 'ingress-and-workload-profile'
         profile=json.loads((output/'manifest.json').read_text())
         profile['project_cpu_period_micros']=args.cpu_period_micros
         profile['project_cpu_allocation']=declared_cpu
@@ -235,14 +241,16 @@ def campaign(args):
         profile['container_log_profile']=LOG_PROFILE
         profile['harness_js_sha256']=hashlib.file_digest((ROOT/'bench/campaign.js').open('rb'),'sha256').hexdigest()
         profile['client_initialization']={'maximum_sessions_per_project':128,'bootstrap_concurrency':4,'setup_timeout_seconds':120,'fully_preallocated_arrival_VUs':True,'mix_schedule':'global scenario arrival ordinal','bootstrap_excluded_from_nominal_metrics':True}
-        profile.update({'schema':2,'cpu_affinity':cpus[:3],'metrics_cpu_affinity':cpus[-1],'capacity_qualification':args.capacity,'provisional_rate_per_project':args.provisional_rate,'max_connections_each':32,'pool_each':4,'generator_memory_mib':512,'metrics_memory_mib':512,'images':{image:json.loads(owned('image','inspect',image))[0]['RepoDigests'] for image in ['ubuntu:24.04','postgres:17-alpine',K6,PROMETHEUS]}})
+        profile.update({'schema':2,'cpu_affinity':cpus[:3],'metrics_cpu_affinity':cpus[-1],'capacity_qualification':args.capacity,'provisional_rate_per_project':args.provisional_rate,'max_connections_each':32,'pool_each':4,'generator_memory_mib':512,'metrics_memory_mib':512,'images':{image:json.loads(owned('image','inspect',image))[0]['RepoDigests'] for image in REQUIRED_IMAGES}})
         atomic_json(output/'manifest.json',profile)
         atomic_json(output/'acceptance-failures.json',[])
+        preparation_stage = 'cross-project-preflight'
         for project in projects:
             for foreign in fixtures:
                 if foreign['label'] != project.label:
                     project.assert_foreign_denied(foreign)
         atomic_json(output/'cross-project-preflight.json', {'distinct_keys': True, 'directed_rejections': args.projects*(args.projects-1), 'status': 'passed'})
+        preparation_stage = 'telemetry-readiness'
         metrics_port = free_port()
         metrics_url = f'http://127.0.0.1:{metrics_port}'
         config = directory/'prometheus.yml'
@@ -340,6 +348,7 @@ def campaign(args):
                     return
                 stop.wait(max(0, 5-(time.monotonic()-cycle)))
 
+        preparation_stage = 'complete'
         phase = 'ready'
         sampler = threading.Thread(target=sample, daemon=True)
         sampler.start()
@@ -505,7 +514,7 @@ def campaign(args):
         if watchdog is not None:
             watchdog.wait(timeout=20)
         signal.signal(signal.SIGTERM,previous)
-        atomic_json(output/'completion.json',{'status':status,'projects':args.projects,'load_seconds':load_seconds,'resource_observations':coverage.count,'cleanup_confirmed':clean,'error_type':type(sys.exception()).__name__})
+        atomic_json(output/'completion.json',{'status':status,'projects':args.projects,'load_seconds':load_seconds,'resource_observations':coverage.count,'cleanup_confirmed':clean,'error_type':type(sys.exception()).__name__,'last_preparation_stage':preparation_stage})
         if status != 'passed' and sys.exception() is None:
             raise RuntimeError('Fleet did not meet its acceptance or cleanup gates')
 

@@ -15,6 +15,7 @@ import time
 
 from campaign import docker, effective_cpus
 from fleet_private_files import COUNTS, PROFILE, PROTOCOL, require, validate_receipt, validate_run
+from host_campaign import REQUIRED_IMAGES
 from matrix_probe import input_artifact, read_receipt
 from native_evidence import notices
 from native_preflight import inventory
@@ -33,6 +34,22 @@ def campaign_arguments(binary, identity, projects, rate, policy):
             "--binary", str(binary), "--projects", str(projects), "--rate", str(rate),
             "--seconds", str(STEP_SECONDS), "--disk-mib", "1536", "--cpu-period-micros", "100000",
             "--project-cpu-policy", policy, "--private-file-isolation"]
+
+
+def prepare_images():
+    result = {}
+    for image in REQUIRED_IMAGES:
+        docker("pull", image)
+        values = json.loads(docker("image", "inspect", image))
+        require(isinstance(values, list) and len(values) == 1 and isinstance(values[0], dict), "Missing required host image metadata")
+        value = values[0]
+        identifier, size, digests = value.get("Id"), value.get("Size"), value.get("RepoDigests")
+        require(isinstance(identifier, str) and re.fullmatch(r"sha256:[0-9a-f]{64}", identifier) is not None
+                and type(size) is int and 0 < size <= 2 * 1024 ** 3 and isinstance(digests, list) and 0 < len(digests) <= 4
+                and all(isinstance(item, str) and re.fullmatch(r"[a-z0-9][a-z0-9./_-]{1,100}@sha256:[0-9a-f]{64}", item) is not None
+                        for item in digests), "Invalid bounded required host image evidence")
+        result[image] = {"id": identifier, "size_bytes": size, "repo_digests": digests}
+    return result
 
 
 def kernel_budget(identity):
@@ -276,8 +293,7 @@ def main():
 
     signal.signal(signal.SIGTERM, terminate)
     try:
-        for image in ["ubuntu:24.04", "postgres:17-alpine"]:
-            docker("pull", image)
+        report["checks"]["images"] = prepare_images()
         for projects, rate, policy in CASES:
             name = identity + "-p" + str(projects)
             output = base / name

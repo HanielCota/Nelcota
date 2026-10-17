@@ -1,0 +1,22 @@
+{
+  "status": "cold image dependency gap reproduced with original AST and corrected in mocked fixture control",
+  "certifies_g05": false,
+  "before_sources_sha256": {
+    "host_file_probe-before-required-images-001.py": "1931df7cdb596715f4a971fbd8770384fe16232377420e71ad6ccf70e44cdfbd",
+    "host_campaign-before-required-images-001.py": "390fbbe870fe1c1f0893e510478af6f63712268791905dbd7a769a7f67bbf172"
+  },
+  "original_prepare_images": [
+    "postgres:17-alpine",
+    "ubuntu:24.04"
+  ],
+  "original_profile_missing_image": "grafana/k6:1.6.1@sha256:a5ad6bc089a08d77c3ec49f3db8c6fa7a148e4073efcac44c675dbaf3568d8e1",
+  "original_manifest_failed": true,
+  "after_all_required_images_prepared": [
+    "grafana/k6:1.6.1@sha256:a5ad6bc089a08d77c3ec49f3db8c6fa7a148e4073efcac44c675dbaf3568d8e1",
+    "postgres:17-alpine",
+    "prom/prometheus:v3.5.0@sha256:63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996",
+    "ubuntu:24.04"
+  ],
+  "same_original_profile_inspection_passed": true,
+  "scope": "Original two-image pull loop and actual four-image profile comprehension evaluated with deterministic empty Docker inventory. No real Docker/network/load credit. Original failed VM did not export exact failing preparation stage, so this proves a real dependency gap without asserting it was the sole cause of that VM failure. Fresh real rerun remains required."
+}

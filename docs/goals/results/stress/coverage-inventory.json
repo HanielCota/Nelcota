@@ -1548,21 +1548,22 @@
   "private_file_host_preflight": {
     "status": "failed during preparation; corrective harness change not yet revalidated on real services",
     "evidence": "host-private-file-preflight-guards-002.json",
-    "source_CI": "all18ordinarychecks passed; actual preflight not run",
-    "focused_guards_passed": 55,
+    "source_CI": "new corrected bootstrap source pending CI and actual fresh rerun; old source3ccproof does not cover it",
+    "focused_guards_passed": 57,
     "actual_Docker_systemd_functionality": "not run",
     "previous_preflight_source_commit": "d4bfc60dc8e87bfe2c5f3786251134a4bba9870b",
     "source_file_sha256": {
-      "bench/host_file_probe.py": "1931df7cdb596715f4a971fbd8770384fe16232377420e71ad6ccf70e44cdfbd",
-      "scripts/review_tests/test_stress_host_file_probe.py": "db4bf9fa2ce6001987228bbec21cae411ef0c7a12ff4c29e669c281685879b6f",
-      ".github/workflows/stress.yml": "f9e99ea373017503b319dca1ba95868fd419d829b1c90ba29e5a92e504b3de5a"
+      "bench/host_campaign.py": "a5ccac34e56d47ff167d57385d1b435e8821a5188c18fedfc6d5cd91d4574cde",
+      "bench/host_file_probe.py": "5e5408c9fc224299c37998a93047a0a192f5e706138e9e31b0fbe7c730166169",
+      "scripts/review_tests/test_stress_host_file_probe.py": "77dc81ff2f4df9160c68ddf70db120132adaf8213849cd9e407330e72934a82d"
     },
     "source_commit": "3cc1b83bfb83a7daa4747cfbd8119d95d2615550",
     "CI_evidence": "ci-host-private-files-product-trees.json",
     "failed_evidence": "host-private-files-bootstrap-failure-001.json",
     "workload_effective_seconds": 0,
     "resource_samples": 0,
-    "scope": "One-project initial owner/anonymous/metadata graph passed. Later preparation failed and owned cleanup passed; five-project and pressure stages did not run. Original exact failing stage was not exported. A cold dependency gap is reproduced separately; no sole-cause claim or relaxed gate."
+    "scope": "One-project initial owner/anonymous/metadata graph passed. Later preparation failed and owned cleanup passed; five-project and pressure stages did not run. Original exact failing stage was not exported. A cold dependency gap is reproduced separately; no sole-cause claim or relaxed gate.",
+    "corrective_evidence": "host-required-images-guards-001.json"
   },
   "latest_inventory_update_utc": "2026-10-17T18:14:34.893203+00:00",
   "native_startup_reproductions": {
