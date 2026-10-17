@@ -1,0 +1,181 @@
+{
+  "CI": {
+    "source_commit": "65d5ce498e8f63edd6a69d5938cd6e607c4faeb3",
+    "observed_utc": "2026-10-17T20:33:09.578640+00:00",
+    "status": "failed",
+    "certifies_g05": false,
+    "ordinary_check_count": 18,
+    "checks": [
+      {
+        "id": 117494968582,
+        "name": "CodeQL",
+        "head_sha": "65d5ce498e8f63edd6a69d5938cd6e607c4faeb3",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/Nelcota/Nelcota/runs/117494968582"
+      },
+      {
+        "id": 117494843537,
+        "name": "sdk / sdk-node (26)",
+        "head_sha": "65d5ce498e8f63edd6a69d5938cd6e607c4faeb3",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/Nelcota/Nelcota/actions/runs/39066386733/job/117494843537"
+      },
+      {
+        "id": 117494843534,
+        "name": "sdk / sdk-node (22)",
+        "head_sha": "65d5ce498e8f63edd6a69d5938cd6e607c4faeb3",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/Nelcota/Nelcota/actions/runs/39066386733/job/117494843534"
+      },
+      {
+        "id": 117494843517,
+        "name": "check",
+        "head_sha": "65d5ce498e8f63edd6a69d5938cd6e607c4faeb3",
+        "status": "completed",
+        "conclusion": "failure",
+        "html_url": "https://github.com/Nelcota/Nelcota/actions/runs/39066386733/job/117494843517"
+      },
+      {
+        "id": 117494843489,
+        "name": "admin-ui",
+        "head_sha": "65d5ce498e8f63edd6a69d5938cd6e607c4faeb3",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/Nelcota/Nelcota/actions/runs/39066386733/job/117494843489"
+      },
+      {
+        "id": 117494843467,
+        "name": "sdk / sdk",
+        "head_sha": "65d5ce498e8f63edd6a69d5938cd6e607c4faeb3",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/Nelcota/Nelcota/actions/runs/39066386733/job/117494843467"
+      },
+      {
+        "id": 117494843424,
+        "name": "upgrade",
+        "head_sha": "65d5ce498e8f63edd6a69d5938cd6e607c4faeb3",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/Nelcota/Nelcota/actions/runs/39066386733/job/117494843424"
+      },
+      {
+        "id": 117494843389,
+        "name": "supply-chain",
+        "head_sha": "65d5ce498e8f63edd6a69d5938cd6e607c4faeb3",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/Nelcota/Nelcota/actions/runs/39066386733/job/117494843389"
+      },
+      {
+        "id": 117494843232,
+        "name": "sdk-rust (macos-latest)",
+        "head_sha": "65d5ce498e8f63edd6a69d5938cd6e607c4faeb3",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/Nelcota/Nelcota/actions/runs/39066386754/job/117494843232"
+      },
+      {
+        "id": 117494843206,
+        "name": "native-lint",
+        "head_sha": "65d5ce498e8f63edd6a69d5938cd6e607c4faeb3",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/Nelcota/Nelcota/actions/runs/39066386733/job/117494843206"
+      },
+      {
+        "id": 117494843194,
+        "name": "sdk-rust (ubuntu-latest)",
+        "head_sha": "65d5ce498e8f63edd6a69d5938cd6e607c4faeb3",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/Nelcota/Nelcota/actions/runs/39066386754/job/117494843194"
+      },
+      {
+        "id": 117494843190,
+        "name": "sdk-rust (windows-latest)",
+        "head_sha": "65d5ce498e8f63edd6a69d5938cd6e607c4faeb3",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/Nelcota/Nelcota/actions/runs/39066386754/job/117494843190"
+      },
+      {
+        "id": 117494843036,
+        "name": "msrv",
+        "head_sha": "65d5ce498e8f63edd6a69d5938cd6e607c4faeb3",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/Nelcota/Nelcota/actions/runs/39066386754/job/117494843036"
+      },
+      {
+        "id": 117494842765,
+        "name": "native-presets",
+        "head_sha": "65d5ce498e8f63edd6a69d5938cd6e607c4faeb3",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/Nelcota/Nelcota/actions/runs/39066386623/job/117494842765"
+      },
+      {
+        "id": 117494838491,
+        "name": "Analyze (python)",
+        "head_sha": "65d5ce498e8f63edd6a69d5938cd6e607c4faeb3",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/Nelcota/Nelcota/actions/runs/39066384110/job/117494838491"
+      },
+      {
+        "id": 117494838464,
+        "name": "Analyze (actions)",
+        "head_sha": "65d5ce498e8f63edd6a69d5938cd6e607c4faeb3",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/Nelcota/Nelcota/actions/runs/39066384110/job/117494838464"
+      },
+      {
+        "id": 117494838413,
+        "name": "Analyze (javascript-typescript)",
+        "head_sha": "65d5ce498e8f63edd6a69d5938cd6e607c4faeb3",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/Nelcota/Nelcota/actions/runs/39066384110/job/117494838413"
+      },
+      {
+        "id": 117494838277,
+        "name": "Analyze (rust)",
+        "head_sha": "65d5ce498e8f63edd6a69d5938cd6e607c4faeb3",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/Nelcota/Nelcota/actions/runs/39066384110/job/117494838277"
+      }
+    ],
+    "pending": [
+      "check"
+    ],
+    "scope": "Source008ordinary checks only; no unrun G05/native/PITR/endurance gate approved."
+  },
+  "failed_test": "cancelled_exports_keep_admission_until_postgres_finishes_cleanup",
+  "actual_numeric_notice": {
+    "authorized_api_status": 200,
+    "backend_queries_after_release": 0,
+    "backend_queries_before_releasing_cancellation": 1,
+    "case": "cancelled_exports_keep_admission_until_postgres_finishes_cleanup",
+    "held_cancellation_packets": 2,
+    "recovered_exact_product_ids": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "recovered_parallel_exports": 2,
+    "recovery_seconds": 0.169797584,
+    "scope": "Real owned PostgreSQL, two bounded export queries, delayed CancelRequest only; no load-time credit",
+    "third_export_busy_code": null,
+    "third_export_status_while_cleanup_pending": 200,
+    "unauthorized_api_status": 401
+  },
+  "status": "original FAILED retained; cause under investigation",
+  "scope": "Backendbusy oracle observed1active ratherthan2 while2CancelRequests held. Sourceonly addedbenchmark/Pythoncontrols; productioncodeunchanged. Read-onlysource suggests testreadiness may include protocolpreparation, but solecauseunconfirmed. No productiondefect/fixcountorpassclaim."
+}

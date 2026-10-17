@@ -1,0 +1,22 @@
+{
+  "utc": "2026-10-17T20:43:59.734297+00:00",
+  "run_id": "s3-final008-pass-1-001",
+  "source_commit": "da262d77f4d2557ff5cbd9007b9a3a6273a92221",
+  "binary_sha256": "aa0967f175d13410d4085841c1e1351597b7d38c7cab8adf51963bfa57336a73",
+  "status": "failed; intentionally interrupted for original CI investigation",
+  "reason": "Source65 ordinary CI cancellation regression failed; pause isolated local load for focused diagnostics. No new production defect confirmed.",
+  "recorded_partial_load_seconds": 2445.0,
+  "continuous_soak_seconds_completed": 0,
+  "required_continuous_soak_seconds": 14400,
+  "resource_observations": 422,
+  "cleanup": {
+    "containers": [],
+    "volumes": [],
+    "directory_removed": true
+  },
+  "cleanup_confirmed": true,
+  "load_time_checkpoint_credit_seconds": 0,
+  "supersedes_failed_evidence": false,
+  "CI_failure": "ci-boot-control-export-cancellation-failure-001.json",
+  "scope": "Partial calibrate-100 phase; no endurance approval or final-artifact certification."
+}

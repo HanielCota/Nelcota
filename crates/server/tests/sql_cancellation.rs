@@ -346,6 +346,25 @@ async fn active_exports(app: &TestApp) -> i64 {
     ).await.unwrap().get(0)
 }
 
+#[derive(Debug)]
+struct ExportActivity {
+    active: i64,
+    sleeping: i64,
+    preparing: i64,
+}
+
+async fn export_activity(app: &TestApp) -> ExportActivity {
+    let row = app.admin_client.query_one(
+        "SELECT count(*), count(*) FILTER (WHERE wait_event_type='Timeout' AND wait_event='PgSleep'), count(*) FILTER (WHERE wait_event_type='Lock' AND wait_event='relation') FROM pg_stat_activity WHERE datname=current_database() AND application_name='nelcota-admin-export' AND state='active' AND query LIKE '%slow_cancel_export%'",
+        &[],
+    ).await.unwrap();
+    ExportActivity {
+        active: row.get(0),
+        sleeping: row.get(1),
+        preparing: row.get(2),
+    }
+}
+
 async fn export_response(
     router: axum::Router,
     cookie: String,
@@ -407,6 +426,15 @@ async fn cancelled_exports_keep_admission_until_postgres_finishes_cleanup() {
         ..app.panel.clone()
     };
     let router = nelcota_admin::router(panel);
+    // Hold parsing at an owned relation lock: PostgreSQL reports these sessions
+    // as active even though neither export has reached the long-running query.
+    let (mut blocker, blocker_connection) = app.admin.connect(tokio_postgres::NoTls).await.unwrap();
+    let blocker_driver = tokio::spawn(blocker_connection);
+    let preparation = blocker.transaction().await.unwrap();
+    preparation
+        .batch_execute("LOCK TABLE public.slow_cancel_export IN ACCESS EXCLUSIVE MODE")
+        .await
+        .unwrap();
     let mut requests = JoinSet::new();
     for _ in 0..2 {
         let router = router.clone();
@@ -414,13 +442,37 @@ async fn cancelled_exports_keep_admission_until_postgres_finishes_cleanup() {
         requests.spawn(async move { export_response(router, cookie, "slow_cancel_export").await });
     }
     let deadline = Instant::now() + Duration::from_secs(3);
-    while active_exports(&app).await != 2 {
-        assert!(
-            Instant::now() < deadline,
-            "two export queries did not start"
-        );
+    let preparing = loop {
+        let activity = tokio::time::timeout_at(deadline, export_activity(&app))
+            .await
+            .expect("two exports did not reach the owned preparation lock");
+        assert!(Instant::now() < deadline, "preparation observation expired");
+        if activity.active == 2 && activity.preparing == 2 {
+            break activity;
+        }
         tokio::time::sleep(Duration::from_millis(10)).await;
-    }
+    };
+    assert_eq!(preparing.sleeping, 0);
+    preparation.commit().await.unwrap();
+    drop(blocker);
+    tokio::time::timeout_at(deadline, blocker_driver)
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+
+    // query_raw prepares/describes before Execute. An active Parse waiting on
+    // the relation is not evidence that cancelling leaves a pg_sleep running.
+    let executing = loop {
+        let activity = tokio::time::timeout_at(deadline, export_activity(&app))
+            .await
+            .expect("two exports did not enter pg_sleep before the original deadline");
+        assert!(Instant::now() < deadline, "query readiness expired");
+        if activity.active == 2 && activity.sleeping == 2 && activity.preparing == 0 {
+            break activity;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    };
     requests.abort_all();
     while let Some(result) = requests.join_next().await {
         assert!(result.unwrap_err().is_cancelled());
@@ -436,6 +488,7 @@ async fn cancelled_exports_keep_admission_until_postgres_finishes_cleanup() {
     // Exceed only the existing two-second cancellation write timeout. The
     // backend queries remain inside their original twenty-second sleep.
     tokio::time::sleep(Duration::from_millis(2200)).await;
+    let pending = export_activity(&app).await;
     let still_active = active_exports(&app).await;
     let third = export_response(router.clone(), cookie.clone(), "products").await;
     let third_status = third.status();
@@ -460,6 +513,12 @@ async fn cancelled_exports_keep_admission_until_postgres_finishes_cleanup() {
         "::notice title=G05 export cancellation admission::{}",
         serde_json::json!({
             "case": "cancelled_exports_keep_admission_until_postgres_finishes_cleanup",
+            "preparation_active_backends": preparing.active,
+            "preparation_relation_lock_waiters": preparing.preparing,
+            "preparation_sleeping_queries": preparing.sleeping,
+            "sleeping_before_cancellation": executing.sleeping,
+            "sleeping_before_releasing_cancellation": pending.sleeping,
+            "controlled_preparation_lock": true,
             "backend_queries_before_releasing_cancellation": still_active,
             "held_cancellation_packets": 2,
             "third_export_status_while_cleanup_pending": third_status.as_u16(),
@@ -472,6 +531,10 @@ async fn cancelled_exports_keep_admission_until_postgres_finishes_cleanup() {
             "recovery_seconds": recovered.as_secs_f64(),
             "scope": "Real owned PostgreSQL, two bounded export queries, delayed CancelRequest only; no load-time credit"
         })
+    );
+    assert_eq!(
+        pending.sleeping, 2,
+        "the fault did not retain two actual queries"
     );
     assert_eq!(still_active, 2);
     assert_eq!(api_status, StatusCode::OK);

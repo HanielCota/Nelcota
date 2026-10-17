@@ -3763,3 +3763,61 @@ e fila vazia antes de criarref própria e lançar remote016 (umaVM).
 Actualbootprobe não executado; fontehipótese não é confirmação de novo
 defeito. Não pausar/alterarS3 por hipótese. Proteção local de recursos e
 contadores continuam no snapshot ativo; timefloor020unchanged.
+
+
+### 2026-10-17, 20:43 UTC — falha de CI preservada; S3 parcial encerrado
+
+O CI da fonte65d5ce4 concluiu17checks aprovados e `check` reprovado em
+`cancelled_exports_keep_admission_until_postgres_finishes_cleanup`. O notice
+original registra2CancelRequests retidos, mas apenas1backend ativo e
+terceira exportação200; recuperação de2exports, IDs1–4 e canários200/401
+passaram. A causa ainda é investigada; não concluir vazamento de admissão
+nem atribuir a falha exclusivamente à preparação de protocolo por hipótese.
+[Resultado original](results/stress/ci-boot-control-export-cancellation-failure-001.json).
+O launcher do novo probe de boot parou antes de criar ref ou lançar VM.
+
+Interromper wrapper008 uma única vez via pidfd/SIGTERM, validando geração
+e comando, às20:40:19UTC. Parent encerrou20:40:24. CampanhaS3 parcial
+registrou2445s/422samples na calibração, zero soak contínuo; cleanup confirma
+zero containers/volumes e diretório próprio removido. Nenhum crédito ao
+checkpoint020 e nenhuma aprovação de endurance.
+[Recibo](results/stress/s3-final008-pass-1-interrupted-001.json).
+
+Iniciar reprodução do teste original em PostgreSQL17 próprio, CPU1,512MiB
+RAM,512MiBtmpfs,128pids,64conexões,fsync padrão,pg_stat_statements carregado.
+Cargo4jobs/testthreads2/baixa prioridade/CPU0–2,PGCPU3; watchdog de1200s,
+limites de log e reservas ativos. Nenhuma carga local em paralelo e nenhum
+acesso ao Postgres de desenvolvimento55432. Resultado ainda pendente.
+
+
+### 2026-10-17, 20:48 UTC — reproduzir e corrigir a precondição do teste
+
+O teste original passou localmente uma vez:2backendspendentes/503, sem
+apagar a falha original doCI. Reproduzir deterministicamente o problema
+do oráculo retendo apenas AccessExclusiveLock na view própria durante
+Parse/Describe. `state=active` contou2sessões com0PgSleep. Cancelar antes
+de Execute e liberar a lock encerrou legitimamente ambas as conexões;
+terceira exportação200 e teste antigo reprovado,2CancelRequests ainda
+retidos. Dados/canários/recuperação/cleanup íntegros. Fonte exata do
+controle falho preservada e hash verificado.
+[Antes controlado](results/stress/export-cancellation-preparation-before-001.json).
+Isso prova a deficiência do oráculo; não prova que foi a causa exclusiva
+da ocorrência original doCI, que não publicou wait_event.
+
+A regressão agora observa primeiro2sessões bloqueadas na preparação e
+0PgSleep, libera a lock, e só cancela após2wait_event=PgSleep da consulta
+da fixture. Prazo total original3s, sleep20s, atraso2200ms, CancelGate2,
+export_busy503 e recuperação3s mantidos. Deadline é verificado mesmo no
+instante em que o predicado passa. Não alterou produção nem conta um
+décimo segundo defeito de produto. Suíte relacionada3/3 passou em39,39s,
+com35,238s de recuperação da falha de transporte dentro do budget40s.
+[Depois](results/stress/export-cancellation-preparation-after-001.json).
+Mais6repetições em novas bases TestApp passaram com os mesmos gates,
+0violações de recurso e cleanup confirmado.
+[Repetições](results/stress/export-cancellation-preparation-repeated-after-001.json).
+Novo CI ainda obrigatório; nenhum crédito de carga/endurance nestes controles.
+
+Validação focada adicional sequencial:18/18 controles Python do executor
+PITR,fmt,boundaries,Clippy `nelcota-server --test sql_cancellation` com
+`-D warnings` e diff-check aprovados;23,42s no total, sem carga concorrente.
+[Checks](results/stress/export-cancellation-preparation-focused-checks-001.json).
