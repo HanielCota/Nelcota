@@ -9,6 +9,7 @@ import unittest
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/'bench'))
 import host_compare
+import fleet_private_files as private_files
 from metrics import STORAGE_PROFILE
 from latency import PROTOCOL as LATENCY_PROTOCOL
 from arrival_counters import PROTOCOL as ARRIVAL_COUNTER_PROTOCOL
@@ -35,6 +36,11 @@ class HostComparison(unittest.TestCase):
             profile['arrival_counter_protocol']=ARRIVAL_COUNTER_PROTOCOL
             profile['successful_latency_protocol']=LATENCY_PROTOCOL
             profile['metrics_storage_profile']=STORAGE_PROFILE.copy()
+            profile['private_file_isolation']={'enabled':False,'protocol':None}
+            profile['private_file_controller_cpu_affinity']=None
+            profile['metrics_cpu_affinity']=3
+            profile['capacity_qualification']=False
+            profile['ingress']={'kind':'direct loopback HTTP'}
             (root/'manifest.json').write_text(json.dumps(profile))
             write_cpu_proof(root,profile['project_cpu_allocation'])
             (root/'completion.json').write_text(json.dumps({'status':'passed','cleanup_confirmed':True}))
@@ -55,6 +61,45 @@ class HostComparison(unittest.TestCase):
 
     def test_equivalent_three_samples_pass(self):
         self.assertTrue(host_compare.compare(self.before,self.after)['gate_passed'])
+
+    def test_private_file_pressure_cannot_certify_a_baseline_without_it(self):
+        path = self.after/'manifest.json'
+        value = json.loads(path.read_text()); value['private_file_isolation'] = private_files.PROFILE.copy()
+        value['private_file_controller_cpu_affinity']=3
+        path.write_text(json.dumps(value))
+        receipt = {'status':'passed','protocol':private_files.PROTOCOL,'counts':private_files.expected_counts(1),
+                   'elapsed_seconds':2.0,'requests_total':3,'logical_HTTP_bytes_total':1000,'in_offered_window':False,
+                   'run_id':self.after.name,'phase':'before','minimum_response_gap_seconds':1/64}
+        for label in ['before','after']:
+            value = {**receipt,'phase':label}
+            if label == 'after':
+                value.update(requests_total=11,logical_HTTP_bytes_total=5000)
+            (self.after/('private-isolation-'+label+'.json')).write_text(json.dumps(value))
+        for index in range(1,4):
+            during = {**receipt,'in_offered_window':True,'foreground_iterations_observed_before':2,
+                      'phase':'balanced-'+str(index),'requests_total':3+2*index,'logical_HTTP_bytes_total':1000+1000*index,
+                      'action_window':{'started_after_seconds':5.0,'ended_after_seconds':7.0,
+                                       'duration_seconds':2.0,'entire_action_within_offered_window':True}}
+            (self.after/('private-isolation-balanced-'+str(index)+'.json')).write_text(json.dumps(during))
+        result = host_compare.compare(self.before,self.after)
+        self.assertFalse(result['gate_passed'])
+        self.assertIn('private_file_isolation',result['fixture_differences'])
+
+    def test_enabled_private_file_profile_requires_actual_receipts(self):
+        path = self.after/'manifest.json'
+        value = json.loads(path.read_text()); value['private_file_isolation'] = private_files.PROFILE.copy()
+        value['private_file_controller_cpu_affinity']=3
+        path.write_text(json.dumps(value))
+        with self.assertRaises(RuntimeError):
+            host_compare.compare(self.before,self.after)
+
+    def test_legacy_absence_means_disabled_but_explicit_null_is_invalid(self):
+        path = self.before/'manifest.json'
+        value = json.loads(path.read_text()); value.pop('private_file_isolation'); path.write_text(json.dumps(value))
+        self.assertTrue(host_compare.compare(self.before,self.after)['gate_passed'])
+        value['private_file_isolation'] = None; path.write_text(json.dumps(value))
+        with self.assertRaises(RuntimeError):
+            host_compare.compare(self.before,self.after)
 
     def test_unbounded_block_chunk_segments_cannot_certify_equivalent_metrics_storage(self):
         path=self.after/'manifest.json'

@@ -9,6 +9,7 @@ from metrics import STORAGE_PROFILE
 from latency import PROTOCOL as LATENCY_PROTOCOL
 from arrival_counters import PROTOCOL as ARRIVAL_COUNTER_PROTOCOL, closed_count
 from cpu_policy import allocation as cpu_allocation, checked as checked_cpu_allocation, validate_proof as validate_cpu_proof
+from fleet_private_files import DISABLED as PRIVATE_FILES_DISABLED, checked_profile as checked_private_profile, validate_run as validate_private_files
 
 FIELDS=['schema','scope','projects','rows_per_project','shared_user_id','cpu_effective','cpu_affinity','metrics_cpu_affinity','app_aggregate_cpus','postgres_aggregate_cpus','generator_cpus','metrics_cpus','app_memory_mib_each','postgres_memory_mib_each','generator_memory_mib','metrics_memory_mib','max_connections_each','pool_each','fixture_disk_mib','storage_filesystem','seconds_per_step','capacity_qualification','provisional_rate_per_project','nominal_rate_per_project','images']
 OPERATIONS=['read','rls','panel','storage','login','refresh','write']
@@ -27,6 +28,8 @@ FIELDS.append('generator_observation_protocol')
 FIELDS.append('successful_latency_protocol')
 FIELDS.append('metrics_storage_profile')
 FIELDS.append('project_cpu_allocation')
+FIELDS.append('private_file_isolation')
+FIELDS.append('private_file_controller_cpu_affinity')
 
 
 def positive(value):
@@ -43,6 +46,11 @@ def nonnegative(value):
 
 def read_run(root):
     profile=json.loads((root/'manifest.json').read_text())
+    if 'private_file_isolation' not in profile:
+        profile['private_file_isolation'] = PRIVATE_FILES_DISABLED.copy()
+    if 'private_file_controller_cpu_affinity' not in profile:
+        profile['private_file_controller_cpu_affinity'] = None
+    checked_private_profile(profile['private_file_isolation'])
     completion=json.loads((root/'completion.json').read_text())
     cleanup=json.loads((root/'cleanup.json').read_text())
     violations=json.loads((root/'resource-violations.json').read_text())
@@ -81,6 +89,7 @@ def read_run(root):
         raise ValueError('Missing equivalent profile or full-duration evidence')
     positive(profile['nominal_rate_per_project'])
     ledger=[json.loads(line) for line in (root/'traffic-ledger.jsonl').read_text().splitlines()]
+    validate_private_files(root, profile, ledger)
     labels={'project-'+str(index) for index in range(profile['projects'])}
     reports=[]
     for index in range(1,4):
@@ -136,7 +145,7 @@ def main():
     args=parser.parse_args()
     try:
         result=compare(args.baseline,args.candidate)
-    except (OSError,ValueError,KeyError,TypeError) as error:
+    except (OSError,ValueError,KeyError,TypeError,RuntimeError) as error:
         result={'gate_passed':False,'invalid_evidence':type(error).__name__,'reason':str(error)[-600:]}
     args.output.parent.mkdir(parents=True,exist_ok=True)
     args.output.write_text(json.dumps(result,indent=2,allow_nan=False)+'\n')

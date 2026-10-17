@@ -1047,3 +1047,54 @@ o ZIP remoto é limitado a 2 MiB, e cinco testes de privacidade/corrupção
 passaram. A indisponibilidade HTTP 401 do GitHub por volta de 10:28 foi
 transitória; o acesso voltou às 10:30 sem trocar credenciais ou bindings,
 enquanto a carga local continuou.
+
+
+## Atualização de 17 de outubro, 17:40 UTC — matriz repetida e isolamento de arquivos
+
+As [duas matrizes completas corrigidas](results/stress/matrix-sdk007-two-corrected-passes-001.json)
+passaram em VMs descartáveis distintas, usando o mesmo ELF final007 do Actions.
+Cada uma qualificou 16, 32, 48 e 64 iterações/s durante 300 segundos por degrau,
+com cinco cenários de 120 segundos a 51 iterações/s. Cada execução reconciliou
+71.874 ACKs e 75.867 commits, sem perda reconhecida ou corrupção. Das 7.986
+respostas ambíguas, 3.993 correspondiam a commits; não houve retry de mutação.
+64 iterações/s equivalem neste perfil a 57,6 escritas reconhecidas/s. Essa taxa
+é um limite inferior qualificado no teto declarado, não capacidade máxima.
+O resultado não explica a variação histórica de 32 versus 16 nem altera o
+veredito da publicação original que falhou.
+
+Os restores tiveram RTO de 2,596884 e 2,499754 segundos, com verificação real de
+bytes, usuário autorizado e JWT estrangeiro rejeitado. O snapshot retrocedeu
+intencionalmente 868 linhas mais recentes; isso não foi ocultado como perda zero
+do snapshot. A segunda matriz tem 372 amostras e intervalo máximo de 8,281884 s.
+O [CI de ec970122](results/stress/ci-native-inflight-recovery-product-trees.json)
+passou nas 18 verificações comuns, incluindo 204 testes SDK e descoberta Python
+completa. A contagem Python não foi inferida. Alterações posteriores no executor
+precisam de seu próprio CI.
+
+A extensão opcional de arquivos privados exige todos os pares direcionais entre
+projetos, rejeição de GET e PUT com token estrangeiro, bytes do proprietário
+intactos, acesso anônimo rejeitado e metadados iguais. Ela verifica antes/depois
+e durante carga positiva em cada fase exigida. Para 1, 5 e 10 projetos são,
+respectivamente, 2, 90 e 380 requisições por grafo. Esse tráfego auxiliar fica
+fora do throughput útil e da latência k6, com limites próprios de CPU, duração,
+requisições e bytes, além de parada automática. A medição real ainda não ocorreu.
+Os [40 controles focados](results/stress/host-private-file-guards-001.json)
+passaram sem skips; não certificam isolamento real por si só.
+
+Um [defeito do novo executor](results/stress/host-private-file-pacing-before-after-001.json)
+foi reproduzido e corrigido antes da carga real: inicialização lenta do cliente
+permitia intervalo de 1 ms; o controle corrigido mede 16,625 ms para mínimo de
+15,625 ms. Não é um novo defeito do produto. Os nove casos host003 preparados
+usarão a mesma extensão na baseline e nas duas passagens, preservando os gates
+de SLO, fairness, recursos e etapas de 300 segundos. A lista foi normalizada
+sem apagar o plano anterior. [Pré-declaração](results/stress/post-endurance-private-files-predeclaration-001.json).
+
+A [sondagem somente de leitura de transporte privado](results/stress/offhost-private-transport-capability-001.json)
+retornou HTTP 403 ao consultar a chave pública de secrets do repositório.
+Nenhuma credencial, permissão ou backup foi alterado. O restore criptografado
+entre hosts permanece bloqueado por ausência de um canal privado de staging
+estabelecido nesta integração; dados e chaves não serão publicados em inputs
+ou notices. A primeira endurance final007 em disco segue em andamento.
+O piso consolidado continua 39h53m54s de carga efetiva no checkpoint 019,
+excluindo preparação, intervalos parciais e sobreposição remota. G05 continua
+aberto, e o PR permanece draft, sem merge ou deploy de produção.

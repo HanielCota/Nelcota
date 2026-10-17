@@ -3331,3 +3331,64 @@ The same35focused controls passed again, zero skips,0.019074sframework and
 [New source-bound control](results/stress/native-inflight-cut-guards-002.json).
 The prepared49add63remote006 has not started and its ref was never created;
 supersede it before dispatch so both actual new VM cases include these probes.
+
+
+### 2026-10-17, 17:40 UTC — second corrected matrix and private-file pressure predeclaration
+
+Both corrected full matrix passes now have original checksummed reports from
+independent disposable VMs, the same retained final007 Actions ELF and image
+profiles. Each qualifies 16/32/48/64 iterations/s for 300 seconds, then holds
+five scenarios for 120 seconds at 51 iterations/s. Each reconciles 71,874 ACKs,
+75,867 committed rows and all 7,986 ambiguous responses without mutation retry,
+missing acknowledged writes or corrupt/unknown rows. Restore RTOs are 2.596884
+and 2.499754 seconds; the snapshot intentionally rewinds 868 newer source rows.
+Both restored targets verify authorized bytes/users and foreign JWT rejection.
+The second run has 372 samples and an 8.281884-second maximum gap. This is a
+qualified lower bound at the fixed ceiling, not maximum capacity, a fourfold
+server gain or closure of the historical 32 versus 16 variation. The original
+failed publication and its missing final exports remain failed/unavailable.
+[Both source-bound reports and measurements](results/stress/matrix-sdk007-two-corrected-passes-001.json).
+
+All 18 ordinary checks also passed at ec970122; its actual SDK merge checkout
+has that full root tree and the six frozen final007 product trees. The SDK
+suite reports 204 passing units; complete Python discovery passed without an
+inferred count. This proof predates the new optional host-file extension.
+[CI provenance](results/stress/ci-native-inflight-recovery-product-trees.json).
+
+The optional `--private-file-isolation` extension now enumerates the complete
+directed foreign-token private-file GET/PUT graph, rechecks owner bytes and
+anonymous denial after every rejected mutation, and compares immutable metadata.
+It runs before/after and after observed positive foreground work in every
+required pressure interval. Auxiliary traffic is excluded from k6 useful rates
+and latency, capped at 8,192 requests, 64/s, 128 MiB logical HTTP and 20 seconds
+per graph, with an independent traffic-stop timer. The controller is pinned
+before creating threads to the telemetry/OS CPU, separate from target/load CPUs.
+Baseline and both candidate passes receive identical additional pressure.
+
+A deterministic transport reproduction exposed a new harness pacing error:
+20 ms of first-client setup could leave only 1 ms between requests. Cooling
+down after response closure produces 16.625 ms against the 15.625 ms minimum.
+Both responses close in either control. This is a benchmark-only defect found
+before real host measurement, not an eleventh product defect. Forty focused
+controls pass with zero skips, 0.054587 seconds framework/0.264958 seconds
+operator, on unused provider CPU3 during disk soak, under 128 MiB/3 CPU-seconds/
+15-second low-priority bounds. No network or effective load credit is claimed.
+[Guards](results/stress/host-private-file-guards-001.json),
+[before/after](results/stress/host-private-file-pacing-before-after-001.json).
+A real disposable-service preflight remains mandatory before full host runs.
+
+The unstarted host002 cases are replaced with nine fresh host003 cases; all
+other arguments, 300-second steps, budgets and absolute/relative gates remain.
+The canonical public plan now has unique IDs and preserves the previous
+unstarted duplicate declaration through an immutable Git link. Fifteen selected
+post-endurance cases remain prepared, not started; all four ordinary final007
+endurance cases must first pass workload, integrity, evidence, comparison and
+owned cleanup. [Declaration](results/stress/post-endurance-private-files-predeclaration-001.json).
+
+A read-only probe of GitHub's repository secret public-key metadata returned
+HTTP 403. No secret, permission, workflow or backup was changed. There is no
+established private staging-key transport in this integration for an encrypted
+two-runner restore; credentials or payloads will not be exposed through public
+inputs/notices. Off-host/PITR recovery remains blocked, not passed.
+[Capability receipt](results/stress/offhost-private-transport-capability-001.json).
+The current disk soak remains incomplete; no partial soak time is consolidated.

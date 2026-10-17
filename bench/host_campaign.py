@@ -35,6 +35,7 @@ from fleet_observer import collect as collect_probes,retain_metrics_snapshot,WOR
 from latency import PROTOCOL as LATENCY_PROTOCOL
 from arrival_counters import PROTOCOL as ARRIVAL_COUNTER_PROTOCOL
 from cpu_policy import allocation as cpu_allocation, verify as verify_cpu_allocation
+from fleet_private_files import DISABLED as PRIVATE_FILES_DISABLED, PROFILE as PRIVATE_FILES_PROFILE, PrivateFiles
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -128,6 +129,14 @@ def campaign(args):
     if args.caddy and (len(cpus) < 5 or effective_cpus(cpus) < 4):
         raise RuntimeError('Real Caddy profile requires five affinity slots and four effective CPUs including reserves')
     declared_cpu = cpu_allocation(args.projects, cpus, args.cpu_period_micros, args.project_cpu_policy)
+    private_profile = PRIVATE_FILES_DISABLED.copy()
+    if getattr(args, 'private_file_isolation', False):
+        private_profile = PRIVATE_FILES_PROFILE.copy()
+        # Pin before creating receivers, samplers or watchdog threads. Target
+        # containers retain their independently declared role affinity slots.
+        os.sched_setaffinity(0, {cpus[-1]})
+        if os.sched_getaffinity(0) != {cpus[-1]}:
+            raise RuntimeError('Private-file controller did not retain its separate telemetry/OS slot')
     fixture_images = [json.loads(docker('image', 'inspect', name))[0] for name in ['ubuntu:24.04', 'postgres:17-alpine']]
     startup_budget = startup_disk_budget(fixture_images, args.projects, args.caddy)
     atomic_json(output/'preflight-budget.json', {**startup_budget, 'separate_database_data_mib':args.disk_mib,
@@ -158,6 +167,7 @@ def campaign(args):
     acceptance_failures = []
     active_generator = None
     heartbeat_thread = sampler = watchdog = None
+    private_files = None
     status = 'failed'
     manifest = {'identity': identity, 'output': str(output), 'reserve_path': str(output), 'pid': os.getpid(), 'process_identity': process_identity(os.getpid()), 'started_monotonic': began, 'maximum_seconds': 7200, 'preparation_seconds': 900, 'containers': [telemetry, generator, *[item.app for item in projects], *[item.pg for item in projects]], 'volumes': [telemetry_volume, *[item.volume for item in projects]]}
     if ingress is not None:
@@ -183,6 +193,25 @@ def campaign(args):
         watchdog = subprocess.Popen([sys.executable, str(ROOT/'bench/watchdog.py'), str(output/'ownership.json')], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
         atomic_json(output/'manifest.json', {'schema': 1, 'scope': 'local independent app/PG clusters, no proxy/controller', 'projects': args.projects, 'rows_per_project': 1000, 'shared_user_id': '00000000-0000-4000-8000-000000000001', 'binary_sha256': hashlib.file_digest(args.binary.open('rb'), 'sha256').hexdigest(), 'cpu_effective': effective_cpus(cpus), 'app_aggregate_cpus': 1, 'postgres_aggregate_cpus': 1, 'generator_cpus': 1, 'metrics_cpus': .25, 'app_memory_mib_each': 128, 'postgres_memory_mib_each': 256, 'max_arrival_rate': 10000, 'fixture_disk_mib': args.disk_mib, 'storage_filesystem': filesystem, 'seconds_per_step': args.seconds, 'project_cpu_period_micros':args.cpu_period_micros, 'certifies_five_minute_steps': args.seconds >= 300, 'base_rate_per_project': args.rate, 'SLOs': 'G05 unchanged'})
         fixtures = [project.create() for project in projects]
+        initial = json.loads((output/'manifest.json').read_text())
+        initial['private_file_isolation'] = private_profile
+        initial['private_file_controller_cpu_affinity'] = None
+        if private_profile['enabled']:
+            initial['private_file_controller_cpu_affinity'] = cpus[-1]
+        atomic_json(output/'manifest.json', initial)
+        if private_profile['enabled']:
+            def private_guard():
+                if critical.is_set() or watchdog.poll() is not None:
+                    raise RuntimeError('Private-file isolation stopped by the fleet guard')
+                context = active_generator
+                if context is not None and context['process'].poll() is not None:
+                    raise RuntimeError('Private-file foreground generator ended')
+            def abort_private():
+                critical.set()
+                stop_generator(manifest)
+            private_files = PrivateFiles(projects, output, private_guard, owns_listener, abort_private)
+            private_files.seed()
+            private_files.graph('before')
         atomic_json(output/'cpu-allocation.json', verify_cpu_allocation(owned, projects, declared_cpu))
         if args.webhooks:
             for project in projects:
@@ -334,17 +363,24 @@ def campaign(args):
                 process = subprocess.Popen(command, stdout=target, stderr=subprocess.STDOUT, env={**os.environ, 'FIXTURE':json.dumps({'projects':fixtures})})
                 active_generator = {'process':process, 'name':generator, 'identity':identity, 'phase':label, 'started':start}
                 action_completed = action is None
+                private_completed = private_files is None or seconds < PRIVATE_FILES_PROFILE['minimum_foreground_seconds']
                 next_action_probe = start
                 try:
                     while process.poll() is None:
                         if critical.wait(.25) or watchdog.poll() is not None or time.monotonic()-start > seconds+120:
                             stop_generator(manifest)
                             raise RuntimeError('Fleet observation, watchdog or duration gate stopped traffic')
-                        if not action_completed and time.monotonic() >= next_action_probe:
+                        if (not action_completed or not private_completed) and time.monotonic() >= next_action_probe:
                             next_action_probe = time.monotonic()+2
-                            if metrics.value('sum(k6_iterations_total{run_id="'+label+'"})', optional=True) > 0:
-                                action()
-                                action_completed = True
+                            positive = metrics.value('sum(k6_iterations_total{run_id="'+label+'"})', optional=True)
+                            if positive > 0:
+                                if not private_completed:
+                                    private_files.graph(label, phase_started=start, phase_seconds=seconds,
+                                                        foreground_iterations=positive)
+                                    private_completed = True
+                                if not action_completed:
+                                    action()
+                                    action_completed = True
                 finally:
                     elapsed = time.monotonic()-start
                     with (output/'traffic-ledger.jsonl').open('a') as target:
@@ -356,8 +392,8 @@ def campaign(args):
                     retain_metrics_snapshot(metrics,label,output,failure_in_progress=sys.exception() is not None or process.returncode not in (None,0))
             if process.returncode or elapsed < seconds:
                 raise RuntimeError('Fleet generator failed or ended before its measured interval')
-            if not action_completed:
-                raise RuntimeError('Fleet fault was not injected during positive traffic')
+            if not action_completed or not private_completed:
+                raise RuntimeError('Fleet action or private-file graph was not observed during positive traffic')
             metrics.finish_phase(label)
             reports = {project.label:metrics.summary(label,seconds,project.label) for project in projects}
             atomic_json(output/(label+'.json'), reports)
@@ -423,6 +459,8 @@ def campaign(args):
         if args.webhooks:
             phase = 'webhook-drain'
             atomic_json(output/'webhook-invariants.json', webhooks.reconcile())
+        if private_files is not None:
+            private_files.graph('after')
         for project in projects:
             for foreign in fixtures:
                 if project.label != foreign['label']:
@@ -486,9 +524,13 @@ def main():
     parser.add_argument('--disk-mib',type=int,default=2048)
     parser.add_argument('--cpu-period-micros',type=int,choices=[10000,100000],default=100000,help='Explicit project CPU bandwidth period; preserves the aggregate CPU budget and must match between comparisons')
     parser.add_argument('--project-cpu-policy',choices=['quota','shared'],default='quota',help='Quota divides one CPU per role; shared permits each project to use the same single role affinity slot, still bounding the whole role to one CPU')
+    parser.add_argument('--private-file-isolation', action='store_true',
+                        help='Prove the directed private-file graph before/after and in every phase of at least60seconds; auxiliary HTTP is separate from k6 useful work')
     args = parser.parse_args()
     if not 30 <= args.seconds <= 300 or not 1 <= args.rate <= 64 or not 4 <= args.provisional_rate <= 64 or not 512 <= args.disk_mib <= 4096:
         parser.error('Steps must be 30..300 seconds, rate 1..64, disk budget 512..4096 MiB')
+    if args.private_file_isolation and args.seconds < PRIVATE_FILES_PROFILE['minimum_foreground_seconds']:
+        parser.error('Private-file pressure graphs require steps of at least60seconds; full capacity/fairness still requires300seconds')
     campaign(args)
 
 
