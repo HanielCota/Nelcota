@@ -221,6 +221,14 @@
       "all_1_5_10_baseline_candidate_profiles_match": true,
       "fresh_topology_run_suffix": "002",
       "new_endurance_or_larger_fixture_limits_changed": false
+    },
+    {
+      "declared_utc": "2026-10-17T09:18:35.531965+00:00",
+      "kind": "stricter per-project CPU isolation diagnostic",
+      "run_id": "host10-quota10ms-candidate-smoke-001",
+      "prior_failed_evidence": "host10-shared-smoke-failure-002.json",
+      "difference": "Same single CPU per app role/database role; replace shared1CPU ceiling per project with0.1CPU hard quotas replenished every10ms. No offered load, memory, disk, duration or SLO/fairness reduction.",
+      "certifies_g05": false
     }
   ],
   "native_same_artifact_suite": {

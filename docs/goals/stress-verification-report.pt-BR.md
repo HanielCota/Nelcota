@@ -680,3 +680,33 @@ reproduzível byte a byte entre hosts. A suíte antiga de `7e68fd2` foi
 [preservada integralmente](results/stress/native-final-suite-7e68fd2/index.json).
 A falha anterior de startup continua aberta e não recebe causa ou correção
 inferida desses resultados aprovados.
+
+
+## Novas reprovações preservadas: browser e interferência entre projetos
+
+O primeiro [controle remoto de auth/browser](results/stress/browser-auth-preparation-first-failure.json)
+falhou durante 26,438 s de preparação. Os seis testes do oráculo passaram e
+a limpeza foi confirmada, mas não há evidência de carga concluída. O erro
+público original contém somente RuntimeError, sem checkpoint interno; sua
+causa ainda não pode ser afirmada. Foram adicionados checkpoints fixos e
+classificação limitada de falhas, sem publicar mensagens, URLs, SQL, tokens
+ou logs. Nove testes do oráculo/privacidade passaram. A nova execução deve
+reproduzir o cenário com esse diagnóstico antes de atribuir uma causa.
+
+O [smoke de dez projetos em CPU compartilhada](results/stress/host10-shared-smoke-failure-002.json)
+concluiu 480 segundos de fases, 204 amostras e limpeza confirmada, mas
+**reprovou os cinco cenários de interferência**: 101 registros de falha,
+incluindo oito violações de SLO absoluto. Houve 90 rejeições dirigidas entre
+projetos e reconciliação de 7.828 eventos assinados, sem perdas, duplicatas,
+extras ou pendências. O disco agregado ficou abaixo de 440 MiB; o teto mais
+restrito não disparou. Não houve guard crítico. A corrente de campanhas parou
+na reprovação, antes de avançar para as fixtures maiores.
+
+Foi predeclarado outro diagnóstico, mantendo tráfego, datasets, duração,
+RAM/disco e todos os gates: cotas rígidas de 0,1 CPU por app/banco com período
+de 10 ms, em vez do compartilhamento que permitia teto de 1 CPU por projeto
+na mesma afinidade. O total efetivo por papel permanece 1 CPU. A execução
+`host10-quota10ms-candidate-smoke-001` começou às 09:18:35 UTC. Isso é uma
+hipótese de isolamento do staging, sem causa de produção ou aprovação inferida.
+Os resultados anteriores continuam reprovados e os degraus completos ainda
+precisam ser executados.

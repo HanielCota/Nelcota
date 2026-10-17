@@ -6,6 +6,7 @@ import unittest
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'bench'))
 from browser_auth import COUNTS, SUCCESS, complete, cycle
+import browser_auth
 
 
 def proof(index=0):
@@ -17,6 +18,27 @@ def proof(index=0):
 
 
 class RawBrowserAuthEvidence(unittest.TestCase):
+    def test_preparation_failures_never_publish_exception_payloads(self):
+        value = browser_auth.failure_receipt('source-create', RuntimeError('Docker operation failed: run secret-password https://private.invalid/token'))
+        self.assertEqual(value['kind'], 'docker-operation')
+        self.assertNotIn('secret', str(value))
+        self.assertNotIn('private', str(value))
+
+    def test_dependency_diagnostics_retain_only_a_bounded_basename(self):
+        value = browser_auth.failure_receipt('runtime-prepare', RuntimeError('Native browser dependency closure is incomplete: _dbm.so'))
+        self.assertEqual(value['component'], '_dbm.so')
+        value = browser_auth.failure_receipt('runtime-prepare', RuntimeError('Native browser dependency closure is incomplete: ../../private-token'))
+        self.assertNotIn('component', value)
+        self.assertNotIn('private', str(value))
+
+    def test_failure_receipt_rejects_unknown_fields_and_checkpoints(self):
+        value = browser_auth.failure_receipt('runtime-prepare', ValueError('private-token'))
+        for changed in [{**value, 'payload':'private-token'}, {**value, 'checkpoint':'private-token'},
+                        {**value, 'checkpoint':None}, {**value, 'type':[]}, {**value, 'kind':float('nan')},
+                        {**value, 'component':'../private-token'}]:
+            with self.assertRaises(ValueError):
+                browser_auth.validate_failure_receipt(changed)
+
     def test_complete_five_cycles_preserve_positive_negative_denominators(self):
         values=complete([proof(index) for index in range(5)])
         self.assertEqual(sum(row['requests_completed'] for row in values),560)

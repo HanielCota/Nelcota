@@ -2736,3 +2736,23 @@ duplicates or extras; all cases confirmed cleanup. The local performance
 ELF9cc6cbf0...remains distinct; no cross-host byte reproducibility is inferred.
 The prior7e68fd2index and12reports were [preserved](results/stress/native-final-suite-7e68fd2/index.json)
 before promotion. Preserve the unresolved af01678startup failure separately.
+
+
+The [first browser/auth request](results/stress/browser-auth-preparation-first-failure.json)
+failed during26.438s preparation, after6focused oracle checks passed; cleanup
+confirmed. The opaque original RuntimeError does not establish a cause. Add fixed
+checkpoint/error categories, never exception messages or private log contents;
+9oracle/privacy checks passed locally. A fresh identical live request is required.
+
+The [ten-project shared-CPU smoke](results/stress/host10-shared-smoke-failure-002.json)
+failed all5noisy phases:101failure records, including8absolute SLO violations.
+It completed480requested load seconds/204samples,90directed foreign-credential
+rejections and7828signed event identities with zero missing/extra/duplicates or
+outstanding, then cleaned completely. Aggregate PGdisk stayed below440MiB with
+no resource guard; tighter disk was not its failure. The serial chain stopped.
+
+Before the next measurement, declare strict0.1CPU/project app/database quotas
+with10ms bandwidth periods, keeping the role's effective1CPU and all offered
+traffic/dataset/duration/RAM/disk/SLO/fairness requirements. Diagnostic
+host10-quota10ms-candidate-smoke-001started09:18:35UTC. It investigates staging
+isolation only; neither a product cause nor a successful result is inferred.

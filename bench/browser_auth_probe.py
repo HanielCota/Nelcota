@@ -11,7 +11,7 @@ import subprocess
 import sys
 import time
 
-from browser_auth import PROFILE, complete
+from browser_auth import PROFILE, complete, validate_failure_receipt
 from campaign import docker
 from matrix_probe import export_resources, input_artifact, kernel_budget, read_receipt, require
 from native_evidence import notices
@@ -88,6 +88,12 @@ def main():
         report['status']='passed'
     except Exception as error:
         report['failure']={'type':type(error).__name__}
+        original = output/'browser-failure.json'
+        if original.exists():
+            try:
+                report['failure'] = validate_failure_receipt(read_receipt(original))
+            except Exception:
+                report['checks']['failure_receipt_invalid'] = True
         critical=output/'live-panel-SDK/browser-critical.json'
         if critical.is_file() and not critical.is_symlink() and critical.stat().st_size<=16384:
             value=json.loads(critical.read_text());reason=value.get('reason')

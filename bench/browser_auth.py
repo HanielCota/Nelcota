@@ -1,5 +1,55 @@
 """Strict numeric publication oracle for concurrent browser/backend auth."""
 import math
+import re
+
+CHECKPOINTS = {'runtime-prepare', 'source-create', 'source-restart', 'consumer-start',
+               'fixture-schema', 'proxy-start', 'proxy-reconfigure', 'profile-complete',
+               'untrusted-browser', 'live-browser', 'auth-census', 'final-resource-check', 'done'}
+FAILURE_KINDS = {'other', 'native-dependency-closure', 'runtime-dependency-root',
+                 'ambiguous-library-name', 'python-dependency-missing',
+                 'browser-or-sdk-missing', 'proxy-configuration', 'app-readiness', 'docker-operation'}
+
+
+def failure_receipt(checkpoint, error):
+    """Classify fixed preparation failures without publishing exception payloads."""
+    require(isinstance(checkpoint,str) and checkpoint in CHECKPOINTS, 'Unknown browser failure checkpoint')
+    category = 'other'
+    text = str(error)
+    fixed = {'Unexpected resolved browser runtime dependency path':'runtime-dependency-root',
+             'Ambiguous browser runtime library names':'ambiguous-library-name',
+             'A required installed browser dependency is missing':'python-dependency-missing',
+             'Native Chromium and freshly built SDK are required':'browser-or-sdk-missing',
+             'Unexpected owned proxy configuration':'proxy-configuration'}
+    category = fixed.get(text, category)
+    component = re.fullmatch(r'Native browser dependency closure is incomplete: ([A-Za-z0-9_.+-]{1,128})', text)
+    if component is not None:
+        category = 'native-dependency-closure'
+    if re.fullmatch(r'Owned project listener did not become ready: project-[01]', text):
+        category = 'app-readiness'
+    if text.startswith('Docker operation failed: '):
+        category = 'docker-operation'
+    kind = 'Exception'
+    for cls in [OSError, ValueError, RuntimeError]:
+        if isinstance(error, cls):
+            kind = cls.__name__
+            break
+    result = {'checkpoint':checkpoint, 'type':kind, 'kind':category}
+    if component is not None:
+        result['component'] = component[1]
+    return validate_failure_receipt(result)
+
+
+def validate_failure_receipt(value):
+    require(isinstance(value,dict) and set(value) in [
+        {'checkpoint','type','kind'}, {'checkpoint','type','kind','component'}], 'Unknown browser failure fields')
+    require(all(isinstance(value[key],str) for key in ['checkpoint','type','kind'])
+            and value['checkpoint'] in CHECKPOINTS and value['type'] in {'Exception','OSError','ValueError','RuntimeError'}
+            and value['kind'] in FAILURE_KINDS, 'Invalid fixed browser failure category')
+    if 'component' in value:
+        require(value['kind']=='native-dependency-closure' and isinstance(value['component'],str)
+                and re.fullmatch(r'[A-Za-z0-9_.+-]{1,128}',value['component']) is not None,
+                'Invalid bounded browser dependency name')
+    return dict(value)
 
 PROFILE = {'cycles':5, 'accounts_per_cycle':8, 'requests_per_cycle':112,
            'maximum_inflight':8, 'maximum_arrivals_per_second':16,

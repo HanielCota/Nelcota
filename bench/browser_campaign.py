@@ -14,7 +14,7 @@ import threading
 import time
 
 from browser_runtime import prepare
-from browser_auth import PROFILE as AUTH_PROFILE, complete as auth_pressure_complete
+from browser_auth import PROFILE as AUTH_PROFILE, complete as auth_pressure_complete, failure_receipt
 from campaign import ResourceCoverage, docker, effective_cpus, owns_listener, validate_disk_headroom, validate_storage_filesystem
 from disk_usage import host as disk_usage, container as container_disk_usage
 from host_resources import owned_cgroup_snapshot, require_no_oom, snapshot as host_snapshot
@@ -64,6 +64,8 @@ def campaign(args):
     violations = []
     coverage = ResourceCoverage()
     status = 'failed'
+    checkpoint = 'runtime-prepare'
+    failure = None
     sampler = watchdog = None
     previous = signal.getsignal(signal.SIGTERM)
     def terminate(signum, frame):
@@ -82,14 +84,19 @@ def campaign(args):
         runtime = directory/'runtime'
         runtime_profile = prepare(runtime, args.sdk, args.chrome_executable)
         shutil.copyfile(runtime/'runtime-manifest.json', output/'runtime-manifest.private.json')
+        checkpoint = 'source-create'
         source.create()
+        checkpoint = 'source-restart'
         source.environment['NELCOTA_TRUST_PROXY'] = 'true'
         owned('rm', '-f', source.app)
         source.start_app()
+        checkpoint = 'consumer-start'
         consumer.storage = source.storage
         consumer.environment = {**source.environment, 'NELCOTA_LISTEN':consumer.base.removeprefix('http://')}
         consumer.start_app()
+        checkpoint = 'fixture-schema'
         source.sql("CREATE TABLE public.bench_alternate(id integer PRIMARY KEY,name text,stock integer); INSERT INTO public.bench_alternate SELECT i,'alternate:'||i,i%50 FROM generate_series(1,1000)i; GRANT SELECT ON public.bench_alternate TO anon,authenticated,service_role; ANALYZE public.bench_alternate; NOTIFY nelcota,'reload schema';")
+        checkpoint = 'proxy-start'
         proxy_profile = ingress.start([source], output)
         original = (ingress.directory/'etc/Caddyfile').read_text()
         needle = f'reverse_proxy 127.0.0.1:{source.port}'
@@ -102,6 +109,7 @@ def campaign(args):
  }}
  reverse_proxy 127.0.0.1:{source.port}'''
         configuration = original.replace(needle, replacement)
+        checkpoint = 'proxy-reconfigure'
         config = ingress.directory/'etc/auth-consumers.Caddyfile'
         config.write_text(configuration)
         config.chmod(0o444)
@@ -270,8 +278,11 @@ def campaign(args):
                 raise RuntimeError('Live browser correctness gates failed')
             owned('rm', '-f', generator)
             return result
+        checkpoint = 'untrusted-browser'
         negative = browser_run('untrusted-ca', False)
+        checkpoint = 'live-browser'
         positive = browser_run('live-panel-SDK', True)
+        checkpoint = 'auth-census'
         if args.auth_pressure:
             positive['auth_pressure'] = auth_pressure_complete(positive['auth_pressure'])
             census = json.loads(source.sql("SELECT json_build_object('created_users',count(DISTINCT u.id),'unrevoked_sessions',count(s.id) FILTER(WHERE s.revoked_at IS NULL)) FROM auth.users u LEFT JOIN auth.sessions s ON s.user_id=u.id WHERE u.email LIKE 'g05-%@example.test'"))
@@ -280,12 +291,18 @@ def campaign(args):
             positive['auth_pressure_census'] = census
             atomic_json(output/'auth-pressure-census.json', census)
         atomic_json(output/'browser-invariants.json', {'untrusted_control':negative, 'live':positive})
+        checkpoint = 'final-resource-check'
         stop.set()
         sampler.join(timeout=30)
         violations.extend(coverage.violations(time.monotonic()-resource_began))
         if sampler.is_alive() or critical.is_set() or violations:
             raise RuntimeError('Browser resource observation incomplete')
         status = 'passed'
+        checkpoint = 'done'
+    except Exception as error:
+        failure = failure_receipt(checkpoint, error)
+        atomic_json(output/'browser-failure.json', failure)
+        raise
     finally:
         phase = 'teardown'
         atomic_json(output/'heartbeat.json', {'phase':phase, 'monotonic':time.monotonic(), 'resource_monotonic':resource_at})
@@ -307,6 +324,7 @@ def campaign(args):
         if not clean:
             status = 'failed'
         atomic_json(output/'completion.json', {'status':status, 'cleanup_confirmed':clean, 'resource_observations':coverage.count,
+                    'failure':failure,
                     'scope':'live browser correctness and lifecycle only; not G05 endurance certification', 'certifies_g05':False})
 
 
