@@ -1000,8 +1000,10 @@
       "Exactly one known table lock owner and one waiting RowExclusiveLock, with a still-unfinished real HTTPS request.",
       "The conservative witness age includes the entire SSH/SQL/response roundtrip and is rechecked after VM ownership lookup immediately before requesting SIGKILL.",
       "Thirty externally fsynced acknowledgements and31actual row values survive; blocked row rolls back, no helper or lock remains.",
-      "Native HTTPS trust, unauthorized rejection, unchanged binary identity, resources and owned cleanup remain mandatory."
+      "Native HTTPS trust, unauthorized rejection, unchanged binary identity, resources and owned cleanup remain mandatory.",
+      "After recovery anonymous REST401, second user sees zero first-user rows and anonymous private-file404, in addition to authorized row/file reads."
     ],
-    "scope": "Separate additional interrupted-write guest control after existing native startup reproductions; blocked before COMMIT, no physical host power loss, commit-flush, off-host or ordinary performance claim. No local overlapping effective load credit."
+    "scope": "Separate additional interrupted-write guest control after existing native startup reproductions; blocked before COMMIT, no physical host power loss, commit-flush, off-host or ordinary performance claim. No local overlapping effective load credit.",
+    "latest_focused_guards": "native-inflight-cut-guards-002.json"
   }
 }

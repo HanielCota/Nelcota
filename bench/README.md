@@ -166,7 +166,8 @@ holds a table lock for at most thirty seconds. One additional real HTTPS
 write must be observed waiting on that lock before the guest is killed;
 the witness may be at most two seconds old and the request must still be
 unfinished. Recovery must preserve every acknowledged row and value, reject
-the anonymous probe, roll back the blocked write and leave no helper or lock.
+the anonymous probe, keep another user's view empty, hide the private file,
+roll back the blocked write and leave no helper or lock.
 The helper has a five-percent CPU quota, 48 MiB RAM, no swap, sixteen tasks
 and a forty-second systemd deadline within the existing aggregate slice.
 Its failure cleanup cancels only the owned marker/table's lock holder.

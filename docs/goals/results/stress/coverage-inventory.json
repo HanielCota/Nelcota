@@ -1479,6 +1479,8 @@
     "status": "not run",
     "scenario": "runtime-inflight",
     "required_independent_passes": 2,
-    "scope": "Separate additional interrupted-write guest control after existing native startup reproductions; blocked before COMMIT, no physical host power loss, commit-flush, off-host or ordinary performance claim. No local overlapping effective load credit."
+    "scope": "Separate additional interrupted-write guest control after existing native startup reproductions; blocked before COMMIT, no physical host power loss, commit-flush, off-host or ordinary performance claim. No local overlapping effective load credit.",
+    "focused_guards": "native-inflight-cut-guards-002.json",
+    "recovery_negatives": "planned actual anonymous REST401/second-user empty RLS/private-file404; not run"
   }
 }

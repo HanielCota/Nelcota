@@ -729,10 +729,17 @@ def campaign(binary, output, scenario, pass_index=None):
             from native_cut import reconcile
             values = json.loads(api.request("GET", "/rest/v1/native_probe?select=id,value&order=id", token=users[0]))
             result = reconcile(values, acknowledged)
+            api.request("GET", "/rest/v1/native_probe", expected=(401,))
+            require(json.loads(api.request("GET", "/rest/v1/native_probe?select=id", token=users[1])) == [],
+                    "Recovered native runtime exposed another user's rows")
+            api.request("GET", "/storage/v1/object/native/kept.bin", expected=(404,))
             after_lock = guest.action("inflight-status", timeout=8)
             require(after_lock == {"lockers": 0, "waiting_writes": 0, "helper_active": False},
                     "Interrupted native write or helper survived recovery")
             report["in_flight_cut_control"]["after_recovery"] = after_lock
+            report["in_flight_cut_control"]["recovered_unauthorized_API_status"] = 401
+            report["in_flight_cut_control"]["recovered_other_user_rows"] = 0
+            report["in_flight_cut_control"]["recovered_unauthorized_private_file_status"] = 404
             report["power_cut_reconciliation"].update(result, fault_during_in_flight_write=True,
                 scope="Loss of guest RAM with one observed table-lock-blocked unacknowledged write; thirty ACKs and row values retained, blocked write rolled back. No cut-during-COMMIT or physical host power-loss claim")
             report["checks"].append("external witness of one blocked write at guest cut; acknowledged row values survive and uncommitted write rolls back")

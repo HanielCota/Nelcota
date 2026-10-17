@@ -3315,3 +3315,19 @@ load seconds or relaxed criterion is inferred from these preparation checks.
 The first final007disk soak remains active. None of its incomplete 14,400-second
 interval is credited yet. G05 remains open, the PR remains draft, and there is
 no production deployment, release or merge.
+
+
+### 2026-10-17, 16:30 UTC — require actual authorization probes after guest cut recovery
+
+Review of the additional runtime-inflight case found that its intended
+post-recovery anonymous rejection was still only asserted before the cut.
+Require actual anonymous REST401, empty RLS reads for the other real user and
+anonymous private-file404 after recovery, together with the authorized row/file
+reads, blocked-write rollback and zero remaining helper/lock owners.
+The original runtime reports remain scoped to their actual assertions; no
+production authorization defect or successful unrun VM probe is inferred.
+The same35focused controls passed again, zero skips,0.019074sframework and
+0.164707soperator on idle providerCPU3 with the existing small explicit limits.
+[New source-bound control](results/stress/native-inflight-cut-guards-002.json).
+The prepared49add63remote006 has not started and its ref was never created;
+supersede it before dispatch so both actual new VM cases include these probes.

@@ -179,6 +179,11 @@ COMMIT nem perda física de energia do host. Os
 [35 controles focados](results/stress/native-inflight-cut-guards-001.json)
 passaram, com dez novas fronteiras e zero skips; as duas VMs reais ainda não
 foram executadas. O protocolo ordinário e o produto continuam iguais.
+Uma revisão posterior acrescentou os probes explícitos após recuperar a VM:
+REST anônimo deve retornar 401, o segundo usuário deve ver zero linhas e o
+arquivo privado deve retornar 404 sem credenciais. Os
+[35 controles repetidos](results/stress/native-inflight-cut-guards-002.json)
+passaram; esses três probes reais continuam pendentes até executar as VMs.
 
 A [validação prévia do próximo plano](results/stress/post-endurance-plan-prestart-uniqueness-001.json)
 também detectou nove IDs duplicados antes de qualquer campanha desse plano.
