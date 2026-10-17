@@ -116,10 +116,42 @@ class HostFilePreflight(unittest.TestCase):
                 probe.watch_command(unit, self.root / "lease.json", 3)
 
     def test_stop_refuses_foreign_unit_description(self):
-        with patch.object(probe.subprocess, "run", return_value=SimpleNamespace(returncode=0, stdout="foreign")) as run:
+        unit = "g05-host-files-watch-123-1-5"
+        state = "Id=" + unit + ".service\nLoadState=loaded\nDescription=foreign\n"
+        with patch.object(probe.subprocess, "run", return_value=SimpleNamespace(returncode=0, stdout=state)) as run:
             with self.assertRaisesRegex(RuntimeError, "another systemd unit"):
                 probe.stop_watch("g05-host-files-watch-123-1-5")
         self.assertEqual(run.call_count, 1)
+
+    def test_collected_owned_watchdog_is_absent_despite_systemd_default_description(self):
+        unit = "g05-host-files-watch-123-1-5"
+        state = "Id=" + unit + ".service\nLoadState=not-found\nDescription=" + unit + ".service\n"
+        for code in [0, 1]:
+            with self.subTest(code=code), patch.object(probe.subprocess, "run", return_value=SimpleNamespace(returncode=code, stdout=state)) as run:
+                self.assertEqual(probe.stop_watch(unit), {"status": "absent", "identity_verified": True, "load_state": "not-found"})
+            self.assertEqual(run.call_count, 1)
+
+    def test_loaded_owned_watchdog_is_stopped_only_after_verified_identity(self):
+        unit = "g05-host-files-watch-123-1-5"
+        state = "Id=" + unit + ".service\nLoadState=loaded\nDescription=G05 private files " + unit + "\n"
+        with patch.object(probe.subprocess, "run", side_effect=[SimpleNamespace(returncode=0, stdout=state),
+                                                               SimpleNamespace(returncode=0)]) as run:
+            self.assertEqual(probe.stop_watch(unit), {"status": "stopped", "identity_verified": True, "load_state": "loaded"})
+        self.assertEqual(run.call_args_list[1].args[0], ["sudo", "-n", "systemctl", "stop", unit])
+
+    def test_missing_ambiguous_or_foreign_watchdog_metadata_never_authorizes_stop(self):
+        unit = "g05-host-files-watch-123-1-5"
+        good = "Id=" + unit + ".service\nLoadState=loaded\nDescription=G05 private files " + unit + "\n"
+        for code, state in [(1, ""), (0, good.replace(unit + ".service", "foreign.service")),
+                            (0, good + "Id=" + unit + ".service\n"), (0, good.replace("LoadState=loaded", "LoadState=error")),
+                            (1, good), (2, good), (0, good.replace("LoadState=loaded\n", ""))]:
+            with self.subTest(code=code, state=state), patch.object(probe.subprocess, "run", return_value=SimpleNamespace(returncode=code, stdout=state)) as run:
+                with self.assertRaises(RuntimeError):
+                    probe.stop_watch(unit)
+            self.assertEqual(run.call_count, 1)
+        with patch.object(probe.subprocess, "run") as run, self.assertRaises(RuntimeError):
+            probe.stop_watch("foreign")
+        run.assert_not_called()
 
     def test_dead_independent_watchdog_stops_qualification(self):
         with patch.object(probe.subprocess, "run", return_value=SimpleNamespace(returncode=3)):
@@ -176,6 +208,25 @@ class HostFilePreflight(unittest.TestCase):
         self.assertEqual(report["maximum_gap_seconds"], 5)
         self.assertEqual(report["sha256"], hashlib.sha256(destination.read_bytes()).hexdigest())
 
+    def test_actual_Docker_inspect_Name_prefix_preserves_complete_numeric_projection(self):
+        rows = self.rows()
+        for row in rows:
+            row["component_cgroups"] = {"/" + name: point for name, point in row["component_cgroups"].items()}
+        report, destination = self.export(rows)
+        decoded = [json.loads(line) for line in gzip.decompress(destination.read_bytes()).splitlines()]
+        self.assertEqual(report["samples"], 2)
+        self.assertTrue(all(set(row["components"]) == {"app-0", "pg-0", "metrics"} for row in decoded))
+        self.assertNotIn("never publish", json.dumps(decoded))
+
+    def test_prefix_normalization_never_accepts_duplicate_or_multiple_slash_roles(self):
+        duplicate = self.rows()
+        duplicate[0]["component_cgroups"]["/" + self.identity + "-app-0"] = copy.deepcopy(duplicate[0]["component_cgroups"][self.identity + "-app-0"])
+        double = self.rows()
+        double[0]["component_cgroups"]["//" + self.identity + "-app-0"] = double[0]["component_cgroups"].pop(self.identity + "-app-0")
+        for rows in [duplicate, double]:
+            with self.subTest(rows=rows), self.assertRaises(RuntimeError):
+                self.export(rows)
+
     def test_incomplete_nonfinite_or_unknown_component_series_cannot_certify(self):
         missing = self.rows(); missing[0]["component_cgroups"].pop(self.identity + "-pg-0")
         foreign = self.rows(); foreign[0]["component_cgroups"]["foreign"] = {}
@@ -220,7 +271,7 @@ class HostFilePreflight(unittest.TestCase):
         case = {"status": "passed", "cleanup_confirmed": False}
         with patch.object(probe, "partial_receipts", side_effect=RuntimeError("private value must not be published")), \
                 patch.object(probe, "read_receipt", return_value={"confirmed": True}), \
-                patch.object(probe, "docker", return_value=""), patch.object(probe, "stop_watch") as stop:
+                patch.object(probe, "docker", return_value=""), patch.object(probe, "stop_watch", return_value={"status": "absent"}) as stop:
             self.assertFalse(probe.close_case(None, None, "g05-host-files-watch-123-1-1", self.root, 1, case))
         stop.assert_called_once_with("g05-host-files-watch-123-1-1")
         self.assertEqual(case["status"], "failed")

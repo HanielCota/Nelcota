@@ -1,0 +1,423 @@
+{
+  "scope": "Complete original private-file real-service preflight report reconstructed losslessly from checksummed public notices. Original source, verdict and cleanup are preserved; overlapping remote time earns no local checkpoint credit.",
+  "workflow_run_id": 39060575768,
+  "job_id": 117477526617,
+  "job_conclusion": "failure",
+  "notice_report_sha256": "82a6b12a878de039f20e5faaffe4b410831b489df9d917db6bd1377f466e9fbc",
+  "notice_parts": 2,
+  "regression_summary": null,
+  "report": {
+    "identity": "host-files-39060575768-1",
+    "source": "2c8e10c4e3e7cf899380194e2bea1cef2fb89e94",
+    "binary_sha256": "d0d1090c91da4435a0d27dcf1dddba1b8695f18f944b1dd8cc5e472089d17432",
+    "scenario": "host-private-file-preflight",
+    "certifies_g05": false,
+    "status": "failed",
+    "cleanup_confirmed": true,
+    "resource_samples": 0,
+    "completed_effective_load_seconds": 0,
+    "checks": {
+      "scope": "Functional private-file preflight; 60-second phases are not five-minute capacity or final fairness certification",
+      "product_artifact": {
+        "source_commit": "35f4a9725d7edcf571f91084c555c127e7323653",
+        "binary_sha256": "d0d1090c91da4435a0d27dcf1dddba1b8695f18f944b1dd8cc5e472089d17432",
+        "size_bytes": 30463736,
+        "product_tree_objects": {
+          "crates": "2162e23a35dfcc0f04b7605a7493161817513d23",
+          "Cargo.toml": "20a3154fea3f1883ccc42882fbd671bc0b12b17f",
+          "Cargo.lock": "9150a443d0d0cec57de152e13bd9a6cb8e7a8c2d",
+          "migrations": "e88cfbfd12955dc8cb9180d3324df6a5d9e62206",
+          "sdk": "9bd7af8fc90a0a3cd5429ad40d8c3ec7b23efedd",
+          "rust-toolchain.toml": "0fd1b3a84b408770d883519014b040aed30a15f0"
+        },
+        "artifact_workflow_run_id": 39036557006,
+        "scope": "The retained Actions ELF is distinct from the local performance ELF; current product trees must match its build source."
+      },
+      "profile": {
+        "enabled": true,
+        "protocol": "g05-private-project-files-v1",
+        "maximum_requests": 8192,
+        "maximum_requests_per_second": 64,
+        "request_timeout_seconds": 2,
+        "maximum_body_bytes": 128,
+        "maximum_read_bytes": 2048,
+        "maximum_header_bytes": 16384,
+        "maximum_logical_HTTP_bytes": 134217728,
+        "maximum_graph_seconds": 20,
+        "extra_controller_threads_during_graph": 1,
+        "minimum_foreground_seconds": 60,
+        "controller_affinity_policy": "one telemetry/OS slot, disjoint from app/PostgreSQL/k6",
+        "transport": "owned direct loopback HTTP; main k6 ingress unchanged",
+        "units": "auxiliary requests excluded from k6 useful throughput and latency"
+      },
+      "controller_kernel_budget": {
+        "cpu_quota_usec": 50000,
+        "cpu_period_usec": 100000,
+        "memory_bytes": 536870912,
+        "swap_bytes": 0,
+        "pids": 128,
+        "maximum_seconds": 2700,
+        "CPU_policy": {
+          "target_app_role_affinity_bound": 1,
+          "target_PostgreSQL_role_affinity_bound": 1,
+          "generator": 1,
+          "telemetry": 0.25,
+          "controller": 0.5,
+          "independent_watchdog": 0.05,
+          "effective_sum": 3.8,
+          "telemetry_slot_sum": 0.8,
+          "telemetry_slot_OS_reserve": 0.2,
+          "five_project_shared_quota_sum_exceeds_role_affinity_bound": true,
+          "one_project_configured_quota_sum": 3.8,
+          "five_project_configured_quota_sum": 11.8
+        },
+        "separate_watchdog": {
+          "CPU_percent": 5,
+          "memory_mib": 128,
+          "swap_bytes": 0,
+          "tasks": 32,
+          "maximum_seconds": 1500,
+          "case_deadline_seconds": 1200
+        }
+      },
+      "cases": [
+        {
+          "projects": 1,
+          "rate_per_project": 4,
+          "CPU_policy": "quota",
+          "status": "failed",
+          "cleanup_confirmed": true,
+          "exit_code": 0,
+          "original_completion": {
+            "status": "passed",
+            "projects": 1,
+            "load_seconds": 180,
+            "resource_observations": 38,
+            "cleanup_confirmed": true,
+            "error_type": "NoneType",
+            "last_preparation_stage": "complete"
+          },
+          "resource_violations": [],
+          "acceptance_failures": [],
+          "private_file_receipts": [
+            {
+              "status": "passed",
+              "protocol": "g05-private-project-files-v1",
+              "counts": {
+                "projects": 1,
+                "directed_pairs": 0,
+                "foreign_reads_rejected": 0,
+                "foreign_writes_rejected": 0,
+                "owner_bytes_verified": 1,
+                "anonymous_private_reads_rejected": 1,
+                "metadata_objects_unchanged": 1,
+                "requests": 2
+              },
+              "elapsed_seconds": 0.16011481699999308,
+              "requests_total": 11,
+              "logical_HTTP_bytes_total": 8346,
+              "in_offered_window": false,
+              "run_id": "host-files-39060575768-1-p1",
+              "phase": "after",
+              "minimum_response_gap_seconds": 0.015694890000020223
+            },
+            {
+              "status": "passed",
+              "protocol": "g05-private-project-files-v1",
+              "counts": {
+                "projects": 1,
+                "directed_pairs": 0,
+                "foreign_reads_rejected": 0,
+                "foreign_writes_rejected": 0,
+                "owner_bytes_verified": 1,
+                "anonymous_private_reads_rejected": 1,
+                "metadata_objects_unchanged": 1,
+                "requests": 2
+              },
+              "elapsed_seconds": 0.15617636699999338,
+              "requests_total": 5,
+              "logical_HTTP_bytes_total": 3840,
+              "in_offered_window": true,
+              "run_id": "host-files-39060575768-1-p1",
+              "phase": "balanced-1",
+              "minimum_response_gap_seconds": 0.01570227299999516,
+              "foreground_iterations_observed_before": 5.0,
+              "action_window": {
+                "started_after_seconds": 4.312452049000001,
+                "ended_after_seconds": 4.468628415999994,
+                "duration_seconds": 0.15617636699999338,
+                "entire_action_within_offered_window": true
+              }
+            },
+            {
+              "status": "passed",
+              "protocol": "g05-private-project-files-v1",
+              "counts": {
+                "projects": 1,
+                "directed_pairs": 0,
+                "foreign_reads_rejected": 0,
+                "foreign_writes_rejected": 0,
+                "owner_bytes_verified": 1,
+                "anonymous_private_reads_rejected": 1,
+                "metadata_objects_unchanged": 1,
+                "requests": 2
+              },
+              "elapsed_seconds": 0.15973664599999893,
+              "requests_total": 7,
+              "logical_HTTP_bytes_total": 5342,
+              "in_offered_window": true,
+              "run_id": "host-files-39060575768-1-p1",
+              "phase": "balanced-2",
+              "minimum_response_gap_seconds": 0.01569771100000139,
+              "foreground_iterations_observed_before": 6.0,
+              "action_window": {
+                "started_after_seconds": 4.268098823999992,
+                "ended_after_seconds": 4.427835469999991,
+                "duration_seconds": 0.15973664599999893,
+                "entire_action_within_offered_window": true
+              }
+            },
+            {
+              "status": "passed",
+              "protocol": "g05-private-project-files-v1",
+              "counts": {
+                "projects": 1,
+                "directed_pairs": 0,
+                "foreign_reads_rejected": 0,
+                "foreign_writes_rejected": 0,
+                "owner_bytes_verified": 1,
+                "anonymous_private_reads_rejected": 1,
+                "metadata_objects_unchanged": 1,
+                "requests": 2
+              },
+              "elapsed_seconds": 0.21600665400001162,
+              "requests_total": 9,
+              "logical_HTTP_bytes_total": 6844,
+              "in_offered_window": true,
+              "run_id": "host-files-39060575768-1-p1",
+              "phase": "balanced-3",
+              "minimum_response_gap_seconds": 0.01569771100000139,
+              "foreground_iterations_observed_before": 6.0,
+              "action_window": {
+                "started_after_seconds": 4.26235939899999,
+                "ended_after_seconds": 4.478366053000002,
+                "duration_seconds": 0.21600665400001162,
+                "entire_action_within_offered_window": true
+              }
+            },
+            {
+              "status": "passed",
+              "protocol": "g05-private-project-files-v1",
+              "counts": {
+                "projects": 1,
+                "directed_pairs": 0,
+                "foreign_reads_rejected": 0,
+                "foreign_writes_rejected": 0,
+                "owner_bytes_verified": 1,
+                "anonymous_private_reads_rejected": 1,
+                "metadata_objects_unchanged": 1,
+                "requests": 2
+              },
+              "elapsed_seconds": 0.158848085999999,
+              "requests_total": 3,
+              "logical_HTTP_bytes_total": 2338,
+              "in_offered_window": false,
+              "run_id": "host-files-39060575768-1-p1",
+              "phase": "before",
+              "minimum_response_gap_seconds": 0.01570227299999516
+            }
+          ],
+          "CPU_affinity": [
+            0,
+            1,
+            2
+          ],
+          "controller_CPU_affinity": 3,
+          "project_CPU_allocation": {
+            "policy": "quota",
+            "projects": 1,
+            "affinity_slots": {
+              "app": 0,
+              "postgres": 1,
+              "generator": 2
+            },
+            "quota_usec_each": 100000,
+            "period_usec": 100000,
+            "configured_quota_sum_per_role": 1.0,
+            "hard_cpu_ceiling_per_role": 1,
+            "quota_oversubscription_within_one_slot": false
+          },
+          "seconds_per_step": 60,
+          "failure_type": "RuntimeError",
+          "original_private_file_receipts": [
+            {
+              "status": "passed",
+              "protocol": "g05-private-project-files-v1",
+              "counts": {
+                "projects": 1,
+                "directed_pairs": 0,
+                "foreign_reads_rejected": 0,
+                "foreign_writes_rejected": 0,
+                "owner_bytes_verified": 1,
+                "anonymous_private_reads_rejected": 1,
+                "metadata_objects_unchanged": 1,
+                "requests": 2
+              },
+              "elapsed_seconds": 0.16011481699999308,
+              "requests_total": 11,
+              "logical_HTTP_bytes_total": 8346,
+              "in_offered_window": false,
+              "run_id": "host-files-39060575768-1-p1",
+              "phase": "after",
+              "minimum_response_gap_seconds": 0.015694890000020223
+            },
+            {
+              "status": "passed",
+              "protocol": "g05-private-project-files-v1",
+              "counts": {
+                "projects": 1,
+                "directed_pairs": 0,
+                "foreign_reads_rejected": 0,
+                "foreign_writes_rejected": 0,
+                "owner_bytes_verified": 1,
+                "anonymous_private_reads_rejected": 1,
+                "metadata_objects_unchanged": 1,
+                "requests": 2
+              },
+              "elapsed_seconds": 0.15617636699999338,
+              "requests_total": 5,
+              "logical_HTTP_bytes_total": 3840,
+              "in_offered_window": true,
+              "run_id": "host-files-39060575768-1-p1",
+              "phase": "balanced-1",
+              "minimum_response_gap_seconds": 0.01570227299999516,
+              "foreground_iterations_observed_before": 5.0,
+              "action_window": {
+                "started_after_seconds": 4.312452049000001,
+                "ended_after_seconds": 4.468628415999994,
+                "duration_seconds": 0.15617636699999338,
+                "entire_action_within_offered_window": true
+              }
+            },
+            {
+              "status": "passed",
+              "protocol": "g05-private-project-files-v1",
+              "counts": {
+                "projects": 1,
+                "directed_pairs": 0,
+                "foreign_reads_rejected": 0,
+                "foreign_writes_rejected": 0,
+                "owner_bytes_verified": 1,
+                "anonymous_private_reads_rejected": 1,
+                "metadata_objects_unchanged": 1,
+                "requests": 2
+              },
+              "elapsed_seconds": 0.15973664599999893,
+              "requests_total": 7,
+              "logical_HTTP_bytes_total": 5342,
+              "in_offered_window": true,
+              "run_id": "host-files-39060575768-1-p1",
+              "phase": "balanced-2",
+              "minimum_response_gap_seconds": 0.01569771100000139,
+              "foreground_iterations_observed_before": 6.0,
+              "action_window": {
+                "started_after_seconds": 4.268098823999992,
+                "ended_after_seconds": 4.427835469999991,
+                "duration_seconds": 0.15973664599999893,
+                "entire_action_within_offered_window": true
+              }
+            },
+            {
+              "status": "passed",
+              "protocol": "g05-private-project-files-v1",
+              "counts": {
+                "projects": 1,
+                "directed_pairs": 0,
+                "foreign_reads_rejected": 0,
+                "foreign_writes_rejected": 0,
+                "owner_bytes_verified": 1,
+                "anonymous_private_reads_rejected": 1,
+                "metadata_objects_unchanged": 1,
+                "requests": 2
+              },
+              "elapsed_seconds": 0.21600665400001162,
+              "requests_total": 9,
+              "logical_HTTP_bytes_total": 6844,
+              "in_offered_window": true,
+              "run_id": "host-files-39060575768-1-p1",
+              "phase": "balanced-3",
+              "minimum_response_gap_seconds": 0.01569771100000139,
+              "foreground_iterations_observed_before": 6.0,
+              "action_window": {
+                "started_after_seconds": 4.26235939899999,
+                "ended_after_seconds": 4.478366053000002,
+                "duration_seconds": 0.21600665400001162,
+                "entire_action_within_offered_window": true
+              }
+            },
+            {
+              "status": "passed",
+              "protocol": "g05-private-project-files-v1",
+              "counts": {
+                "projects": 1,
+                "directed_pairs": 0,
+                "foreign_reads_rejected": 0,
+                "foreign_writes_rejected": 0,
+                "owner_bytes_verified": 1,
+                "anonymous_private_reads_rejected": 1,
+                "metadata_objects_unchanged": 1,
+                "requests": 2
+              },
+              "elapsed_seconds": 0.158848085999999,
+              "requests_total": 3,
+              "logical_HTTP_bytes_total": 2338,
+              "in_offered_window": false,
+              "run_id": "host-files-39060575768-1-p1",
+              "phase": "before",
+              "minimum_response_gap_seconds": 0.01570227299999516
+            }
+          ],
+          "cleanup_errors": [
+            {
+              "step": "confirm-cleanup-and-stop-watch",
+              "failure_type": "RuntimeError"
+            }
+          ]
+        }
+      ],
+      "local_load_checkpoint_credit_seconds": 0,
+      "images": {
+        "ubuntu:24.04": {
+          "id": "sha256:6277ab668b2ad3c3ab851d370faa1690d324b30db29d342527f61fed28f20f36",
+          "size_bytes": 78177487,
+          "repo_digests": [
+            "ubuntu@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac"
+          ]
+        },
+        "postgres:17-alpine": {
+          "id": "sha256:79bd7c99e923138f136f8009d6bffa66e21e9d4fda5c0c561b00fc9c90cfe537",
+          "size_bytes": 297176980,
+          "repo_digests": [
+            "postgres@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24"
+          ]
+        },
+        "grafana/k6:1.6.1@sha256:a5ad6bc089a08d77c3ec49f3db8c6fa7a148e4073efcac44c675dbaf3568d8e1": {
+          "id": "sha256:f170959744bc64d5cebcd13ebbc72e82baeb09c3f7a15cb15db7c1127010bafd",
+          "size_bytes": 77964088,
+          "repo_digests": [
+            "grafana/k6@sha256:a5ad6bc089a08d77c3ec49f3db8c6fa7a148e4073efcac44c675dbaf3568d8e1"
+          ]
+        },
+        "prom/prometheus:v3.5.0@sha256:63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996": {
+          "id": "sha256:a3bc50fcb50fb1409287c32773d8fe799f6cad5511c4ba3e2e851784e7a05026",
+          "size_bytes": 313019686,
+          "repo_digests": [
+            "prom/prometheus@sha256:63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996"
+          ]
+        }
+      }
+    },
+    "failure": "RuntimeError",
+    "elapsed_seconds_including_preparation": 211.390350032
+  }
+}

@@ -110,12 +110,25 @@ def watch_command(unit, lease, cpu):
 
 
 def stop_watch(unit):
-    result = subprocess.run(["sudo", "-n", "systemctl", "show", unit, "--property=Description", "--value"],
+    require(re.fullmatch(r"g05-host-files-watch-[0-9]{1,20}-[0-9]{1,4}-[15]", unit) is not None,
+            "Unknown independent fleet watchdog")
+    result = subprocess.run(["sudo", "-n", "systemctl", "show", unit,
+                             "--property=Id", "--property=LoadState", "--property=Description"],
                             capture_output=True, text=True, timeout=15)
-    if result.returncode or not result.stdout.strip():
-        return
-    require(result.stdout.strip() == "G05 private files " + unit, "Refusing to stop another systemd unit")
+    require(result.returncode in {0, 1} and isinstance(result.stdout, str) and len(result.stdout) <= 1024,
+            "Cannot verify independent watchdog state")
+    lines = result.stdout.splitlines()
+    fields = dict(line.split("=", 1) for line in lines if "=" in line)
+    require(len(lines) == 3 and len(fields) == 3 and set(fields) == {"Id", "LoadState", "Description"}
+            and fields["Id"] == unit + ".service", "Cannot verify independent watchdog identity")
+    # --collect can unload the guard after the campaign disarms it. systemd
+    # still returns a default Description for this absent unit.
+    if fields["LoadState"] == "not-found":
+        return {"status": "absent", "identity_verified": True, "load_state": "not-found"}
+    require(result.returncode == 0 and fields["LoadState"] == "loaded"
+            and fields["Description"] == "G05 private files " + unit, "Refusing to stop another systemd unit")
     subprocess.run(["sudo", "-n", "systemctl", "stop", unit], check=True, capture_output=True, timeout=30)
+    return {"status": "stopped", "identity_verified": True, "load_state": "loaded"}
 
 
 def require_watch(unit):
@@ -194,7 +207,9 @@ def export_resources(source, destination, projects):
             previous = now
             projected = {"monotonic": now, "phase": row["phase"], "components": {}}
             for name, point in row["component_cgroups"].items():
-                match = re.fullmatch(r"nelcota-fleet-[0-9a-f]{32}-(app-[0-9]|pg-[0-9]|metrics)", name)
+                # Docker inspect's Name includes one leading slash; the
+                # controller stores that exact Name in component_cgroups.
+                match = re.fullmatch(r"/?nelcota-fleet-[0-9a-f]{32}-(app-[0-9]|pg-[0-9]|metrics)", name)
                 require(match is not None and match[1] in roles and match[1] not in projected["components"], "Unexpected host-file role")
                 numeric = {"memory_current_bytes": point["memory.current"], "memory_peak_bytes": point["memory.peak"],
                            "anonymous_bytes": point["memory.stat"]["anon"], "tasks": point["pids.current"],
@@ -249,7 +264,7 @@ def close_case(child, lease, unit, output, projects, case):
         case["cleanup_confirmed"] = clean.get("confirmed") is True and not docker("ps", "-aq") and not docker("volume", "ls", "-q")
         require(case["cleanup_confirmed"], "Host-file fixture cleanup is incomplete")
         # Keep the independent deadline guard if owned resources still exist.
-        stop_watch(unit)
+        case["independent_watchdog_close"] = stop_watch(unit)
     except Exception as error:
         errors.append({"step": "confirm-cleanup-and-stop-watch", "failure_type": type(error).__name__})
     if errors:
@@ -301,7 +316,7 @@ def main():
             unit = "g05-host-files-watch-" + run + "-" + attempt + "-" + str(projects)
             lease, child = None, None
             case = {"projects": projects, "rate_per_project": rate, "CPU_policy": policy, "status": "failed",
-                    "cleanup_confirmed": False}
+                    "cleanup_confirmed": False, "last_collection_stage": "launch"}
             report["checks"]["cases"].append(case)
             logpath = private / ("p" + str(projects) + ".private.log")
             try:
@@ -325,18 +340,23 @@ def main():
                             next_watch_probe = time.monotonic() + 5
                         time.sleep(.5)
                 case["exit_code"] = child.returncode
+                case["last_collection_stage"] = "original-completion"
                 completion = read_receipt(output / "completion.json")
                 case["original_completion"] = completion
                 case["resource_violations"] = read_receipt(output / "resource-violations.json")
                 case["acceptance_failures"] = read_receipt(output / "acceptance-failures.json")
+                case["last_collection_stage"] = "private-file-receipts"
                 case.update(project_receipts(output, projects))
+                case["last_collection_stage"] = "resource-projection"
                 series = export_resources(output / "resources.jsonl", public / ("resources-p" + str(projects) + ".jsonl.gz"), projects)
                 case["resource_evidence"] = series
                 report["resource_samples"] += series["samples"]
+                case["last_collection_stage"] = "acceptance"
                 require(lease is not None and child.returncode == 0 and completion["status"] == "passed"
                         and not case["resource_violations"] and not case["acceptance_failures"]
                         and series["maximum_gap_seconds"] <= 30, "Host-file campaign failed its original acceptance gates")
                 case["status"] = "passed"
+                case["last_collection_stage"] = "complete"
             except BaseException as error:
                 case["failure_type"] = type(error).__name__
                 raise

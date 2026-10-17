@@ -1,0 +1,40 @@
+{
+  "utc": "2026-10-17T19:13:14.350882+00:00",
+  "status": "harness correction implemented; CI and actual fresh host rerun pending",
+  "certifies_g05": false,
+  "original_failed_report": "host-private-files-resource-publication-failure-002.json",
+  "original_notice_report_sha256": "82a6b12a878de039f20e5faaffe4b410831b489df9d917db6bd1377f466e9fbc",
+  "original_workflow_run_id": 39060575768,
+  "original_job_id": 117477526617,
+  "unchanged_product_source": "35f4a9725d7edcf571f91084c555c127e7323653",
+  "retained_Actions_ELF_sha256": "d0d1090c91da4435a0d27dcf1dddba1b8695f18f944b1dd8cc5e472089d17432",
+  "original_observations": {
+    "N1_workload_exit_code": 0,
+    "N1_original_completion_status": "passed",
+    "N1_effective_load_seconds": 180,
+    "N1_original_resource_observations": 38,
+    "N1_private_graphs_passed": 5,
+    "N1_resource_violations": [],
+    "N1_acceptance_failures": [],
+    "N5_executed": false,
+    "top_level_status": "failed",
+    "cleanup_confirmed": true,
+    "local_checkpoint_additional_credit_seconds": 0
+  },
+  "Docker_Name_contract": {
+    "observed_utc": "2026-10-17T19:11:59.505555+00:00",
+    "actual_Docker_inspect_Name_has_one_leading_slash": true,
+    "own_requested_name_sha256": "ca81e5b5233c95eeb6a65feecf170452881452181a3b028fd1358ca175f548b7",
+    "Name_equals_slash_plus_owned_requested_name": true,
+    "operation": "read-only exact owned running app metadata; no resource mutation",
+    "scope": "Confirms Docker Name contract used by host_campaign component_cgroups. Does not recover the failed remote VM raw series or prove its lost exact exception."
+  },
+  "changes": [
+    "Accept precisely one optional Docker inspect Name slash, retaining role uniqueness, finite numeric, cardinality, gap and byte limits.",
+    "Verify exact watchdog Id and LoadState before stopping. A collected not-found unit is safely absent even with the systemd default Description. Loaded foreign/ambiguous units never authorize stop.",
+    "Preserve fixed collection-stage and normalized watchdog-close receipts for future actual failures."
+  ],
+  "validation_status": "No local unit execution during live S3; focused and complete Python discovery must run in ordinary CI before fresh immutable host rerun. No passed test count inferred.",
+  "attribution_limit": "Actual remote exception messages/raw series and stopped-unit metadata were not exported, and artifact/log download returned an error. N1 real workload and private graphs passed but the original overall FAILED result remains. Docker Name mismatch is proven by source contract and an exact owned read-only Docker inspect observation; the exact exclusive remote cause and collected-unit state still require a fresh real rerun.",
+  "PITR_independent_probe": "Reviewed original host cleanup and preserved failure before dispatching one fresh owned native runtime-pitr-error VM on immutable2c8e10c. Marker-only fixed adapter; no production, real PG data-file change or real S3/PITR claim."
+}
