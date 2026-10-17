@@ -2,7 +2,7 @@
 
 **Estado: em execução, sem aprovação do G05.** Este relatório é atualizado
 durante as campanhas. Checkpoint de carga consolidada: 17/10/2026, 03:47 UTC.
-Atualização da investigação: 17/10/2026, 06:58 UTC.
+Atualização da investigação: 17/10/2026, 07:31 UTC.
 Não houve merge nem deploy de produção. O trabalho está na branch
 `test/g05-stress-verification`, no [PR #90](https://github.com/Nelcota/Nelcota/pull/90),
 mantido como rascunho para revisão.
@@ -54,7 +54,7 @@ O backend de produção continua um único binário Rust, sem Node ou Python.
 | 8 | Falhas, drain, restart, restore e deployment aplicável | Parcial | Primeiro fault passou com reconciliação de ACKs e restore local novo. Dois fluxos nativos passaram no escopo de restore no mesmo alvo e perda da RAM da convidada. Repetição final de faults/carga, atualização operacional, DNS/ACME públicos e recuperação fora do host continuam incompletos. |
 | 9 | Recursos, invariantes de dados/arquivos/eventos e regressão | Parcial | Invariantes locais e plateaus observados; precisam das campanhas finais comparáveis. Retenção anônima do provedor ainda exige atribuição. |
 | 10 | Correções focadas e regressões dos defeitos confirmados | Verificado nos defeitos já reproduzidos; revisão continua | Antes/depois em sete defeitos reais: cluster incorreto, unit relativa, outro host nativo, lease aninhado na migração, remoção com limpeza incompleta e liberação antecipada da admissão SQL e de exportações. A correção SQL passou em dois testes locais reais; CI e campanhas finais ainda precisam repeti-la. Os cenários específicos passaram em VMs novas. A falha da fixture Rust teve local original recuperado e passou 1.000 repetições após I/O de prontidão; o erro original continua visível. Fairness não recebeu causa de produção inventada. |
-| 11 | Rust/UI/SDK/lint/CI correspondentes ao SHA testado | Aprovado no artefato anterior; pendente após a correção SQL | [18 checks ordinários](results/stress/ci-final-artifact-source.json), incluindo Rust/serviços reais, painel e assets, SDKs, supply chain e CodeQL. As 12 execuções nativas também passaram no mesmo source, com ELF próprio comum. Falhas anteriores de Rust, fixtures CodeQL e assets continuam preservadas; alterações futuras exigem a revalidação afetada. |
+| 11 | Rust/UI/SDK/lint/CI correspondentes ao SHA testado | Reprovado no CodeQL de af01678; correção da fixture em validação | [18 checks ordinários](results/stress/ci-final-artifact-source.json), incluindo Rust/serviços reais, painel e assets, SDKs, supply chain e CodeQL. As 12 execuções nativas também passaram no mesmo source, com ELF próprio comum. Falhas anteriores de Rust, fixtures CodeQL e assets continuam preservadas; alterações futuras exigem a revalidação afetada. |
 | 12 | Relatório, limites e todos os testes falhos/bloqueados/não executados | Em consolidação | Este relatório e o [registro detalhado](stress-verification-execution.md) preservam os resultados; ainda há campanhas abertas. |
 
 ## Staging e limites
@@ -505,3 +505,26 @@ modo, mtime e hardlinks; oito grupos modificados foram deixados intactos.
 Essa realocação reversível liberou3.010.748.416 bytes, sem remover dados,
 evidências ou binários das campanhas. Os caches serão restaurados antes de
 novas verificações Rust debug locais; nenhuma compressão roda junto à carga.
+
+
+Os [18 checks ordinários de cb916d0](results/stress/ci-cb916d0-sql-only-source.json)
+passaram no escopo intermediário, anterior à correção de exportações.
+O CI completo de af01678 ainda executa a suíte de serviços reais; essa
+pendência não é substituída pela aprovação da revisão anterior.
+
+
+## Alerta CodeQL na credencial da fixture compartilhada
+
+O check de Rust/serviços reais de `af01678` passou, mas o agregado CodeQL
+reprovou com um alerta crítico: senha fixa do authenticator em
+`crates/server/tests/common/mod.rs:36`, alcançando cinco usos. O
+[resultado original](results/stress/codeql-authenticator-fixture-before.json)
+preserva **17 checks aprovados e um reprovado**. A revisão não tem aprovação
+integral de CI nesse estado.
+
+A correção gera um segredo aleatório de64 caracteres, uma vez por processo
+de testes. Essa estabilidade preserva roles compartilhadas pelo cluster,
+bootstraps repetidos de RLS e a variável do processo filho do SDK Rust.
+A regra CodeQL continua habilitada. Só arquivos de integração são alterados;
+CI novo e verificação explícita de equivalência do ELF ainda são pendentes.
+A campanha em andamento mantém os mesmos bytes Rust de produção congelados.

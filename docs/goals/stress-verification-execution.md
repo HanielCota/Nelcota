@@ -2559,3 +2559,26 @@ Eight changed groups were skipped intact. Actual free space increased
 3,010,748,416B in4.796s; no data, evidence, source or campaign ELF was removed.
 Selective restoration is prepared for those exact113 paths, preserving changed
 outputs. No compression or local Rust/UI suite overlaps the measured load.
+
+
+All18ordinary checks passed on the intermediate SQL-only source cb916d0:
+[metadata](results/stress/ci-cb916d0-sql-only-source.json). This excludes the
+later export correction and is not final-artifact acceptance. The af01678
+Rust full-service job is still running its integration suite; pending native
+and ordinary checks retain their actual statuses.
+
+
+### Final-source CodeQL gate found a shared test credential
+
+The af01678 Rust/service job passed, but its aggregate CodeQL check failed
+on one critical hard-coded-password finding at common/mod.rs:36, with five
+sinks. [Original metadata](results/stress/codeql-authenticator-fixture-before.json)
+retains17successful ordinary checks and the failed18th; this is not full CI
+approval. Keep the query enabled. The integration harness now creates one
+fresh64-character UUID/CSPRNG-derived secret per process via OnceLock,
+shared by isolated database bootstraps, RLS checks and SDK child environment.
+Per-process stability is necessary because PostgreSQL roles span databases.
+Only four server integration-test files change; no production credential or
+backend implementation is changed by this fixture correction. Fresh full CI
+and a release-byte/source-equivalence check remain pending. Do not infer
+that changed test sources are already covered by earlier CI.
