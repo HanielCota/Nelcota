@@ -128,6 +128,68 @@ describe('password sign-in', () => {
 });
 
 describe('refresh', () => {
+  it.each([false, true])('coalesces a late native-browser refresh while another tab is rotating (warm=%s)', async (warm) => {
+    vi.stubGlobal('indexedDB', new IDBFactory());
+    vi.stubGlobal('window', {});
+    vi.stubGlobal('document', {});
+    vi.stubGlobal('BroadcastChannel', undefined);
+    const committed = new Map([[KEY, JSON.stringify(session())]]);
+    const storage = {
+      getItem: (key: string) => committed.get(key) ?? null,
+      setItem: (key: string, value: string) => { committed.set(key, value); },
+      removeItem: (key: string) => { committed.delete(key); },
+    };
+    vi.stubGlobal('localStorage', storage);
+    let queue: Promise<unknown> = Promise.resolve();
+    let pending = false;
+    let waiting = 0;
+    let firstStarted!: () => void;
+    let releaseFirst!: () => void;
+    let laterQueued!: () => void;
+    const started = new Promise<void>((resolve) => { firstStarted = resolve; });
+    const release = new Promise<void>((resolve) => { releaseFirst = resolve; });
+    const queued = new Promise<void>((resolve) => { laterQueued = resolve; });
+    vi.stubGlobal('navigator', { locks: {
+      request: <T>(_name: string, task: () => Promise<T>) => {
+        if (pending && ++waiting === 2) laterQueued();
+        const run = queue.then(task);
+        queue = run.then(() => undefined, () => undefined);
+        return run;
+      },
+    } });
+    let rotations = 0;
+    const mock = mockFetch(async () => {
+      rotations++;
+      if (rotations === 1) {
+        pending = true;
+        firstStarted();
+        await release;
+        pending = false;
+      }
+      return json(session(900, `refresh-${rotations + 1}`, `access-${rotations + 1}`));
+    });
+    const clients = [0, 1, 2].map(() => createClient('https://api.example.com', {
+      fetch: mock.fetch, auth: { autoRefresh: false },
+    }));
+    try {
+      await clients[0]!.auth.getSession();
+      if (warm) await Promise.all(clients.slice(1).map(client => client.auth.getSession()));
+      const first = clients[0]!.auth.refreshSession();
+      await started;
+      const later = clients.slice(1).map(client => client.auth.refreshSession());
+      await queued;
+      expect(rotations).toBe(1);
+      releaseFirst();
+      const results = await Promise.all([first, ...later]);
+      expect(rotations).toBe(1);
+      expect(results.every(result => result.error === null)).toBe(true);
+      expect(results.map(result => result.data?.refresh_token)).toEqual(['refresh-2', 'refresh-2', 'refresh-2']);
+    } finally {
+      releaseFirst();
+      clients.forEach(client => client.dispose());
+    }
+  });
+
   it('leaves the lock-grant task before reading a native storage snapshot', async () => {
     vi.stubGlobal('indexedDB', new IDBFactory());
     vi.stubGlobal('window', {});
