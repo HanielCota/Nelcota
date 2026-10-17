@@ -429,6 +429,7 @@ jobs:
           suite.addTests(unittest.defaultTestLoader.discover('scripts/review_tests', pattern='test_stress_auth_links.py'))
           suite.addTests(unittest.defaultTestLoader.discover('scripts/review_tests', pattern='test_stress_ledger_arrivals.py'))
           suite.addTests(unittest.defaultTestLoader.discover('scripts/review_tests', pattern='test_stress_matrix_capacity.py'))
+          suite.addTests(unittest.defaultTestLoader.discover('scripts/review_tests', pattern='test_stress_http.py'))
           result = unittest.TextTestRunner(verbosity=2).run(suite)
           report = {'source_commit': os.environ['GITHUB_SHA'], 'tests': result.testsRun,
                     'failures': len(result.failures), 'errors': len(result.errors), 'skipped': len(result.skipped),
@@ -439,7 +440,7 @@ jobs:
           with target.open('x') as stream:
               stream.write(json.dumps(report, indent=2, allow_nan=False) + '\n')
           print('::notice title=Supplemental matrix regression summary::' + json.dumps(report, separators=(',', ':'), allow_nan=False))
-          if not result.wasSuccessful() or result.testsRun < 36 or result.skipped:
+          if not result.wasSuccessful() or result.testsRun < 43 or result.skipped:
               raise SystemExit(1)
           PY
       - name: Reproduce temporary PostgreSQL readiness and verify the TCP guard

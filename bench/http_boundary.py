@@ -2,6 +2,28 @@
 import urllib.parse
 import urllib.request
 import uuid
+import ssl
+import threading
+
+_LEDGER_TLS_CONTEXT = None
+_LEDGER_TLS_LOCK = threading.Lock()
+
+
+def _ledger_tls_context():
+    global _LEDGER_TLS_CONTEXT
+    with _LEDGER_TLS_LOCK:
+        if _LEDGER_TLS_CONTEXT is None:
+            context = ssl.create_default_context()
+            context.set_alpn_protocols(['http/1.1'])
+            if getattr(context, 'post_handshake_auth', None) is not None:
+                context.post_handshake_auth = True
+            if context.verify_mode != ssl.CERT_REQUIRED or context.check_hostname is not True:
+                raise RuntimeError('Fixture TLS verification must remain enabled')
+            _LEDGER_TLS_CONTEXT = context
+        context = _LEDGER_TLS_CONTEXT
+    if context.verify_mode != ssl.CERT_REQUIRED or context.check_hostname is not True:
+        raise RuntimeError('Fixture TLS verification must remain enabled')
+    return context
 
 
 class FixtureRedirect(urllib.request.HTTPRedirectHandler):
@@ -40,3 +62,14 @@ def opener(s3_endpoint=None):
     # Fixture traffic is loopback-only, including its real provider. A system
     # proxy must never receive credentials or signed object URLs from this test.
     return urllib.request.build_opener(urllib.request.ProxyHandler({}),FixtureRedirect(s3_endpoint))
+
+
+def ledger_opener(s3_endpoint=None):
+    """Reuse only the verified CA store; keep each request's handlers private.
+
+    Python constructs an HTTPS context even for an HTTP-only opener. Loading
+    its CA store for every ledger request can saturate the generator itself.
+    Ordinary campaigns keep the original opener and observer behavior.
+    """
+    return urllib.request.build_opener(urllib.request.ProxyHandler({}), FixtureRedirect(s3_endpoint),
+                                       urllib.request.HTTPSHandler(context=_ledger_tls_context()))

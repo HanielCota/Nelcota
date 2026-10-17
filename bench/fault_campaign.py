@@ -36,7 +36,7 @@ from ownership import OwnedDocker
 from objects import S3Inventory
 from ports import published_port
 from postgres_evidence import retain_failure
-from http_boundary import opener
+from http_boundary import ledger_opener as opener
 from fixture_copy import copy_to_tmpfs
 from disk_usage import container as container_disk_usage
 from lost_reply import discard_reply

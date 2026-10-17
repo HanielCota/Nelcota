@@ -3209,3 +3209,42 @@ calibration. Its continuous soak is active at280mixediterations/s,70percent.
 The14,400second interval is not credited or approved until completed, with
 unchanged app/database processes, retention, resource, integrity and cleanup
 evidence followed by the required baseline comparison.
+
+
+### 2026-10-17, 15:36 UTC — original matrix failure preserved; generator CPU cause isolated locally
+
+The old-source matrix39041951068/job117423061373 closed with overall FAILED,
+cleanup confirmed,33focused guards passed and371resource samples/gap5.817s.
+Its inner workload declared1850seconds passed and all five120second case
+receipts passed with full action overlap. The actual exported16/32/48/64
+receipts evaluate FALSE against the original8/16/24/32assertion. Integrity and
+restore receipts were copied only after that assertion, so they are absent
+and not inferred passed. [Original failed envelope](results/stress/matrix-sdk007-capacity-publication-failure-001.json).
+
+Only16/s qualified. At32/48/64 the generator used97.06/97.07/97.11percent
+of one CPU in its own process and99.98/100.00/100.00percent in its current
+1CPU cgroup, with1366/5985/10557dropped arrivals. Host steal deltas were zero.
+Those higher steps do not establish server breaking capacity. The remote
+serial owner stopped before any native/second-matrix job.
+
+A bounded local profile of five opener constructions found five calls to
+create_default_context/load_default_certs even for plain HTTP. The ledger
+now shares one verified CA context per process under a lock, while keeping
+every request's redirect/proxy handlers separate. CERT_REQUIRED, hostname
+verification, ALPN and post-handshake policy remain enabled; invalid fake
+configurations fail closed before caching or reuse. No unverified real TLS
+client is constructed by the negative tests. Ordinary campaigns retain the
+original opener: its AST and the redirect policy AST are unchanged.
+
+Five original constructions consumed36.899ms CPU; five ledger constructions
+consumed10.397ms with one CA load initially, then2.493ms with zero CA reloads
+after warmup. These are client construction controls, not server throughput
+or effective load. Four new concurrent/security/isolation regressions passed
+among43exact workflow controls (0.222s framework,0.415s operator) on the
+reserved OS CPU4 with small explicit limits.
+[Profiling, source hashes and strict controls](results/stress/ledger-generator-tls-construction-before-after-001.json).
+Both real matrices must repeat with the same64maximum,300second steps,
+CPU/RAM/disk budgets and SLOs. The prepared47a96cfcontroller004 has not run
+and is superseded before measurement; a fresh source/ref/controller will
+include the targeted generator correction. No eleventh product fix, causal
+closure of historical32versus16variation or remote CPU improvement is claimed.

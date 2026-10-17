@@ -946,5 +946,20 @@
     "maximum_offer_unchanged": true,
     "scope": "Actual full driver already used its64default. A wrong half-rate publication guard is corrected by sharing ledger_capacity.py between the actual driver, command factory and validator. Keep failed saturation steps, never reduce traffic to fit the old validator.36focused guards passed; both corrected full matrix repetitions pending.",
     "evidence": "matrix-capacity-declaration-before-after-001.json"
+  },
+  "ledger_generator_TLS_predeclaration": {
+    "declared_utc": "2026-10-17T15:36:55.350817+00:00",
+    "status": "focused controls passed; new actual campaigns not run yet",
+    "maximum_offered_rate": 64,
+    "step_seconds": 300,
+    "full_cases": 5,
+    "case_seconds": 120,
+    "CPU_memory_disk_SLO_limits_changed": false,
+    "TLS_certificate_verification": "CERT_REQUIRED and check_hostnameTrue, failclosed before cache/reuse",
+    "CA_contexts_each_ledger_process": 1,
+    "private_handlers_each_request": true,
+    "ordinary_opener_and_redirect_policy_AST_unchanged": true,
+    "scope": "Remove repeatedly loadingCAroots from the RPC generator. Keep every original failed/uncertain result and repeat both final realmatrices. Do not reinterpret generator drops as serverbreakingpoints or micro-constructor savings as product throughput improvement.",
+    "evidence": "ledger-generator-tls-construction-before-after-001.json"
   }
 }

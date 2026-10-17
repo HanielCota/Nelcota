@@ -115,6 +115,31 @@ predeclarado e iniciou o intervalo contínuo a280/s,70por cento. O teto não
 é uma afirmação de capacidade máxima. As quatro horas, a reconciliação,
 a recuperação e a comparação ainda precisam fechar.
 
+## Matriz original reprovada e CPU do gerador
+
+A [matriz final007 original](results/stress/matrix-sdk007-capacity-publication-failure-001.json)
+encerrou como `failed`, com limpeza e371amostras. Os cinco casos de120s
+passaram, mas a publicação rejeitou os degraus reais16/32/48/64. Os recibos
+públicos de integridade e restore não chegaram a ser exportados; não são
+tratados como aprovados. O controlador parou antes dos demais jobs.
+
+Só16/s qualificou. Nas taxas32/48/64, o processo do gerador consumiu cerca
+de97por cento de uma CPU, seu cgroup chegou a100por cento e houve perdas
+de chegadas. Esses degraus não definem a capacidade máxima do servidor.
+O perfil local mostrou recarga de CAs em cada novo opener, mesmo em HTTP.
+O caminho do ledger agora reutiliza um verificador TLS, com handlers novos
+por requisição, certificado/hostname obrigatórios e proxies desabilitados.
+O opener das campanhas ordinárias e a regra de redirects ficaram idênticos.
+
+Os [controles de construção](results/stress/ledger-generator-tls-construction-before-after-001.json)
+mediram36,899ms de CPU em cinco construções originais,10,397ms com uma carga
+de CAs na primeira sequência e2,493ms sem novas cargas após aquecimento.
+Passaram43guardas focadas, incluindo quatro novas de concorrência e segurança.
+Isso não é ganho de performance do produto. Duas novas matrizes reais,
+com a mesma CPU, limites,64/s máximo e degraus de300s, ainda precisam fechar.
+A variação histórica32→16/s e a falha anterior de SLO do navegador continuam
+sem causa encerrada por esses controles locais.
+
 ## Décima correção: isolamento do SDK no servidor
 
 O [controle anterior](results/stress/sdk-independent-server-clients-before-001.json)
