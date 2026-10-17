@@ -2332,3 +2332,13 @@ soak. Source locations/classes are retained on failure, with no SQL/cookies
 or assertion payloads in public evidence. Full forced catalog-refresh,
 SMTP/OAuth/public-ingress and remaining management/update combinations stay
 separate incomplete cells rather than being inferred from this subset.
+
+The native-presets review-tool jobs failed on 3da98cb and ed963ad in their
+full Python regression step; the ordinary check job on 3da98cb passed.
+[Original job metadata](results/stress/review-tools-ci-failures-under-investigation.json)
+is retained without guessed test counts or attribution to the new matrix.
+The bounded diagnostic accepts that exact failed unit step as well, emitting
+only review-test identities, source locations and exception classes. The
+pending diagnostic dispatch will be replaced with one that recovers these
+two jobs and the first focused failure together. No active workload is
+cancelled and no passing rerun resolves an unexplained failure by itself.

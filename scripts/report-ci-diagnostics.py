@@ -98,7 +98,7 @@ def focused_python_failures(content):
     for raw in content.splitlines():
         line = re.sub(r"\x1b\[[0-9;]*[mK]", "", raw)
         line = re.sub(r"^[0-9T:.+-]+Z\s+", "", line).strip()
-        match = re.match(r"^(?:FAIL|ERROR): (test_[a-z0-9_]+) \((test_stress_provider_runtime\.[A-Za-z0-9_.]+)\)", line)
+        match = re.match(r"^(?:FAIL|ERROR): (test_[a-z0-9_]+) \((test_[a-z0-9_]+\.[A-Za-z0-9_.]+)\)", line)
         if match is not None:
             current = None
             if len(findings) < 16 and match[2].endswith("." + match[1]):
@@ -107,7 +107,7 @@ def focused_python_failures(content):
             continue
         if current is None:
             continue
-        location = re.fullmatch(r'File "[^"\n]*/scripts/review_tests/(test_stress_provider_runtime\.py)", line ([0-9]{1,8}), in ([A-Za-z0-9_]+)', line)
+        location = re.fullmatch(r'File "[^"\n]*/scripts/review_tests/(test_[a-z0-9_]+\.py)", line ([0-9]{1,8}), in ([A-Za-z0-9_]+)', line)
         if location is not None and len(current["locations"]) < 8:
             current["locations"].append({"file": location[1], "line": int(location[2]), "function": location[3]})
         for name in ["AssertionError", "RuntimeError", "ValueError", "TimeoutError"]:
@@ -127,17 +127,19 @@ def main():
             "Expected up to three numeric job IDs")
     for identity in identifiers:
         metadata = api("actions/jobs/" + identity)
-        require(metadata.get("name") in {"check", "admin-ui", "provider-runtime"} and metadata.get("conclusion") == "failure",
+        require(metadata.get("name") in {"check", "admin-ui", "provider-runtime", "native-presets"} and metadata.get("conclusion") == "failure",
                 "Only failed public Rust/panel/probe-regression jobs can be inspected")
         failures = [step["name"] for step in metadata.get("steps", []) if step.get("conclusion") == "failure"]
         allowed = {"Run cargo clippy --all-targets -- -D warnings", "Run npm run check", "versioned dist is up to date", "Run set -o pipefail"}
         if metadata["name"] == "provider-runtime":
             allowed = {"Check the bounded runtime diagnostic regressions"}
+        if metadata["name"] == "native-presets":
+            allowed = {"Validate configs, JSON contracts, ignores and fix boundaries"}
         require(failures and all(value in allowed for value in failures), "Refusing unrelated runtime or deployment logs")
         content = api("actions/jobs/" + identity + "/logs", logs=True)
         headers = []
         for raw in content.splitlines():
-            if "Run set -o pipefail" in failures or metadata["name"] == "provider-runtime":
+            if "Run set -o pipefail" in failures or metadata["name"] in {"provider-runtime", "native-presets"}:
                 break
             line = re.sub(r"\x1b\[[0-9;]*[mK]", "", raw)
             line = re.sub(r"^[0-9T:.+-]+Z\s+", "", line).strip()

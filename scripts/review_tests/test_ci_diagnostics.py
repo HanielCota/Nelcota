@@ -75,6 +75,9 @@ class BoundedCIDiagnostics(unittest.TestCase):
         self.assertEqual(diagnostics.focused_python_failures(text), expected)
         self.assertNotIn("private-token", str(diagnostics.focused_python_failures(text)))
         self.assertEqual(diagnostics.focused_python_failures("FAIL: test_fixture (unrelated_module.test_fixture)\n"), [])
+        general = text.replace("test_stress_provider_runtime", "test_stress_matrix_pressure")
+        self.assertEqual(diagnostics.focused_python_failures(general)[0]["locations"][0]["file"],
+                         "test_stress_matrix_pressure.py")
 
 
 if __name__ == "__main__":
