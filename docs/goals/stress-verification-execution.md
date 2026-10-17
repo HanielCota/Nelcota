@@ -2537,3 +2537,25 @@ survived, and two parallel complete exports recovered exact product IDs1–4.
 Existing unpolled-response expiry and delayed-footer assertions passed unchanged.
 Sixteen resource samples,zero violations,owned cleanup confirmed. Preserve the
 first failed correction attempt; final build/CI/campaign repetitions are pending.
+
+
+### Candidate003 and four final replacements started
+
+The clean af01678 release build passed89.900s with unchanged locked/fourjobs/
+thinLTO/codegen-units1 profile and no compiler overrides. Its30,477,344B ELF is
+acfb2c604a7376be95690852ef016bca90eba599a55bad4be27b6c071b59a6b2.
+Current provenance records all six product trees; intermediate cb916d0
+provenance is retained separately, with no load measured on that intermediate.
+Four new003 IDs preserve every workload argument, budget and approval gate.
+The first disk run started2026-10-17T06:57:06Z; the detached30h owner serializes
+disk1/S3-1/disk2/S3-2, reaping only its own adopted children and stopping on
+workload/evidence/cleanup/comparison failure. Every campaign retains its own
+independent watchdog. New native-suite39011610600 is queued on af01678;
+previous native/CI evidence is not approval for these changed product bytes.
+
+Before load,113 unchanged debug cache outputs were hash/mode/mtime/hardlink
+verified against the already retained archive003, then unlinked reversibly.
+Eight changed groups were skipped intact. Actual free space increased
+3,010,748,416B in4.796s; no data, evidence, source or campaign ELF was removed.
+Selective restoration is prepared for those exact113 paths, preserving changed
+outputs. No compression or local Rust/UI suite overlaps the measured load.

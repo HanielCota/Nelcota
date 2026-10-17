@@ -2,7 +2,7 @@
 
 **Estado: em execução, sem aprovação do G05.** Este relatório é atualizado
 durante as campanhas. Checkpoint de carga consolidada: 17/10/2026, 03:47 UTC.
-Atualização da investigação: 17/10/2026, 06:52 UTC.
+Atualização da investigação: 17/10/2026, 06:58 UTC.
 Não houve merge nem deploy de produção. O trabalho está na branch
 `test/g05-stress-verification`, no [PR #90](https://github.com/Nelcota/Nelcota/pull/90),
 mantido como rascunho para revisão.
@@ -20,7 +20,7 @@ O tempo parcial das campanhas ainda abertas não está somado nesse checkpoint.
 |---|---|
 | Código após o novo defeito SQL confirmado | Correção local em `crates/admin/src/sql/executor.rs`, com dois testes reais aprovados e hashes em [evidência](results/stress/sql-cancellation-admission-after.json). O binário anterior foi interrompido; novo build e repetições afetadas são obrigatórios |
 | SHA-256 do binário de baseline preservado | `75c44c85a85db26195166aa1d2c6caf481e3db476801ec8131525ef62adf1be0` |
-| Novo candidato local congelado | `cb916d04fa43679152b2a463870c466a17bd9e91`; SHA-256 `48aec40eb643133dbc7bc8aba91cea1705f7534aae93947bc5d8a7782278774a`; [proveniência](results/stress/final-local-candidate.json). Build release passou em 89,251 s; CI e repetições finais ainda pendentes. O [artefato anterior](results/stress/final-local-candidate-7e68fd2.json) continua preservado |
+| Novo candidato local congelado | `af01678ac773f932232d0f37e6d0a2fa02edc343`; SHA-256 `acfb2c604a7376be95690852ef016bca90eba599a55bad4be27b6c071b59a6b2`; [proveniência](results/stress/final-local-candidate.json). Build release passou em 89,900 s; primeira campanha em disco iniciou às06:57 UTC. CI, suíte nativa e campanhas finais ainda pendentes. Artefatos anteriores preservados |
 | SHA-256 do workload k6 atual | `0ac01578bf19155302fe465884b480d792569086f23bb4ba3615ca5f0ce2547d` |
 | Baseline em disco no protocolo atual | Snapshot imutável de `1f391594dd8db6cccac54d6720d90c33d461d1f1`; `disk-final-pass-1-002` concluiu como baseline no binário retido, com protocolo atual |
 | Primeira execução nativa separada | [Actions 38962480993](https://github.com/Nelcota/Nelcota/actions/runs/38962480993), código congelado `e80770b3f6aa1f64d011a3d62f8ebf0f1201bdac`; reprovada no oráculo de signup antes do backup |
@@ -480,3 +480,28 @@ após limpeza, duas exportações paralelas recuperaram os IDs exatos 1–4.
 A expiração de resposta não consumida e o footer atrasado voltaram a passar
 sem mudar suas asserções. Foram 16 amostras, zero violações e limpeza confirmada.
 A primeira validação falha permanece publicada; novo build/CI/campanhas pendentes.
+
+
+## Novo artefato com as duas correções e retomada das campanhas
+
+O checkout limpo `af01678` produziu um novo ELF de 30.477.344 bytes em
+89,900 s, SHA-256 `acfb2c604a7376be95690852ef016bca90eba599a55bad4be27b6c071b59a6b2`.
+O perfil release locked/quatro jobs/thinLTO/codegen-units=1 foi mantido.
+A [proveniência atual](results/stress/final-local-candidate.json) e as duas
+anteriores preservam hashes, árvores de produto e builds distintos. Nenhuma
+campanha foi feita no candidato intermediário com somente a correção SQL.
+
+Às06:57 UTC iniciou `disk-candidate-pass-1-003`, seguida somente após aprovação
+por S3 pass1, disco pass2 e S3 pass2, todas em fixtures novas, com os mesmos
+argumentos, limites e metas predeclarados. O owner separado tem limite de30h,
+subreaper apenas dos filhos próprios e watchdogs independentes por campanha.
+Ele para em falha de carga, evidência, limpeza ou comparação; não há promoção
+automática nem deploy. A suíte nativa `39011610600` usa a mesma fonte de produto
+em VMs separadas; está pendente, sem reaproveitar a aprovação do ELF anterior.
+
+Antes dessa retomada,113 saídas de compilação debug inalteradas foram novamente
+verificadas contra seu arquivo integral já preservado, incluindo SHA-256,
+modo, mtime e hardlinks; oito grupos modificados foram deixados intactos.
+Essa realocação reversível liberou3.010.748.416 bytes, sem remover dados,
+evidências ou binários das campanhas. Os caches serão restaurados antes de
+novas verificações Rust debug locais; nenhuma compressão roda junto à carga.

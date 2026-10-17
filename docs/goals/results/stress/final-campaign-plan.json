@@ -160,6 +160,26 @@
         "Two independent 14400-second continuous runs per backend",
         "Native-suite and full supplemental matrix must use new product trees"
       ]
+    },
+    {
+      "declared_utc": "2026-10-17T06:53:58.529114+00:00",
+      "trigger": "Confirmed export cancellation admission defect, fixed af01678 after16passing real-service regressions; no candidate002 load started",
+      "change": "Fresh candidate003 disk/S3 passes1/2; identical workload arguments, budgets, SLOs and comparison thresholds. Retain candidate002 as unmeasured historical build.",
+      "replacement_run_ids": [
+        "disk-candidate-pass-1-003",
+        "s3-candidate-pass-1-003",
+        "disk-candidate-pass-2-003",
+        "s3-candidate-pass-2-003"
+      ],
+      "binary_sha256": "acfb2c604a7376be95690852ef016bca90eba599a55bad4be27b6c071b59a6b2",
+      "source_commit": "af01678ac773f932232d0f37e6d0a2fa02edc343",
+      "previous_artifact_evidence": "final-local-candidate-cb916d0.json",
+      "conditions": [
+        "Two independent14400s continuous runs per backend",
+        "Keep all original failed or unrun verdicts",
+        "Source/artifact identity and owned cleanup/comparison gates unchanged",
+        "Stop on any failed evidence, cleanup or regression gate"
+      ]
     }
   ],
   "native_same_artifact_suite": {
@@ -476,9 +496,9 @@
     "approval_thresholds_reduced": false
   },
   "current_final_artifact": {
-    "source_commit": "cb916d04fa43679152b2a463870c466a17bd9e91",
-    "binary_sha256": "48aec40eb643133dbc7bc8aba91cea1705f7534aae93947bc5d8a7782278774a",
+    "source_commit": "af01678ac773f932232d0f37e6d0a2fa02edc343",
+    "binary_sha256": "acfb2c604a7376be95690852ef016bca90eba599a55bad4be27b6c071b59a6b2",
     "evidence": "final-local-candidate.json",
-    "status": "new artifact frozen after SQL admission correction; affected campaign repetitions pending"
+    "status": "first disk run003 started2026-10-17T06:57:06Z; full acceptance pending"
   }
 }
