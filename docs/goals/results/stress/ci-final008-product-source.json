@@ -1,0 +1,203 @@
+{
+  "source_commit": "da262d77f4d2557ff5cbd9007b9a3a6273a92221",
+  "observed_utc": "2026-10-17T19:41:21.223909+00:00",
+  "status": "passed",
+  "certifies_g05": false,
+  "ordinary_check_count": 18,
+  "checks": [
+    {
+      "id": 117482766851,
+      "name": "CodeQL",
+      "head_sha": "da262d77f4d2557ff5cbd9007b9a3a6273a92221",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/Nelcota/Nelcota/runs/117482766851"
+    },
+    {
+      "id": 117482665948,
+      "name": "supply-chain",
+      "head_sha": "da262d77f4d2557ff5cbd9007b9a3a6273a92221",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/Nelcota/Nelcota/actions/runs/39062329490/job/117482665948"
+    },
+    {
+      "id": 117482665933,
+      "name": "sdk / sdk",
+      "head_sha": "da262d77f4d2557ff5cbd9007b9a3a6273a92221",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/Nelcota/Nelcota/actions/runs/39062329490/job/117482665933"
+    },
+    {
+      "id": 117482665918,
+      "name": "sdk / sdk-node (22)",
+      "head_sha": "da262d77f4d2557ff5cbd9007b9a3a6273a92221",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/Nelcota/Nelcota/actions/runs/39062329490/job/117482665918"
+    },
+    {
+      "id": 117482665901,
+      "name": "sdk / sdk-node (26)",
+      "head_sha": "da262d77f4d2557ff5cbd9007b9a3a6273a92221",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/Nelcota/Nelcota/actions/runs/39062329490/job/117482665901"
+    },
+    {
+      "id": 117482665857,
+      "name": "upgrade",
+      "head_sha": "da262d77f4d2557ff5cbd9007b9a3a6273a92221",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/Nelcota/Nelcota/actions/runs/39062329490/job/117482665857"
+    },
+    {
+      "id": 117482665818,
+      "name": "admin-ui",
+      "head_sha": "da262d77f4d2557ff5cbd9007b9a3a6273a92221",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/Nelcota/Nelcota/actions/runs/39062329490/job/117482665818"
+    },
+    {
+      "id": 117482665765,
+      "name": "check",
+      "head_sha": "da262d77f4d2557ff5cbd9007b9a3a6273a92221",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/Nelcota/Nelcota/actions/runs/39062329490/job/117482665765"
+    },
+    {
+      "id": 117482665716,
+      "name": "sdk-rust (ubuntu-latest)",
+      "head_sha": "da262d77f4d2557ff5cbd9007b9a3a6273a92221",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/Nelcota/Nelcota/actions/runs/39062329460/job/117482665716"
+    },
+    {
+      "id": 117482665692,
+      "name": "sdk-rust (windows-latest)",
+      "head_sha": "da262d77f4d2557ff5cbd9007b9a3a6273a92221",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/Nelcota/Nelcota/actions/runs/39062329460/job/117482665692"
+    },
+    {
+      "id": 117482665672,
+      "name": "sdk-rust (macos-latest)",
+      "head_sha": "da262d77f4d2557ff5cbd9007b9a3a6273a92221",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/Nelcota/Nelcota/actions/runs/39062329460/job/117482665672"
+    },
+    {
+      "id": 117482665655,
+      "name": "native-lint",
+      "head_sha": "da262d77f4d2557ff5cbd9007b9a3a6273a92221",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/Nelcota/Nelcota/actions/runs/39062329490/job/117482665655"
+    },
+    {
+      "id": 117482665477,
+      "name": "msrv",
+      "head_sha": "da262d77f4d2557ff5cbd9007b9a3a6273a92221",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/Nelcota/Nelcota/actions/runs/39062329460/job/117482665477"
+    },
+    {
+      "id": 117482665099,
+      "name": "native-presets",
+      "head_sha": "da262d77f4d2557ff5cbd9007b9a3a6273a92221",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/Nelcota/Nelcota/actions/runs/39062329389/job/117482665099"
+    },
+    {
+      "id": 117482657685,
+      "name": "Analyze (actions)",
+      "head_sha": "da262d77f4d2557ff5cbd9007b9a3a6273a92221",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/Nelcota/Nelcota/actions/runs/39062326231/job/117482657685"
+    },
+    {
+      "id": 117482657625,
+      "name": "Analyze (javascript-typescript)",
+      "head_sha": "da262d77f4d2557ff5cbd9007b9a3a6273a92221",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/Nelcota/Nelcota/actions/runs/39062326231/job/117482657625"
+    },
+    {
+      "id": 117482657617,
+      "name": "Analyze (rust)",
+      "head_sha": "da262d77f4d2557ff5cbd9007b9a3a6273a92221",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/Nelcota/Nelcota/actions/runs/39062326231/job/117482657617"
+    },
+    {
+      "id": 117482657472,
+      "name": "Analyze (python)",
+      "head_sha": "da262d77f4d2557ff5cbd9007b9a3a6273a92221",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/Nelcota/Nelcota/actions/runs/39062326231/job/117482657472"
+    }
+  ],
+  "pending": [],
+  "scope": "All18ordinarychecks passed at frozen008buildsourceDA, actualSDKmerge complete root and sixproducttrees match,204SDKunits passed. WholePythondiscoverypassed with no inferredcount. Currentlaterdocumentationheadhas same producttrees but its own checks are separate. Does not certify actualcorrectedPITRVMs, endurance, performance or unrunG05 clauses.",
+  "binary_sha256": "aa0967f175d13410d4085841c1e1351597b7d38c7cab8adf51963bfa57336a73",
+  "six_product_trees_match": true,
+  "product_tree_objects": {
+    "crates": "4a4cfb7efb49f0cb7f0e00b3aeb594c8cc75f091",
+    "Cargo.toml": "20a3154fea3f1883ccc42882fbd671bc0b12b17f",
+    "Cargo.lock": "9150a443d0d0cec57de152e13bd9a6cb8e7a8c2d",
+    "migrations": "e88cfbfd12955dc8cb9180d3324df6a5d9e62206",
+    "sdk": "9bd7af8fc90a0a3cd5429ad40d8c3ec7b23efedd",
+    "rust-toolchain.toml": "0fd1b3a84b408770d883519014b040aed30a15f0"
+  },
+  "PR_checkout_proof": {
+    "actual_SDK_merge_checkout_sha": "78bacc839bed8fd89e16a79de911f7f35de58c0b",
+    "complete_root_trees_equal": true,
+    "root_tree_sha": "fa79743c93d3bc9f9c62379726986097cff345d7",
+    "SDK_job_id": 117482665933,
+    "branch_source_in_actual_merge_parents": true,
+    "SDK_unit_notice": {
+      "source_commit": "78bacc839bed8fd89e16a79de911f7f35de58c0b",
+      "tests": 204,
+      "passed": 204,
+      "failed": 0,
+      "pending": 0,
+      "independent_server_clients": [
+        {
+          "web_locks": false,
+          "status": "passed"
+        },
+        {
+          "web_locks": true,
+          "status": "passed"
+        }
+      ],
+      "framework_successful": true,
+      "successful": true,
+      "scope": "SDK unit regressions only; no backend load or G05 effective-time credit.",
+      "original_report_sha256": "07e2a1f9dcbbfc8384bb224d36f6fb3fe83d82794b5d0f9fcda16f0ae2c6b3a0"
+    }
+  },
+  "complete_Python_discovery": {
+    "job_id": 117482665655,
+    "step": {
+      "number": 6,
+      "name": "Run python3 -m unittest discover -s scripts/review_tests -v",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    "exact_test_count": null
+  }
+}

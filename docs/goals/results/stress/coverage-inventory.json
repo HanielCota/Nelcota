@@ -1544,7 +1544,7 @@
     "second_pass_evidence": "provider-runtime-corrected-pass-2.json"
   },
   "current_final_candidate": {
-    "status": "frozen008; actuallocalfive-scenariosmokepassed/cleanup; CI17of18observed, correctedactualPITR/native/endurancepending",
+    "status": "frozen008; ordinarysourceCI18/18, SDK204, five-scenariosmoke andtwoactualcorrectedPITRVMspassed; firstS3active, commonnative008suitepending",
     "latest_fix_commit": "3cd1b8a",
     "generated_asset_commit": "da262d77f4d2557ff5cbd9007b9a3a6273a92221",
     "source_commit": "da262d77f4d2557ff5cbd9007b9a3a6273a92221",
@@ -1553,17 +1553,21 @@
     "confirmed_production_defects": 11,
     "focused_PITR_tests_passed": 6,
     "native_actual_PITR_before": "native-pitr-unknown-state-reopening-before-001.json",
-    "native_actual_PITR_after": "notrun",
-    "ordinary_CI_checks_passed": null,
+    "native_actual_PITR_after": "native-pitr-error-final008-after-001/index.json",
+    "ordinary_CI_checks_passed": 18,
     "scope": "NewCLIandguideproducttrees require008observations; no007approval transfers implicitly.",
-    "functional_smoke": "matrix-sdk008-auth-links-functional-smoke-001.json"
+    "functional_smoke": "matrix-sdk008-auth-links-functional-smoke-001.json",
+    "CI_evidence": "ci-final008-product-source.json",
+    "SDK_unit_passed": 204,
+    "active_endurance": "s3-final008-pass-1-001",
+    "native_complete_suite_workflow": 39064489119
   },
   "current_campaign_checkpoint": {
     "checkpoint": "load-time-checkpoint-020.json",
     "effective_local_load_seconds": 162324,
-    "active_local_at_recording": null,
+    "active_local_at_recording": "s3-final008-pass-1-001",
     "recorded_utc": "2026-10-17T19:14:32.694794+00:00",
-    "scope": "Checkpoint020162324s includescompleted007disk.008150ssmoke passed but is a diagnostic excluded from timefloor.008ordinary waitsall18sourceCI andtwo actualcorrectedPITRVMpasses; no active local load."
+    "scope": "020162324sunchanged. New008S3startedafterCI18andtwoactualPITRVMspassed/cleanup; no warmup/preparation/partial/remote timeadded. Currentnativecommon008suiteunfinished."
   },
   "native_inflight_cut": {
     "status": "passed scoped control twice",
@@ -1598,7 +1602,7 @@
     "corrective_evidence": "host-resource-and-collected-watchdog-correction-001.json",
     "latest_focused_evidence": "host-Docker-name-and-watchdog-guards-001.json"
   },
-  "latest_inventory_update_utc": "2026-10-17T19:40:02.522729+00:00",
+  "latest_inventory_update_utc": "2026-10-17T19:59:11.432585+00:00",
   "native_startup_reproductions": {
     "status": "passed scoped repetitions; original failure unresolved",
     "count": 8,
@@ -1606,7 +1610,7 @@
     "scope": "Separate actual ELFs on the same final007product trees, same guest image, completedACKcuts only. Additional in-flight controls not run."
   },
   "native_pitr_error_hypothesis": {
-    "status": "confirmed11thproductiondefect; actualVM andRust reproduced unsafe reopening; focused fix passed, newVM pending",
+    "status": "confirmed11thdefect, focusedcorrectionandtwoactual008VMrepetitionspassed",
     "evidence": "pitr-restore-unknown-state-correction-001.json",
     "focused_native_and_control_tests_passed": 44,
     "real_adapter_process_controls": "passed only on isolated temporary marker fixtures",
@@ -1615,7 +1619,9 @@
     "workflow_run_id": 39061394536,
     "source_commit": "2c8e10c4e3e7cf899380194e2bea1cef2fb89e94",
     "actual_native_failed_original": "native-pitr-unknown-state-reopening-before-001.json",
-    "Rust_after_tests_passed": 6
+    "Rust_after_tests_passed": 6,
+    "actual_after_evidence": "native-pitr-error-final008-after-001/index.json",
+    "actual_after_passes": 2
   },
   "next_final_candidate": {
     "identity": "008",
@@ -1655,5 +1661,14 @@
     "matrix_final007_full_passes": 2,
     "matrix_final007_passed_evidence": "matrix-sdk007-two-corrected-passes-001.json",
     "harness_head_CI_status": "All18ordinary source3cc1b83 checks and whole Python discovery passed; actual private-file preflight not run."
+  },
+  "ten_project_current_readiness": {
+    "status": "blocked atread-onlycapacitypreflight",
+    "current_free_bytes": 15580618752,
+    "required_free_bytes": 16062994022.4,
+    "missing_bytes": 482375270.4,
+    "resource_creation_started": false,
+    "thresholds_reduced": false,
+    "scope": "Exact existingvfsimage profiles,1536MiBPGdisk,8440MiBstartup,15percentreserve. Re-evaluate onlyafterlocalcampaignsclose with safeownedcachemaintenance; no speculativefreebyteclaim or foreigncleanup."
   }
 }

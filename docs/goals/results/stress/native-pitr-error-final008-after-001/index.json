@@ -1,0 +1,66 @@
+{
+  "utc": "2026-10-17T19:55:57.858766+00:00",
+  "status": "passed in the controlled actualCLI error-path scope",
+  "certifies_g05": false,
+  "source_commit": "da262d77f4d2557ff5cbd9007b9a3a6273a92221",
+  "local008ELF_sha256": "aa0967f175d13410d4085841c1e1351597b7d38c7cab8adf51963bfa57336a73",
+  "product_tree_objects": {
+    "crates": "4a4cfb7efb49f0cb7f0e00b3aeb594c8cc75f091",
+    "Cargo.toml": "20a3154fea3f1883ccc42882fbd671bc0b12b17f",
+    "Cargo.lock": "9150a443d0d0cec57de152e13bd9a6cb8e7a8c2d",
+    "migrations": "e88cfbfd12955dc8cb9180d3324df6a5d9e62206",
+    "sdk": "9bd7af8fc90a0a3cd5429ad40d8c3ec7b23efedd",
+    "rust-toolchain.toml": "0fd1b3a84b408770d883519014b040aed30a15f0"
+  },
+  "cases": [
+    {
+      "pass_index": 1,
+      "workflow_run_id": 39063548584,
+      "job_id": 117486348932,
+      "source_commit": "da262d77f4d2557ff5cbd9007b9a3a6273a92221",
+      "binary_sha256": "e8390792c87d08239a10004ece15970883aac52299ba5f168725ba27f5225dd3",
+      "report_status": "passed",
+      "cleanup_confirmed": true,
+      "unknown_state_kept_stopped": true,
+      "real_PG_files_modified": false,
+      "post_error_app_and_Postgres_PID": [
+        0,
+        0
+      ],
+      "resource_samples": 18,
+      "elapsed_seconds_including_preparation": 94.20447540799995,
+      "evidence": "pass-1.json",
+      "public_file_sha256": "b3a9fe9e691b54f465303df2fb03eca100cd060e87046f56aae1080e4add14aa",
+      "actual_guest_image_sha256": "6a81c37564db9b1ee84e141922625e1d7c5b389b99bb3c572e0243607d5bb4d2"
+    },
+    {
+      "pass_index": 2,
+      "workflow_run_id": 39064039025,
+      "job_id": 117487807352,
+      "source_commit": "da262d77f4d2557ff5cbd9007b9a3a6273a92221",
+      "binary_sha256": "45f05cf07536768ab2d2f09df1c2f9ce4f7fce4215b0ed920bdabd2eee96a849",
+      "report_status": "passed",
+      "cleanup_confirmed": true,
+      "unknown_state_kept_stopped": true,
+      "real_PG_files_modified": false,
+      "post_error_app_and_Postgres_PID": [
+        0,
+        0
+      ],
+      "resource_samples": 20,
+      "elapsed_seconds_including_preparation": 105.169916236,
+      "evidence": "pass-2.json",
+      "public_file_sha256": "1453889a0550022a93f59e14bb36b3176ffabd223258cc51d95cae6393050fb6",
+      "actual_guest_image_sha256": "6a81c37564db9b1ee84e141922625e1d7c5b389b99bb3c572e0243607d5bb4d2"
+    }
+  ],
+  "original_failed_before": "../native-pitr-unknown-state-reopening-before-001.json",
+  "before_unknown_state_kept_stopped": false,
+  "before_app_Postgres_automatically_active": true,
+  "focusedRust_before_after": [
+    "../pitr-error-rust-regression-before-001.json",
+    "../pitr-error-rust-regression-after-001.json"
+  ],
+  "ordinary_performance_ELF_equivalence_claimed": false,
+  "scope": "Two independent freshownednativeVMs actualsamefixedadapter failure. Eachleftapp/PGinactivewithPID0until explicitknownmarker-onlyfixture recovery, thenrow/auth/bytecanariesandcleanupverified. ActualELFsrecordedseparately, samesix008producttrees; no bitreproducibility, actualPGfilemodification/corruption, realS3/PITRsuccessfulrestore, physicalhost/offhostdurability or finalG05certificate. No remoteoverlaptimecredit."
+}

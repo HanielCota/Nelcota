@@ -322,7 +322,69 @@
     "performance_comparisons_must_reject_instrumented_runs": true,
     "expected_extra_threads": 1,
     "expected_extra_descriptors": 1,
-    "scope": "App allocation accounting only; does not attribute RustFS MiMalloc live owners or replace any ordinary final pass."
+    "scope": "App allocation accounting only; does not attribute RustFS MiMalloc live owners or replace any ordinary final pass.",
+    "final008_predeclaration": {
+      "declared_utc": "2026-10-17T19:51:30.685316+00:00",
+      "status": "conditional predeclared; not started",
+      "source_commit": "da262d77f4d2557ff5cbd9007b9a3a6273a92221",
+      "campaigns": [
+        {
+          "run_id": "allocation-final008-disk-four-hours-001",
+          "binary": "frozen final008 with eleven corrections and rebuilt guide assets",
+          "kind": "single",
+          "arguments": [
+            "--backend",
+            "disk",
+            "--steady",
+            "60s",
+            "--workloads",
+            "read,rls,panel,storage,login,refresh,write,mixed",
+            "--soak-seconds",
+            "14400",
+            "--capacity",
+            "--capacity-step-seconds",
+            "300",
+            "--spikes",
+            "--fixture-disk-mib",
+            "1024",
+            "--wal-mib",
+            "256",
+            "--soak-fraction",
+            "0.7",
+            "--calibration-ceiling",
+            "400",
+            "--s3-memory-mib",
+            "1024",
+            "--storage-fixture-disk-mib",
+            "1024",
+            "--final-idle-seconds",
+            "180",
+            "--write-steady-rate",
+            "50",
+            "--allocation-probe",
+            "/workspace/Nelcota/target/stress-g05/artifacts/allocation-probe-001/libg05alloc.so"
+          ],
+          "scope": "Conditional separate instrumented ownership diagnostic if late post-warm anonymous-memory growth persists in final ordinary campaigns. Same four-hour mixed disk load and original quotas/SLOs; one additional observer thread/descriptor, no forced trimming. No ordinary performance or regression certification from LD_PRELOAD instrumentation.",
+          "previous_unstarted_or_superseded_plan_run_id": "allocation-final007-disk-four-hours-001"
+        }
+      ],
+      "probe_profile": {
+        "kind": "owned glibc mallinfo2 diagnostic",
+        "library_sha256": "a5396ed7b8ed580f27dbfe7358444c734b1a486e9566e41114fa6ef5636f9ec3",
+        "source_sha256": "f833882f9c9697d7e838871dad3d398fb6427e78b21104d30ea8fcd7f13678f3",
+        "sample_period_ms": 5000,
+        "expected_extra_threads": 1,
+        "expected_extra_descriptors": 1,
+        "maximum_bytes_per_process": 1048576,
+        "scope": "instrumented ownership diagnostic; cannot certify ordinary performance or G05",
+        "in_use_scope": "glibc accounting includes allocator thread caches, not an exact application-object census"
+      },
+      "trigger": "Unexplained lateanonymousgrowth persists on new008ordinary disk/S3 repetitions, like confirmed007disk26.81to28.60MiB; conditionalcase has no performancecertificate and does not replace anyordinarycase.",
+      "scope": "Same priorfourhour14400sG05disk mixedprofile and argumentvector; oneextraobserverthread/FD, noforcedmalloc_trim. Existingvalidatedglibcprobe reused, not rebuilt during live load. Manualserializedlaunchonlyafterordinary008closes andbeforepostload; neverrunconcurrently.",
+      "runner_sha256": "5b777f20faa1d02cd3b95574b5889e2a34ddcd4b7ea0179d010f3d68d70a9a40",
+      "plan_sha256": "15bf76de5c20647c6086cffaced07ed901effc1fac7dfc00c07dac6a21686618",
+      "runner": "run-planned-campaign-once-v11-allocation.py"
+    }
   },
   "retained_s3_baseline_retry": {
     "declared_utc": "2026-10-17T02:13:19.494144+00:00",

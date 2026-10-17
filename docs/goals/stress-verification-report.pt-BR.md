@@ -2,7 +2,7 @@
 
 **Estado: em execução, sem aprovação do G05.** Este relatório é atualizado
 durante as campanhas. Checkpoint de carga consolidada: 17/10/2026, 18:57 UTC.
-Atualização da investigação: 17/10/2026, 19:31 UTC.
+Atualização da investigação: 17/10/2026, 19:57 UTC.
 Não houve merge nem deploy de produção. O trabalho está na branch
 `test/g05-stress-verification`, no [PR #90](https://github.com/Nelcota/Nelcota/pull/90),
 mantido como rascunho para revisão.
@@ -20,7 +20,7 @@ O tempo parcial das campanhas ainda abertas não está somado nesse checkpoint.
 |---|---|
 | Código após as correções de cancelamento SQL/export e de exportação grande não consumida | Regressões reais aprovadas; [último antes/depois](results/stress/export-large-unpolled-deadline-after.json) inclui 17 testes. Binário final reconstruído; campanhas afetadas continuam pendentes |
 | SHA-256 do binário de baseline preservado | `75c44c85a85db26195166aa1d2c6caf481e3db476801ec8131525ef62adf1be0` |
-| Candidato008 congelado | Fonte `da262d77f4d2557ff5cbd9007b9a3a6273a92221`; ELF SHA-256 `aa0967f175d13410d4085841c1e1351597b7d38c7cab8adf51963bfa57336a73`, 30.484.800 bytes. [Build limpo](results/stress/final-local-candidate-da262d7.json) release com lockfile verificado, 4 jobs, thin LTO/codegen1, 88,810 s. Inclui as onze correções. Smoke dos cinco cenários aprovado; CI completo, duas VMs PITR e campanhas longas008 ainda pendentes. |
+| Candidato008 congelado | Fonte `da262d77f4d2557ff5cbd9007b9a3a6273a92221`; ELF SHA-256 `aa0967f175d13410d4085841c1e1351597b7d38c7cab8adf51963bfa57336a73`, 30.484.800 bytes. [Build limpo](results/stress/final-local-candidate-da262d7.json) release com lockfile verificado, 4 jobs, thin LTO/codegen1, 88,810 s. Inclui as onze correções. Smoke dos cinco cenários, CI18/18 e duas VMs reais do erro PITR aprovados. Primeira campanha S3 ativa; nova suíte nativa completa e demais campanhas008 pendentes. |
 | Candidato local007 preservado | `35f4a9725d7edcf571f91084c555c127e7323653`; SHA-256 `96811748f1f45ad4894114188642f9343df661c750ad22768eaf2275659081b1`; 30.484.800 bytes; build release de 93,286 s. [Proveniência](results/stress/final-local-candidate.json). Inclui as dez correções e os guias reconstruídos. Checkout limpo antes/depois do build. Smoke HTTP real dos cinco cenários aprovado; primeira endurance final em disco e oito comparações aprovadas. CI18/18 e suíte nativa12/12 passaram nas mesmas árvores de produto; primeira campanha S3 em execução, segundas passagens pendentes |
 | Candidato006 preservado | Fonte `860d2f9`; ELF `c7e3d254...`; [proveniência histórica](results/stress/final-local-candidate-860d2f9.json). CI18/18, native12/12 e dois ciclos browser com sobreposição real passaram nesse produto. A décima correção posterior exige novas verificações |
 | Candidato anterior preservado | Fonte `f40774e`; ELF `9cc6cbf0...`; [proveniência histórica](results/stress/final-local-candidate-f40774e.json). CI ordinário 18/18 e suíte nativa 12/12 passaram nesse produto; esses resultados não certificam a correção posterior do SDK |
@@ -58,14 +58,14 @@ O backend de produção continua um único binário Rust, sem Node ou Python.
 | 1 | Inventário, baseline imutável e SLOs declarados | Atendido para o staging local | [Inventário](results/stress/coverage-inventory.json), [plano](results/stress/final-campaign-plan.json), manifestos por execução. A matriz registra os cenários ainda incompletos. |
 | 2 | Calibração, unidades, amostragem e oráculos | Duas matrizes reais corrigidas aprovadas; fechamento ordinário pendente | [Duas passagens](results/stress/matrix-sdk007-two-corrected-passes-001.json): degraus de 300 s em 16/32/48/64 iterações/s, oráculos completos, 43 controles por passagem, sem chegadas perdidas. Não prova capacidade máxima nem fecha os demais perfis. |
 | 3 | Cancelamento, watchdogs, redação e limpeza restrita | Demonstrado nos escopos local e nativo executados | [Controle nativo de guardas/pidfd](results/stress/native-guards-pidfd.json), interrupções reais e recibos de limpeza. A VM própria também confirmou limpeza e limites reais de kernel, sem guard crítico disparado nas execuções aprovadas. |
-| 4 | Duas passagens de steady/staircase/picos/descanso | Primeira007 em disco aprovada; final008 pendente | [Disco final007](results/stress/disk-final007-pass-1-001.json) concluiu 4.290 s de fases prévias e 14.400 s de endurance; oito comparações aprovadas. S3 foi encerrado com limpeza após o novo defeito PITR; campanhas008 precisam executar. |
-| 5 | Toda a matriz funcional, de segurança e concorrência | Parcial | Duas matrizes completas e dois ciclos browser/auth medidos passaram no produto007. O browser provou sobreposição real e expiração. Falhas históricas continuam preservadas; SMTP/OAuth e os demais cenários não executados não recebem aprovação por inferência. |
+| 4 | Duas passagens de steady/staircase/picos/descanso | Primeira007 em disco aprovada; primeira008S3 em execução | [Disco final007](results/stress/disk-final007-pass-1-001.json) concluiu 4.290 s de fases prévias e 14.400 s de endurance; oito comparações aprovadas. S3 parcial007 foi encerrado com limpeza após o defeito PITR; primeira008S3 iniciou após CI e duas VMs corrigidas passarem. |
+| 5 | Toda a matriz funcional, de segurança e concorrência | Parcial | Duas matrizes completas e dois ciclos browser/auth medidos passaram no produto007. O smoke008 de cinco cenários e a correção PITR em duas VMs passaram; novas matrizes/browser008 ainda precisam executar. Falhas históricas continuam preservadas; SMTP/OAuth e os demais cenários não executados não recebem aprovação por inferência. |
 | 6 | Isolamento/fairness em 1/5/10 projetos e controle responsivo | Reprovado/incompleto | Cinco/dez projetos tiveram falhas anteriores de fairness/drain. Novo smoke compartilhado falhou com 101 registros, incluindo 8 SLOs absolutos. Smoke de cotas de 10ms falhou com 106 registros relativos, sem falhas absolutas; 1.381 eventos íntegros e limpeza completa. Nenhum smoke substitui os passos obrigatórios de cinco minutos. |
-| 7 | Quatro horas contínuas em disco e S3 no artefato final |007disco aprovado; novo008 ainda sem endurance | [Disco final007](results/stress/disk-final007-pass-1-001.json): 14.403,997 s reais para 14.400 s solicitados, mesmos processos, 4 chegadas perdidas dentro do limite original e zero rejeições por sobrecarga. S3 parcial007 interrompido, sem aprovação. Repetição008 obrigatória. Resultados históricos com contadores incompletos continuam reprovados. |
-| 8 | Falhas, drain, restart, restore e deployment aplicável | Parcial | Duas matrizes finais restauraram alvo local novo; RTO 2,597/2,500 s. [Dois cortes com write realmente observado em voo](results/stress/native-final007-inflight-controls-001/index.json) passaram, com reconciliação e canários reais. Probe PITR confirmou reabertura indevida; regressão passou após correção, nova VM pendente. Faults completos, atualização operacional, DNS/ACME e recuperação fora do host permanecem incompletos. |
+| 7 | Quatro horas contínuas em disco e S3 no artefato final |007disco aprovado; primeira008S3 ativa, sem soak concluído | [Disco final007](results/stress/disk-final007-pass-1-001.json): 14.403,997 s reais para 14.400 s solicitados, mesmos processos, 4 chegadas perdidas dentro do limite original e zero rejeições por sobrecarga. S3 parcial007 interrompido, sem aprovação. Repetição008 obrigatória. Resultados históricos com contadores incompletos continuam reprovados. |
+| 8 | Falhas, drain, restart, restore e deployment aplicável | Parcial | Duas matrizes finais restauraram alvo local novo; RTO 2,597/2,500 s. [Dois cortes com write realmente observado em voo](results/stress/native-final007-inflight-controls-001/index.json) passaram, com reconciliação e canários reais. Probe PITR confirmou reabertura indevida; após correção, seis regressões e [duas VMs008](results/stress/native-pitr-error-final008-after-001/index.json) passaram, mantendo os serviços parados. Suíte008 comum de12 casos em execução. Faults completos, atualização operacional, DNS/ACME e recuperação fora do host permanecem incompletos. |
 | 9 | Recursos, invariantes de dados/arquivos/eventos e regressão | Primeira passagem em disco aprovada no escopo medido; atribuição de memória incompleta | [Disco final007](results/stress/disk-final007-pass-1-001.json): 257.626 eventos distintos íntegros, 129 objetos byte a byte, zero OOM; seis plateaus com 24 descritores/4 tarefas/18 sockets. Mediana anônima 26,81→28,60 MiB ainda exige atribuição, assim como o provedor. [Oito comparações](results/stress/disk-final007-pass-1-comparison-001.json) passaram. |
-| 10 | Correções focadas e regressões dos defeitos confirmados | Onze defeitos reproduzidos; regressões focadas aprovadas, novas campanhas pendentes | Seis falhas na CLI, três de SQL/export e duas no SDK. A nova falha religava serviços após erro potencialmente modificador no restore: VM real e Rust reprovados antes; seis testes PITR aprovados depois. Nova VM008 e campanhas afetadas obrigatórias. Startup original e fairness continuam abertos. |
-| 11 | Rust/UI/SDK/lint/CI correspondentes ao SHA testado | Produto007 e executor2c8e10c aprovados; produto008 ainda precisa CI | [CI 2c818/18](results/stress/ci-host-bootstrap-and-native-pitr-product-trees.json), SDK204/204 e [native12/12](results/stress/native-final-suite/index.json). Checkout real do SDK tem a árvore completa de 2c8 e seis árvores de produto do build. A segunda tentativa real de arquivos falhou na publicação/encerramento após N1; a correção do executor exige CI e nova VM. |
+| 10 | Correções focadas e regressões dos defeitos confirmados | Onze defeitos reproduzidos; regressões focadas aprovadas, novas campanhas pendentes | Seis falhas na CLI, três de SQL/export e duas no SDK. A nova falha religava serviços após erro potencialmente modificador no restore: VM real e Rust reprovados antes; seis testes PITR aprovados depois. Duas VMs008 verificaram a correção e a limpeza; campanhas afetadas continuam obrigatórias. Startup original e fairness permanecem abertos. |
+| 11 | Rust/UI/SDK/lint/CI correspondentes ao SHA testado | Fonte008 aprovada18/18; nova suíte nativa completa pendente | [CI da262d718/18](results/stress/ci-final008-product-source.json), SDK204/204 e descoberta Python completa aprovados. Checkout SDK real78bacc83 tem a árvore completa da fonte008 e suas seis árvores de produto. Nova suíte nativa39064489119 em execução; os12 resultados atuais do índice nativo ainda são007. A coleta de arquivos tem62 controles aprovados, mas exige novo preflight real008. |
 | 12 | Relatório, limites e todos os testes falhos/bloqueados/não executados | Em consolidação | Este relatório e o [registro detalhado](stress-verification-execution.md) preservam os resultados; ainda há campanhas abertas. |
 
 ## Falha original do navegador: SLO de refresh ainda sem causa confirmada
@@ -1350,3 +1350,48 @@ smoke aprovados, além de verificar os manifestos reais do ELF e a ausência
 de recursos antigos. Rascunhos de guards não executados foram preservados;
 um deles esperava hash no completion, e foi corrigido para conferir os dois
 manifestos que realmente o registram, sem relaxar a comparação do artefato.
+
+
+## CI008 e duas repetições reais PITR aprovados — 19:57 UTC
+
+A [fonte do build008](results/stress/ci-final008-product-source.json) encerrou
+18/18 verificações. A suíte SDK confirmou204/204; o checkout realmente
+executado78bacc839bed8fd89e16a79de911f7f35de58c0b contém a fonte da262d7
+nos pais e a mesma árvore completa fa79743c93d3bc9f9c62379726986097cff345d7.
+As seis árvores de produto008 conferem. A descoberta Python completa passou,
+sem inventar sua contagem. O commit posterior de documentação tem seu próprio
+CI; os resultados de produto são vinculados ao build identificado.
+
+As [duas VMs corrigidas](results/stress/native-pitr-error-final008-after-001/index.json),
+workflows39063548584 e39064039025, aprovaram o mesmo adaptador que falhou
+antes. Após o erro, ambas registraram PostgreSQL e app inativos, com PID0,
+antes da recuperação explícita. Depois verificaram linhas preservadas e
+401/RLS vazio/arquivo privado404, remoção do fault e limpeza.18/20 amostras,
+mesma imagem de convidada e budgets declarados. Os ELFs reais de cada VM
+estão registrados separadamente; não é prova de reprodução byte a byte.
+O resultado anterior reprovado permanece preservado. A injeção modificou
+somente o marcador inerte e não prova restore PITR/S3 real ou corrupção.
+
+Às19:54:50UTC, após esses gates, o owner008 iniciou a primeira campanha
+S3-final008-pass-1-001. Preparação/aquecimento e parciais não adicionam
+tempo ao checkpoint020. A suíte nativa008 começou separadamente no workflow
+39064489119, com12 casos seriais, um ELF comum e duas VMs independentes por
+cenário. Seu owner interrompe avanço no primeiro job reprovado, preserva a
+evidência e cancela somente esse workflow próprio; limite3h para o workflow.
+Nenhum caso pendente foi aprovado por inferência.
+
+O cálculo somente de leitura para10 projetos/Caddy encontrou uma limitação
+real de disco:15.580.618.752 bytes livres para16.062.994.022,4 exigidos pelo
+perfil, incluindo15% de reserva,1.536MiB de dados e8.440MiB de startup no
+driver vfs. Déficit482.375.270,4 bytes; nenhum recurso de dez projetos foi
+criado e nenhum gate foi reduzido. Manutenção adicional de cache foi barrada
+assim que a campanha008 iniciou; não executou verificações nem remoções.
+Reavaliar somente depois da carga encerrar, usando caches próprios
+reconstruíveis com integridade comprovada. Recursos estrangeiros e caches
+Docker sem propriedade comprovada permanecem preservados.
+
+O diagnóstico condicional de memória ganhou um ID008 próprio, com o mesmo
+probe glibc validado, quatro horas de soak e uma thread/descritor adicional.
+Não iniciou, não força trim e não substitui performance ordinária nem atribui
+objetos vivos do RustFS. A decisão depende dos plateaus finais008 e sua
+execução será serial.

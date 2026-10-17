@@ -3684,3 +3684,41 @@ removidos, mas espaço realmente livre subiu só195051520bytes (camadas/COW);
 não inferir espaço recuperado pelo tamanho lógico. Source, frozenELFs,
 baselines/testbinaries/logs/evidence e recursos estrangeiros intactos.
 Preflight de10projetos ainda pode bloquear; reserva não será reduzida.
+
+
+### 2026-10-17, 19:57 UTC — duas VMs PITR008 passaram; S3 e suíte nativa avançaram
+
+CI008da262d7 fechou18/18 às19:41:21UTC. SDK204, checkout real78bacc83 root
+fa79743c93d3bc9f9c62379726986097cff345d7 igual à fonte; seis árvores008
+conferem, descoberta Python passou sem contagem inferida.
+[Prova](results/stress/ci-final008-product-source.json).
+
+Remote014 completou duas VMs reais aprovadas:39063548584/job117486348932,
+ELFe8390792c87d08239a10004ece15970883aac52299ba5f168725ba27f5225dd3,18samples;
+39064039025/job117487807352,ELF45f05cf07536768ab2d2f09df1c2f9ce4f7fce4215b0ed920bdabd2eee96a849,
+20samples. Ambas app/PGinactivePID0 no erro, recuperação explícita/rows/401/
+RLSvazio/404 ecleanuptrue. Tempos94,204/105,170s incluem preparo e não
+são comparação de performance. Mesmaimagem6a81c3 e adaptadorSHAde3112f.
+[Índice e originais](results/stress/native-pitr-error-final008-after-001/index.json).
+
+Launcher liberou chain008 às19:54:50.759UTC,pid24662,geração33045603.
+Ativo s3-final008-pass-1-001; draftguardedv2 verificou actualfixture/launch
+hashes,smoke,CI e dois afterVMs/cleanup. Pré-compilação/testes/compressão locais suspensos
+durante provider. Quatro casos em sequência,30howner/8hwrapper.
+Remote015pid23682/geração32986970 começouworkflow39064489119 para12native
+casos commonELF, máximo3hworkflow/6hownerincluindoprereq. Sem resultado
+completo alegado; stopfirstfailedjob/cancelonlyownedsource/ref.
+
+Preflight read-only de10projetos bloqueou por482375270,4bytes:free
+15580618752,required16062994022,4, vfs2x, perproject780MiB, startup8440MiB,
+PGdata1536MiB e15%reserve.0resourcecreation. Cachemaintenance001removeu0
+porque manifestos de checksum por arquivo são de vendor, não da extração
+normal do registry;707pastas preservadas. Nova verificação planejava comparar
+Cargo.lock archiveSHA e cada byte TAR/source, mas guardinitial detectou
+chain008iniciada e abortou antes de qualquer leitura pesada/remoção.
+Não afrouxar integridade ou reserva; retomar somente após fim da carga.
+
+Adicionar diagnóstico condicional allocation-final008-disk-four-hours-001
+a plano privado008/runnerallocationv11, não iniciado. Mesmo vetor antigo
+007,DSOa5396ed7,sourcef833882f,uma thread/FD,semtrim,nãocertificaperformance.
+É separado dos19casos ordinários/grandes/fault/host e não substitui nenhum.
