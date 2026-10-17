@@ -2117,3 +2117,32 @@ was dispatched on the same source with twelve fresh, serialized outer/guest
 VM cases and its own common Actions-built ELF. Neither its completion nor
 bit identity with the separate local build is assumed. Both final local
 backend passes and all other remaining matrix cells stay open.
+
+
+### Final-source ordinary CI and twelve native cases passed (2026-10-17 01:56 UTC)
+
+All [eighteen ordinary checks](results/stress/ci-final-artifact-source.json)
+on the frozen product source `7e68fd2` passed, including the panel asset drift
+guard, Rust/real services, SDKs, supply chain and CodeQL. The original failed
+asset/identity/CodeQL receipts remain unchanged.
+
+[Native suite 38990677734](results/stress/native-final-suite/index.json)
+completed all twelve serial cases successfully on fresh disposable outer/guest
+VMs, with confirmed cleanup and no critical guard failure. Every case used
+the same 30,452,336-byte Actions-built ELF, SHA-256
+`010d0fc52f5cc5961f56baf6902294abfcc2c9d855ccbf7605e4b91e8a89a45c`.
+The bounded original notice reports are preserved with their transport hashes.
+Ten application cases contain twelve actual deployed-inode/running/provided
+byte comparisons in total, including the two post-power-cut processes.
+No bit identity with the separate local performance build is claimed.
+
+Both native runtimes reconciled all thirty external ACKs with zero missing,
+duplicate or extra operations and matching private file bytes. Restore took
+2.014/2.376 seconds; guest boot recovery took 17.782/17.260 seconds. Both final
+idle apps had 14 descriptors/ten sockets/three tasks. These functional results
+do not certify in-flight cut writes, physical host power loss, fresh/off-host
+restore, public ACME, PITR or endurance capacity. Preparation and overlapping
+native/local observations do not increase the conservative effective-load
+checkpoint. The retained S3 baseline remains active, and the four predeclared
+final disk/S3 endurance campaigns are serialized behind verified closure;
+failed workload/evidence/cleanup/comparison gates stop that chain.

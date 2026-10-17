@@ -1,7 +1,7 @@
 # G05 — relatório técnico de stress
 
 **Estado: em execução, sem aprovação do G05.** Este relatório é atualizado
-durante as campanhas. Data deste checkpoint: 17/10/2026, 01:19 UTC.
+durante as campanhas. Data deste checkpoint: 17/10/2026, 01:56 UTC.
 Não houve merge nem deploy de produção. O trabalho está na branch
 `test/g05-stress-verification`, no [PR #90](https://github.com/Nelcota/Nelcota/pull/90),
 mantido como rascunho para revisão.
@@ -19,7 +19,7 @@ O tempo parcial das campanhas ainda abertas não está somado nesse checkpoint.
 |---|---|
 | Código do backend sob carga local | `2efede8c27ee12119142170e8bd9742ff7cb900e` |
 | SHA-256 do binário local preservado | `75c44c85a85db26195166aa1d2c6caf481e3db476801ec8131525ef62adf1be0` |
-| Candidato local final congelado | `7e68fd21430ac93125149f60927f8676b077811d`; SHA-256 `b047fb880feb10e41e7d0308e6037b8cd3bc770b0452a30cab59c3e2d20514a0`; [proveniência](results/stress/final-local-candidate.json), carga/CI finais pendentes |
+| Candidato local final congelado | `7e68fd21430ac93125149f60927f8676b077811d`; SHA-256 `b047fb880feb10e41e7d0308e6037b8cd3bc770b0452a30cab59c3e2d20514a0`; [proveniência](results/stress/final-local-candidate.json), [18 checks ordinários aprovados](results/stress/ci-final-artifact-source.json), carga final pendente |
 | SHA-256 do workload k6 atual | `0ac01578bf19155302fe465884b480d792569086f23bb4ba3615ca5f0ce2547d` |
 | Protocolo da repetição local em andamento | Snapshot imutável de `1f391594dd8db6cccac54d6720d90c33d461d1f1`; `disk-final-pass-1-002` concluiu como baseline no binário retido, com protocolo atual |
 | Primeira execução nativa separada | [Actions 38962480993](https://github.com/Nelcota/Nelcota/actions/runs/38962480993), código congelado `e80770b3f6aa1f64d011a3d62f8ebf0f1201bdac`; reprovada no oráculo de signup antes do backup |
@@ -49,10 +49,10 @@ O backend de produção continua um único binário Rust, sem Node ou Python.
 | 5 | Toda a matriz funcional, de segurança e concorrência | Parcial | CI funcional, primeiros browser/fault e smokes reais disponíveis; cobertura funcional não substitui stress repetido de cada célula. |
 | 6 | Isolamento/fairness em 1/5/10 projetos e controle responsivo | Reprovado/incompleto | Primeira topologia de um projeto passou no protocolo anterior; cinco/dez projetos tiveram violações reais de fairness. Dez projetos também falharam no drain de 30 s. |
 | 7 | Quatro horas contínuas em disco e S3 no artefato final | Pendente | Três execuções históricas completaram fisicamente quatro horas, com aprovação de contadores retirada. Uma nova campanha em disco passou no protocolo atual, como baseline; as campanhas de quatro horas do novo candidato ainda não executaram. |
-| 8 | Falhas, drain, restart, restore e deployment aplicável | Parcial | Primeiro fault passou com reconciliação de ACKs e restore local novo. Dois fluxos nativos passaram no escopo de restore no mesmo alvo e perda da RAM da convidada. Repetição final, atualização operacional, DNS/ACME públicos e recuperação fora do host continuam incompletos. |
+| 8 | Falhas, drain, restart, restore e deployment aplicável | Parcial | Primeiro fault passou com reconciliação de ACKs e restore local novo. Dois fluxos nativos passaram no escopo de restore no mesmo alvo e perda da RAM da convidada. Repetição final de faults/carga, atualização operacional, DNS/ACME públicos e recuperação fora do host continuam incompletos. |
 | 9 | Recursos, invariantes de dados/arquivos/eventos e regressão | Parcial | Invariantes locais e plateaus observados; precisam das campanhas finais comparáveis. Retenção anônima do provedor ainda exige atribuição. |
 | 10 | Correções focadas e regressões dos defeitos confirmados | Verificado nos defeitos já reproduzidos; revisão continua | Antes/depois em cinco defeitos reais: cluster incorreto, unit relativa, outro host nativo, lease aninhado na migração e sucesso indevido de remoção com limpeza incompleta. Os cenários específicos passaram em VMs novas. A falha da fixture Rust teve local original recuperado e passou 1.000 repetições após I/O de prontidão; o erro original continua visível. Fairness não recebeu causa de produção inventada. |
-| 11 | Rust/UI/SDK/lint/CI correspondentes ao SHA testado | Parcial | [18 checks de `1f39159`](results/stress/ci-1f39159.json) passaram. O [CodeQL corrigido](results/stress/codeql-invalid-fixtures-before-after.json) passou em `f560493`; [CI de `85b3c5a`](results/stress/ci-85b3c5a.json): 18 success, quatro skipped e falha somente no guard de assets do painel. Job Rust completo e CodeQL passaram, incluindo as novas regressões de limpeza. A falha Rust original de `14725d6` continua preservada com diagnóstico e correção da fixture; CI final após assets ainda incompleto. `dist` continua pendente de rebuild separado. Falhas anteriores permanecem registradas. |
+| 11 | Rust/UI/SDK/lint/CI correspondentes ao SHA testado | Aprovado na fonte congelada `7e68fd2` | [18 checks ordinários](results/stress/ci-final-artifact-source.json), incluindo Rust/serviços reais, painel e assets, SDKs, supply chain e CodeQL. As 12 execuções nativas também passaram no mesmo source, com ELF próprio comum. Falhas anteriores de Rust, fixtures CodeQL e assets continuam preservadas; alterações futuras exigem a revalidação afetada. |
 | 12 | Relatório, limites e todos os testes falhos/bloqueados/não executados | Em consolidação | Este relatório e o [registro detalhado](stress-verification-execution.md) preservam os resultados; ainda há campanhas abertas. |
 
 ## Staging e limites
@@ -219,7 +219,7 @@ de descoberta/publicação. O relatório original permanece bloqueado e o job or
 | `9e1f236` / `4ffad18` | Descoberta limitada do alocador real; prefixo, disponibilidade e permissão do artefato corrigidos. |
 | `85b3c5a` | Preflight e propagação de erros na limpeza nativa de pgBackRest/PITR; falha e repetição real de remoção preservadas. |
 | `c98aaaf` / `5fab62a` | I/O de prontidão da fixture de identidade; 1.000/1.000 repetições reais aprovadas. |
-| `ffae0e5` | Suite manual de seis cenários nativos em duas passagens com o mesmo ELF; verificação do processo ativo; execução final ainda pendente. |
+| `ffae0e5` | Suíte manual de seis cenários nativos em duas passagens com o mesmo ELF; as 12 execuções finais passaram na fonte `7e68fd2`, com verificação do processo ativo. |
 | `a9bb8c2` | Diagnóstico CI HTTPS limitado, sem encaminhamento de token nem publicação de assertions. |
 | `e4e89d3` / `5abdf2a` | Fixtures aleatórias e distinção entre candidato de validação e credencial efetiva; segunda falha preservada e CodeQL posterior aprovado. |
 
@@ -227,7 +227,7 @@ O [CI completo registrado de `85b3c5a`](results/stress/ci-85b3c5a.json)
 mostra 18 checks aprovados, quatro jobs opcionais ignorados e uma falha, no
 guard de assets do painel. As etapas de check/test/build do painel e o job
 Rust completo (com as quatro regressões novas de limpeza) passaram.
-CodeQL também passou; o source final depois dos assets continua pendente.
+CodeQL também passou. Depois do rebuild separado dos assets, os [18 checks ordinários de `7e68fd2`](results/stress/ci-final-artifact-source.json) passaram; o registro reprovado anterior continua preservado.
 
 Os 290 testes Python atuais passaram em 14,987 s. A execução anterior
 teve dois erros porque TMPDIR estava em target/, ignorado pelo Oxlint:
@@ -272,10 +272,18 @@ AWS/S3 remoto, restauração fora do host, PITR configurado, ARM64, gerador em
 outra máquina e DNS/ACME públicos seguem sem alvo configurado. A VM KVM
 tem uma execução inicial reprovada por oráculo, dois fluxos completos
 aprovados em seus próprios hashes, cinco defeitos reais reproduzidos com regressões
-aprovadas em seus escopos, controle real de relógio aprovado e outras verificações em andamento. A repetição
-completa do candidato final continua pendente. O novo target native-suite
-congela um único ELF para os seis cenários em duas passagens próprias;
-a preparação e cinco regressões do artefato não são doze casos já executados.
+aprovadas em seus escopos e controle real de relógio aprovado. A [suíte final](results/stress/native-final-suite/index.json) concluiu **12/12 casos**,
+os seis cenários em duas passagens próprias, na fonte `7e68fd2`.
+Seu ELF comum `010d0fc52f5cc5961f56baf6902294abfcc2c9d855ccbf7605e4b91e8a89a45c`
+foi conferido em todos os casos. Houve 12 verificações de inode/digest
+do processo ativo, incluindo depois dos dois cortes de energia da VM.
+Todos confirmaram limpeza e ausência de guard crítico disparado.
+Os dois runtimes reconciliaram 30 ACKs cada, com zero perdas/duplicados/extras.
+RTO de restore: **2,014 e 2,376 s**; recuperação da convidada: **17,782 e
+17,260 s**. App em repouso, nas duas VMs: **14 FDs, dez sockets, três tarefas**.
+Esses tempos incluem um teste funcional pequeno; preparação nativa e
+janelas simultâneas não aumentaram o checkpoint de carga efetiva local.
+As duas passagens de endurance do candidato local continuam pendentes.
 A perda de RAM da convidada não certifica perda de energia do host físico. Nenhum desses
 impedimentos foi substituído silenciosamente por mock ou critério menor.
 

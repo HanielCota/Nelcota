@@ -21,12 +21,9 @@
         "scope": "Existing real-PostgreSQL auth, independent consumers, rotation/revocation, recovery links and bounded password-worker cancellation; release-load endurance still pending.",
         "test_count": null,
         "latest_confirmed_ci": {
-          "source_commit": "1f391594dd8db6cccac54d6720d90c33d461d1f1",
-          "evidence": "ci-1f39159.json",
-          "checks": [
-            "check"
-          ],
-          "scope": "Existing functional subset repeated in matching CI; no new load/topology or production certification."
+          "source_commit": "7e68fd21430ac93125149f60927f8676b077811d",
+          "evidence": "ci-final-artifact-source.json",
+          "scope": "Existing functional subset repeated in exact frozen-source CI; whole stress/topology row remains separate."
         }
       },
       "native_diagnostics": [
@@ -117,12 +114,9 @@
         "scope": "Existing REST/RPC/RLS, paging, admission and catalog regressions on real PostgreSQL; native million-row load profile still pending.",
         "test_count": null,
         "latest_confirmed_ci": {
-          "source_commit": "1f391594dd8db6cccac54d6720d90c33d461d1f1",
-          "evidence": "ci-1f39159.json",
-          "checks": [
-            "check"
-          ],
-          "scope": "Existing functional subset repeated in matching CI; no new load/topology or production certification."
+          "source_commit": "7e68fd21430ac93125149f60927f8676b077811d",
+          "evidence": "ci-final-artifact-source.json",
+          "scope": "Existing functional subset repeated in exact frozen-source CI; whole stress/topology row remains separate."
         }
       },
       "native_diagnostics": [
@@ -213,12 +207,9 @@
         "scope": "Existing concurrent password/account/storage mutations and rollback regressions. The new native discarded post-COMMIT reply campaign is not certified by this subset.",
         "test_count": null,
         "latest_confirmed_ci": {
-          "source_commit": "1f391594dd8db6cccac54d6720d90c33d461d1f1",
-          "evidence": "ci-1f39159.json",
-          "checks": [
-            "check"
-          ],
-          "scope": "Existing functional subset repeated in matching CI; no new load/topology or production certification."
+          "source_commit": "7e68fd21430ac93125149f60927f8676b077811d",
+          "evidence": "ci-final-artifact-source.json",
+          "scope": "Existing functional subset repeated in exact frozen-source CI; whole stress/topology row remains separate."
         }
       },
       "native_diagnostics": [
@@ -254,12 +245,9 @@
         "scope": "Existing committed DDL, failed catalog refresh, concurrent migration export and cancellation regressions.",
         "test_count": null,
         "latest_confirmed_ci": {
-          "source_commit": "1f391594dd8db6cccac54d6720d90c33d461d1f1",
-          "evidence": "ci-1f39159.json",
-          "checks": [
-            "check"
-          ],
-          "scope": "Existing functional subset repeated in matching CI; no new load/topology or production certification."
+          "source_commit": "7e68fd21430ac93125149f60927f8676b077811d",
+          "evidence": "ci-final-artifact-source.json",
+          "scope": "Existing functional subset repeated in exact frozen-source CI; whole stress/topology row remains separate."
         }
       },
       "native_diagnostics": [
@@ -289,12 +277,9 @@
         "scope": "Existing real-file storage API, paths, listings, quotas, concurrent replacements and cancellation cases; continuous disk endurance still pending.",
         "test_count": null,
         "latest_confirmed_ci": {
-          "source_commit": "1f391594dd8db6cccac54d6720d90c33d461d1f1",
-          "evidence": "ci-1f39159.json",
-          "checks": [
-            "check"
-          ],
-          "scope": "Existing functional subset repeated in matching CI; no new load/topology or production certification."
+          "source_commit": "7e68fd21430ac93125149f60927f8676b077811d",
+          "evidence": "ci-final-artifact-source.json",
+          "scope": "Existing functional subset repeated in exact frozen-source CI; whole stress/topology row remains separate."
         }
       },
       "native_diagnostics": [
@@ -376,12 +361,9 @@
         "scope": "Explicit storage_s3 ignored tests were run against real RustFS, including multipart, grant expiry, timeout/cancel cleanup. A continuous four-hour release campaign is a separate gate.",
         "test_count": null,
         "latest_confirmed_ci": {
-          "source_commit": "1f391594dd8db6cccac54d6720d90c33d461d1f1",
-          "evidence": "ci-1f39159.json",
-          "checks": [
-            "check"
-          ],
-          "scope": "Existing functional subset repeated in matching CI; no new load/topology or production certification."
+          "source_commit": "7e68fd21430ac93125149f60927f8676b077811d",
+          "evidence": "ci-final-artifact-source.json",
+          "scope": "Existing functional subset repeated in exact frozen-source CI; whole stress/topology row remains separate."
         }
       },
       "native_diagnostics": [
@@ -432,12 +414,9 @@
         "scope": "Existing real HTTP receivers, signatures/retries/leases/workers and the full 100000-event retained-history boundary. 99999 history fixtures are explicitly cancelled, not claimed network deliveries.",
         "test_count": null,
         "latest_confirmed_ci": {
-          "source_commit": "1f391594dd8db6cccac54d6720d90c33d461d1f1",
-          "evidence": "ci-1f39159.json",
-          "checks": [
-            "check"
-          ],
-          "scope": "Existing functional subset repeated in matching CI; no new load/topology or production certification."
+          "source_commit": "7e68fd21430ac93125149f60927f8676b077811d",
+          "evidence": "ci-final-artifact-source.json",
+          "scope": "Existing functional subset repeated in exact frozen-source CI; whole stress/topology row remains separate."
         }
       },
       "native_diagnostics": [
@@ -510,12 +489,9 @@
         "scope": "Existing real-PostgreSQL SQL/export limits, slow/unpolled consumer cancellation, deadlines and role/connection recovery.",
         "test_count": null,
         "latest_confirmed_ci": {
-          "source_commit": "1f391594dd8db6cccac54d6720d90c33d461d1f1",
-          "evidence": "ci-1f39159.json",
-          "checks": [
-            "check"
-          ],
-          "scope": "Existing functional subset repeated in matching CI; no new load/topology or production certification."
+          "source_commit": "7e68fd21430ac93125149f60927f8676b077811d",
+          "evidence": "ci-final-artifact-source.json",
+          "scope": "Existing functional subset repeated in exact frozen-source CI; whole stress/topology row remains separate."
         }
       },
       "native_diagnostics": [
@@ -557,12 +533,9 @@
         "scope": "Existing Vite browser suites and memory regressions with explicit endpoint/response doubles. This is not a measured release-panel visual p95 under native traffic.",
         "test_count": null,
         "latest_confirmed_ci": {
-          "source_commit": "1f391594dd8db6cccac54d6720d90c33d461d1f1",
-          "evidence": "ci-1f39159.json",
-          "checks": [
-            "admin-ui"
-          ],
-          "scope": "Existing functional subset repeated in matching CI; no new load/topology or production certification."
+          "source_commit": "7e68fd21430ac93125149f60927f8676b077811d",
+          "evidence": "ci-final-artifact-source.json",
+          "scope": "Existing functional subset repeated in exact frozen-source CI; whole stress/topology row remains separate."
         }
       },
       "native_diagnostics": [
@@ -622,17 +595,9 @@
         "scope": "Existing TypeScript/Rust package, runtime, memory and server/browser contracts on documented CI runtimes; no VPS load envelope follows from these functional checks.",
         "test_count": null,
         "latest_confirmed_ci": {
-          "source_commit": "1f391594dd8db6cccac54d6720d90c33d461d1f1",
-          "evidence": "ci-1f39159.json",
-          "checks": [
-            "sdk / sdk",
-            "sdk / sdk-node (22)",
-            "sdk / sdk-node (26)",
-            "sdk-rust (ubuntu-latest)",
-            "sdk-rust (macos-latest)",
-            "sdk-rust (windows-latest)"
-          ],
-          "scope": "Existing functional subset repeated in matching CI; no new load/topology or production certification."
+          "source_commit": "7e68fd21430ac93125149f60927f8676b077811d",
+          "evidence": "ci-final-artifact-source.json",
+          "scope": "Existing functional subset repeated in exact frozen-source CI; whole stress/topology row remains separate."
         }
       },
       "native_diagnostics": [
@@ -718,12 +683,9 @@
         "scope": "Isolated root Docker lifecycle, paired backup/restore and recovery with explicit provenance/DNS/TLS/proxy doubles, plus actual 255-receipt and 256-identity boundaries.",
         "test_count": null,
         "latest_confirmed_ci": {
-          "source_commit": "1f391594dd8db6cccac54d6720d90c33d461d1f1",
-          "evidence": "ci-1f39159.json",
-          "checks": [
-            "check"
-          ],
-          "scope": "Existing functional subset repeated in matching CI; no new load/topology or production certification."
+          "source_commit": "7e68fd21430ac93125149f60927f8676b077811d",
+          "evidence": "ci-final-artifact-source.json",
+          "scope": "Existing functional subset repeated in exact frozen-source CI; whole stress/topology row remains separate."
         }
       },
       "native_diagnostics": [
@@ -738,6 +700,12 @@
           "status": "passed",
           "evidence": "native-host-root-after.json",
           "scope": "Durable machine owner candidate: specific second-directory rejection, unchanged first credential/Caddy/sentinel, no second host/unit, strict HTTPS readiness and owned cleanup. 72.176555455s including preparation, fourteen samples."
+        },
+        {
+          "run_id": "native-suite-38990677734",
+          "status": "passed",
+          "evidence": "native-final-suite/index.json",
+          "scope": "Two fresh independent passes of all six native cases using one common ELF; actual runtime inode/digest, provisioning rejection boundaries, clock restore, backup/restore,30 ACKs per runtime after guest RAM loss and cleanup. No full combined management/update stress, in-flight power cut, physical host power loss or off-host certification."
         }
       ]
     },
@@ -759,12 +727,9 @@
         "scope": "Existing upgrade/rollback acceptance against published v0.3.1 and v0.4.0 and the checkout. Public deployment/power-loss acceptance remains separate.",
         "test_count": null,
         "latest_confirmed_ci": {
-          "source_commit": "1f391594dd8db6cccac54d6720d90c33d461d1f1",
-          "evidence": "ci-1f39159.json",
-          "checks": [
-            "upgrade"
-          ],
-          "scope": "Existing functional subset repeated in matching CI; no new load/topology or production certification."
+          "source_commit": "7e68fd21430ac93125149f60927f8676b077811d",
+          "evidence": "ci-final-artifact-source.json",
+          "scope": "Existing functional subset repeated in exact frozen-source CI; whole stress/topology row remains separate."
         }
       }
     },
@@ -786,12 +751,9 @@
         "scope": "Existing owned Docker paired snapshots and restored files/database integrity. Off-host/PITR and power loss are not established.",
         "test_count": null,
         "latest_confirmed_ci": {
-          "source_commit": "1f391594dd8db6cccac54d6720d90c33d461d1f1",
-          "evidence": "ci-1f39159.json",
-          "checks": [
-            "check"
-          ],
-          "scope": "Existing functional subset repeated in matching CI; no new load/topology or production certification."
+          "source_commit": "7e68fd21430ac93125149f60927f8676b077811d",
+          "evidence": "ci-final-artifact-source.json",
+          "scope": "Existing functional subset repeated in exact frozen-source CI; whole stress/topology row remains separate."
         }
       },
       "native_diagnostics": [
@@ -812,6 +774,12 @@
           "status": "passed",
           "evidence": "native-vm-runtime-candidate-pass-1.json",
           "scope": "Native PostgreSQL candidate: exact guest binary SHA verified; normal init/migrate, RLS/file bytes, same-target restore and restart of the same guest disk preserve 30 externally recorded ACKs. 168.203009496s including preparation, 32 samples, owned cleanup confirmed."
+        },
+        {
+          "run_id": "native-suite-38990677734",
+          "status": "passed",
+          "evidence": "native-final-suite/index.json",
+          "scope": "Two fresh independent passes of all six native cases using one common ELF; actual runtime inode/digest, provisioning rejection boundaries, clock restore, backup/restore,30 ACKs per runtime after guest RAM loss and cleanup. No full combined management/update stress, in-flight power cut, physical host power loss or off-host certification."
         }
       ]
     },
@@ -833,12 +801,9 @@
         "scope": "Existing malformed input, bounded API/storage/admin admission, peer identity, webhook destination/redirect and signature regressions; public ingress stress remains separate.",
         "test_count": null,
         "latest_confirmed_ci": {
-          "source_commit": "1f391594dd8db6cccac54d6720d90c33d461d1f1",
-          "evidence": "ci-1f39159.json",
-          "checks": [
-            "check"
-          ],
-          "scope": "Existing functional subset repeated in matching CI; no new load/topology or production certification."
+          "source_commit": "7e68fd21430ac93125149f60927f8676b077811d",
+          "evidence": "ci-final-artifact-source.json",
+          "scope": "Existing functional subset repeated in exact frozen-source CI; whole stress/topology row remains separate."
         }
       },
       "native_diagnostics": [
@@ -855,7 +820,7 @@
       "area": "Public DNS/ACME/TLS, native systemd and power loss",
       "entrypoints": "docs/host-management.md; scripts/acceptance-systemd.sh",
       "status": "not run",
-      "scope_or_limit": "Three actual native provisioning defects now have scoped fresh-VM before/after evidence: PostgreSQL cluster routing, relative unit environment path and second host directory takeover. Full final runtime repetition and the extended cwd migration probe are pending. Public DNS/ACME and physical host power loss remain unavailable.",
+      "scope_or_limit": "Five provisioning faults have scoped before/after regressions. Final common-ELF suite passed all six cases twice on fresh disposable VMs. Public DNS/ACME, physical host power loss, operational updates and broader combined stress remain unverified.",
       "native_diagnostics": [
         {
           "run_id": "native-vm-38963816198-1",
@@ -904,6 +869,12 @@
           "status": "passed",
           "evidence": "native-host-root-after.json",
           "scope": "Durable machine owner candidate: specific second-directory rejection, unchanged first credential/Caddy/sentinel, no second host/unit, strict HTTPS readiness and owned cleanup. 72.176555455s including preparation, fourteen samples."
+        },
+        {
+          "run_id": "native-suite-38990677734",
+          "status": "passed",
+          "evidence": "native-final-suite/index.json",
+          "scope": "Two fresh independent passes of all six native cases using one common ELF; actual runtime inode/digest, provisioning rejection boundaries, clock restore, backup/restore,30 ACKs per runtime after guest RAM loss and cleanup. No full combined management/update stress, in-flight power cut, physical host power loss or off-host certification."
         }
       ]
     },
@@ -1019,9 +990,17 @@
     "native_suite": {
       "workflow_run_id": 38990677734,
       "source_commit": "7e68fd21430ac93125149f60927f8676b077811d",
-      "status": "in progress; no pass inferred",
+      "status": "passed;12/12 cases with cleanup",
       "url": "https://github.com/Nelcota/Nelcota/actions/runs/38990677734",
-      "scope": "One distinct Actions-built ELF reused in twelve fresh serial native cases"
+      "scope": "One distinct Actions-built ELF reused in twelve fresh serial native cases",
+      "evidence": "native-final-suite/index.json",
+      "binary_sha256": "010d0fc52f5cc5961f56baf6902294abfcc2c9d855ccbf7605e4b91e8a89a45c"
+    },
+    "ci": {
+      "status": "passed",
+      "ordinary_checks": 18,
+      "source_commit": "7e68fd21430ac93125149f60927f8676b077811d",
+      "evidence": "ci-final-artifact-source.json"
     }
   }
 }
