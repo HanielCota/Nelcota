@@ -2,7 +2,7 @@
 
 **Estado: em execução, sem aprovação do G05.** Este relatório é atualizado
 durante as campanhas. Checkpoint de carga consolidada: 17/10/2026, 11:15 UTC.
-Atualização da investigação: 17/10/2026, 11:44 UTC.
+Atualização da investigação: 17/10/2026, 12:09 UTC.
 Não houve merge nem deploy de produção. O trabalho está na branch
 `test/g05-stress-verification`, no [PR #90](https://github.com/Nelcota/Nelcota/pull/90),
 mantido como rascunho para revisão.
@@ -20,9 +20,10 @@ O tempo parcial das campanhas ainda abertas não está somado nesse checkpoint.
 |---|---|
 | Código após as correções de cancelamento SQL/export e de exportação grande não consumida | Regressões reais aprovadas; [último antes/depois](results/stress/export-large-unpolled-deadline-after.json) inclui 17 testes. Binário final reconstruído; campanhas afetadas continuam pendentes |
 | SHA-256 do binário de baseline preservado | `75c44c85a85db26195166aa1d2c6caf481e3db476801ec8131525ef62adf1be0` |
-| Candidato local atual congelado | `860d2f990949bfc5c8c612de3341c65a39e8d259`; SHA-256 `c7e3d25467823c9d44157aca762761c23a49cd81f8ee96915b468f7bc3d119a4`; 30.480.704 bytes; build release de 90,048 s. [Proveniência](results/stress/final-local-candidate.json). Inclui a correção de refresh do SDK e guias reconstruídos. CI, nova suíte nativa e campanhas afetadas ainda precisam encerrar |
+| Candidato local atual congelado | `860d2f990949bfc5c8c612de3341c65a39e8d259`; SHA-256 `c7e3d25467823c9d44157aca762761c23a49cd81f8ee96915b468f7bc3d119a4`; 30.480.704 bytes; build release de 90,048 s. [Proveniência](results/stress/final-local-candidate.json). Inclui a correção de refresh do SDK e guias reconstruídos. CI ordinário 18/18 e nova suíte nativa 12/12 aprovados nas mesmas seis árvores de produto. Campanhas afetadas continuam pendentes |
 | Candidato anterior preservado | Fonte `f40774e`; ELF `9cc6cbf0...`; [proveniência histórica](results/stress/final-local-candidate-f40774e.json). CI ordinário 18/18 e suíte nativa 12/12 passaram nesse produto; esses resultados não certificam a correção posterior do SDK |
-| Candidato nativo anterior do Actions | Mesma fonte de produto `f40774e`; ELF `872c3b1efc71e0118386cdd3caf36bae0de26cb213307b91396fe30c0af83d75`, 30.463.736 bytes. [12 relatórios originais](results/stress/native-final-suite/index.json) aprovados no mesmo ELF; diferença entre hosts registrada, sem alegar build byte a byte reproduzível |
+| Candidato nativo anterior do Actions | Mesma fonte histórica de produto `f40774e`; ELF `872c3b1efc71e0118386cdd3caf36bae0de26cb213307b91396fe30c0af83d75`, 30.463.736 bytes. [12 relatórios históricos](results/stress/native-final-suite-f40774e/index.json) aprovados no mesmo ELF; diferença entre hosts registrada, sem alegar build byte a byte reproduzível |
+| Candidato nativo atual do Actions | Fonte `860d2f9`; ELF `6aa5d48e502dc9b2ac46c595bc24bea4e56a5960f07af81c291e8f8b2708aedc`, 30.463.736 bytes. [12 casos originais](results/stress/native-final-suite/index.json) aprovados, com limpeza, dois restores e reconciliação de 30 ACKs após perda da RAM da VM em cada passagem. Não resolve a falha nativa original nem certifica endurance |
 | SHA-256 do workload k6 atual | `0ac01578bf19155302fe465884b480d792569086f23bb4ba3615ca5f0ce2547d` |
 | Baseline em disco no protocolo atual | Snapshot imutável de `1f391594dd8db6cccac54d6720d90c33d461d1f1`; `disk-final-pass-1-002` concluiu como baseline no binário retido, com protocolo atual |
 | Primeira execução nativa separada | [Actions 38962480993](https://github.com/Nelcota/Nelcota/actions/runs/38962480993), código congelado `e80770b3f6aa1f64d011a3d62f8ebf0f1201bdac`; reprovada no oráculo de signup antes do backup |
@@ -57,7 +58,7 @@ O backend de produção continua um único binário Rust, sem Node ou Python.
 | 8 | Falhas, drain, restart, restore e deployment aplicável | Parcial | Primeiro fault passou com reconciliação de ACKs e restore local novo. Dois fluxos nativos passaram no escopo de restore no mesmo alvo e perda da RAM da convidada. Repetição final de faults/carga, atualização operacional, DNS/ACME públicos e recuperação fora do host continuam incompletos. |
 | 9 | Recursos, invariantes de dados/arquivos/eventos e regressão | Parcial | Invariantes locais e plateaus observados; precisam das campanhas finais comparáveis. Retenção anônima do provedor ainda exige atribuição. |
 | 10 | Correções focadas e regressões dos defeitos confirmados | Verificado localmente nos nove defeitos reproduzidos; repetições completas pendentes | Cinco falhas na CLI, três na admissão/liberação de recursos SQL/export e uma no refresh concorrente do SDK. SDK: duas rotações antes, uma depois, 202 testes unitários e 15 testes de tipos aprovados. A falha nativa original após perda da RAM e as falhas de fairness continuam sem causa comprovada. |
-| 11 | Rust/UI/SDK/lint/CI correspondentes ao SHA testado | Pendente no novo produto 860d2f9 | Build local, checks focados do SDK, painel e 300 testes do executor aprovados. Os [18 checks ordinários](results/stress/ci-f40774e-final-product-source.json) e [12 casos nativos anteriores](results/stress/native-final-suite/index.json) pertencem ao f40774e. A nova suíte nativa está em execução; fontes diferentes não são intercambiáveis. |
+| 11 | Rust/UI/SDK/lint/CI correspondentes ao SHA testado | CI ordinário e suíte nativa aprovados para o produto atual; harness novo pendente | [18 checks ordinários](results/stress/ci-sdk006-final-product-trees.json) e [12 casos nativos](results/stress/native-final-suite/index.json) passaram nas mesmas seis árvores do produto 860d2f9. O ELF local é identificado separadamente. Extensões novas de links e agendamento do gerador ainda serão testadas após a carga local aberta; campanhas finais permanecem pendentes. |
 | 12 | Relatório, limites e todos os testes falhos/bloqueados/não executados | Em consolidação | Este relatório e o [registro detalhado](stress-verification-execution.md) preservam os resultados; ainda há campanhas abertas. |
 
 ## Staging e limites

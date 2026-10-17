@@ -117,6 +117,16 @@
           "status": "passed",
           "evidence": "browser-auth-full-final-pass-1-005.json",
           "scope": "First final-ELF full real browser/auth pass:560requests/40users/0unrevokedgeneratedsessions,5cycles,3tabs,823navigations/p95feedback267.2ms,2511SDKRLSreads,actual900sTTL/1082.087sobservation,expired401/logoutrefresh400,bothrealconsumers,219resourcesamples/gap5.297s,noOOM/restarts,cleanup. Existingheap/node/listenerguards applied but detailedplateauvalues were not exported; subsequent strengthened receipts retain them. Other pass/SMTP/OAuth/endurance clauses remain separate;0overlappinglocaltimecredit."
+        },
+        {
+          "status": "failed",
+          "evidence": "browser-auth-owner-pass-2-failure-006.json",
+          "scope": "Previous real browser owner pass failed because late overlapping native-browser refreshes rotated more than once. The original failure and cleanup remain visible."
+        },
+        {
+          "status": "passed",
+          "evidence": "sdk-native-overlapping-refresh-before-after-001.json",
+          "scope": "Focused ninth-defect correction only: deterministic SDK two-to-one rotations, 202 unit and 15 type tests, 37 guide tests and rebuilt assets. Full repaired browser repetitions remain pending."
         }
       ]
     },
@@ -278,6 +288,11 @@
           "status": "passed",
           "evidence": "matrix-full-final-pass-1-002.json",
           "scope": "First full retained final-ELF backend subset:1730effective seconds,4x300sledgercapacity,4x120sadmin/cancellation/catalog/hostile scenarios,347samples/gap6.045s,44092ACKs0missing,2279ambiguouscommitsreconciled,restoreRTO1.850366s/RPOupper17.998048s,cleanup. Second full pass and broader area clauses remain separate; remote overlap adds0localcheckpointcredit."
+        },
+        {
+          "status": "passed",
+          "evidence": "matrix-full-final-pass-2-003.json",
+          "scope": "Second complete supplemental matrix on previous f40774e ELF. Acknowledged mutation reconciliation and restore passed. Qualification varied 32 to16iterations/s without a proven cause; complete final006 matrix and other clauses remain separate."
         }
       ]
     },
@@ -328,6 +343,11 @@
           "status": "passed",
           "evidence": "matrix-full-final-pass-1-002.json",
           "scope": "First full retained final-ELF backend subset:1730effective seconds,4x300sledgercapacity,4x120sadmin/cancellation/catalog/hostile scenarios,347samples/gap6.045s,44092ACKs0missing,2279ambiguouscommitsreconciled,restoreRTO1.850366s/RPOupper17.998048s,cleanup. Second full pass and broader area clauses remain separate; remote overlap adds0localcheckpointcredit."
+        },
+        {
+          "status": "passed",
+          "evidence": "matrix-full-final-pass-2-003.json",
+          "scope": "Second complete supplemental matrix on previous f40774e ELF. Acknowledged mutation reconciliation and restore passed. Qualification varied 32 to16iterations/s without a proven cause; complete final006 matrix and other clauses remain separate."
         }
       ]
     },
@@ -674,6 +694,11 @@
           "status": "passed",
           "evidence": "matrix-full-final-pass-1-002.json",
           "scope": "First full retained final-ELF backend subset:1730effective seconds,4x300sledgercapacity,4x120sadmin/cancellation/catalog/hostile scenarios,347samples/gap6.045s,44092ACKs0missing,2279ambiguouscommitsreconciled,restoreRTO1.850366s/RPOupper17.998048s,cleanup. Second full pass and broader area clauses remain separate; remote overlap adds0localcheckpointcredit."
+        },
+        {
+          "status": "passed",
+          "evidence": "matrix-full-final-pass-2-003.json",
+          "scope": "Second complete supplemental matrix on previous f40774e ELF. Acknowledged mutation reconciliation and restore passed. Qualification varied 32 to16iterations/s without a proven cause; complete final006 matrix and other clauses remain separate."
         }
       ]
     },
@@ -738,6 +763,16 @@
           "status": "passed",
           "evidence": "browser-auth-full-final-pass-1-005.json",
           "scope": "First final-ELF full real browser/auth pass:560requests/40users/0unrevokedgeneratedsessions,5cycles,3tabs,823navigations/p95feedback267.2ms,2511SDKRLSreads,actual900sTTL/1082.087sobservation,expired401/logoutrefresh400,bothrealconsumers,219resourcesamples/gap5.297s,noOOM/restarts,cleanup. Existingheap/node/listenerguards applied but detailedplateauvalues were not exported; subsequent strengthened receipts retain them. Other pass/SMTP/OAuth/endurance clauses remain separate;0overlappinglocaltimecredit."
+        },
+        {
+          "status": "failed",
+          "evidence": "browser-auth-owner-pass-2-failure-006.json",
+          "scope": "Previous real browser owner pass failed because late overlapping native-browser refreshes rotated more than once. The original failure and cleanup remain visible."
+        },
+        {
+          "status": "passed",
+          "evidence": "sdk-native-overlapping-refresh-before-after-001.json",
+          "scope": "Focused ninth-defect correction only: deterministic SDK two-to-one rotations, 202 unit and 15 type tests, 37 guide tests and rebuilt assets. Full repaired browser repetitions remain pending."
         }
       ]
     },
@@ -792,6 +827,16 @@
           "status": "passed",
           "evidence": "browser-auth-full-final-pass-1-005.json",
           "scope": "First final-ELF full real browser/auth pass:560requests/40users/0unrevokedgeneratedsessions,5cycles,3tabs,823navigations/p95feedback267.2ms,2511SDKRLSreads,actual900sTTL/1082.087sobservation,expired401/logoutrefresh400,bothrealconsumers,219resourcesamples/gap5.297s,noOOM/restarts,cleanup. Existingheap/node/listenerguards applied but detailedplateauvalues were not exported; subsequent strengthened receipts retain them. Other pass/SMTP/OAuth/endurance clauses remain separate;0overlappinglocaltimecredit."
+        },
+        {
+          "status": "failed",
+          "evidence": "browser-auth-owner-pass-2-failure-006.json",
+          "scope": "Previous real browser owner pass failed because late overlapping native-browser refreshes rotated more than once. The original failure and cleanup remain visible."
+        },
+        {
+          "status": "passed",
+          "evidence": "sdk-native-overlapping-refresh-before-after-001.json",
+          "scope": "Focused ninth-defect correction only: deterministic SDK two-to-one rotations, 202 unit and 15 type tests, 37 guide tests and rebuilt assets. Full repaired browser repetitions remain pending."
         }
       ]
     },
@@ -1004,6 +1049,11 @@
           "status": "passed",
           "evidence": "matrix-full-final-pass-1-002.json",
           "scope": "First full retained final-ELF backend subset:1730effective seconds,4x300sledgercapacity,4x120sadmin/cancellation/catalog/hostile scenarios,347samples/gap6.045s,44092ACKs0missing,2279ambiguouscommitsreconciled,restoreRTO1.850366s/RPOupper17.998048s,cleanup. Second full pass and broader area clauses remain separate; remote overlap adds0localcheckpointcredit."
+        },
+        {
+          "status": "passed",
+          "evidence": "matrix-full-final-pass-2-003.json",
+          "scope": "Second complete supplemental matrix on previous f40774e ELF. Acknowledged mutation reconciliation and restore passed. Qualification varied 32 to16iterations/s without a proven cause; complete final006 matrix and other clauses remain separate."
         }
       ]
     },
@@ -1060,6 +1110,11 @@
           "status": "passed",
           "evidence": "browser-auth-full-final-pass-1-005.json",
           "scope": "First final-ELF full real browser/auth pass:560requests/40users/0unrevokedgeneratedsessions,5cycles,3tabs,823navigations/p95feedback267.2ms,2511SDKRLSreads,actual900sTTL/1082.087sobservation,expired401/logoutrefresh400,bothrealconsumers,219resourcesamples/gap5.297s,noOOM/restarts,cleanup. Existingheap/node/listenerguards applied but detailedplateauvalues were not exported; subsequent strengthened receipts retain them. Other pass/SMTP/OAuth/endurance clauses remain separate;0overlappinglocaltimecredit."
+        },
+        {
+          "status": "passed",
+          "evidence": "matrix-full-final-pass-2-003.json",
+          "scope": "Second complete supplemental matrix on previous f40774e ELF. Acknowledged mutation reconciliation and restore passed. Qualification varied 32 to16iterations/s without a proven cause; complete final006 matrix and other clauses remain separate."
         }
       ]
     },
@@ -1210,13 +1265,14 @@
     "regression_evidence": "ci-native-executable-identity-after.json"
   },
   "native_final_same_artifact_suite": {
-    "workflow_run_id": 39017663454,
-    "source_commit": "f40774e1504a924fe6d9c801e251278cee1a8fab",
-    "binary_sha256": "872c3b1efc71e0118386cdd3caf36bae0de26cb213307b91396fe30c0af83d75",
     "status": "passed",
+    "workflow_run_id": 39029580219,
+    "source_commit": "860d2f990949bfc5c8c612de3341c65a39e8d259",
+    "binary_sha256": "6aa5d48e502dc9b2ac46c595bc24bea4e56a5960f07af81c291e8f8b2708aedc",
     "cases": 12,
     "evidence": "native-final-suite/index.json",
-    "earlier_startup_failure": "native-af-post-cut-runtime-investigation.json"
+    "scope": "Two fresh independent passes of all six native/KVM scenarios on the common SDK/assets-corrected product source and ELF. This does not explain the original af01678 startup failure or certify endurance/capacity, physical host power loss, public DNS/ACME, PITR or off-host restore. Remote windows earn no overlapping local effective-time credit.",
+    "previous_suite": "native-final-suite-f40774e/index.json"
   },
   "completed_current_protocol_disk_baseline": {
     "run_id": "disk-final-pass-1-002",
@@ -1226,10 +1282,10 @@
   },
   "latest_local_python_regressions": {
     "status": "passed",
-    "tests": 290,
-    "elapsed_seconds": 14.987,
-    "earlier_failed_log": "python-checks-024.log",
-    "scope": "All review-tool/harness regressions, after correcting a task TMPDIR under an ignored target directory; not BaaS load credit."
+    "tests": 300,
+    "elapsed_seconds": 12.586,
+    "skipped": 0,
+    "scope": "Complete stress harness suite after SDK overlap and generator CPU diagnostics; a new auth-links extension is prepared but not yet tested or measured. No BaaS load credit."
   },
   "unattributed_app_anonymous_growth": {
     "status": "under investigation",
@@ -1243,15 +1299,15 @@
   "frozen_final_candidate": {
     "source_commit": "7e68fd21430ac93125149f60927f8676b077811d",
     "binary_sha256": "b047fb880feb10e41e7d0308e6037b8cd3bc770b0452a30cab59c3e2d20514a0",
-    "build_evidence": "final-local-candidate.json",
-    "status": "frozen; ordinary CI and twelve native cases passed; final local load/comparison pending",
+    "build_evidence": "final-local-candidate-7e68fd2.json",
+    "status": "historical 7e68fd2 source only; superseded after confirmed defects, not current approval",
     "native_suite": {
       "workflow_run_id": 38990677734,
       "source_commit": "7e68fd21430ac93125149f60927f8676b077811d",
       "status": "passed;12/12 cases with cleanup",
       "url": "https://github.com/Nelcota/Nelcota/actions/runs/38990677734",
       "scope": "One distinct Actions-built ELF reused in twelve fresh serial native cases",
-      "evidence": "native-final-suite/index.json",
+      "evidence": "native-final-suite-7e68fd2/index.json",
       "binary_sha256": "010d0fc52f5cc5961f56baf6902294abfcc2c9d855ccbf7605e4b91e8a89a45c"
     },
     "ci": {
@@ -1282,27 +1338,30 @@
     "clock_fixture_before_after": "provider-fixture-clock-before-after.json"
   },
   "current_final_candidate": {
-    "source_commit": "f40774e1504a924fe6d9c801e251278cee1a8fab",
-    "binary_sha256": "9cc6cbf0be68d38ba1c9e138cbeee7c4fac0324e91c406fae977eba591c76f44",
-    "build_seconds": 90.63318545097718,
-    "status": "built; final affected CI/native/campaigns pending",
-    "prior_candidate003": "interrupted after confirmed large unpolled export defect; cleanup confirmed; partial soak excluded",
-    "before_evidence": "export-large-unpolled-deadline-before.json",
-    "after_evidence": "export-large-unpolled-deadline-after.json",
+    "source_commit": "860d2f990949bfc5c8c612de3341c65a39e8d259",
+    "binary_sha256": "c7e3d25467823c9d44157aca762761c23a49cd81f8ee96915b468f7bc3d119a4",
+    "build_seconds": 90.04832498799078,
+    "status": "ordinary CI18/18 and native common-ELF12/12 passed on matching product trees; final live campaigns pending",
     "evidence": "final-local-candidate.json",
-    "ordinary_ci_run_id": 39017645220,
-    "native_suite_run_id": 39017663454
+    "native_suite_run_id": 39029580219,
+    "production_findings": 9,
+    "focused_sdk_unit_tests": 202,
+    "focused_sdk_type_tests": 15,
+    "focused_guide_tests": 37,
+    "full_browser_repetitions": "pending after genuine-overlap oracle and SDK correction",
+    "ordinary_ci_evidence": "ci-sdk006-final-product-trees.json",
+    "native_suite_evidence": "native-final-suite/index.json",
+    "native_binary_sha256": "6aa5d48e502dc9b2ac46c595bc24bea4e56a5960f07af81c291e8f8b2708aedc"
   },
   "current_campaign_checkpoint": {
-    "checkpoint": "load-time-checkpoint-017.json",
-    "effective_local_load_seconds": 135294,
-    "current_product_source": "f40774e1504a924fe6d9c801e251278cee1a8fab",
-    "current_harness_source": "df51f80b29bcd0edaacd91270cd19d610381afff",
-    "active_local_at_recording": "large-disk-retained-baseline-001",
-    "active_or_queued_remote_at_recording": [
-      39024051590,
-      39024053691
+    "checkpoint": "load-time-checkpoint-018.json",
+    "effective_local_load_seconds": 139464,
+    "current_product_source": "860d2f990949bfc5c8c612de3341c65a39e8d259",
+    "active_local_at_recording": "large-s3-retained-baseline-001",
+    "active_remote_at_recording": [
+      39029580219
     ],
-    "scope": "Timestamped checkpoint, not a live scheduler; no full matrix or endurance approval from partial subsets."
+    "recorded_utc": "2026-10-17T11:54:25.025135+00:00",
+    "scope": "Timestamped checkpoint only; open phases, remote overlap and SDK diagnostics excluded. No whole matrix or endurance approval."
   }
 }

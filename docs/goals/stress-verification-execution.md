@@ -2940,3 +2940,24 @@ IDs preserve the original rates, datasets, SLOs, reserves and durations; after
 new source verification the four disk/S3 endurance passes take priority over
 remaining larger/topology profiles. G05 and draft PR90 remain open. No merge,
 release or production deployment was performed.
+
+
+### 2026-10-17, 12:09 UTC — candidate006 ordinary CI and common native suite close
+
+All 18 ordinary checks passed on `d2c9b1f`, with all six product tree objects
+verified equal to frozen build source `860d2f9`. Native suite39029580219 also
+closed successfully: 12/12 original reports use the common 30,463,736-byte
+ELF `6aa5d48e502dc9b2ac46c595bc24bea4e56a5960f07af81c291e8f8b2708aedc`.
+Both runtime passes reconciled 30 acknowledged writes after loss of guest RAM
+without missing, duplicate or extra rows. Every case confirmed owned cleanup
+and no critical resource guard failure. The complete f40774e native suite is
+preserved at `results/stress/native-final-suite-f40774e/` before selecting the
+new source. These successes do not explain the original af01678 startup failure
+or certify endurance, physical host power loss, public TLS/DNS or off-host/PITR.
+
+The unaffected retained million-row real-S3 baseline remains active. Candidate006
+four-hour disk/S3 campaigns and genuine-overlap browser repetitions remain
+pending. A newly inspected fault-ledger admission bug and seeded single-use-link
+pressure case are prepared but not tested during local measured traffic. They
+are harness changes, not a tenth confirmed production defect. No acceptance
+threshold or historical failed result was changed.
