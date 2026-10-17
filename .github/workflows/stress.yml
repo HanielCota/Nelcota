@@ -20,7 +20,7 @@ on:
       native_case:
         description: Native lifecycle, cluster routing, installation contracts or guest clock
         type: choice
-        options: [runtime, runtime-inflight, runtime-pitr-error, cluster-routing, default-root, host-root, clock-drift, remove-boundary]
+        options: [runtime, runtime-inflight, runtime-pitr-error, runtime-pitr-reboot, cluster-routing, default-root, host-root, clock-drift, remove-boundary]
         default: runtime
       diagnostic_jobs:
         description: Optional failed public lint/panel job IDs for native-preflight (comma separated)
@@ -597,6 +597,7 @@ jobs:
         run: |
           nice -n19 ionice -c3 python3 -m unittest discover -s scripts/review_tests -p test_stress_native_vm.py -v
           nice -n19 ionice -c3 python3 -m unittest discover -s scripts/review_tests -p test_stress_native_pitr_error.py -v
+          nice -n19 ionice -c3 python3 -m unittest discover -s scripts/review_tests -p test_stress_native_pitr_reboot.py -v
       - name: Inventory the disposable outer VM
         run: python3 bench/native_preflight.py
       - name: Read earlier structured native evidence

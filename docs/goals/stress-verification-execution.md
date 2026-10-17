@@ -3722,3 +3722,23 @@ Adicionar diagnóstico condicional allocation-final008-disk-four-hours-001
 a plano privado008/runnerallocationv11, não iniciado. Mesmo vetor antigo
 007,DSOa5396ed7,sourcef833882f,uma thread/FD,semtrim,nãocertificaperformance.
 É separado dos19casos ordinários/grandes/fault/host e não substitui nenhum.
+
+
+### 2026-10-17, 20:20 UTC — hipótese de persistência PITR no boot preparada
+
+As duas VMs008 anteriores provaram fechamento imediato após erro e
+recuperação explícita, sem teste de reinício nesse intervalo. A revisão
+observou unidades nativas habilitadas no boot e ausência de gate durável
+nesse caminho. Não é defeito de boot confirmado por leitura de código.
+
+Preparar runtime-pitr-reboot: mesmo adaptador marcador-only; restaurar
+pacote/flags/marcador com fsync dos diretórios, adiar recuperação explícita,
+perderRAM/reiniciar somente a VM própria, verificar bootid e cleanup durável.
+Observar20s com máximo50s/22samples, verificar unidades e GET autenticado;
+qualquer ativação/reabertura falha. Só então recuperação explícita da fixture
+conhecidamente não modificada, canários e cleanup.0PGrealfilechanges.
+18controles focados foram preparados; sintaxe validada, nenhum teste local
+rodou ao lado deS3. CI completo e fim de015/fila vazia precedem a VM nova.
+Produto008/ELF e seus seis trees não mudaram; não alterar produção antes de
+reprodução real. Mantém11defeitos confirmados e as falhas originais.
+[Protocolo/limites/hashes](results/stress/native-pitr-boot-persistence-predeclaration-001.json).

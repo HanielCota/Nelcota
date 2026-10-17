@@ -107,7 +107,32 @@ def marker_written(postgres_uid):
     return True
 
 
-def observe(identity):
+def sync_parent(path):
+    descriptor = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def recover_fixture(identity, expected_rows):
+    owned(identity)
+    helper_budget(identity)
+    require(isinstance(expected_rows, str) and re.fullmatch(r"[0-9a-f]{64}", expected_rows) is not None,
+            "Missing owned pre-fault row digest")
+    recovery = cli("-p", PROJECT, "up", timeout=PROFILE["explicit_recovery_timeout_seconds"], check=False)
+    result = {"explicit_fixture_recovery_exit_code": recovery.returncode,
+              "after_explicit_fixture_recovery": snapshot()}
+    require(recovery.returncode == 0 and all(point["MainPID"] > 1 and point["ActiveState"] == "active"
+                                            for point in result["after_explicit_fixture_recovery"].values()),
+            "Explicit owned fixture recovery failed")
+    result["fixture_rows_preserved"] = fixture_digest() == expected_rows
+    require(result["fixture_rows_preserved"], "Controlled fixture rows changed")
+    return result
+
+
+def observe(identity, *, defer_recovery=False):
+    require(type(defer_recovery) is bool, "Unknown fixture recovery mode")
     owned(identity)
     budget = helper_budget(identity)
     postgres_uid = pwd.getpwnam("postgres").pw_uid
@@ -153,6 +178,8 @@ def observe(identity):
         descriptor = os.open(LOG, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
         with os.fdopen(descriptor, "wb") as stream:
             stream.write(failure.stdout + failure.stderr)
+            stream.flush()
+            os.fsync(stream.fileno())
         result["restore_exit_code"] = failure.returncode
         result["owned_marker_written_before_adapter_failure"] = marker_written(postgres_uid)
         result["after_unknown_restore_error_before_explicit_recovery"] = snapshot()
@@ -166,29 +193,36 @@ def observe(identity):
             require(digest(SAVED) == before_digest, "Saved package executable changed")
             SAVED.replace(BINARY)
             require(digest(BINARY) == before_digest, "Original pgBackRest package was not restored")
+            sync_parent(BINARY)
+            sync_parent(SAVED)
         if flag_inode is not None:
             current = FLAG.lstat()
             require(stat.S_ISREG(current.st_mode) and current.st_ino == flag_inode and current.st_uid == 0,
                     "Owned PITR flag changed; refuse unrelated cleanup")
             FLAG.unlink()
+            sync_parent(FLAG)
         if marker_written(postgres_uid):
             MARKER.unlink()
+            sync_parent(MARKER)
         result["controlled_adapter_and_flag_removed"] = not SAVED.exists() and not FLAG.exists() and not MARKER.exists()
         # The injected adapter can change only the checked inert marker. This
         # explicit fixture recovery is independent of the error-path observation.
-        recovery = cli("-p", PROJECT, "up", timeout=PROFILE["explicit_recovery_timeout_seconds"], check=False)
-        result["explicit_fixture_recovery_exit_code"] = recovery.returncode
-        result["after_explicit_fixture_recovery"] = snapshot()
-        require(recovery.returncode == 0 and all(point["MainPID"] > 1 and point["ActiveState"] == "active"
-                                                for point in result["after_explicit_fixture_recovery"].values()),
-                "Explicit owned fixture recovery failed")
-        result["fixture_rows_preserved"] = fixture_digest() == before_rows
-        require(result["fixture_rows_preserved"], "Controlled fixture rows changed")
+        if not defer_recovery:
+            result.update(recover_fixture(identity, before_rows))
+        if defer_recovery:
+            result["explicit_fixture_recovery_deferred"] = True
+            result["fixture_rows_before_sha256"] = before_rows
     return result
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("identity")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--defer-recovery", action="store_true")
+    mode.add_argument("--recover-fixture")
     args = parser.parse_args()
-    print(json.dumps(observe(args.identity), allow_nan=False))
+    if args.recover_fixture is not None:
+        print(json.dumps(recover_fixture(args.identity, args.recover_fixture), allow_nan=False))
+        raise SystemExit(0)
+    print(json.dumps(observe(args.identity, defer_recovery=args.defer_recovery), allow_nan=False))

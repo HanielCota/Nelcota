@@ -116,6 +116,25 @@ class NativePitrErrorControl(unittest.TestCase):
             control.digest(link)
         self.assertEqual(binary.read_bytes(), b"owned package")
 
+    def test_unknown_deferred_recovery_mode_is_rejected_before_guest_access(self):
+        for value in [None, 1, "yes", float("nan")]:
+            with self.subTest(value=value), patch.object(control, "owned") as owned, self.assertRaises(RuntimeError):
+                control.observe(self.identity, defer_recovery=value)
+            owned.assert_not_called()
+
+    def test_post_boot_recovery_requires_owned_helper_and_bounded_digest(self):
+        for value in [None, True, "invalid", "a" * 65]:
+            with self.subTest(value=value), patch.object(control, "owned"), patch.object(control, "helper_budget"), \
+                    patch.object(control, "cli") as cli, self.assertRaises(RuntimeError):
+                control.recover_fixture(self.identity, value)
+            cli.assert_not_called()
+
+    def test_parent_sync_closes_its_descriptor_even_when_sync_fails(self):
+        with patch.object(control.os, "open", return_value=123), patch.object(control.os, "fsync", side_effect=OSError), \
+                patch.object(control.os, "close") as close, self.assertRaises(OSError):
+            control.sync_parent(self.root / "owned-marker")
+        close.assert_called_once_with(123)
+
 
 if __name__ == "__main__":
     unittest.main()

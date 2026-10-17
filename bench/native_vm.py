@@ -35,7 +35,8 @@ ORIGIN = "https://cloud-images.ubuntu.com/releases/noble/release/"
 GIB = 1024 ** 3
 MIB = 1024 ** 2
 MAXIMUM_SECONDS = 1800
-SCENARIOS = ("runtime", "runtime-inflight", "runtime-pitr-error", "cluster-routing", "default-root", "host-root", "clock-drift", "remove-boundary")
+SCENARIOS = ("runtime", "runtime-inflight", "runtime-pitr-error", "runtime-pitr-reboot", "cluster-routing", "default-root", "host-root", "clock-drift", "remove-boundary")
+PITR_SCENARIOS = {"runtime-pitr-error", "runtime-pitr-reboot"}
 
 
 def require(condition, message):
@@ -442,7 +443,7 @@ def campaign(binary, output, scenario, pass_index=None):
         cpu_sum = 3.25
     if scenario == "runtime-inflight":
         cpu_sum += .05
-    if scenario == "runtime-pitr-error":
+    if scenario in PITR_SCENARIOS:
         cpu_sum += .1
     identity = campaign_identity(os.environ["GITHUB_RUN_ID"], os.environ["GITHUB_RUN_ATTEMPT"], scenario, pass_index)
     unit(identity)
@@ -476,11 +477,17 @@ def campaign(binary, output, scenario, pass_index=None):
                           "maximum_table_lock_seconds": 30, "helper_runtime_seconds": 40,
                           "maximum_observation_age_seconds": 2,
                           "scope": "Owned guest table lock; blocked before COMMIT, no physical host power loss"},
-        "controlled_PITR_adapter_error": {"enabled": scenario == "runtime-pitr-error",
+        "controlled_PITR_adapter_error": {"enabled": scenario in PITR_SCENARIOS,
                                          "helper_cpu_quota": .1, "helper_memory_mib": 96,
                                          "helper_pids": 32, "helper_runtime_seconds": 120,
                                          "real_PG_files_modified": False,
                                          "scope": "Actual CLI error handling after inert owned marker; no real PITR/S3/data-corruption claim"},
+        "PITR_error_boot_persistence": {"enabled": scenario == "runtime-pitr-reboot",
+                                        "minimum_post_boot_observation_seconds": 20,
+                                        "maximum_post_boot_observation_seconds": 50,
+                                        "maximum_post_boot_samples": 22,
+                                        "explicit_recovery_deferred_until_after_boot_observation": True,
+                                        "scope": "Loss of owned guest RAM after known marker-only adapter cleanup; unchanged real PG files"},
         "controlled_guest_clock": {"enabled": scenario == "clock-drift", "maximum_forward_seconds": 1800,
                                    "step_verification_tolerance_seconds": 5,
                                    "maximum_restored_offset_seconds": 5, "restore_command_timeout_seconds": 15,
@@ -535,7 +542,7 @@ def campaign(binary, output, scenario, pass_index=None):
         if scenario == "runtime-inflight":
             guest.copy(Path(__file__).with_name("native_inflight.py"), "/tmp/native_inflight.py")
             guest.ssh(["sudo", "-n", "install", "-m", "600", "/tmp/native_inflight.py", "/opt/g05-tools/native_inflight.py"])
-        if scenario == "runtime-pitr-error":
+        if scenario in PITR_SCENARIOS:
             guest.copy(Path(__file__).with_name("native_pitr_failure.py"), "/tmp/native_pitr_failure.py")
             guest.ssh(["sudo", "-n", "install", "-m", "600", "/tmp/native_pitr_failure.py", "/opt/g05-tools/native_pitr_failure.py"])
         guest.ready = True
@@ -646,20 +653,53 @@ def campaign(binary, output, scenario, pass_index=None):
                     expected=(201,), headers={"Content-Type": "application/octet-stream"})
         require(api.request("GET", "/storage/v1/object/native/kept.bin", token=service) == original, "Native uploaded bytes differ")
         api.request("GET", "/storage/v1/object/native/kept.bin", expected=(404,))
-        if scenario == "runtime-pitr-error":
+        if scenario in PITR_SCENARIOS:
             from native_pitr_failure import PROFILE as PITR_PROFILE, helper_name
             guest.phase = "controlled-pitr-error"
             helper = helper_name(identity)
-            raw = guest.ssh(["sudo", "-n", "systemd-run", "--quiet", "--wait", "--pipe", "--collect",
+            arguments = []
+            if scenario == "runtime-pitr-reboot":
+                arguments = ["--defer-recovery"]
+            helper_command = ["sudo", "-n", "systemd-run", "--quiet", "--wait", "--pipe", "--collect",
                              "--unit=" + helper, "--description=g05-pitr-error:" + identity,
                              "--slice=g05native.slice", "--property=CPUQuota=10%", "--property=CPUQuotaPeriodSec=100ms",
                              "--property=MemoryMax=96M", "--property=MemorySwapMax=0", "--property=TasksMax=32",
                              "--property=RuntimeMaxSec=120", "--property=TimeoutStopSec=5",
                              "--property=Nice=19", "--property=IOSchedulingClass=idle", "--property=KillMode=control-group",
-                             "/usr/bin/python3", "/opt/g05-tools/native_pitr_failure.py", identity], timeout=145).stdout
+                             "/usr/bin/python3", "/opt/g05-tools/native_pitr_failure.py", identity]
+            raw = guest.ssh([*helper_command, *arguments], timeout=145).stdout
             require(len(raw) <= 65536, "Controlled PITR report exceeded its byte boundary")
             report["native_contract"] = json.loads(raw)
             control = report["native_contract"]
+            if scenario == "runtime-pitr-reboot":
+                from native_pitr_failure import BINARY, FLAG, SAVED, MARKER
+                from native_pitr_reboot import observe as observe_boot
+                require(control.get("explicit_fixture_recovery_deferred") is True
+                        and control.get("unknown_state_kept_stopped") is True,
+                        "Immediate PITR fencing/deferred recovery was not reached before boot")
+                before_boot = guest.action("resources")["boot_id"]
+                guest.phase = "pitr-error-guest-reboot"
+                guest.ready = False
+                guest.fault_until = time.monotonic() + 180
+                report["power_cut_unit_state"] = stop_owned(identity, power_cut=True)
+                guest.start()
+                guest.ready = True
+                guest.last_guest_sample = time.monotonic()
+                require(guest.action("resources")["boot_id"] != before_boot,
+                        "PITR boot control did not change the guest kernel boot")
+                control["guest_boot_id_changed"] = True
+                actual_adapter = guest.ssh(["sudo", "-n", "sha256sum", str(BINARY)]).stdout.decode().split()[0]
+                require(actual_adapter == control["original_adapter_sha256"],
+                        "Controlled package cleanup did not persist across boot")
+                for path in [FLAG, SAVED, MARKER]:
+                    guest.ssh(["sudo", "-n", "test", "!", "-e", str(path)])
+                control["controlled_cleanup_persisted_across_boot"] = True
+                guest.phase = "pitr-error-post-boot-observation"
+                control["boot_observation"] = observe_boot(guest, api, users[0])
+                guest.phase = "pitr-error-explicit-fixture-recovery"
+                raw = guest.ssh([*helper_command, "--recover-fixture", control["fixture_rows_before_sha256"]], timeout=145).stdout
+                require(len(raw) <= 65536, "Controlled post-boot recovery report exceeded its byte boundary")
+                control.update(json.loads(raw))
             require(control.get("profile") == PITR_PROFILE and control.get("real_PG_files_modified") is False
                     and control.get("owned_marker_written_before_adapter_failure") is True
                     and control.get("controlled_adapter_and_flag_removed") is True
@@ -676,6 +716,11 @@ def campaign(binary, output, scenario, pass_index=None):
             control["post_explicit_recovery_unauthorized_API_status"] = 401
             control["post_explicit_recovery_other_user_rows"] = 0
             control["post_explicit_recovery_private_file_status"] = 404
+            if scenario == "runtime-pitr-reboot":
+                guest.phase = "pitr-error-post-boot-verdict"
+                require(control["boot_observation"].get("unknown_state_kept_stopped_after_boot") is True,
+                        "Unknown native PITR recovery state reopened after guest boot")
+                report["checks"].append("native restore-error fence survives owned guest RAM loss before any explicit fixture recovery")
             require(control.get("unknown_state_kept_stopped") is True,
                     "Unknown native restore error automatically reopened the project")
             report["checks"].append("controlled native restore adapter error stays closed; original executable, rows, private bytes and authorization recover explicitly")
