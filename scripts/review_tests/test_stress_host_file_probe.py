@@ -47,6 +47,14 @@ class HostFilePreflight(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             probe.campaign_arguments(Path("/owned/nelcota"), "owned-host-files", 10, 1, "shared")
 
+    def test_insufficient_host_CPU_fails_before_any_Docker_or_artifact_work(self):
+        with patch.object(sys, "argv", ["host_file_probe.py", "--artifact", str(self.root)]), \
+                patch.object(probe, "inventory", return_value={"cpu_affinity_slots": 4}), \
+                patch.object(probe, "effective_cpus", return_value=3.5), patch.object(probe, "docker") as docker:
+            with self.assertRaisesRegex(RuntimeError, "empty disposable Docker VM"):
+                probe.main()
+        docker.assert_not_called()
+
     def test_lease_only_tightens_a_fresh_owned_case_deadline(self):
         original = self.manifest()
         actual = self.lease(original)
@@ -85,6 +93,33 @@ class HostFilePreflight(unittest.TestCase):
         with patch.object(probe.subprocess, "run", return_value=SimpleNamespace(returncode=3)):
             with self.assertRaisesRegex(RuntimeError, "exited during foreground"):
                 probe.require_watch("g05-host-files-watch-123-1-5")
+
+    def test_kernel_controller_quota_leaves_space_for_telemetry_watchdog_and_OS(self):
+        cgroup = self.root / "cgroup"
+        unit = cgroup / "g05-host-files-123-1.service"
+        unit.mkdir(parents=True)
+        for name, value in {"cpu.max": "50000 100000", "memory.max": str(512 * 1024 ** 2),
+                            "memory.swap.max": "0", "pids.max": "128"}.items():
+            (unit / name).write_text(value)
+        proc = self.root / "proc-cgroup"
+        proc.write_text("0::/g05-host-files-123-1.service\n")
+
+        def mapped(value):
+            if value == "/proc/self/cgroup":
+                return proc
+            if value == "/sys/fs/cgroup":
+                return cgroup
+            return Path(value)
+
+        with patch.object(probe, "Path", side_effect=mapped):
+            actual = probe.kernel_budget("123-1")
+            self.assertEqual(actual["cpu_quota_usec"], 50000)
+            policy = actual["CPU_policy"]
+            self.assertAlmostEqual(policy["telemetry"] + policy["controller"] + policy["independent_watchdog"] +
+                                   policy["telemetry_slot_OS_reserve"], 1)
+            (unit / "cpu.max").write_text("100000 100000")
+            with self.assertRaisesRegex(RuntimeError, "budget differs"):
+                probe.kernel_budget("123-1")
 
     def rows(self):
         point = {"memory.current": 10, "memory.peak": 20, "memory.stat": {"anon": 5}, "pids.current": 3,

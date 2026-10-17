@@ -13,7 +13,7 @@ import subprocess
 import sys
 import time
 
-from campaign import docker
+from campaign import docker, effective_cpus
 from fleet_private_files import COUNTS, PROFILE, PROTOCOL, require, validate_receipt, validate_run
 from matrix_probe import input_artifact, read_receipt
 from native_evidence import notices
@@ -42,12 +42,17 @@ def kernel_budget(identity):
     require(path.is_relative_to(base) and "g05-host-files-" + identity + ".service" in path.parts,
             "Host-file controller is outside its owned systemd unit")
     quota, period = (path / "cpu.max").read_text().split()
-    require(quota.isdigit() and int(quota) == int(period)
+    require(quota.isdigit() and int(period) > 0 and int(quota) * 2 == int(period)
             and (path / "memory.max").read_text().strip() == str(512 * 1024 ** 2)
             and (path / "memory.swap.max").read_text().strip() == "0"
             and (path / "pids.max").read_text().strip() == "128", "Host-file controller budget differs")
     return {"cpu_quota_usec": int(quota), "cpu_period_usec": int(period), "memory_bytes": 512 * 1024 ** 2,
             "swap_bytes": 0, "pids": 128, "maximum_seconds": 2700,
+            "CPU_policy": {"target_app_role_affinity_bound": 1, "target_PostgreSQL_role_affinity_bound": 1,
+                           "generator": 1, "telemetry": .25, "controller": .5, "independent_watchdog": .05,
+                           "effective_sum": 3.8, "telemetry_slot_sum": .8, "telemetry_slot_OS_reserve": .2,
+                           "five_project_shared_quota_sum_exceeds_role_affinity_bound": True,
+                           "one_project_configured_quota_sum": 3.8, "five_project_configured_quota_sum": 11.8},
             "separate_watchdog": {"CPU_percent": 5, "memory_mib": 128, "swap_bytes": 0,
                                   "tasks": 32, "maximum_seconds": 1500, "case_deadline_seconds": CASE_SECONDS}}
 
@@ -241,7 +246,8 @@ def main():
     parser.add_argument("--artifact", type=Path, required=True)
     args = parser.parse_args()
     available = inventory()
-    require(available["cpu_affinity_slots"] >= 4 and not docker("ps", "-aq") and not docker("volume", "ls", "-q"),
+    require(available["cpu_affinity_slots"] >= 4 and effective_cpus(sorted(os.sched_getaffinity(0))) >= 3.8
+            and not docker("ps", "-aq") and not docker("volume", "ls", "-q"),
             "Host-file probes need their empty disposable Docker VM")
     run, attempt = os.environ.get("GITHUB_RUN_ID", ""), os.environ.get("GITHUB_RUN_ATTEMPT", "")
     require(re.fullmatch(r"[0-9]{1,20}", run) is not None and re.fullmatch(r"[0-9]{1,4}", attempt) is not None,

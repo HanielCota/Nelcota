@@ -8,7 +8,7 @@
       "area": "Authentication and independent consumers",
       "entrypoints": "crates/server/tests/auth.rs; concurrency.rs; scripts/test-auth-package.py",
       "status": "not run",
-      "scope_or_limit": "First final-ELF raw browser auth pressure passed560requests/40users/0unrevokedgeneratedsessions across2actualconsumers, including replay/family/logout negatives. Final endurance, further independent browser pass, SMTP/OAuth stress and remaining auth clauses are not inferred.",
+      "scope_or_limit": "One final007 measured full browser/auth pass passed400positive/160expectednegative responses,40users/zero remaining sessions, five actual numeric cycles and expiry. Original refresh-SLO failure remains unexplained. Second independent pass, final endurance and SMTP/OAuth stress remain pending.",
       "functional_subset": {
         "status": "passed",
         "source_commit": "3203330cf3df2b9b7dd68efebc79412a8564e9fd",
@@ -149,7 +149,13 @@
           "evidence": "matrix-sdk007-corrected-generator-pass-1-001.json",
           "scope": "First corrected full final007 remote matrix only: four300s rates16/32/48/64 qualified, five120s foreground scenarios at51/s,71874ACKs zero loss/corruption,3993lost real commit replies reconciled without mutation retry,371samples/gap5.237s,cleanup; second pass and all other row clauses remain separate."
         }
-      ]
+      ],
+      "current_final007_measured_browser_subset": {
+        "status": "passed",
+        "independent_passes": 1,
+        "evidence": "browser-sdk007-measured-auth-pass-1-001.json",
+        "scope": "Second measured independent pass pending; original failed refresh SLO is not closed."
+      }
     },
     {
       "id": "rest",
@@ -272,7 +278,7 @@
       "area": "Concurrent mutations and ambiguous replies",
       "entrypoints": "bench/fault_campaign.py; crates/server/tests/concurrency.rs",
       "status": "not run",
-      "scope_or_limit": "Original fault pass reconciled53049ACKs withoutloss. First full final-ELF supplemental matrix reconciled44092ACKs0missing/unknown/corrupt and2279ambiguouscommits without automaticmutationretry. Second independent final fault/matrix remains pending.",
+      "scope_or_limit": "Two final007 full supplemental matrices passed: each 71,874 ACKs, 75,867 commits, 7,986 ambiguous replies/3,993 committed, zero missing/corrupt and no automatic mutation retry. Final full fault passes and broader mutation clauses remain unrun.",
       "functional_subset": {
         "status": "passed",
         "source_commit": "3203330cf3df2b9b7dd68efebc79412a8564e9fd",
@@ -326,14 +332,20 @@
           "evidence": "matrix-sdk007-corrected-generator-pass-1-001.json",
           "scope": "First corrected full final007 remote matrix only: four300s rates16/32/48/64 qualified, five120s foreground scenarios at51/s,71874ACKs zero loss/corruption,3993lost real commit replies reconciled without mutation retry,371samples/gap5.237s,cleanup; second pass and all other row clauses remain separate."
         }
-      ]
+      ],
+      "current_final007_subset": {
+        "status": "passed",
+        "independent_passes": 2,
+        "evidence": "matrix-sdk007-two-corrected-passes-001.json",
+        "scope": "Only the named five-scenario supplemental subset; whole row status unchanged."
+      }
     },
     {
       "id": "catalog",
       "area": "Catalog, DDL and refresh recovery",
       "entrypoints": "crates/server/tests/architecture.rs; admin/migrations.rs",
       "status": "not run",
-      "scope_or_limit": "Existing committed-DDL/failed-refresh functional regressions passed. First full final-ELF matrix discovered20committedtables under concurrent introspection, with no mutation retries. Second full pass and forced-refresh-failure stress remain separate.",
+      "scope_or_limit": "Two final007 full supplemental DDL/introspection scenarios passed in120-second positive-traffic windows. Forced-refresh-failure stress and broader catalog clauses remain separate, unrun requirements.",
       "functional_subset": {
         "status": "passed",
         "source_commit": "3203330cf3df2b9b7dd68efebc79412a8564e9fd",
@@ -387,7 +399,13 @@
           "evidence": "matrix-sdk007-corrected-generator-pass-1-001.json",
           "scope": "First corrected full final007 remote matrix only: four300s rates16/32/48/64 qualified, five120s foreground scenarios at51/s,71874ACKs zero loss/corruption,3993lost real commit replies reconciled without mutation retry,371samples/gap5.237s,cleanup; second pass and all other row clauses remain separate."
         }
-      ]
+      ],
+      "current_final007_subset": {
+        "status": "passed",
+        "independent_passes": 2,
+        "evidence": "matrix-sdk007-two-corrected-passes-001.json",
+        "scope": "Only the named five-scenario supplemental subset; whole row status unchanged."
+      }
     },
     {
       "id": "disk",
@@ -646,7 +664,7 @@
       "area": "SQL/export admission and cancellation",
       "entrypoints": "crates/server/tests/architecture.rs; admin/sql.rs; hardening.rs",
       "status": "not run",
-      "scope_or_limit": "All17focused real-PG regressions and18final-product ordinary checks passed. First full combined backend-pressure matrix passed; second fresh pass, final ordinary performance/endurance and broader admin clauses remain pending.",
+      "scope_or_limit": "Two corrected full final007 backend-pressure matrices passed admin budgets and cancellation/export ownership, retaining original failures. Final ordinary performance/endurance and broader admin clauses remain pending.",
       "functional_subset": {
         "status": "passed",
         "source_commit": "3203330cf3df2b9b7dd68efebc79412a8564e9fd",
@@ -754,14 +772,20 @@
           "evidence": "matrix-sdk007-corrected-generator-pass-1-001.json",
           "scope": "First corrected full final007 remote matrix only: four300s rates16/32/48/64 qualified, five120s foreground scenarios at51/s,71874ACKs zero loss/corruption,3993lost real commit replies reconciled without mutation retry,371samples/gap5.237s,cleanup; second pass and all other row clauses remain separate."
         }
-      ]
+      ],
+      "current_final007_subset": {
+        "status": "passed",
+        "independent_passes": 2,
+        "evidence": "matrix-sdk007-two-corrected-passes-001.json",
+        "scope": "Only the named five-scenario supplemental subset; whole row status unchanged."
+      }
     },
     {
       "id": "browser",
       "area": "Panel tabs, request lifetime and retained resources",
       "entrypoints": "crates/admin/ui/e2e; src/lib/query-client.test.ts",
       "status": "not run",
-      "scope_or_limit": "Historical local and first final-ELF real browser/auth lifecycles passed in distinct profiles. Full final pass observed823navigations/p95feedback267.2ms,3tabs/5cycles,219resourcesamples and actualexpiration/disposal. Two strengthened owner-metric receipts and final comparison remain pending; no cross-profile performance improvement is inferred.",
+      "scope_or_limit": "One final007 measured browser pass passed706navigations/p95visual308.4ms, five numeric auth cycles, seven heap/DOM/listener plateaus and actual900second expiry. Original SLO failure remains failed/unexplained; second same-profile pass and final comparison pending. Historical different-profile results are preserved without cross-profile performance claims.",
       "functional_subset": {
         "status": "passed",
         "source_commit": "3203330cf3df2b9b7dd68efebc79412a8564e9fd",
@@ -838,14 +862,20 @@
           "evidence": "browser-sdk006-genuine-overlap-pass-2-008.json",
           "scope": "Complete historical candidate006 genuine-overlap browser pass, one refresh for48callers,sevenownerplateaus,cleanup. NewSDKisolation correction requires final-source repetitions."
         }
-      ]
+      ],
+      "current_final007_measured_browser_subset": {
+        "status": "passed",
+        "independent_passes": 1,
+        "evidence": "browser-sdk007-measured-auth-pass-1-001.json",
+        "scope": "Second measured independent pass pending; original failed refresh SLO is not closed."
+      }
     },
     {
       "id": "sdks",
       "area": "TypeScript/Rust SDK runtime, cancellation and refresh",
       "entrypoints": "sdk/typescript; sdk/rust; crates/server/tests/sdk_rust.rs",
       "status": "not run",
-      "scope_or_limit": "Existing runtime/package/memory and browser/server contracts passed confirmed CI. First live three-tab/independent-consumer pass passed; second complete load pass and final comparison remain pending.",
+      "scope_or_limit": "All204SDK units passed at proved EC merge source. Final007 browser control verified48overlapping refresh callers produce one real request, five live auth cycles and disposal; independent second full browser pass and remaining SDK/native load clauses remain pending.",
       "functional_subset": {
         "status": "passed",
         "source_commit": "3203330cf3df2b9b7dd68efebc79412a8564e9fd",
@@ -917,7 +947,13 @@
           "evidence": "browser-sdk006-genuine-overlap-pass-2-008.json",
           "scope": "Complete historical candidate006 genuine-overlap browser pass, one refresh for48callers,sevenownerplateaus,cleanup. NewSDKisolation correction requires final-source repetitions."
         }
-      ]
+      ],
+      "current_final007_measured_browser_subset": {
+        "status": "passed",
+        "independent_passes": 1,
+        "evidence": "browser-sdk007-measured-auth-pass-1-001.json",
+        "scope": "Second measured independent pass pending; original failed refresh SLO is not closed."
+      }
     },
     {
       "id": "topologies",
@@ -985,7 +1021,14 @@
           "evidence": "host10-quota10ms-smoke-failure-001.json",
           "scope": "480closedload seconds,106relativefairnessfailures and0absoluteSLOfailures;414samples,90cross-projectrejections,1381signeduniqueevents reconciled,cleanup. Thirty-seconddiagnostic only, never five-minutecertification; no productioncause inferred."
         }
-      ]
+      ],
+      "private_file_extension": {
+        "status": "not run",
+        "focused_guards": "host-private-file-guards-001.json",
+        "real_preflight_declaration": "host-private-file-preflight-guards-002.json",
+        "full_host_predeclaration": "post-endurance-private-files-predeclaration-001.json",
+        "scope": "Existing failed fairness results remain failed. New full1/5/10 baselines and two candidate passes add identical bounded private-file pressure; short real-service preflight is prepared only."
+      }
     },
     {
       "id": "management",
@@ -1074,7 +1117,7 @@
       "area": "Local paired snapshots and restored integrity",
       "entrypoints": "bench/fault_campaign.py; scripts/test-host-management.py",
       "status": "not run",
-      "scope_or_limit": "Original full fault pass and final native suites retained. First full final-ELF backend matrix restored45945rows into a new local target:RTO1.850366s/RPOupper17.998048s, matching physicalbytes/user, foreignJWT401. Second fault/matrix and off-host/PITR remain incomplete.",
+      "scope_or_limit": "Two final007 supplemental fresh local restores passed with identical physical bytes/user and foreign JWT401: RTO2.596884/2.499754seconds, RPO upper about18seconds, intentional snapshot rewind868rows. Full final fault passes and off-host/PITR remain incomplete.",
       "functional_subset": {
         "status": "passed",
         "source_commit": "3203330cf3df2b9b7dd68efebc79412a8564e9fd",
@@ -1140,14 +1183,20 @@
           "evidence": "matrix-sdk007-corrected-generator-pass-1-001.json",
           "scope": "First corrected full final007 remote matrix only: four300s rates16/32/48/64 qualified, five120s foreground scenarios at51/s,71874ACKs zero loss/corruption,3993lost real commit replies reconciled without mutation retry,371samples/gap5.237s,cleanup; second pass and all other row clauses remain separate."
         }
-      ]
+      ],
+      "current_final007_subset": {
+        "status": "passed",
+        "independent_passes": 2,
+        "evidence": "matrix-sdk007-two-corrected-passes-001.json",
+        "scope": "Only the named five-scenario supplemental subset; whole row status unchanged."
+      }
     },
     {
       "id": "hostile",
       "area": "Malformed inputs, churn and ingress policy",
       "entrypoints": "crates/server/tests/hardening.rs; storage.rs; webhooks",
       "status": "not run",
-      "scope_or_limit": "First full final-ELF backend matrix rejected malformed400/nonfinite400/null422/deep422/missing-cookie401/wrong-origin403 inputs and closed10slow clients, with live positive/negativecanaries. Second full pass and broader/public-ingress stress remain separate.",
+      "scope_or_limit": "Two corrected final007 full supplemental hostile-backend windows passed explicit malformed/nonfinite/null/deep/cookie/origin/slow-client boundaries with positive/negative canaries. Broader security and public-ingress stress remain separate.",
       "functional_subset": {
         "status": "passed",
         "source_commit": "3203330cf3df2b9b7dd68efebc79412a8564e9fd",
@@ -1207,7 +1256,13 @@
           "evidence": "matrix-sdk007-corrected-generator-pass-1-001.json",
           "scope": "First corrected full final007 remote matrix only: four300s rates16/32/48/64 qualified, five120s foreground scenarios at51/s,71874ACKs zero loss/corruption,3993lost real commit replies reconciled without mutation retry,371samples/gap5.237s,cleanup; second pass and all other row clauses remain separate."
         }
-      ]
+      ],
+      "current_final007_subset": {
+        "status": "passed",
+        "independent_passes": 2,
+        "evidence": "matrix-sdk007-two-corrected-passes-001.json",
+        "scope": "Only the named five-scenario supplemental subset; whole row status unchanged."
+      }
     },
     {
       "id": "deployment",
@@ -1283,7 +1338,8 @@
       "area": "Off-host restore, external cloud provider and PITR",
       "entrypoints": "docs/backup.md; scripts/acceptance-pitr.sh",
       "status": "blocked",
-      "scope_or_limit": "No separate recovery host or configured WAL archive/PITR destination is available. Local RustFS does not certify external cloud latency or off-host durability."
+      "scope_or_limit": "Read-only GitHub repository secret public-key metadata returned403; no established private staging-key transport is available in this integration. No secret, permission, workflow or backup was changed/exposed. No configured separate recovery host/WAL archive/PITR target; local RustFS does not certify off-host durability.",
+      "private_transport_evidence": "offhost-private-transport-capability-001.json"
     },
     {
       "id": "arm64",
@@ -1454,26 +1510,27 @@
     "source_commit": "35f4a9725d7edcf571f91084c555c127e7323653",
     "binary_sha256": "96811748f1f45ad4894114188642f9343df661c750ad22768eaf2275659081b1",
     "functional_smoke": "matrix-sdk007-auth-links-functional-smoke-001.json",
-    "CI_evidence": "ci-sdk007-ledger-tls-product-trees.json",
+    "CI_evidence": "ci-native-inflight-recovery-product-trees.json",
     "ordinary_CI_checks_passed": 18,
     "native_evidence": "native-final-suite/index.json",
     "native_cases_passed": 12,
-    "browser_final007_status": "One full same-profile final007 repetition passed after the numeric publication change; first refresh-SLO failure remains failed/unexplained. Second independent browser pass and full matrix still pending.",
+    "browser_final007_status": "One complete measured final007 pass passed; second active remote sequence still pending, original refresh-SLO failure remains unexplained.",
     "browser_final007_failure": "browser-sdk007-refresh-slo-first-failure-001.json",
     "browser_final007_passed_evidence": "browser-sdk007-measured-auth-pass-1-001.json",
     "browser_final007_full_passes": 1,
-    "matrix_capacity_oracle": "Confirmed harness mismatch: driver64default offers16/32/48/64 but old publication expected8/16/24/32. Shared unchanged64rate/300second declaration now passes36focused controls; two fresh real matrices still required. Active old-source run retains its original verdict.",
-    "matrix_final007_status": "First corrected full five-case matrix passed on exact common007ELF; all four300s steps qualified through unchanged64/s ceiling, original failed publication retained. Second corrected full pass pending.",
+    "matrix_capacity_oracle": "Old half-rate publication mismatch corrected using shared unchanged64maximum/300second steps. Two real independent full matrices now passed with the ledger-only verified CA reuse; original failed report preserved.",
+    "matrix_final007_status": "Two corrected full five-case matrices passed on exact common final007 Actions ELF, all four300second steps qualified to the unchanged64/s ceiling; no maximum/server-gain claim.",
     "matrix_final007_original_failure": "matrix-sdk007-capacity-publication-failure-001.json",
-    "matrix_final007_full_passes": 1,
-    "matrix_final007_passed_evidence": "matrix-sdk007-corrected-generator-pass-1-001.json"
+    "matrix_final007_full_passes": 2,
+    "matrix_final007_passed_evidence": "matrix-sdk007-two-corrected-passes-001.json",
+    "harness_head_CI_status": "Latest host-file source d4bfc60 ordinary CI pending; EC proof does not cover this later extension."
   },
   "current_campaign_checkpoint": {
     "checkpoint": "load-time-checkpoint-019.json",
     "effective_local_load_seconds": 143634,
     "active_local_at_recording": "disk-candidate-pass-1-006",
     "recorded_utc": "2026-10-17T14:45:04.319630+00:00",
-    "scope": "019 conservative completed-interval count. Local final007 disk capacity/overload sequence still active. Remote first failed SLO retained; one same-profile full browser repetition now passed with400positive/160expected negative responses. Two full five-case backend matrices/eight native startup repetitions now run under a bounded serial owner; no overlapping local time credit."
+    "scope": "019 conservative completed-interval floor; current final007 disk soak is incomplete and uncredited. Two corrected remote matrices passed, eight native startup reproductions and second measured browser continue serialized. Remote overlap earns no local time credit."
   },
   "native_inflight_cut": {
     "status": "not run",
@@ -1482,5 +1539,19 @@
     "scope": "Separate additional interrupted-write guest control after existing native startup reproductions; blocked before COMMIT, no physical host power loss, commit-flush, off-host or ordinary performance claim. No local overlapping effective load credit.",
     "focused_guards": "native-inflight-cut-guards-002.json",
     "recovery_negatives": "planned actual anonymous REST401/second-user empty RLS/private-file404; not run"
-  }
+  },
+  "private_file_host_preflight": {
+    "status": "not run",
+    "evidence": "host-private-file-preflight-guards-002.json",
+    "source_CI": "pending on the forthcoming committed half-CPU source; D4proof cannot certify it",
+    "focused_guards_passed": 55,
+    "actual_Docker_systemd_functionality": "not run",
+    "previous_preflight_source_commit": "d4bfc60dc8e87bfe2c5f3786251134a4bba9870b",
+    "source_file_sha256": {
+      "bench/host_file_probe.py": "1931df7cdb596715f4a971fbd8770384fe16232377420e71ad6ccf70e44cdfbd",
+      "scripts/review_tests/test_stress_host_file_probe.py": "db4bf9fa2ce6001987228bbec21cae411ef0c7a12ff4c29e669c281685879b6f",
+      ".github/workflows/stress.yml": "f9e99ea373017503b319dca1ba95868fd419d829b1c90ba29e5a92e504b3de5a"
+    }
+  },
+  "latest_inventory_update_utc": "2026-10-17T17:42:45.158080+00:00"
 }

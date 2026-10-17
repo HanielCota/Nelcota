@@ -862,14 +862,15 @@ and complete source-bound cumulative receipts on both sides. Legacy evidence
 without this option only certifies its original scope.
 
 The manual `host-files` Actions target first validates this optional harness on
-a fresh empty hosted four-slot VM with the retained final007 Actions executable.
+a fresh empty hosted four-slot VM with at least 3.8 effective CPUs and the retained
+final007 Actions executable.
 It declares one project at 4 iterations/s and five at 1 iteration/s each, using
 60-second phases, direct owned loopback HTTP and a 1536-MiB aggregate PostgreSQL
 disk ceiling. Those rates are functional preflight settings, not the full host
 capacity profile or five-minute fairness approval. All existing short-profile
 absolute and relative gates still apply; any failed gate stays failed.
 
-The controller has 1 CPU/512 MiB/no swap/128 tasks and a 2700-second systemd
+The controller has 0.5 CPU/512 MiB/no swap/128 tasks and a 2700-second systemd
 ceiling. Each case has a tighter 1200-second lease. A separate transient systemd
 watchdog, outside the controller cgroup, has 5 percent CPU/128 MiB/no swap/32 tasks
 and a 1500-second expiry. It retains the existing host reserves, owner generation,
@@ -877,4 +878,9 @@ and a 1500-second expiry. It retains the existing host reserves, owner generatio
 qualification. Teardown retains original failed counts and attempts every owned
 cleanup step even if publication fails; an incomplete cleanup retains the guard.
 Only validated fixed receipts and numeric component projections are public.
+On the shared telemetry slot, controller 0.5 + metrics 0.25 + watchdog 0.05
+leaves 0.2 CPU for the OS. The effective role/auxiliary bound is 3.8 CPUs. Five
+shared app/PG quota sums intentionally exceed each role's single pinned CPU;
+their configured sum is 11.8 CPUs, with a 3.8-CPU affinity bound. These numbers
+are declared, not a guarantee about an unmeasured host.
 Full host1/5/10 baselines and two candidate passes remain separately required.

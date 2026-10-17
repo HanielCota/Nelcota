@@ -441,7 +441,7 @@ jobs:
           sudo -n systemd-run --wait --pipe --collect \
             --unit="g05-host-files-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
             --uid="$(id -u)" --gid="$(id -g)" --working-directory="$GITHUB_WORKSPACE" \
-            --property=CPUQuota=100% --property=MemoryMax=512M --property=MemorySwapMax=0 \
+            --property=CPUQuota=50% --property=MemoryMax=512M --property=MemorySwapMax=0 \
             --property=Nice=19 --property=IOSchedulingClass=idle \
             --property=TasksMax=128 --property=RuntimeMaxSec=2700 --property=KillMode=control-group \
             env GITHUB_ACTIONS="$GITHUB_ACTIONS" RUNNER_ENVIRONMENT="$RUNNER_ENVIRONMENT" \

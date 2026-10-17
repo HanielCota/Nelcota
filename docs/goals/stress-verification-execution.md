@@ -3413,3 +3413,24 @@ waits for the current eleven-case remote sequence, both native in-flight control
 empty global queue and its own ordinary CI. This preflight creates no local fixtures; remote overlap time never enters
 the local checkpoint.
 [Source hashes, bounds and exact scope](results/stress/host-private-file-preflight-guards-001.json).
+
+
+### 2026-10-17, 17:47 UTC — reserve CPU before the first private-file preflight
+
+Prestart accounting found that a full controller CPU plus 0.25 metrics and
+0.05 independent watchdog would oversubscribe the shared telemetry/OS slot.
+No real private-file run has started. Tighten only this auxiliary controller to
+0.5 CPU and verify that quota against the actual cgroup files. The slot now has
+0.8 CPU of configured auxiliary quotas, leaving 0.2 CPU for the OS; app/PG/load
+roles retain their separate CPU slots and unchanged budgets. The effective sum
+is 3.8 CPUs. Five-project shared app/PG quota sums intentionally exceed their
+single-role affinity bound; the raw sum is 11.8, also explicitly recorded.
+This is a pre-measurement instrument-budget correction, not a reduced product
+workload or approval gate. Hosts below 3.8 effective CPUs are refused before
+Docker/artifact work. Fifty-five focused controls passed with zero skips,
+0.068875 seconds framework/0.266347 seconds operator, under the same idle CPU3,
+128-MiB/3-CPU-second/15-second bounds. The new kernel-file control rejects the old
+full-CPU controller budget. Prior focused proofs stay tied to their actual source.
+[Amended source and budget evidence](results/stress/host-private-file-preflight-guards-002.json).
+The unstarted D4 remote008 plan is superseded before ref creation or dispatch;
+its CI cannot certify this subsequent code. Native EC remote007 is unaffected.

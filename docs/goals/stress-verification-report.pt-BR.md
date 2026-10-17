@@ -1109,3 +1109,17 @@ por limite mesmo se o grupo do controller morrer. As [53 regressões focadas](re
 passaram, incluindo 13 controles novos de propriedade, encerramento, privacidade
 e evidência. São testes com stubs; a execução real permanece não realizada,
 aguardando os casos remotos anteriores e o CI da nova fonte.
+
+
+Na auditoria anterior ao primeiro preflight real, o controller auxiliar foi
+limitado a 0,5 CPU. Somado a 0,25 CPU de métricas e 0,05 do watchdog, usa no máximo
+0,8 CPU desse slot, com reserva declarada de 0,2 para o sistema. Apps, PostgreSQL,
+gerador, taxas e SLOs permanecem iguais. A afinidade limita a soma efetiva a
+3,8 CPUs; a soma nominal das quotas do perfil de cinco projetos é 11,8 CPUs,
+pois os projetos compartilham explicitamente os slots de app e banco.
+Hosts abaixo de 3,8 CPUs efetivas são recusados antes de criar recursos.
+Os [55 controles focados](results/stress/host-private-file-preflight-guards-002.json)
+passaram, incluindo a rejeição do orçamento auxiliar antigo nos arquivos de
+cgroup. Nenhuma execução real ocorreu com o perfil anterior. O plano remoto
+D4 ainda não iniciado foi substituído antes de criar sua ref; a nova fonte
+precisa de CI próprio. Os dois casos nativos EC preparados continuam válidos.
