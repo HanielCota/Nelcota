@@ -3,6 +3,7 @@ import base64
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import redirect_stdout
 import gzip
+import http.client
 import io
 import json
 from pathlib import Path
@@ -17,6 +18,7 @@ import urllib.error
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "bench"))
 import provider_runtime as runtime
+from test_stress_otlp_metrics import export
 
 
 class RuntimeBoundaries(unittest.TestCase):
@@ -161,6 +163,73 @@ class RuntimePublication(unittest.TestCase):
                    if line.startswith("::notice title=Provider runtime evidence::")]
         raw = gzip.decompress(base64.b64decode("".join(value["payload"] for value in notices)))
         self.assertEqual(json.loads(raw), report)
+
+
+class RuntimeTelemetryWindow(unittest.TestCase):
+    def setUp(self):
+        self.servers = []
+
+    def tearDown(self):
+        for server, worker in self.servers:
+            server.shutdown()
+            server.server_close()
+            worker.join(timeout=2)
+            self.assertFalse(worker.is_alive())
+
+    def server(self, **limits):
+        token = secrets.token_hex(32)
+        server = runtime.Receiver(("127.0.0.1", 0), token, **limits)
+        server.peer = "127.0.0.1"
+        worker = threading.Thread(target=server.serve_forever)
+        worker.start()
+        self.servers.append((server, worker))
+        return server, token
+
+    def send(self, server, token, body):
+        connection = http.client.HTTPConnection(*server.server_address, timeout=2)
+        try:
+            connection.request("POST", "/v1/metrics", body=body,
+                               headers={"X-G05-Probe": token, "Content-Type": "application/x-protobuf"})
+            response = connection.getresponse()
+            response.read()
+            return response.status
+        finally:
+            connection.close()
+
+    def test_old_discovery_default_rejects_export129_but_long_probe_remains_bounded(self):
+        body = export(1024)
+        short, token = self.server()
+        self.assertEqual((short.maximum_exports, short.maximum_wire_bytes), (128, 16 * 1024 ** 2))
+        short.exports = 128
+        self.assertEqual(self.send(short, token, body), 400)
+        self.assertEqual(short.exports, 128)
+        self.assertEqual(short.failure["reason"], "Provider telemetry exceeded its cumulative budget")
+        long, token = self.server(maximum_exports=256, maximum_wire_bytes=32 * 1024 ** 2)
+        long.exports = 128
+        self.assertEqual(self.send(long, token, body), 200)
+        self.assertEqual(long.exports, 129)
+        self.assertIsNone(long.failure)
+        long.exports = 256
+        self.assertEqual(self.send(long, token, body), 400)
+        self.assertEqual(long.exports, 256)
+
+    def test_larger_export_window_does_not_remove_the_wire_ceiling(self):
+        body = export(1024)
+        server, token = self.server(maximum_exports=256, maximum_wire_bytes=len(body))
+        self.assertEqual(self.send(server, token, body), 200)
+        self.assertEqual(self.send(server, token, body), 400)
+        self.assertEqual(server.exports, 1)
+        self.assertEqual(server.received, len(body))
+
+    def test_invalid_or_unbounded_limits_are_rejected_before_opening_a_listener(self):
+        invalid = [{"maximum_exports": value} for value in [True, 0, 257, float("nan"), "256"]]
+        invalid += [{"maximum_wire_bytes": value} for value in [False, 0, 33 * 1024 ** 2, float("inf")]]
+        for limits in invalid:
+            with self.subTest(limits=limits):
+                with patch("http.server.ThreadingHTTPServer.__init__") as opened:
+                    with self.assertRaisesRegex(RuntimeError, "Invalid bounded telemetry"):
+                        runtime.Receiver(("127.0.0.1", 0), secrets.token_hex(32), **limits)
+                    opened.assert_not_called()
 
 
 if __name__ == "__main__":

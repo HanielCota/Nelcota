@@ -188,7 +188,7 @@
     "performance_comparison_scope": "Alternative provider runtime settings cannot certify equivalence with the default profile. Requested-live-byte accounting remains unavailable until observed; cumulative allocation is never treated as live bytes.",
     "production_deployment": false,
     "manual_target": "provider-runtime",
-    "status": "implemented; remote regressions and actual dispatch pending",
+    "status": "Both original and unchanged-limit reproduction failed at the collector cumulative-export ceiling; corrected fresh passes pending",
     "profiles": [
       {},
       {
@@ -225,6 +225,21 @@
     "maximum_network_bytes": 4294967296,
     "sample_seconds": 5,
     "maximum_observation_gap_seconds": 30,
-    "scope": "Two independent disposable Actions runs, three fresh sequential providers each. Container environment only shows passed settings; actual process owner counts/gauges determine observations. No assumption that a setting was honored or that anonymous memory is cache/live allocation. Direct provider diagnostics have zero BaaS load-time credit."
+    "scope": "Two independent disposable Actions runs, three fresh sequential providers each. Container environment only shows passed settings; actual process owner counts/gauges determine observations. No assumption that a setting was honored or that anonymous memory is cache/live allocation. Direct provider diagnostics have zero BaaS load-time credit.",
+    "collector_window_correction": {
+      "declared_utc": "2026-10-17T04:37:53.910960+00:00",
+      "reproduction": "provider-runtime-reproduced-budget-failure.json",
+      "original_discovery_defaults": {
+        "maximum_exports": 128,
+        "maximum_wire_bytes": 16777216
+      },
+      "long_probe_explicit_limits": {
+        "maximum_exports": 256,
+        "maximum_wire_bytes": 33554432
+      },
+      "reason": "Per-case1080s/5s can require216 exports; fixed128-export discovery window cannot cover pressure plus idle. Count256 remains bounded and all per-request parser/nonce/peer/process/traffic/host reserve and approval limits remain unchanged.",
+      "prior_failures_preserved": true,
+      "regressions": "Actual authorized HTTP admission at128/129 and256/257, wire budget, and reject invalid limits before binding; remote execution pending"
+    }
   }
 }

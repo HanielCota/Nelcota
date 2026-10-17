@@ -2251,3 +2251,27 @@ original observer recorded only RuntimeError. A fresh unchanged-limit
 reproduction will retain the exact sampler step and a safe telemetry error
 category before any budget correction. The legacy failed report remains
 unchanged. The independent local final disk campaign continues safely.
+
+
+### Collector cause reproduced; bounded long-window correction prepared
+
+[Actions 39002499251](https://github.com/Nelcota/Nelcota/actions/runs/39002499251)
+reproduced the unchanged-limit failure on source ff74094. The exact observer
+step was telemetry; its structured category was cumulative_budget, with 128
+exports and 3,151,161 wire bytes, below the 16-MiB byte cap. All 960 object
+operations verified, no OOM was recorded and cleanup passed. The
+[second original failed report](results/stress/provider-runtime-reproduced-budget-failure.json)
+retains the full receipt and checksum. This confirms a reused collector
+window defect, not a Nelcota/RustFS byte-integrity failure.
+
+Capability discovery keeps its 128-export/16-MiB defaults. The new long
+probe explicitly requests 256 exports/32 MiB, covering the bounded 1,080s/5s
+observation ceiling of 216 exports. The receiver still keeps only first/last
+observations; no process memory quota, per-request parser limit, nonce/peer
+check, ordinary workload, SLO, reserve or approval gate is loosened.
+Three real-HTTP boundary regressions bring the focused module to twelve
+checks, still awaiting remote execution. The workflow now emits actual
+unittest counts/duration/skips in a bounded public notice, avoiding inferred
+counts when signed job-log transport is unavailable in this workspace.
+Two fresh corrected full diagnostic passes remain mandatory. The active
+local disk candidate and its frozen bytes are unchanged.

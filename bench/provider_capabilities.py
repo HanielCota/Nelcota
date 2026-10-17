@@ -52,8 +52,13 @@ def require(condition, message):
 class Receiver(http.server.ThreadingHTTPServer):
     daemon_threads = False
 
-    def __init__(self, address, token):
+    def __init__(self, address, token, *, maximum_exports=128, maximum_wire_bytes=16 * 1024 ** 2):
+        require(type(maximum_exports) is int and 1 <= maximum_exports <= 256,
+                "Invalid bounded telemetry export count")
+        require(type(maximum_wire_bytes) is int and 1 <= maximum_wire_bytes <= 32 * 1024 ** 2,
+                "Invalid bounded telemetry wire bytes")
         self.token, self.peer = token, None
+        self.maximum_exports, self.maximum_wire_bytes = maximum_exports, maximum_wire_bytes
         self.lock = threading.Lock()
         self.slots = threading.BoundedSemaphore(2)
         self.exports = self.received = 0
@@ -108,7 +113,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             require(len(points) <= 64, "Provider memory inventory exceeded its 64-point report budget")
             observation = {"observed_monotonic": time.monotonic(), "points": points}
             with server.lock:
-                require(server.exports < 128 and server.received + len(body) <= 16 * 1024 ** 2,
+                require(server.exports < server.maximum_exports and server.received + len(body) <= server.maximum_wire_bytes,
                         "Provider telemetry exceeded its cumulative budget")
                 server.exports += 1
                 server.received += len(body)

@@ -233,6 +233,11 @@ samples retain the existing 30-second gap and 10% RAM/15% disk/inode reserves.
 Signed requests are capped at 4,096 per case, and byte mismatches stop new
 traffic immediately. Public evidence contains OS owner counts and typed
 allocator capabilities, with no raw thread names, credentials or payloads.
+The long diagnostic explicitly allows at most 256 telemetry exports/32 MiB
+per case, covering its bounded observation period; short capability discovery
+keeps its original 128-export/16-MiB defaults. Per-request parser limits and
+the controller's memory quota remain unchanged. Failed collector runs retain
+their original verdict and are repeated after a correction.
 It earns zero BaaS endurance time and cannot establish exact live allocation
 ownership or explain anonymous retention without further evidence. G05 plans
 two independent dispatches of this diagnostic before drawing recommendations.

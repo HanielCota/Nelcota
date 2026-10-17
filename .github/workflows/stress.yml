@@ -198,7 +198,23 @@ jobs:
       - name: Inventory the disposable provider runtime VM
         run: python3 bench/native_preflight.py
       - name: Check the bounded runtime diagnostic regressions
-        run: nice -n19 ionice -c3 python3 -m unittest discover -s scripts/review_tests -p 'test_stress_provider_runtime.py' -v
+        run: |
+          nice -n19 ionice -c3 python3 - <<'PY'
+          import json, os, pathlib, time, unittest
+          began = time.monotonic()
+          suite = unittest.defaultTestLoader.discover('scripts/review_tests', pattern='test_stress_provider_runtime.py')
+          result = unittest.TextTestRunner(verbosity=2).run(suite)
+          report = {'source_commit': os.environ['GITHUB_SHA'], 'tests': result.testsRun,
+                    'failures': len(result.failures), 'errors': len(result.errors), 'skipped': len(result.skipped),
+                    'elapsed_seconds': time.monotonic() - began, 'successful': result.wasSuccessful()}
+          target = pathlib.Path('target/provider-runtime-regressions-public.json')
+          target.parent.mkdir(exist_ok=True)
+          with target.open('x') as stream:
+              stream.write(json.dumps(report, indent=2, allow_nan=False) + '\n')
+          print('::notice title=Provider runtime regression summary::' + json.dumps(report, separators=(',', ':'), allow_nan=False))
+          if not result.wasSuccessful() or result.testsRun < 12 or result.skipped:
+              raise SystemExit(1)
+          PY
       - name: Compare provider runtime owners on fresh fixtures
         timeout-minutes: 70
         run: |
@@ -216,7 +232,9 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: provider-runtime-owners
-          path: target/stress-g05/native-provider-runtime-*-public
+          path: |
+            target/stress-g05/native-provider-runtime-*-public
+            target/provider-runtime-regressions-public.json
           if-no-files-found: ignore
           retention-days: 14
 
