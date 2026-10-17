@@ -33,6 +33,8 @@ def input_artifact(directory, provenance, native):
             and value["size_bytes"] == native["common_executable_size_bytes"], "Downloaded native artifact differs from retained evidence")
     trees = provenance["product_tree_objects"]
     require(set(trees) == PRODUCT_PATHS, "Missing complete final product tree identity")
+    dirty = subprocess.check_output(["git", "status", "--porcelain", "--", *sorted(PRODUCT_PATHS)], cwd=ROOT, text=True, timeout=10)
+    require(not dirty.strip(), "Product sources changed in the working tree after the retained ELF was built")
     for path, expected in trees.items():
         actual = subprocess.check_output(["git", "rev-parse", "HEAD:" + path], cwd=ROOT, text=True, timeout=10).strip()
         require(re.fullmatch("[0-9a-f]{40}", expected) is not None and actual == expected,
@@ -43,11 +45,12 @@ def input_artifact(directory, provenance, native):
             "scope": "The retained Actions ELF is distinct from the local performance ELF; current product trees must match its build source."}
 
 
-def kernel_budget(identity):
+def kernel_budget(identity, prefix="g05-matrix-"):
     relative = next(line.split(":", 2)[2] for line in Path("/proc/self/cgroup").read_text().splitlines() if line.startswith("0::"))
     root = Path("/sys/fs/cgroup").resolve()
     path = (root / relative.lstrip("/")).resolve(strict=True)
-    require(path.is_relative_to(root) and "g05-matrix-" + identity + ".service" in path.parts,
+    require(prefix in {"g05-matrix-", "g05-browser-auth-"}, "Unknown owned diagnostic unit namespace")
+    require(path.is_relative_to(root) and prefix + identity + ".service" in path.parts,
             "Supplemental controller is outside its owned systemd unit")
     quota, period = (path / "cpu.max").read_text().split()
     memory, swap, tasks = [(path / name).read_text().strip() for name in ["memory.max", "memory.swap.max", "pids.max"]]
@@ -62,7 +65,7 @@ def read_receipt(path):
     return json.loads(path.read_text())
 
 
-def export_resources(source, destination):
+def export_resources(source, destination, roles=None):
     require(not source.is_symlink() and source.is_file(), "Missing supplemental resource series")
     samples, previous, maximum_gap = 0, None, 0
     peaks = {}
@@ -75,17 +78,26 @@ def export_resources(source, destination):
             require(len(line) <= 256 * 1024 and samples < 600, "Supplemental resource inventory exceeded its ceiling")
             row = json.loads(line)
             now = row["monotonic"]
+            phase = row["phase"]
+            if roles is not None:
+                require(phase in {"preparation", "untrusted-ca", "live-panel-SDK", "teardown"}, "Unexpected owned browser observation phase")
+                phase = phase.lower()
             require(type(now) in {int, float} and math.isfinite(now) and now >= 0
-                    and re.fullmatch("[a-z0-9-]{1,80}", row["phase"]) is not None, "Invalid supplemental observation")
+                    and re.fullmatch("[a-z0-9-]{1,80}", phase) is not None, "Invalid supplemental observation")
             if previous is not None:
                 require(now >= previous, "Resource observations moved backwards")
                 maximum_gap = max(maximum_gap, now - previous)
             previous = now
-            projected = {"monotonic": now, "phase": row["phase"], "components": {}}
+            projected = {"monotonic": now, "phase": phase, "components": {}}
             for name, values in row["component_cgroups"].items():
-                match = re.search(r"-(app|pg)-([01])$", name)
-                require(match is not None, "Unexpected supplemental component identity")
-                role = match[1] + "-" + match[2]
+                role = None
+                if roles is None:
+                    match = re.search(r"-(app|pg)-([01])$", name)
+                    require(match is not None, "Unexpected supplemental component identity")
+                    role = match[1] + "-" + match[2]
+                if roles is not None:
+                    role = roles.get(name)
+                    require(role in {"app-0", "app-1", "pg-0", "proxy", "browser"}, "Unexpected owned browser component")
                 require(role not in projected["components"], "Duplicate supplemental component role")
                 point = {"memory_current_bytes": values["memory.current"], "memory_peak_bytes": values["memory.peak"],
                          "anonymous_bytes": values["memory.stat"]["anon"], "tasks": values["pids.current"],

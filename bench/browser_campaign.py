@@ -14,6 +14,7 @@ import threading
 import time
 
 from browser_runtime import prepare
+from browser_auth import PROFILE as AUTH_PROFILE, complete as auth_pressure_complete
 from campaign import ResourceCoverage, docker, effective_cpus, owns_listener, validate_disk_headroom, validate_storage_filesystem
 from disk_usage import host as disk_usage, container as container_disk_usage
 from host_resources import owned_cgroup_snapshot, require_no_oom, snapshot as host_snapshot
@@ -30,8 +31,17 @@ def campaign(args):
         raise ValueError('Preserve prior browser evidence')
     output.mkdir(parents=True, exist_ok=True)
     cpus = sorted(os.sched_getaffinity(0))
-    if os.getuid() != 1000 or len(cpus) < 5 or effective_cpus(cpus) < 4 or host_reserves(output):
-        raise RuntimeError('Browser profile needs five affinity slots and four effective CPUs with reserves')
+    minimum_slots = 5
+    observer_affinity = cpus
+    if args.four_cpu_actions:
+        if os.getuid() == 0 or os.environ.get('GITHUB_ACTIONS') != 'true' or os.environ.get('RUNNER_ENVIRONMENT') != 'github-hosted':
+            raise RuntimeError('The explicit four-slot browser profile requires a nonroot disposable Actions VM')
+        minimum_slots = 4
+        observer_affinity = cpus[3:4]
+    if (not args.four_cpu_actions and os.getuid() != 1000) or len(cpus) < minimum_slots or effective_cpus(cpus) < 4 or host_reserves(output):
+        raise RuntimeError('Browser profile needs its declared affinity slots, four effective CPUs and reserves')
+    if args.four_cpu_actions:
+        os.sched_setaffinity(0, {cpus[3]})
     validate_disk_headroom(output, 512, startup_mib=4096)
     identity = 'nelcota-browser-'+secrets.token_hex(16)
     owned = OwnedDocker(identity, docker)
@@ -70,7 +80,7 @@ def campaign(args):
     try:
         watchdog = subprocess.Popen([sys.executable, str(Path(__file__).with_name('watchdog.py')), str(output/'ownership.json')], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
         runtime = directory/'runtime'
-        runtime_profile = prepare(runtime, args.sdk)
+        runtime_profile = prepare(runtime, args.sdk, args.chrome_executable)
         shutil.copyfile(runtime/'runtime-manifest.json', output/'runtime-manifest.private.json')
         source.create()
         source.environment['NELCOTA_TRUST_PROXY'] = 'true'
@@ -103,10 +113,15 @@ def campaign(args):
                    'upstreams':[f'127.0.0.1:{source.port}', f'127.0.0.1:{consumer.port}']}
         with args.binary.open('rb') as stream:
             binary_digest = hashlib.file_digest(stream, 'sha256').hexdigest()
+        fixture['auth_pressure'] = args.auth_pressure
         profile = {'scope':'owned live browser panel and built SDK, shared database with two real auth consumers; no public WAN/controller certification',
                    'binary_sha256':binary_digest, 'runtime':runtime_profile, 'proxy':proxy_profile,
                    'proxy_config_sha256':hashlib.sha256(configuration.encode()).hexdigest(),
                    'auth_consumers':2, 'app_aggregate_cpus':1, 'postgres_cpus':.5, 'browser_cpus':1,
+                   'auth_pressure_enabled':args.auth_pressure,
+                   'auth_pressure_profile':AUTH_PROFILE,
+                   'observer_shares_proxy_CPU_explicitly':args.four_cpu_actions,
+                   'observer_CPU_affinity':observer_affinity,
                    'app_memory_mib_each':128, 'postgres_memory_mib':256, 'browser_memory_mib':1536,
                    'browser_pids_limit':256, 'browser_home_disk_mib_each':256, 'database_disk_mib':512,
                    'browser_fixture_disk_mib':3072,
@@ -206,10 +221,11 @@ def campaign(args):
                        '--mount', f'type=bind,source={runtime},target=/runtime,readonly',
                        '--mount', f'type=bind,source={runtime/"libs"},target=/usr/lib/x86_64-linux-gnu,readonly',
                        '--mount', f'type=bind,source={Path(__file__).with_name("browser_driver.py")},target=/driver.py,readonly',
+                       '--mount', f'type=bind,source={Path(__file__).with_name("browser_auth.js")},target=/auth-pressure.js,readonly',
                        '--mount', f'type=bind,source={input_file},target=/fixture.json,readonly',
                        '--mount', f'type=bind,source={home},target=/home/ubuntu',
                        '--mount', f'type=bind,source={evidence},target=/evidence',
-                       '-e', 'XDG_CONFIG_HOME=/home/ubuntu/.config', '-e', 'XDG_CACHE_HOME=/home/ubuntu/.cache',
+                       '-e', 'HOME=/home/ubuntu', '-e', 'XDG_CONFIG_HOME=/home/ubuntu/.config', '-e', 'XDG_CACHE_HOME=/home/ubuntu/.cache',
                        '-e', 'FONTCONFIG_FILE=/runtime/fonts.conf', '-e', 'LANG=C.UTF-8',
                        '-e', 'DEBUG=pw:browser',
                        image['Id'], '/runtime/python/bin/python3', '-I', '/driver.py']
@@ -256,6 +272,13 @@ def campaign(args):
             return result
         negative = browser_run('untrusted-ca', False)
         positive = browser_run('live-panel-SDK', True)
+        if args.auth_pressure:
+            positive['auth_pressure'] = auth_pressure_complete(positive['auth_pressure'])
+            census = json.loads(source.sql("SELECT json_build_object('created_users',count(DISTINCT u.id),'unrevoked_sessions',count(s.id) FILTER(WHERE s.revoked_at IS NULL)) FROM auth.users u LEFT JOIN auth.sessions s ON s.user_id=u.id WHERE u.email LIKE 'g05-%@example.test'"))
+            if census != {'created_users':40, 'unrevoked_sessions':0}:
+                raise RuntimeError('Raw browser auth pressure row/session accounting failed')
+            positive['auth_pressure_census'] = census
+            atomic_json(output/'auth-pressure-census.json', census)
         atomic_json(output/'browser-invariants.json', {'untrusted_control':negative, 'live':positive})
         stop.set()
         sampler.join(timeout=30)
@@ -293,6 +316,9 @@ if __name__ == '__main__':
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--sdk', type=Path, required=True)
     parser.add_argument('--session-seconds', type=int, default=1080)
+    parser.add_argument('--auth-pressure', action='store_true')
+    parser.add_argument('--four-cpu-actions', action='store_true')
+    parser.add_argument('--chrome-executable', type=Path)
     args = parser.parse_args()
     if not args.binary.is_file() or not 900 <= args.session_seconds <= 1500:
         parser.error('Browser needs an existing binary and a 900..1500-second real session observation')

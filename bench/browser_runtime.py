@@ -44,17 +44,21 @@ def runtime_dependencies(binaries, roots):
     return libraries
 
 
-def prepare(destination, sdk):
+def prepare(destination, sdk, chrome_executable=None):
     if platform.machine() != 'x86_64':
         raise RuntimeError('The native browser runtime profile is validated only on x86_64')
     destination = Path(destination).resolve()
     if destination.exists():
         raise ValueError('Preserve an existing browser runtime')
     chrome = Path('/usr/lib/chromium')
+    executable_chrome = chrome/'chromium'
+    if chrome_executable is not None:
+        executable_chrome = Path(chrome_executable).resolve(strict=True)
+        chrome = executable_chrome.parent
     python = Path(sys.prefix)
     executable = Path(sys.executable).resolve()
     sdk = Path(sdk).resolve(strict=True)
-    if not (chrome/'chromium').is_file() or not (sdk/'index.js').is_file():
+    if not executable_chrome.is_file() or not os.access(executable_chrome, os.X_OK) or not (sdk/'index.js').is_file():
         raise RuntimeError('Native Chromium and freshly built SDK are required')
     destination.mkdir()
     records = []
@@ -84,7 +88,12 @@ def prepare(destination, sdk):
                 if name in exclusions or name.endswith(('.pyc', '.pyo')) or item.is_symlink():
                     continue
                 copy(item, target/item.relative_to(source))
-    tree(chrome, destination/'chrome')
+    exclusions = ()
+    if executable_chrome.name != 'chromium':
+        exclusions = (executable_chrome.name,)
+    tree(chrome, destination/'chrome', exclusions)
+    if executable_chrome.name != 'chromium':
+        copy(executable_chrome, destination/'chrome/chromium')
     copy(executable, destination/'python/bin/python3')
     stdlib = Path(sysconfig.get_path('stdlib'))
     # This headless Chromium profile does not import Python's separate Tcl/Tk
@@ -123,14 +132,14 @@ def prepare(destination, sdk):
         if item.is_symlink() or not item.resolve().is_relative_to(sdk):
             raise ValueError('SDK runtime cannot follow external asset links')
         copy(item, destination/'sdk'/item.relative_to(sdk))
-    binaries = [chrome/'chromium', executable, Path(shutil.which('certutil') or '/missing-certutil'),
+    binaries = [executable_chrome, executable, Path(shutil.which('certutil') or '/missing-certutil'),
                 *[item for item in stdlib.glob('lib-dynload/*.so') if item.name not in unused_extensions],
                 *[Path(shutil.which(name) or '/missing-tool') for name in ['sh', 'cat', 'ls', 'wc', 'du']]]
     binaries.extend((destination/'python').rglob('node'))
     modules = set()
     for pattern in ['libnss*.so*', 'libsoftokn*.so*', 'libfreebl*.so*']:
         modules.update(Path('/usr/lib/x86_64-linux-gnu').glob(pattern))
-    libraries = modules | runtime_dependencies([*binaries, *sorted(modules)], [Path('/lib'), Path('/usr/lib'), python, destination])
+    libraries = modules | runtime_dependencies([*binaries, *sorted(modules)], [Path('/lib'), Path('/usr/lib'), python, destination, chrome])
     names = {}
     for library in sorted(libraries):
         resolved = library.resolve(strict=True)

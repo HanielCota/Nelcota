@@ -2582,3 +2582,27 @@ Only four server integration-test files change; no production credential or
 backend implementation is changed by this fixture correction. Fresh full CI
 and a release-byte/source-equivalence check remain pending. Do not infer
 that changed test sources are already covered by earlier CI.
+
+
+### Additional concurrent backend-auth coverage prepared
+
+Two new optional browser/auth passes are predeclared, not run. Each retains
+five navigation pressure/rest cycles, three tabs, real1080s credential expiry,
+verified owned HTTPS and48SDK-call singleflight. During each pressure cycle,
+eight raw account flows exercise112requests with16/s and8inflight bounds:
+40generated users/pass,400positive responses and160specific invalid-grant
+rejections. Exact user/family/RLS/logout oracles, independent marked wire counts
+and final40users/0unrevoked generated-user sessions are required. Per-response
+reads stop at64KiB; positive-only latency keeps existing750/1500ms login and
+200/500ms read/refresh gates. HTTP redirects and automatic mutation retries
+are disabled; missing retry-grace timing cannot certify reuse behavior.
+
+A distinct nonroot disposable Actions four-slot profile explicitly shares the
+observer/proxy slot (configured quota1.25on that slot), with3.75total configured
+component CPUs and0.25CPU OS headroom. The local five-slot default, target
+memory/disk/traffic/reserve/TLS/RLS/30s sample-gap bounds stay unchanged.
+Source reuse now also rejects dirty product files, even if HEAD tree IDs match.
+Six new auth-publication and three additional shared source/resource guards
+are prepared; tests will run remotely before any live dispatch. Only static
+Python/JavaScript/workflow parsing has run locally, on the controller slot where
+applicable. No Rust/UI suite or compression overlaps the local load.

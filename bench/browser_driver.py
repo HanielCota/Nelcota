@@ -4,6 +4,7 @@ from collections import Counter, deque
 import json
 import math
 import os
+import re
 from pathlib import Path
 import time
 import urllib.parse
@@ -33,6 +34,7 @@ async def main():
     state = {'phase':'startup', 'api_requests':0, 'decoded_network_bytes':0,
              'external_requests_blocked':0, 'page_errors':0}
     paths, grants, consumers, uploads = Counter(), Counter(), Counter(), Counter()
+    raw_auth_requests = Counter()
     arrivals = deque()
     def fatal(reason):
         save(output/'browser-critical.json', {'reason':reason, **state})
@@ -55,6 +57,13 @@ async def main():
             if grant not in ('password', 'refresh_token'):
                 fatal('unexpected_browser_auth_grant')
             grants[grant] += 1
+        raw_cycle = request.headers.get('x-g05-auth-pressure')
+        if raw_cycle is not None:
+            if raw_cycle not in {'0', '1', '2', '3', '4'} or not fixture.get('auth_pressure'):
+                fatal('invalid_raw_auth_pressure_marker')
+            raw_auth_requests[raw_cycle] += 1
+            if raw_auth_requests[raw_cycle] > 112:
+                fatal('raw_auth_pressure_request_ceiling')
     def received(event):
         size = event.get('dataLength')
         if isinstance(size, bool) or not isinstance(size, (int, float)) or not math.isfinite(size) or size < 0:
@@ -102,6 +111,7 @@ async def main():
         }''', {'user':fixture['user'], 'body':fixture['label']})
         require(value, 'live_browser_SDK_RLS_oracle')
     plateaus, timings = [], []
+    auth_jobs, auth_pressure = set(), []
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(executable_path='/runtime/chrome/chromium', headless=True,
             chromium_sandbox=False, args=['--disable-gpu', '--disable-background-networking', '--no-first-run'])
@@ -340,6 +350,21 @@ async def main():
             await sample('baseline')
             for cycle in range(5):
                 state['phase'] = 'navigation-pressure-'+str(cycle+1)
+                auth_job = None
+                if fixture.get('auth_pressure') is True:
+                    auth_job = asyncio.create_task(pages[0].evaluate(Path('/auth-pressure.js').read_text(), {'password':fixture['password'], 'cycle':cycle}))
+                    auth_jobs.add(auth_job)
+                    def auth_finished(task):
+                        if task.cancelled():
+                            return
+                        error = task.exception()
+                        if error is not None:
+                            code = re.search(r'g05_auth_[a-z0-9_]{1,80}', str(error))
+                            reason = 'backend_auth_pressure_failed'
+                            if code is not None:
+                                reason = code.group(0)
+                            fatal(reason)
+                    auth_job.add_done_callback(auth_finished)
                 deadline = time.monotonic()+30
                 count = 0
                 while time.monotonic() < deadline:
@@ -357,6 +382,14 @@ async def main():
                       window.g05Disposed=[];
                       for(let index=0;index<20;index++){const client=window.g05SDK.createClient(base,{auth:{storageKey:key}});await client.auth.getSession();client.dispose();window.g05Disposed.push(new WeakRef(client));}
                     }''', {'base':base, 'key':fixture['storage_key']})
+                if auth_job is not None:
+                    proof = await asyncio.wait_for(auth_job, timeout=45)
+                    require(proof['status']=='passed' and proof['requests_completed']==112, 'backend_auth_pressure_incomplete')
+                    require(raw_auth_requests[str(cycle)]==112, 'backend_auth_pressure_wire_accounting')
+                    proof['independent_browser_request_count'] = raw_auth_requests[str(cycle)]
+                    auth_pressure.append(proof)
+                    auth_jobs.discard(auth_job)
+                    save(output/'browser-auth-pressure.json', {'status':'in progress', 'cycles':auth_pressure})
                 await asyncio.sleep(15)
                 await sample('navigation-rest-'+str(cycle+1))
                 for page in pages:
@@ -409,6 +442,7 @@ async def main():
                       'temporary_clients_checked_per_tab_per_cycle':20, 'navigation_requires_different_table':True,
                       'authoritative_visual_feedback_p95_ms':p95, 'feedback_SLO_ms':1000, 'api_requests':state['api_requests'],
                       'decoded_network_bytes':state['decoded_network_bytes'], 'auth_grants':dict(grants), 'auth_consumers':dict(consumers),
+                      'auth_pressure':auth_pressure,
                       'sdk_RLS_reads':reads, 'cross_tab_refresh_coalesced':True, 'actual_credential_renewal':True,
                       'offline_reconnect':True, 'offline_read_error':disconnected['code'],
                       'offline_read_attempts':offline_attempts, 'configured_additional_read_retries':2,
@@ -424,8 +458,14 @@ async def main():
             for profiler in profilers:
                 await profiler.detach()
             await context.close()
+            if fixture.get('auth_pressure') is True:
+                require(len(auth_pressure)==5, 'backend_auth_pressure_missing_cycles')
+                save(output/'browser-auth-pressure.json', {'status':'passed', 'cycles':auth_pressure})
             save(output/'browser-result.json', result)
         finally:
+            for job in auth_jobs:
+                job.cancel()
+            await asyncio.gather(*auth_jobs, return_exceptions=True)
             await browser.close()
 
 

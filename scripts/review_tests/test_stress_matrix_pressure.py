@@ -100,7 +100,11 @@ class SupplementalProbeGuards(unittest.TestCase):
                   "common_elf_verified": True, "binary_sha256": digest, "common_executable_size_bytes": 100,
                   "workflow_run_id": 123}
         artifact = {"source_commit": source, "binary_sha256": digest, "size_bytes": 100}
-        with patch.object(runner, "artifact", return_value=artifact), patch.object(runner.subprocess, "check_output", return_value="d" * 40):
+        def git_value(arguments, **_):
+            if arguments[1] == "status":
+                return ""
+            return "d" * 40
+        with patch.object(runner, "artifact", return_value=artifact), patch.object(runner.subprocess, "check_output", side_effect=git_value):
             with self.assertRaisesRegex(RuntimeError, "Product sources changed"):
                 runner.input_artifact(Path("."), provenance, native)
         with patch.object(runner, "artifact", return_value={**artifact, "binary_sha256": "e" * 64}), \
@@ -122,6 +126,44 @@ class SupplementalProbeGuards(unittest.TestCase):
             body = gzip.decompress((root / result["public_file"]).read_bytes()).decode()
         self.assertEqual((result["samples"], result["maximum_gap_seconds"]), (2, 5))
         self.assertEqual(result["component_peaks"]["app-0"]["anonymous_bytes"], 50)
+        self.assertNotIn("must-stay-private", body)
+
+    def test_dirty_product_checkout_is_refused_even_when_head_objects_match(self):
+        source, digest = "a" * 40, "b" * 64
+        provenance = {"source_commit": source, "product_tree_objects": {name: "c" * 40 for name in runner.PRODUCT_PATHS}}
+        native = {"source_commit": source, "status": "passed", "total_cases": 12,
+                  "common_elf_verified": True, "binary_sha256": digest, "common_executable_size_bytes": 100,
+                  "workflow_run_id": 123}
+        with patch.object(runner, "artifact", return_value={"binary_sha256": digest, "size_bytes": 100}), \
+                patch.object(runner.subprocess, "check_output", return_value=" M crates/admin/src/sql/executor.rs\n") as git:
+            with self.assertRaisesRegex(RuntimeError, "working tree"):
+                runner.input_artifact(Path("."), provenance, native)
+            self.assertEqual(git.call_count, 1)
+            self.assertEqual(git.call_args.args[0][:4], ["git", "status", "--porcelain", "--"])
+
+    def test_explicit_browser_resource_roles_cannot_publish_a_foreign_component(self):
+        values = {"memory.current": 100, "memory.peak": 200, "memory.stat": {"anon": 50},
+                  "pids.current": 4, "memory.events": {"oom": 0, "oom_kill": 0}, "cpu.stat": {"throttled_usec": 10}}
+        row = {"monotonic": 10, "phase": "live-panel-SDK", "component_cgroups": {"foreign-app-0": values}}
+        with tempfile.TemporaryDirectory() as root:
+            root = Path(root);source = root / "source.jsonl"
+            source.write_text(json.dumps(row) + "\n")
+            with self.assertRaisesRegex(RuntimeError, "owned browser component"):
+                runner.export_resources(source, root, {"owned-app-0": "app-0"})
+
+    def test_browser_phase_alias_preserves_numeric_owners_without_private_fields(self):
+        values = {"memory.current": 100, "memory.peak": 200, "memory.stat": {"anon": 50},
+                  "pids.current": 4, "memory.events": {"oom": 0, "oom_kill": 0}, "cpu.stat": {"throttled_usec": 10}}
+        row = {"monotonic": 10, "phase": "live-panel-SDK", "private": "must-stay-private",
+               "component_cgroups": {"owned-proxy": values, "browser": values}}
+        with tempfile.TemporaryDirectory() as root:
+            root = Path(root);source = root / "source.jsonl"
+            source.write_text(json.dumps(row) + "\n" + json.dumps({**row, "monotonic": 15}) + "\n")
+            result = runner.export_resources(source, root, {"owned-proxy": "proxy", "browser": "browser"})
+            body = gzip.decompress((root / result["public_file"]).read_bytes()).decode()
+        self.assertEqual(result["samples"], 2)
+        self.assertEqual(set(result["component_peaks"]), {"proxy", "browser"})
+        self.assertEqual(json.loads(body.splitlines()[0])["phase"], "live-panel-sdk")
         self.assertNotIn("must-stay-private", body)
 
     def test_invalid_resource_times_cannot_create_a_passing_summary(self):

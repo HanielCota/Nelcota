@@ -764,3 +764,34 @@ not certify forced catalog-refresh failures,
 all security/mutation scenarios, public TLS/DNS/ingress, SMTP/OAuth or the full
 G05 matrix. Remote time overlapping local load earns no extra local checkpoint
 credit. These profiles are prepared until their actual receipts exist.
+
+
+### Additional browser/backend authentication pressure
+
+The optional `browser-auth` manual workflow uses the retained verified final
+native ELF, two auth consumers sharing one disposable database, and the real
+panel/TypeScript SDK in Chromium. It adds eight concurrent account flows to each
+of five existing navigation pressure/rest cycles: signup/login, rejected wrong
+passwords, user and RLS canaries, supported refresh retry grace, stale-token family
+revocation, an independent surviving family, logout and revoked-refresh rejection.
+Each cycle is limited to112 raw requests,8in flight,16arrivals/s,64KiB per
+response and40s, without automatic mutation retries. The browser independently
+counts its marked requests. Final database accounting requires40created users
+and zero unrevoked sessions belonging to those generated users. Existing login,
+read/refresh and visual SLOs remain unchanged; negatives have separate counts.
+
+Its explicit four-slot Actions profile keeps app/database/generator on distinct
+slots and shares slot3 between observer and proxy. Configured quotas total3.75
+CPUs, including a1CPU/512MiB/128-task controller; observer+proxy quotas on their
+shared slot total1.25CPUs. This intentional local oversubscription is recorded,
+not a claim of physical isolation or a comparison to the existing local five-slot
+profile. Existing memory/disk/traffic/reserve/30s sampling-gap gates, the untrusted
+CA rejection, verified local TLS, actual expiry and SDK disposal stay enabled.
+The local five-slot default is unchanged. Alternate public Chromium tooling is
+copied under the same runtime byte/ownership boundary and exposed read-only;
+Node/Python remain development tooling, with no backend production dependency.
+
+The two new passes are predeclared in the G05 plan and remain **not run** until
+remote regressions, source/provenance and the native artifact gates pass. Their
+full browser observation lasts1080s. SMTP/OAuth/public ingress are separate cells;
+this profile neither bypasses unavailable services nor certifies all G05 work.

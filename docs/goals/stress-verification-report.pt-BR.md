@@ -528,3 +528,14 @@ bootstraps repetidos de RLS e a variável do processo filho do SDK Rust.
 A regra CodeQL continua habilitada. Só arquivos de integração são alterados;
 CI novo e verificação explícita de equivalência do ELF ainda são pendentes.
 A campanha em andamento mantém os mesmos bytes Rust de produção congelados.
+
+
+Duas passagens adicionais de autenticação durante navegação foram
+predeclaradas: oito fluxos concorrentes por ciclo, cinco ciclos,560requisições
+brutas/passagem,40usuários novos,400respostas positivas e160rejeições de
+credenciais/replay/logout. A contagem independente do browser, o census final
+40usuários/0sessões ativas próprias e os SLOs existentes são obrigatórios.
+O perfil remoto de quatro slots declara o compartilhamento observador/proxy;
+o perfil local original de cinco slots permanece distinto. Até este registro,
+só sintaxe foi verificada: regressões focadas e testes reais ainda **não foram
+executados**. SMTP/OAuth e ingress público continuam fora desse perfil.
