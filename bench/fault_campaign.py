@@ -336,6 +336,7 @@ def run(args):
                 raise
 
         def traffic(label,seconds,action=None,allow_unavailable=False,rate=None,exploratory=False):
+            from ledger_arrivals import collect_ready, has_capacity
             nonlocal phase,load_seconds
             phase=label
             if rate is None:
@@ -365,13 +366,7 @@ def run(args):
             with ThreadPoolExecutor(max_workers=8) as workers:
                 for index in range(seconds*rate):
                     require_running(critical,watchdog,action_error)
-                    for future in list(in_flight):
-                        if future.done():
-                            outcome,ack,latency=future.result()
-                            counts[outcome]+=1;counts['acknowledged']+=ack
-                            if ack:
-                                success_latencies.append(latency)
-                            in_flight.remove(future)
+                    collect_ready(in_flight,counts,success_latencies)
                     delay=start+index/rate-time.monotonic()
                     if delay < -1/rate:
                         counts['late_arrivals']+=1
@@ -379,7 +374,7 @@ def run(args):
                         continue
                     if delay>0:
                         time.sleep(delay)
-                    if len(in_flight)>=8:
+                    if not has_capacity(in_flight,counts,success_latencies):
                         counts['dropped_arrivals']+=1
                         continue
                     in_flight.add(workers.submit(operation,label,index,allow_unavailable))
