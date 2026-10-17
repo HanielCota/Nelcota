@@ -636,3 +636,35 @@ detectar falhas antes de novos soaks. Durações, taxas, SLOs, reservas e gates
 já declarados permanecem iguais. A suíte nativa deste novo source está no
 [Actions 39017663454](https://github.com/Nelcota/Nelcota/actions/runs/39017663454);
 seu resultado e o CI ainda não estão aprovados neste registro.
+
+
+## Ajuste explícito de staging antes das topologias substitutas
+
+O perfil original de dez projetos, com teto agregado de dados PostgreSQL de
+2.048 MiB, exige 16.599.864.934 bytes livres considerando cópias VFS, reserva
+de 15% e margem adicional. O ambiente dispunha de 16.123.875.328 bytes.
+Antes de medir qualquer topologia substituta, foi declarado um teto **mais
+restrito de 1.536 MiB**, comum aos novos baselines e candidatos de 1/5/10
+projetos, com IDs terminados em `002`. Dataset de 1.000 linhas/projeto,
+usuários, tráfego, duração, CPU, RAM, fairness, SLOs, integridade e reserva
+permanecem iguais. O teto menor acrescenta uma condição de parada mais
+restrita; ultrapassá-lo reprova a execução, sem reduzir os requisitos de
+trabalho ou alterar uma medição em andamento. Os pedidos originais de
+2.048 MiB permanecem preservados. O smoke de dez projetos começou às
+08:51:27 UTC e não pode aprovar capacidade de cinco minutos.
+
+A preparação de espaço não contou como carga. Uma tentativa de arquivo
+parou no limite de 3 GiB antes de remover qualquer original. O arquivo
+verificado seguinte consumiu 1.499.942.912 bytes líquidos adicionais porque
+os arquivos antigos estavam em camadas inferiores do overlay. Esse resultado
+negativo não foi apresentado como capacidade liberada. O cache Cargo
+reconstruível foi então descartado com inventário; dois probes manuais sem
+proveniência de fonte estabelecida foram preservados byte a byte em arquivo
+separado. Fontes, Git, releases congelados e evidências permaneceram intactos.
+Cache npm/node_modules também é reconstruível pelo lockfile preservado; sua
+limpeza liberou apenas cerca de 25 MB neste overlay. Testes Rust/UI locais
+futuros exigem restaurar/reconstruir as dependências antes de executar.
+
+Os [18 checks de f40774e](results/stress/ci-f40774e-final-product-source.json)
+passaram, incluindo a suíte Rust e CodeQL. A suíte nativa final e as campanhas
+ainda precisam concluir; CI ordinário não aprova esses critérios.

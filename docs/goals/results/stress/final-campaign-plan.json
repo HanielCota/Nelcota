@@ -48,7 +48,9 @@
       "provisional_rate_per_project": 32,
       "fallback_rate_per_project": 8,
       "fresh_passes": 2,
-      "scope": "First current fixed-counter run already active; the new optional sharing capability leaves its default CPU limits unchanged."
+      "scope": "First current fixed-counter run already active; the new optional sharing capability leaves its default CPU limits unchanged.",
+      "aggregate_database_disk_ceiling_mib": 1536,
+      "replacement_run_suffix": "002"
     },
     {
       "projects": 5,
@@ -56,7 +58,9 @@
       "seconds_per_step": 300,
       "provisional_rate_per_project": 32,
       "fallback_rate_per_project": 8,
-      "fresh_passes": 2
+      "fresh_passes": 2,
+      "aggregate_database_disk_ceiling_mib": 1536,
+      "replacement_run_suffix": "002"
     },
     {
       "projects": 10,
@@ -65,7 +69,9 @@
       "provisional_rate_per_project": 8,
       "fallback_rate_per_project": 4,
       "fresh_passes": 2,
-      "scope": "Conservative predeclared operating band for a distinct sharing allocation; not a comparison against failed fractional-quota campaigns or an absolute capacity maximum."
+      "scope": "Conservative predeclared operating band for a distinct sharing allocation; not a comparison against failed fractional-quota campaigns or an absolute capacity maximum.",
+      "aggregate_database_disk_ceiling_mib": 1536,
+      "replacement_run_suffix": "002"
     }
   ],
   "host_cpu_sharing": {
@@ -204,6 +210,17 @@
         "status": "same exact retained ELF as the ongoing disk003 campaign; no workload, process or approval-threshold change; updated test/native CI pending"
       },
       "reason": "Confirmed large unpolled export deadline retention defect; new product build required"
+    },
+    {
+      "declared_utc": "2026-10-17T08:50:51.988312+00:00",
+      "kind": "stricter topology data ceiling before any replacement measurement",
+      "old_aggregate_database_disk_ceiling_mib": 2048,
+      "new_aggregate_database_disk_ceiling_mib": 1536,
+      "reason": "Original ten-project worst-case startup plus2048MiB database ceiling cannot fit above the unchanged15% filesystem reserve. A stricter1536MiB owned-data stop ceiling admits the identical1000-row/project fixture without reducing traffic, duration, SLO, fairness, integrity or isolation requirements. If actual growth breaches it, stop and retain the failure; no pass is inferred.",
+      "changes_to_dataset_or_offered_work": false,
+      "all_1_5_10_baseline_candidate_profiles_match": true,
+      "fresh_topology_run_suffix": "002",
+      "new_endurance_or_larger_fixture_limits_changed": false
     }
   ],
   "native_same_artifact_suite": {

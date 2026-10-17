@@ -2703,3 +2703,27 @@ arguments. Run available short larger-fixture/topology controls before fresh
 endurance to expose failures earlier; no rates, durations, SLOs, budgets or
 approval criteria change. Final-source native suite39017663454 and ordinary
 CI39017645220 are pending at this checkpoint.
+
+
+Before starting any replacement topology measurement, predeclare a stricter
+1536MiB aggregate PostgreSQL data stop ceiling for matching1/5/10baseline and
+candidate runs, suffix002. The original2048MiB requests remain in the ledger.
+Ten-project startup on VFS needs16599864934bytes free with the original ceiling,
+versus16123875328observed. The1536MiB ceiling needs16062994022bytes, preserving
+15%free plus the existing512MiB margin. Rows/users, traffic, durations, CPU,
+RAM, fairness, latency and integrity gates do not change. Exceeding the tighter
+ceiling fails and stops the campaign. Candidate005 ten-project30s diagnostic
+started08:51:27UTC; it cannot certify five-minute qualification. The bounded
+serial short chain stops on any workload, evidence, cleanup or comparison failure.
+
+Space preparation earns no effective-load credit. A3GiB archive cap stopped a
+cache-only attempt before any unlink. The next verified archive actually cost
+1499942912additional filesystem bytes due to lower overlay layers; preserve that
+negative result. Rebuildable Cargo cache was discarded with an inventory, while
+two manually named probes were preserved losslessly because their source provenance
+is not established. Frozen releases, source/Git and benchmark data/evidence were
+not deleted. npm cache/node_modules cleanup freed only about25MB. Restore/rebuild
+local compiler or UI dependencies before any further related local checks.
+
+[All18ordinary checks](results/stress/ci-f40774e-final-product-source.json) passed
+on exact product sourcef40774e. Final native acceptance and stress remain separate.
