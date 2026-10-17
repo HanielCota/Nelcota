@@ -170,5 +170,14 @@
     "expected_extra_threads": 1,
     "expected_extra_descriptors": 1,
     "scope": "App allocation accounting only; does not attribute RustFS MiMalloc live owners or replace any ordinary final pass."
+  },
+  "retained_s3_baseline_retry": {
+    "declared_utc": "2026-10-17T02:13:19.494144+00:00",
+    "failed_run": "s3-retained-baseline-001",
+    "failure_evidence": "s3-retained-baseline-001-interrupted.json",
+    "retry_run": "s3-retained-baseline-002",
+    "traffic_limits_and_slos": "unchanged; same predeclared baseline profile and600s soak",
+    "operator": "Bounded detached controller with independent per-campaign watchdogs and generation receipts; serialize the retry and all four final endurance runs, stop on failed workload/evidence/cleanup/comparison. It changes no test or approval criterion.",
+    "final_candidates_started_before_interruption": false
   }
 }

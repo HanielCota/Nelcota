@@ -1,15 +1,15 @@
 # G05 — relatório técnico de stress
 
 **Estado: em execução, sem aprovação do G05.** Este relatório é atualizado
-durante as campanhas. Data deste checkpoint: 17/10/2026, 01:56 UTC.
+durante as campanhas. Data deste checkpoint: 17/10/2026, 02:13 UTC.
 Não houve merge nem deploy de produção. O trabalho está na branch
 `test/g05-stress-verification`, no [PR #90](https://github.com/Nelcota/Nelcota/pull/90),
 mantido como rascunho para revisão.
 
 ## Tempo efetivo e artefatos
 
-O [checkpoint 012](results/stress/load-time-checkpoint-012.json) registra
-**118.734 segundos, ou 32h58min54s, de carga efetiva concluída**. O cálculo
+O [checkpoint 013](results/stress/load-time-checkpoint-013.json) registra
+**120.864 segundos, ou 33h34min24s, de carga efetiva concluída**. O cálculo
 conservador exclui preparação, aquecimento, descanso, fases interrompidas,
 controles artificiais e dupla contagem de janelas simultâneas. Tempo mínimo
 de oito horas atingido não significa aprovação dos demais critérios.
@@ -290,3 +290,16 @@ impedimentos foi substituído silenciosamente por mock ou critério menor.
 As campanhas continuam enquanto houver trabalho relevante e condições
 seguras. O G05 permanece aberto enquanto houver requisito obrigatório
 reprovado, bloqueado ou não executado.
+
+
+Em 17/10, às 02:07 UTC, o baseline S3 `001` foi interrompido por SIGTERM
+na calibração de 75%. A transição de acesso ao ambiente ocorreu no mesmo
+período; o emissor do sinal não foi identificado de forma independente.
+Não há arquivo de violação de recursos/watchdog, e a limpeza confirmou
+zero containers/volumes próprios e remoção da fixture.
+A [execução reprovada](results/stress/s3-retained-baseline-001-interrupted.json)
+preserva 36 fases fechadas, 387 amostras e 2.130 s efetivos sem aquecimento;
+a fase parcial, soak não executado e invariantes finais ausentes não
+receberam aprovação. Nenhuma campanha do candidato começou. O retry
+`002` mantém exatamente o tráfego, limites e SLOs e usará controlador
+limitado, independente da conexão com a ferramenta.

@@ -2146,3 +2146,31 @@ native/local observations do not increase the conservative effective-load
 checkpoint. The retained S3 baseline remains active, and the four predeclared
 final disk/S3 endurance campaigns are serialized behind verified closure;
 failed workload/evidence/cleanup/comparison gates stop that chain.
+
+
+### Retained S3 baseline interrupted; original failure preserved (2026-10-17 02:13 UTC)
+
+The environment access transition coincided with external SIGTERM reaching
+the frozen S3 campaign handler in `calibrate-75`. The sender is unverified;
+no application bug or resource-guard breach is inferred. Owned teardown
+completed, and the [failed receipt](results/stress/s3-retained-baseline-001-interrupted.json)
+retains 36 closed phases/387 resource observations. Only 2,130 completed
+seconds excluding warmup enter [checkpoint013](results/stress/load-time-checkpoint-013.json),
+now 120,864 seconds (33h34m24s). Partial calibration, unexecuted soak and absent
+final invariants cannot certify the baseline/candidate. The tool operator
+exit receipt was lost; the generation-verified waiting chain was terminated
+with pidfd before any final campaign started. That exited operator awaits
+the environment PID1 reaper; no live fixture or child work remains.
+
+Fresh baseline002 is predeclared with unchanged profile/limits/SLOs. A bounded
+detached owner will serialize it and the four final endurance campaigns,
+retain PID generations, reap only its own adopted descendants and stop on
+any failed workload/evidence/cleanup/comparison gate. Per-campaign independent
+watchdogs remain authoritative; a future observation gap still rejects a run.
+
+A reversible archive also verified two older debug-test executables by full
+round-trip hashes/modes/mtime. Their unlink did not increase actual workspace
+free bytes, unlike the previously restored upper-layer cache003. No logical
+size is presented as reclaimed headroom. The private 163,161,294-byte archive
+and restoration manifest remain retained; no source, release ELF, data or
+original failure was discarded. Ten-project startup reserves are unchanged.
