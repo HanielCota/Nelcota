@@ -917,7 +917,15 @@
         "artifact_role": "frozen candidate007 after independent default server SDK isolation and regenerated embedded guide assets"
       }
     ],
-    "approval_thresholds_reduced": false
+    "approval_thresholds_reduced": false,
+    "private_executor_uniqueness_preflight": {
+      "status": "passed before any case started",
+      "evidence": "post-endurance-plan-prestart-uniqueness-001.json",
+      "original_unstarted_plan_preserved": true,
+      "duplicate_IDs_removed": 9,
+      "selected_cases_unchanged": 15,
+      "all_arguments_kinds_and_baseline_candidate_selections_unchanged": true
+    }
   },
   "final007_browser_auth": {
     "same_profile_passed": 1,
@@ -945,11 +953,12 @@
     "scenarios": 5,
     "maximum_offer_unchanged": true,
     "scope": "Actual full driver already used its64default. A wrong half-rate publication guard is corrected by sharing ledger_capacity.py between the actual driver, command factory and validator. Keep failed saturation steps, never reduce traffic to fit the old validator.36focused guards passed; both corrected full matrix repetitions pending.",
-    "evidence": "matrix-capacity-declaration-before-after-001.json"
+    "evidence": "matrix-capacity-declaration-before-after-001.json",
+    "current_status": "first real corrected64/300s declaration accepted with43guards and full final007 receipts; second full pass pending"
   },
   "ledger_generator_TLS_predeclaration": {
     "declared_utc": "2026-10-17T15:36:55.350817+00:00",
-    "status": "focused controls passed; new actual campaigns not run yet",
+    "status": "one fresh full corrected real matrix passed; second independent pass pending",
     "maximum_offered_rate": 64,
     "step_seconds": 300,
     "full_cases": 5,
@@ -960,6 +969,39 @@
     "private_handlers_each_request": true,
     "ordinary_opener_and_redirect_policy_AST_unchanged": true,
     "scope": "Remove repeatedly loadingCAroots from the RPC generator. Keep every original failed/uncertain result and repeat both final realmatrices. Do not reinterpret generator drops as serverbreakingpoints or micro-constructor savings as product throughput improvement.",
-    "evidence": "ledger-generator-tls-construction-before-after-001.json"
+    "evidence": "ledger-generator-tls-construction-before-after-001.json",
+    "completed_pass_1_evidence": "matrix-sdk007-corrected-generator-pass-1-001.json",
+    "observed_generator_before_after": "matrix-ledger-generator-before-after-001.json"
+  },
+  "native_inflight_cut_predeclaration": {
+    "declared_utc": "2026-10-17T16:17:26.779351+00:00",
+    "status": "prepared; real VM cases not run",
+    "native_case": "runtime-inflight",
+    "fresh_independent_passes": 2,
+    "parent_ordinary_and_native_artifacts_unchanged": true,
+    "original_twelve_case_native_suite_scope_unchanged": true,
+    "profile": {
+      "maximum_seconds": 1800,
+      "vm_vcpus": 2,
+      "vm_memory_mib": 3072,
+      "same_guest_parent_cpu_ceiling": 1.5,
+      "same_guest_parent_memory_mib": 2048,
+      "helper_cpu_quota": 0.05,
+      "helper_memory_mib": 48,
+      "helper_pids": 16,
+      "helper_swap_bytes": 0,
+      "maximum_table_lock_seconds": 30,
+      "helper_systemd_runtime_seconds": 40,
+      "maximum_witness_age_before_signal_request_seconds": 2,
+      "external_acknowledgements": 30,
+      "additional_blocked_unacknowledged_writes": 1
+    },
+    "oracles": [
+      "Exactly one known table lock owner and one waiting RowExclusiveLock, with a still-unfinished real HTTPS request.",
+      "The conservative witness age includes the entire SSH/SQL/response roundtrip and is rechecked after VM ownership lookup immediately before requesting SIGKILL.",
+      "Thirty externally fsynced acknowledgements and31actual row values survive; blocked row rolls back, no helper or lock remains.",
+      "Native HTTPS trust, unauthorized rejection, unchanged binary identity, resources and owned cleanup remain mandatory."
+    ],
+    "scope": "Separate additional interrupted-write guest control after existing native startup reproductions; blocked before COMMIT, no physical host power loss, commit-flush, off-host or ordinary performance claim. No local overlapping effective load credit."
   }
 }

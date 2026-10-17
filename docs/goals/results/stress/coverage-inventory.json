@@ -142,6 +142,12 @@
           "status": "passed",
           "evidence": "browser-sdk006-genuine-overlap-pass-2-008.json",
           "scope": "Complete historical candidate006 genuine-overlap browser pass, one refresh for48callers,sevenownerplateaus,cleanup. NewSDKisolation correction requires final-source repetitions."
+        },
+        {
+          "run_id": "native-matrix-39046455871-1",
+          "status": "passed",
+          "evidence": "matrix-sdk007-corrected-generator-pass-1-001.json",
+          "scope": "First corrected full final007 remote matrix only: four300s rates16/32/48/64 qualified, five120s foreground scenarios at51/s,71874ACKs zero loss/corruption,3993lost real commit replies reconciled without mutation retry,371samples/gap5.237s,cleanup; second pass and all other row clauses remain separate."
         }
       ]
     },
@@ -313,6 +319,12 @@
           "status": "passed",
           "evidence": "matrix-full-final-pass-2-003.json",
           "scope": "Second complete supplemental matrix on previous f40774e ELF. Acknowledged mutation reconciliation and restore passed. Qualification varied 32 to16iterations/s without a proven cause; complete final006 matrix and other clauses remain separate."
+        },
+        {
+          "run_id": "native-matrix-39046455871-1",
+          "status": "passed",
+          "evidence": "matrix-sdk007-corrected-generator-pass-1-001.json",
+          "scope": "First corrected full final007 remote matrix only: four300s rates16/32/48/64 qualified, five120s foreground scenarios at51/s,71874ACKs zero loss/corruption,3993lost real commit replies reconciled without mutation retry,371samples/gap5.237s,cleanup; second pass and all other row clauses remain separate."
         }
       ]
     },
@@ -368,6 +380,12 @@
           "status": "passed",
           "evidence": "matrix-full-final-pass-2-003.json",
           "scope": "Second complete supplemental matrix on previous f40774e ELF. Acknowledged mutation reconciliation and restore passed. Qualification varied 32 to16iterations/s without a proven cause; complete final006 matrix and other clauses remain separate."
+        },
+        {
+          "run_id": "native-matrix-39046455871-1",
+          "status": "passed",
+          "evidence": "matrix-sdk007-corrected-generator-pass-1-001.json",
+          "scope": "First corrected full final007 remote matrix only: four300s rates16/32/48/64 qualified, five120s foreground scenarios at51/s,71874ACKs zero loss/corruption,3993lost real commit replies reconciled without mutation retry,371samples/gap5.237s,cleanup; second pass and all other row clauses remain separate."
         }
       ]
     },
@@ -729,6 +747,12 @@
           "status": "passed",
           "evidence": "matrix-full-final-pass-2-003.json",
           "scope": "Second complete supplemental matrix on previous f40774e ELF. Acknowledged mutation reconciliation and restore passed. Qualification varied 32 to16iterations/s without a proven cause; complete final006 matrix and other clauses remain separate."
+        },
+        {
+          "run_id": "native-matrix-39046455871-1",
+          "status": "passed",
+          "evidence": "matrix-sdk007-corrected-generator-pass-1-001.json",
+          "scope": "First corrected full final007 remote matrix only: four300s rates16/32/48/64 qualified, five120s foreground scenarios at51/s,71874ACKs zero loss/corruption,3993lost real commit replies reconciled without mutation retry,371samples/gap5.237s,cleanup; second pass and all other row clauses remain separate."
         }
       ]
     },
@@ -1109,6 +1133,12 @@
           "status": "passed",
           "evidence": "matrix-full-final-pass-2-003.json",
           "scope": "Second complete supplemental matrix on previous f40774e ELF. Acknowledged mutation reconciliation and restore passed. Qualification varied 32 to16iterations/s without a proven cause; complete final006 matrix and other clauses remain separate."
+        },
+        {
+          "run_id": "native-matrix-39046455871-1",
+          "status": "passed",
+          "evidence": "matrix-sdk007-corrected-generator-pass-1-001.json",
+          "scope": "First corrected full final007 remote matrix only: four300s rates16/32/48/64 qualified, five120s foreground scenarios at51/s,71874ACKs zero loss/corruption,3993lost real commit replies reconciled without mutation retry,371samples/gap5.237s,cleanup; second pass and all other row clauses remain separate."
         }
       ]
     },
@@ -1170,6 +1200,12 @@
           "status": "passed",
           "evidence": "matrix-full-final-pass-2-003.json",
           "scope": "Second complete supplemental matrix on previous f40774e ELF. Acknowledged mutation reconciliation and restore passed. Qualification varied 32 to16iterations/s without a proven cause; complete final006 matrix and other clauses remain separate."
+        },
+        {
+          "run_id": "native-matrix-39046455871-1",
+          "status": "passed",
+          "evidence": "matrix-sdk007-corrected-generator-pass-1-001.json",
+          "scope": "First corrected full final007 remote matrix only: four300s rates16/32/48/64 qualified, five120s foreground scenarios at51/s,71874ACKs zero loss/corruption,3993lost real commit replies reconciled without mutation retry,371samples/gap5.237s,cleanup; second pass and all other row clauses remain separate."
         }
       ]
     },
@@ -1347,7 +1383,10 @@
     "focused_matrix_tests_after_capacity_declaration": 36,
     "focused_matrix_evidence": "matrix-capacity-declaration-before-after-001.json",
     "focused_matrix_tests_after_generatorTLS": 43,
-    "focused_matrix_TLS_evidence": "ledger-generator-tls-construction-before-after-001.json"
+    "focused_matrix_TLS_evidence": "ledger-generator-tls-construction-before-after-001.json",
+    "focused_native_inflight_guards": 35,
+    "focused_native_inflight_evidence": "native-inflight-cut-guards-001.json",
+    "focused_native_scope": "Ten additional ownership, freshness, cleanup and row-value boundaries; two actual native VM repetitions remain not run. No overlapping full local regression suite or effective load credit."
   },
   "unattributed_app_anonymous_growth": {
     "status": "under investigation",
@@ -1415,7 +1454,7 @@
     "source_commit": "35f4a9725d7edcf571f91084c555c127e7323653",
     "binary_sha256": "96811748f1f45ad4894114188642f9343df661c750ad22768eaf2275659081b1",
     "functional_smoke": "matrix-sdk007-auth-links-functional-smoke-001.json",
-    "CI_evidence": "ci-sdk007-auth-metrics-product-trees.json",
+    "CI_evidence": "ci-sdk007-ledger-tls-product-trees.json",
     "ordinary_CI_checks_passed": 18,
     "native_evidence": "native-final-suite/index.json",
     "native_cases_passed": 12,
@@ -1424,8 +1463,10 @@
     "browser_final007_passed_evidence": "browser-sdk007-measured-auth-pass-1-001.json",
     "browser_final007_full_passes": 1,
     "matrix_capacity_oracle": "Confirmed harness mismatch: driver64default offers16/32/48/64 but old publication expected8/16/24/32. Shared unchanged64rate/300second declaration now passes36focused controls; two fresh real matrices still required. Active old-source run retains its original verdict.",
-    "matrix_final007_status": "First final007 matrix workload and5case receipts passed but overall publication failed wronghalf-rate assertion. Originalfailedreport preserved; publicintegrity/restore receipts notexported and notinferred. CPU evidence shows generator saturation above16/s; corrected sharedscale and ledger-only verifiedTLS initialization require2freshfullpasses.",
-    "matrix_final007_original_failure": "matrix-sdk007-capacity-publication-failure-001.json"
+    "matrix_final007_status": "First corrected full five-case matrix passed on exact common007ELF; all four300s steps qualified through unchanged64/s ceiling, original failed publication retained. Second corrected full pass pending.",
+    "matrix_final007_original_failure": "matrix-sdk007-capacity-publication-failure-001.json",
+    "matrix_final007_full_passes": 1,
+    "matrix_final007_passed_evidence": "matrix-sdk007-corrected-generator-pass-1-001.json"
   },
   "current_campaign_checkpoint": {
     "checkpoint": "load-time-checkpoint-019.json",
@@ -1433,5 +1474,11 @@
     "active_local_at_recording": "disk-candidate-pass-1-006",
     "recorded_utc": "2026-10-17T14:45:04.319630+00:00",
     "scope": "019 conservative completed-interval count. Local final007 disk capacity/overload sequence still active. Remote first failed SLO retained; one same-profile full browser repetition now passed with400positive/160expected negative responses. Two full five-case backend matrices/eight native startup repetitions now run under a bounded serial owner; no overlapping local time credit."
+  },
+  "native_inflight_cut": {
+    "status": "not run",
+    "scenario": "runtime-inflight",
+    "required_independent_passes": 2,
+    "scope": "Separate additional interrupted-write guest control after existing native startup reproductions; blocked before COMMIT, no physical host power loss, commit-flush, off-host or ordinary performance claim. No local overlapping effective load credit."
   }
 }

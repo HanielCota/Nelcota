@@ -140,6 +140,52 @@ com a mesma CPU, limites,64/s máximo e degraus de300s, ainda precisam fechar.
 A variação histórica32→16/s e a falha anterior de SLO do navegador continuam
 sem causa encerrada por esses controles locais.
 
+## Primeira matriz corrigida e controle nativo adicional — 17/10, 16:20 UTC
+
+A [primeira matriz corrigida](results/stress/matrix-sdk007-corrected-generator-pass-1-001.json)
+passou no mesmo ELF remoto do candidato007, com 43 guardas, 371 amostras,
+gap máximo de 5,237 s e limpeza confirmada. Os quatro degraus de cinco minutos
+qualificaram 16, 32, 48 e 64 **iterações/s**. Todos os cinco cenários de 120 s
+passaram a 51 iterações/s, equivalentes a 79,6875% da taxa qualificada.
+Foram reconciliados 71.874 ACKs sem perda ou corrupção; 3.993 respostas reais
+posteriores ao COMMIT foram descartadas e reconciliadas sem retry de mutação.
+O restore para alvo local novo mediu RTO de 2,597 s e RPO superior de 18,001 s,
+com bytes correspondentes e JWT de outro projeto rejeitado.
+
+Na etapa de 64 iterações/s, o processo do gerador usou 9,400% de uma CPU e
+seu cgroup, incluindo o observador, 12,232%. A execução anterior usava cerca
+de 97% e 100%, respectivamente. As imagens, o binário, a quota e a escala
+oferecida foram iguais; as VMs são distintas. A
+[comparação com os limites da conclusão](results/stress/matrix-ledger-generator-before-after-001.json)
+não anuncia ganho de quatro vezes no servidor. As 64 iterações/s produziram
+57,6 escritas confirmadas/s; descartes deliberados de resposta não contam
+como ACKs. Não se determinou a capacidade máxima, e a segunda passagem ainda
+está pendente. A reprovação original continua preservada.
+
+O [CI de 9b2af6d](results/stress/ci-sdk007-ledger-tls-product-trees.json)
+passou nos 18 checks ordinários, incluindo a descoberta completa de Python.
+O SDK realmente testado em `79bad325` tem árvore completa igual ao head
+e as seis árvores de produto do build007; 204 testes unitários passaram.
+Esses resultados não incluem a extensão nativa posterior nem aprovam o G05.
+
+O commit `f1268a6` acrescentou o cenário separado `runtime-inflight`.
+Um helper restrito segura um lock por até 30 s, com backstop de 40 s,
+5% de CPU, 48 MiB e 16 tarefas, dentro do mesmo slice agregado. Uma escrita
+HTTPS deve continuar pendente e aparecer esperando o lock. A idade da prova
+inclui SSH, SQL e transporte e é checada novamente antes de solicitar SIGKILL.
+Após recuperar a VM, os 30 ACKs e 31 valores devem existir; a escrita bloqueada
+deve ter sido revertida, sem helper ou lock restante. Isso não é corte durante
+COMMIT nem perda física de energia do host. Os
+[35 controles focados](results/stress/native-inflight-cut-guards-001.json)
+passaram, com dez novas fronteiras e zero skips; as duas VMs reais ainda não
+foram executadas. O protocolo ordinário e o produto continuam iguais.
+
+A [validação prévia do próximo plano](results/stress/post-endurance-plan-prestart-uniqueness-001.json)
+também detectou nove IDs duplicados antes de qualquer campanha desse plano.
+A versão normalizada preserva todos os 15 casos, os mesmos argumentos e o
+limite de disco PostgreSQL de 1.536 MiB. Essa correção de preparação não
+representa teste de stress executado nem alteração de critério.
+
 ## Décima correção: isolamento do SDK no servidor
 
 O [controle anterior](results/stress/sdk-independent-server-clients-before-001.json)

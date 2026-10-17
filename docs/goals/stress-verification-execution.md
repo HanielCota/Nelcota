@@ -3248,3 +3248,70 @@ CPU/RAM/disk budgets and SLOs. The prepared47a96cfcontroller004 has not run
 and is superseded before measurement; a fresh source/ref/controller will
 include the targeted generator correction. No eleventh product fix, causal
 closure of historical32versus16variation or remote CPU improvement is claimed.
+
+
+### 2026-10-17, 16:22 UTC — first corrected full matrix passed; interrupted-write VM control prepared
+
+The immutable `9b2af6d` matrix 39046455871/job117436042592 passed all 43 focused
+guards and the complete original 1,850-second profile, with 371 resource samples,
+a 5.237-second maximum gap and confirmed cleanup. Every 16/32/48/64 iteration/s
+step held 300 seconds and qualified. All five 120-second scenarios remained
+nominal at 51 iterations/s with actions entirely inside their traffic windows.
+There were 71,874 ACKs with zero missing/corrupt records; 3,993 real post-COMMIT
+replies were deliberately lost and reconciled with zero automatic mutation
+retries. A fresh local restore preserved matching bytes and rejected a foreign
+JWT: RTO 2.596884s/RPO upper 18.001436s.
+[Complete original report](results/stress/matrix-sdk007-corrected-generator-pass-1-001.json).
+
+At 64 offered iterations/s the generator used 9.400 percent of one CPU itself,
+12.232 percent in its cgroup including observation, and delivered 57.6 acknowledged writes/s.
+All offered outcomes reconcile without drops. The earlier same 64/s step used
+about 97 percent self/100 percent cgroup and dropped 10,557 arrivals. The binary,
+fixture image profiles, quota, rates and durations match; the disposable VMs
+are distinct. This is one real confirmation that the client CA construction
+limitation was removed at the unchanged ceiling, not a fourfold server gain,
+maximum capacity or closure of historical 32 versus 16 variation. The original
+failed report and absent final invariant exports remain unchanged. The second
+corrected full pass remains scheduled after four independent native startup
+reproductions. [Strict before/after units and evidence](results/stress/matrix-ledger-generator-before-after-001.json).
+
+All 18 ordinary `9b2af6d` checks passed, including complete Python discovery;
+its exact count is not inferred. The actual SDK merge checkout `79bad325` has
+the complete root tree of `9b2af6d` and the six final007 product trees; 204 SDK
+units passed. [CI/tree proof](results/stress/ci-sdk007-ledger-tls-product-trees.json).
+The subsequent native control requires its own CI and real VM receipts.
+
+Commit `f1268a6` adds a separate runtime-inflight VM case without replacing the
+original twelve-case suite. A transient owned helper holds a table lock for
+at most 30 seconds, with 40-second expiry, 5 percent CPU, 48 MiB/no swap and 16 tasks
+inside the unchanged 1.5-CPU/2-GiB parent slice. One real HTTPS write must be
+observed waiting and unfinished. The witness age includes the SSH/SQL/response
+roundtrip and is rechecked after owned-VM lookup immediately before requesting
+SIGKILL. Recovery must preserve thirty externally fsynced ACKs and 31 row values,
+roll back the blocked write and retain no helper/controlled lock. Failure
+cleanup cancels only the owned marker/table lock holder. No cut during COMMIT,
+physical host loss or off-host durability is claimed. 35 focused controls passed,
+including ten new ownership/freshness/cleanup/integrity boundaries, zero skips,
+0.019228s framework/0.215416s operator. Two actual fresh VM cases remain not run.
+[Source hashes, exact limits and focused evidence](results/stress/native-inflight-cut-guards-001.json).
+
+These tiny controls used the currently unused provider CPU3 during disk soak,
+separate from app0/PG1/generator2/metrics4. Earlier matrix controls described
+CPU4 as the OS reserve; the actual ordinary manifest also pins 0.25 CPU metrics
+there. Their retained taskset/nice commands and short durations are unchanged;
+that slot was not exclusive to the OS. No heavy local suite/build overlaps load.
+
+A prestart audit also found nine duplicate host IDs in the unstarted private
+post-endurance plan. They had identical arguments/kinds and baseline/candidate
+selection, but the executor correctly rejects nonunique IDs. A new canonical
+plan preserves all fifteen selected cases and the identical 1536-MiB aggregate
+PostgreSQL DISK ceiling, quotas, 300-second steps, fairness/SLO and host reserves.
+The original plan remains retained and was never launched. A metadata-update
+helper also stopped on a wrong optional JSON key before changing that plan;
+the intended fields were then updated explicitly. No failed stress campaign,
+load seconds or relaxed criterion is inferred from these preparation checks.
+[Prestart uniqueness reconciliation](results/stress/post-endurance-plan-prestart-uniqueness-001.json).
+
+The first final007disk soak remains active. None of its incomplete 14,400-second
+interval is credited yet. G05 remains open, the PR remains draft, and there is
+no production deployment, release or merge.
