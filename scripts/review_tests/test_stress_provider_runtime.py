@@ -204,7 +204,7 @@ class RuntimeTelemetryWindow(unittest.TestCase):
         self.assertEqual(self.send(short, token, body), 400)
         self.assertEqual(short.exports, 128)
         self.assertEqual(short.failure["reason"], "Provider telemetry exceeded its cumulative budget")
-        long, token = self.server(maximum_exports=256, maximum_wire_bytes=32 * 1024 ** 2)
+        long, token = self.server(maximum_exports=256, maximum_wire_bytes=16 * 1024 ** 2)
         long.exports = 128
         self.assertEqual(self.send(long, token, body), 200)
         self.assertEqual(long.exports, 129)
@@ -223,7 +223,7 @@ class RuntimeTelemetryWindow(unittest.TestCase):
 
     def test_invalid_or_unbounded_limits_are_rejected_before_opening_a_listener(self):
         invalid = [{"maximum_exports": value} for value in [True, 0, 257, float("nan"), "256"]]
-        invalid += [{"maximum_wire_bytes": value} for value in [False, 0, 33 * 1024 ** 2, float("inf")]]
+        invalid += [{"maximum_wire_bytes": value} for value in [False, 0, 17 * 1024 ** 2, float("inf")]]
         for limits in invalid:
             with self.subTest(limits=limits):
                 with patch("http.server.ThreadingHTTPServer.__init__") as opened:

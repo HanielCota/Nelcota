@@ -235,11 +235,16 @@
       },
       "long_probe_explicit_limits": {
         "maximum_exports": 256,
-        "maximum_wire_bytes": 33554432
+        "maximum_wire_bytes": 16777216
       },
       "reason": "Per-case1080s/5s can require216 exports; fixed128-export discovery window cannot cover pressure plus idle. Count256 remains bounded and all per-request parser/nonce/peer/process/traffic/host reserve and approval limits remain unchanged.",
       "prior_failures_preserved": true,
-      "regressions": "Actual authorized HTTP admission at128/129 and256/257, wire budget, and reject invalid limits before binding; remote execution pending"
+      "regressions": "Actual authorized HTTP admission at128/129 and256/257, wire budget, and reject invalid limits before binding; remote execution pending",
+      "pre_dispatch_review": {
+        "observed_utc": "2026-10-17T04:39:55.951973+00:00",
+        "change": "Retain the original16-MiB byte ceiling. Only the exhausted export-count window changes; the initially prepared32-MiB allowance was never used in a provider campaign.",
+        "evidence": "Unchanged-limit reproduction received3151161 bytes, below the original byte ceiling."
+      }
     }
   }
 }

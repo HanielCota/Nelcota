@@ -47,7 +47,7 @@ PROFILE = {"provider_cpus": .5, "provider_memory_mib": 1024, "provider_pids": 25
            "burst_interval_seconds": 3, "pressure_seconds": 180, "idle_seconds": 600,
            "payload_bytes": 64, "maximum_signed_requests_per_case": 4096, "sample_seconds": 5,
            "maximum_fd_observation_entries": 4096, "maximum_resource_samples_per_case": 200,
-           "maximum_telemetry_exports_per_case": 256, "maximum_telemetry_wire_bytes_per_case": 32 * 1024 ** 2,
+           "maximum_telemetry_exports_per_case": 256, "maximum_telemetry_wire_bytes_per_case": 16 * 1024 ** 2,
            "maximum_observation_gap_seconds": 30, "maximum_case_seconds": 1080,
            "maximum_total_seconds": MAXIMUM_SECONDS, "maximum_network_bytes": 4 * 1024 ** 3,
            "host_memory_reserve_fraction": .1, "host_disk_inode_reserve_fraction": .15}

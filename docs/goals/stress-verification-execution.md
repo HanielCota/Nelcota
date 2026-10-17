@@ -2275,3 +2275,11 @@ unittest counts/duration/skips in a bounded public notice, avoiding inferred
 counts when signed job-log transport is unavailable in this workspace.
 Two fresh corrected full diagnostic passes remain mandatory. The active
 local disk candidate and its frozen bytes are unchanged.
+
+
+Before corrected dispatch, review retained the original 16-MiB cumulative
+wire ceiling for every receiver. Only the exhausted export-count window
+changes to 256 for the long probe. The initially prepared 32-MiB allowance
+was never used in a provider campaign; observed 3.15 MiB did not justify
+raising that independent bound. The regression rejects even 17 MiB before
+opening a listener. All process/parser/traffic/approval limits stay fixed.

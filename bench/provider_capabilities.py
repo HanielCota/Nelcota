@@ -55,7 +55,7 @@ class Receiver(http.server.ThreadingHTTPServer):
     def __init__(self, address, token, *, maximum_exports=128, maximum_wire_bytes=16 * 1024 ** 2):
         require(type(maximum_exports) is int and 1 <= maximum_exports <= 256,
                 "Invalid bounded telemetry export count")
-        require(type(maximum_wire_bytes) is int and 1 <= maximum_wire_bytes <= 32 * 1024 ** 2,
+        require(type(maximum_wire_bytes) is int and 1 <= maximum_wire_bytes <= 16 * 1024 ** 2,
                 "Invalid bounded telemetry wire bytes")
         self.token, self.peer = token, None
         self.maximum_exports, self.maximum_wire_bytes = maximum_exports, maximum_wire_bytes
