@@ -193,6 +193,17 @@
         "Use strict independent browser request counts, final user/session census, and successful-only latency distributions",
         "No claim that this completes SMTP/OAuth/public-ingress or all remaining G05 cells"
       ]
+    },
+    {
+      "kind": "superseded artifact provenance",
+      "preserved_artifact": {
+        "source_commit": "e6fdfd7cca377edb0b36184a21a9a7b30a4d1d0c",
+        "binary_sha256": "acfb2c604a7376be95690852ef016bca90eba599a55bad4be27b6c071b59a6b2",
+        "evidence": "final-local-candidate.json",
+        "byte_equivalence_evidence": "release-test-fixture-byte-equivalence.json",
+        "status": "same exact retained ELF as the ongoing disk003 campaign; no workload, process or approval-threshold change; updated test/native CI pending"
+      },
+      "reason": "Confirmed large unpolled export deadline retention defect; new product build required"
     }
   ],
   "native_same_artifact_suite": {
@@ -509,11 +520,14 @@
     "approval_thresholds_reduced": false
   },
   "current_final_artifact": {
-    "source_commit": "e6fdfd7cca377edb0b36184a21a9a7b30a4d1d0c",
-    "binary_sha256": "acfb2c604a7376be95690852ef016bca90eba599a55bad4be27b6c071b59a6b2",
-    "evidence": "final-local-candidate.json",
-    "byte_equivalence_evidence": "release-test-fixture-byte-equivalence.json",
-    "status": "same exact retained ELF as the ongoing disk003 campaign; no workload, process or approval-threshold change; updated test/native CI pending"
+    "source_commit": "f40774e1504a924fe6d9c801e251278cee1a8fab",
+    "binary_sha256": "9cc6cbf0be68d38ba1c9e138cbeee7c4fac0324e91c406fae977eba591c76f44",
+    "build_seconds": 90.63318545097718,
+    "status": "built; final affected CI/native/campaigns pending",
+    "prior_candidate003": "interrupted after confirmed large unpolled export defect; cleanup confirmed; partial soak excluded",
+    "before_evidence": "export-large-unpolled-deadline-before.json",
+    "after_evidence": "export-large-unpolled-deadline-after.json",
+    "evidence": "final-local-candidate.json"
   },
   "additional_browser_auth_pressure": {
     "status": "not run; static syntax only; focused regressions and retained-artifact gates must pass before live dispatch",
@@ -571,5 +585,14 @@
       "minimum_filesystem_reserve_fraction": 0.15
     },
     "scope": "Raw signup/login/password-worker concurrency, grace retry versus stale-token family revocation, independent-session survival, logout and cross-user RLS during the five existing UI pressure/rest cycles. Verified owned TLS, 48SDK-caller singleflight and real expiry remain enabled. SMTP/OAuth not exercised. No local endurance overlap credited and no new production runtime dependency."
+  },
+  "current_final_candidate": {
+    "source_commit": "f40774e1504a924fe6d9c801e251278cee1a8fab",
+    "binary_sha256": "9cc6cbf0be68d38ba1c9e138cbeee7c4fac0324e91c406fae977eba591c76f44",
+    "build_seconds": 90.63318545097718,
+    "status": "built; final affected CI/native/campaigns pending",
+    "prior_candidate003": "interrupted after confirmed large unpolled export defect; cleanup confirmed; partial soak excluded",
+    "before_evidence": "export-large-unpolled-deadline-before.json",
+    "after_evidence": "export-large-unpolled-deadline-after.json"
   }
 }

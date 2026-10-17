@@ -2692,3 +2692,14 @@ new production correction. The enhanced runtime [reproduction](results/stress/na
 on8c5a868 also passed. Neither success establishes the cause of the original
 af01678startup failure. Keep that investigation open.20focused native diagnostic
 checks passed locally, including environment-shape privacy and numeric exit fields.
+
+
+Fresh candidate005 built successfully fromf40774e in90.633s, with the declared
+four-job Rust1.99/thinLTO/codegen-unit1 profile. The [public receipt](results/stress/final-local-candidate.json)
+fixes30480704bytes and SHA2569cc6cbf0be68d38ba1c9e138cbeee7c4fac0324e91c406fae977eba591c76f44.
+All prior build identities remain preserved. New endurance IDs end004; the
+36-row private command ledger preserves old requests and their original
+arguments. Run available short larger-fixture/topology controls before fresh
+endurance to expose failures earlier; no rates, durations, SLOs, budgets or
+approval criteria change. Final-source native suite39017663454 and ordinary
+CI39017645220 are pending at this checkpoint.

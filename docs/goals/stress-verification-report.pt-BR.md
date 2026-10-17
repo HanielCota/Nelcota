@@ -20,7 +20,7 @@ O tempo parcial das campanhas ainda abertas não está somado nesse checkpoint.
 |---|---|
 | Código após o novo defeito SQL confirmado | Correção local em `crates/admin/src/sql/executor.rs`, com dois testes reais aprovados e hashes em [evidência](results/stress/sql-cancellation-admission-after.json). O binário anterior foi interrompido; novo build e repetições afetadas são obrigatórios |
 | SHA-256 do binário de baseline preservado | `75c44c85a85db26195166aa1d2c6caf481e3db476801ec8131525ef62adf1be0` |
-| Candidato anterior, agora substituído | Build de `af01678`, com equivalência byte a byte verificada em `e6fdfd7`: SHA-256 `acfb2c604a7376be95690852ef016bca90eba599a55bad4be27b6c071b59a6b2`. A campanha `disk-candidate-pass-1-003` foi interrompida após o defeito de exportações grandes, com limpeza confirmada. Novo build e repetições afetadas são obrigatórios |
+| Candidato local atual congelado | `f40774e1504a924fe6d9c801e251278cee1a8fab`; SHA-256 `9cc6cbf0be68d38ba1c9e138cbeee7c4fac0324e91c406fae977eba591c76f44`; 30.480.704 bytes; build release de 90,633 s. [Proveniência](results/stress/final-local-candidate.json). CI, suíte nativa e campanhas finais desta correção ainda precisam concluir |
 | SHA-256 do workload k6 atual | `0ac01578bf19155302fe465884b480d792569086f23bb4ba3615ca5f0ce2547d` |
 | Baseline em disco no protocolo atual | Snapshot imutável de `1f391594dd8db6cccac54d6720d90c33d461d1f1`; `disk-final-pass-1-002` concluiu como baseline no binário retido, com protocolo atual |
 | Primeira execução nativa separada | [Actions 38962480993](https://github.com/Nelcota/Nelcota/actions/runs/38962480993), código congelado `e80770b3f6aa1f64d011a3d62f8ebf0f1201bdac`; reprovada no oráculo de signup antes do backup |
@@ -623,3 +623,16 @@ resultados não demonstram a causa da falha anterior de inicialização de
 af01678. Ela continua aberta, com novas reproduções limitadas necessárias.
 Os 20 testes focados dos diagnósticos nativos passaram, incluindo publicação
 sem conteúdo de journal ou ambiente.
+
+
+O novo build de `f40774e1504a924fe6d9c801e251278cee1a8fab` passou em
+90,633 s, com quatro jobs e Rust 1.99.0. A [proveniência atual](results/stress/final-local-candidate.json)
+fixa o ELF de **30.480.704 bytes**, SHA-256
+`9cc6cbf0be68d38ba1c9e138cbeee7c4fac0324e91c406fae977eba591c76f44`.
+As quatro campanhas de endurance substitutas têm sufixo `004`; o artefato
+privado correspondente é `candidate-final-005.json`. Antes delas, os controles
+curtos disponíveis de fixtures grandes e topologias recebem prioridade para
+detectar falhas antes de novos soaks. Durações, taxas, SLOs, reservas e gates
+já declarados permanecem iguais. A suíte nativa deste novo source está no
+[Actions 39017663454](https://github.com/Nelcota/Nelcota/actions/runs/39017663454);
+seu resultado e o CI ainda não estão aprovados neste registro.

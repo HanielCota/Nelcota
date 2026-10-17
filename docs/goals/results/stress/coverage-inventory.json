@@ -1166,10 +1166,15 @@
     "clock_fixture_before_after": "provider-fixture-clock-before-after.json"
   },
   "current_final_candidate": {
-    "source_commit": "e6fdfd7cca377edb0b36184a21a9a7b30a4d1d0c",
-    "binary_sha256": "acfb2c604a7376be95690852ef016bca90eba599a55bad4be27b6c071b59a6b2",
+    "source_commit": "f40774e1504a924fe6d9c801e251278cee1a8fab",
+    "binary_sha256": "9cc6cbf0be68d38ba1c9e138cbeee7c4fac0324e91c406fae977eba591c76f44",
+    "build_seconds": 90.63318545097718,
+    "status": "built; final affected CI/native/campaigns pending",
+    "prior_candidate003": "interrupted after confirmed large unpolled export defect; cleanup confirmed; partial soak excluded",
+    "before_evidence": "export-large-unpolled-deadline-before.json",
+    "after_evidence": "export-large-unpolled-deadline-after.json",
     "evidence": "final-local-candidate.json",
-    "byte_equivalence_evidence": "release-test-fixture-byte-equivalence.json",
-    "status": "same exact retained ELF as the ongoing disk003 campaign; no workload, process or approval-threshold change; updated test/native CI pending"
+    "ordinary_ci_run_id": 39017645220,
+    "native_suite_run_id": 39017663454
   }
 }
