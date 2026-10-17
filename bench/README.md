@@ -791,7 +791,24 @@ The local five-slot default is unchanged. Alternate public Chromium tooling is
 copied under the same runtime byte/ownership boundary and exposed read-only;
 Node/Python remain development tooling, with no backend production dependency.
 
-The two new passes are predeclared in the G05 plan and remain **not run** until
-remote regressions, source/provenance and the native artifact gates pass. Their
+Both predeclared passes require remote regressions, source/provenance and the
+native artifact gates. The G05 execution record tracks their actual outcomes. Their
 full browser observation lasts1080s. SMTP/OAuth/public ingress are separate cells;
 this profile neither bypasses unavailable services nor certifies all G05 work.
+
+### Recovering existing public resource series
+
+When the operator cannot download an Actions artifact, dispatch `public-evidence`
+with `evidence_run` set to its completed workflow run and `evidence_kind` set to
+`matrix` or `browser-auth`. This read-only five-minute job downloads only the
+corresponding named public artifact, bounded at2MiB, then republishes its original
+numeric gzip series through checksummed notices. It starts no backend fixture and
+earns no load-time credit.
+
+The republisher requires the series hash, byte count, sample count and maximum
+gap recorded in the original report to agree. It rejects private/unknown fields, duplicate JSON keys,
+nonfinite/boolean gauges, unknown phases/roles, gzip comments/extra metadata,
+trailing streams and excessive decoded/encoded data. It preserves the original
+source, artifact digest, status and cleanup verdict; republication cannot approve
+a failed campaign. Original resource files larger than the18KiB notice boundary
+remain in their provider artifact and require direct download.

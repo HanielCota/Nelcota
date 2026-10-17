@@ -2835,3 +2835,13 @@ reproduced Go's virtual-address reservation failure under the128MiBASlimit
 in0.004164s, exit2. Apply a256MiB kernel memory cgroup instead, retaining
 CPU/task/swap/runtime limits. This fixes the resource-limiter mechanism;
 the real temporary-PG before/after remains pending and is not called passed.
+
+Direct resource-artifact retrieval isHTTP403 in this operator environment.
+Add a separately bounded, read-only `public-evidence` dispatch to recover the
+original numeric gzip through the provider's own artifact reader. Artifact ZIP
+is capped at2MiB; original gzip at18KiB, decoded bytes at4MiB and samples at600.
+Verify the original hash/bytes/count/gap, exact roles/gauges/phases and original
+source/verdict; reject duplicate JSON keys, private fields, nonfinite values,
+gzip hidden metadata and trailing streams before publication.5focused privacy,
+corruption and lossless-roundtrip tests passed. No service starts, load-time
+credit or replacement verdict is created. Actual provider recovery is pending.

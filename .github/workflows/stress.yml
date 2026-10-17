@@ -6,12 +6,17 @@ on:
       target:
         description: Dedicated benchmark, disposable VM inventory or native acceptance
         type: choice
-        options: [benchmark, native-preflight, native-vm, provider-preflight, native-identity, native-suite, provider-runtime, matrix, browser-auth]
+        options: [benchmark, native-preflight, native-vm, provider-preflight, native-identity, native-suite, provider-runtime, matrix, browser-auth, public-evidence]
         default: benchmark
       evidence_run:
         description: Optional earlier native workflow artifact to republish before native-vm
         type: string
         default: ''
+      evidence_kind:
+        description: Existing public numeric resource artifact to republish
+        type: choice
+        options: [matrix, browser-auth]
+        default: matrix
       native_case:
         description: Native lifecycle, cluster routing, installation contracts or guest clock
         type: choice
@@ -43,6 +48,58 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  public-evidence:
+    if: inputs.target == 'public-evidence'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check resource publication privacy and select the fixed artifact
+        id: selection
+        env:
+          EVIDENCE_RUN: ${{ inputs.evidence_run }}
+          EVIDENCE_KIND: ${{ inputs.evidence_kind }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          nice -n19 ionice -c3 python3 -m unittest discover -s scripts/review_tests -p test_stress_resource_republish.py -v
+          python3 - <<'PY'
+          import json, os, re, urllib.request
+          kind=os.environ['EVIDENCE_KIND']
+          names={'matrix':'supplemental-backend-matrix','browser-auth':'browser-auth-pressure'}
+          assert kind in names and re.fullmatch('[1-9][0-9]{0,19}',os.environ['EVIDENCE_RUN'])
+          request=urllib.request.Request('https://api.github.com/repos/Nelcota/Nelcota/actions/runs/'+os.environ['EVIDENCE_RUN']+'/artifacts?per_page=100',
+              headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
+          with urllib.request.urlopen(request,timeout=20) as response:
+              raw=response.read(2*1024**2+1)
+          assert len(raw)<=2*1024**2
+          inventory=json.loads(raw)
+          assert inventory['total_count']==len(inventory['artifacts'])<=100
+          selected=[row for row in inventory['artifacts'] if row['name']==names[kind]]
+          assert len(selected)==1 and selected[0]['expired'] is False and 0<selected[0]['size_in_bytes']<=2*1024**2
+          with open(os.environ['GITHUB_OUTPUT'],'a') as stream:
+              stream.write('artifact='+names[kind]+'\n')
+          PY
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ${{ steps.selection.outputs.artifact }}
+          run-id: ${{ inputs.evidence_run }}
+          github-token: ${{ github.token }}
+          path: target/public-resource-recovery
+      - name: Republish only the original checksummed numeric series
+        env:
+          EVIDENCE_RUN: ${{ inputs.evidence_run }}
+          EVIDENCE_KIND: ${{ inputs.evidence_kind }}
+        run: |
+          timeout --kill-after=10s 30s nice -n19 ionice -c3 \
+            prlimit --as=134217728:134217728 --cpu=20:20 -- \
+            python3 bench/resource_republish.py target/public-resource-recovery \
+              --kind "$EVIDENCE_KIND" --run "$EVIDENCE_RUN"
+
   native-suite-build:
     if: inputs.target == 'native-suite'
     runs-on: ubuntu-24.04
