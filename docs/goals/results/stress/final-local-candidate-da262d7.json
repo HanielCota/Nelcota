@@ -1,0 +1,48 @@
+{
+  "source_commit": "da262d77f4d2557ff5cbd9007b9a3a6273a92221",
+  "build_command": [
+    "cargo",
+    "build",
+    "--locked",
+    "--release",
+    "-p",
+    "nelcota-server"
+  ],
+  "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.0\nLLVM version: 23.1.1",
+  "cargo": "cargo 1.99.0 (5f94df478 2026-08-27)",
+  "cargo_lock_sha256": "cb7f9f559f32415fc520a144801ba3f59ba0ca091530d487f9ad3790788189ff",
+  "workspace_manifest_sha256": "2527746af359ef502f1bd6a836fda5a161456fcf7d11766a1b1d4da64a86de09",
+  "build_jobs": 4,
+  "incremental": "0",
+  "release_profile": {
+    "lto": "thin",
+    "codegen_units": 1
+  },
+  "compiler_overrides": [],
+  "build_exit": 0,
+  "build_seconds": 88.80950128700351,
+  "completed_utc": "2026-10-17T19:26:10.215864+00:00",
+  "cpu_affinity": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "binary_sha256": "aa0967f175d13410d4085841c1e1351597b7d38c7cab8adf51963bfa57336a73",
+  "size": 30484800,
+  "scope": "Fresh frozen local staging candidate after eleven confirmed production corrections including uncertain PITR-error stopped-service preservation, independent default server SDK queues, native-browser late-overlap refresh and rebuilt guide assets, retaining SQL/export ownership corrections; no production release or deployment",
+  "status": "frozen candidate008 after eleven corrections; new matchingCI/native/realPITR-error repetitions/endurance still pending",
+  "certifies_g05": false,
+  "product_tree_objects": {
+    "crates": "4a4cfb7efb49f0cb7f0e00b3aeb594c8cc75f091",
+    "Cargo.toml": "20a3154fea3f1883ccc42882fbd671bc0b12b17f",
+    "Cargo.lock": "9150a443d0d0cec57de152e13bd9a6cb8e7a8c2d",
+    "migrations": "e88cfbfd12955dc8cb9180d3324df6a5d9e62206",
+    "sdk": "9bd7af8fc90a0a3cd5429ad40d8c3ec7b23efedd",
+    "rust-toolchain.toml": "0fd1b3a84b408770d883519014b040aed30a15f0"
+  },
+  "previous_build": "final-local-candidate-35f4a97.json",
+  "build_receipt": "candidate-final-008.json",
+  "architecture": "x86_64-unknown-linux-gnu"
+}

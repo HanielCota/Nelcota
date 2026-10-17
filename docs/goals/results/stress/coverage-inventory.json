@@ -1544,43 +1544,26 @@
     "second_pass_evidence": "provider-runtime-corrected-pass-2.json"
   },
   "current_final_candidate": {
-    "status": "frozen final007; CI18/18 and native12/12 passed, first ordinary disk campaign active, no completed final007 endurance approval",
-    "latest_fix_commit": "9bca03bc689c425a7660c5da9305180450aeaa7c",
-    "generated_asset_commit": "df77883b1d149938979ba7a76bde2b125b7dbf44",
-    "last_frozen_artifact_evidence": "final-local-candidate.json",
-    "last_frozen_scope": "final007 includes all ten confirmed production corrections and regenerated assets; no complete final endurance result yet",
-    "SDK_before_after": [
-      "sdk-independent-server-clients-before-001.json",
-      "sdk-independent-server-clients-after-ci-001.json",
-      "sdk-independent-server-clients-built-before-after-001.json"
-    ],
-    "SDK_unit_passed": 204,
-    "latest_harness_passed": 308,
-    "SDK_projection_regressions_passed": 3,
-    "source_commit": "35f4a9725d7edcf571f91084c555c127e7323653",
-    "binary_sha256": "96811748f1f45ad4894114188642f9343df661c750ad22768eaf2275659081b1",
-    "functional_smoke": "matrix-sdk007-auth-links-functional-smoke-001.json",
-    "CI_evidence": "ci-host-private-files-product-trees.json",
-    "ordinary_CI_checks_passed": 18,
-    "native_evidence": "native-final-suite/index.json",
-    "native_cases_passed": 12,
-    "browser_final007_status": "Both measured full final007 browser passes completed with same retained ELF/profiles; original refresh-SLO failure still unexplained.",
-    "browser_final007_failure": "browser-sdk007-refresh-slo-first-failure-001.json",
-    "browser_final007_passed_evidence": "browser-sdk007-two-measured-passes-001.json",
-    "browser_final007_full_passes": 2,
-    "matrix_capacity_oracle": "Old half-rate publication mismatch corrected using shared unchanged64maximum/300second steps. Two real independent full matrices now passed with the ledger-only verified CA reuse; original failed report preserved.",
-    "matrix_final007_status": "Two corrected full five-case matrices passed on exact common final007 Actions ELF, all four300second steps qualified to the unchanged64/s ceiling; no maximum/server-gain claim.",
-    "matrix_final007_original_failure": "matrix-sdk007-capacity-publication-failure-001.json",
-    "matrix_final007_full_passes": 2,
-    "matrix_final007_passed_evidence": "matrix-sdk007-two-corrected-passes-001.json",
-    "harness_head_CI_status": "All18ordinary source3cc1b83 checks and whole Python discovery passed; actual private-file preflight not run."
+    "status": "frozen008; actuallocalfive-scenariosmokepassed/cleanup; CI17of18observed, correctedactualPITR/native/endurancepending",
+    "latest_fix_commit": "3cd1b8a",
+    "generated_asset_commit": "da262d77f4d2557ff5cbd9007b9a3a6273a92221",
+    "source_commit": "da262d77f4d2557ff5cbd9007b9a3a6273a92221",
+    "binary_sha256": "aa0967f175d13410d4085841c1e1351597b7d38c7cab8adf51963bfa57336a73",
+    "last_frozen_artifact_evidence": "final-local-candidate-da262d7.json",
+    "confirmed_production_defects": 11,
+    "focused_PITR_tests_passed": 6,
+    "native_actual_PITR_before": "native-pitr-unknown-state-reopening-before-001.json",
+    "native_actual_PITR_after": "notrun",
+    "ordinary_CI_checks_passed": null,
+    "scope": "NewCLIandguideproducttrees require008observations; no007approval transfers implicitly.",
+    "functional_smoke": "matrix-sdk008-auth-links-functional-smoke-001.json"
   },
   "current_campaign_checkpoint": {
     "checkpoint": "load-time-checkpoint-020.json",
     "effective_local_load_seconds": 162324,
     "active_local_at_recording": null,
     "recorded_utc": "2026-10-17T19:14:32.694794+00:00",
-    "scope": "Checkpoint020 retains162324completed effective seconds. New actual PITR defect11requires008product.007disk pass preserved;007S3partial stopped/cleaned and zero added time.008campaigns not started."
+    "scope": "Checkpoint020162324s includescompleted007disk.008150ssmoke passed but is a diagnostic excluded from timefloor.008ordinary waitsall18sourceCI andtwo actualcorrectedPITRVMpasses; no active local load."
   },
   "native_inflight_cut": {
     "status": "passed scoped control twice",
@@ -1615,7 +1598,7 @@
     "corrective_evidence": "host-resource-and-collected-watchdog-correction-001.json",
     "latest_focused_evidence": "host-Docker-name-and-watchdog-guards-001.json"
   },
-  "latest_inventory_update_utc": "2026-10-17T19:23:42.825367+00:00",
+  "latest_inventory_update_utc": "2026-10-17T19:40:02.522729+00:00",
   "native_startup_reproductions": {
     "status": "passed scoped repetitions; original failure unresolved",
     "count": 8,
@@ -1636,9 +1619,41 @@
   },
   "next_final_candidate": {
     "identity": "008",
-    "status": "production fix/guide assets complete; source freeze, releasebuild, actualnativeandaffectedcampaigns pending",
+    "status": "008releasebuilt/frozen, smokepending; newCI/native/affectedcampaigns notpassed",
     "confirmed_production_defects": 11,
-    "evidence": "pitr-restore-unknown-state-correction-001.json",
+    "evidence": "final-local-candidate-da262d7.json",
     "scope": "ProductchangedafteractualPITRerrorrepro;007doesnotcertify008. No active local load."
+  },
+  "historical_candidate007": {
+    "status": "source-bound historical007 only; first disk4h/comparisons passed, laterPITRdefect requires008. PartialS3stopped/cleaned.",
+    "latest_fix_commit": "9bca03bc689c425a7660c5da9305180450aeaa7c",
+    "generated_asset_commit": "df77883b1d149938979ba7a76bde2b125b7dbf44",
+    "last_frozen_artifact_evidence": "final-local-candidate.json",
+    "last_frozen_scope": "final007 includes all ten confirmed production corrections and regenerated assets; no complete final endurance result yet",
+    "SDK_before_after": [
+      "sdk-independent-server-clients-before-001.json",
+      "sdk-independent-server-clients-after-ci-001.json",
+      "sdk-independent-server-clients-built-before-after-001.json"
+    ],
+    "SDK_unit_passed": 204,
+    "latest_harness_passed": 308,
+    "SDK_projection_regressions_passed": 3,
+    "source_commit": "35f4a9725d7edcf571f91084c555c127e7323653",
+    "binary_sha256": "96811748f1f45ad4894114188642f9343df661c750ad22768eaf2275659081b1",
+    "functional_smoke": "matrix-sdk007-auth-links-functional-smoke-001.json",
+    "CI_evidence": "ci-host-private-files-product-trees.json",
+    "ordinary_CI_checks_passed": 18,
+    "native_evidence": "native-final-suite/index.json",
+    "native_cases_passed": 12,
+    "browser_final007_status": "Both measured full final007 browser passes completed with same retained ELF/profiles; original refresh-SLO failure still unexplained.",
+    "browser_final007_failure": "browser-sdk007-refresh-slo-first-failure-001.json",
+    "browser_final007_passed_evidence": "browser-sdk007-two-measured-passes-001.json",
+    "browser_final007_full_passes": 2,
+    "matrix_capacity_oracle": "Old half-rate publication mismatch corrected using shared unchanged64maximum/300second steps. Two real independent full matrices now passed with the ledger-only verified CA reuse; original failed report preserved.",
+    "matrix_final007_status": "Two corrected full five-case matrices passed on exact common final007 Actions ELF, all four300second steps qualified to the unchanged64/s ceiling; no maximum/server-gain claim.",
+    "matrix_final007_original_failure": "matrix-sdk007-capacity-publication-failure-001.json",
+    "matrix_final007_full_passes": 2,
+    "matrix_final007_passed_evidence": "matrix-sdk007-two-corrected-passes-001.json",
+    "harness_head_CI_status": "All18ordinary source3cc1b83 checks and whole Python discovery passed; actual private-file preflight not run."
   }
 }

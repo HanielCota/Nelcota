@@ -2,7 +2,7 @@
 
 **Estado: em execução, sem aprovação do G05.** Este relatório é atualizado
 durante as campanhas. Checkpoint de carga consolidada: 17/10/2026, 18:57 UTC.
-Atualização da investigação: 17/10/2026, 19:23 UTC.
+Atualização da investigação: 17/10/2026, 19:31 UTC.
 Não houve merge nem deploy de produção. O trabalho está na branch
 `test/g05-stress-verification`, no [PR #90](https://github.com/Nelcota/Nelcota/pull/90),
 mantido como rascunho para revisão.
@@ -20,7 +20,8 @@ O tempo parcial das campanhas ainda abertas não está somado nesse checkpoint.
 |---|---|
 | Código após as correções de cancelamento SQL/export e de exportação grande não consumida | Regressões reais aprovadas; [último antes/depois](results/stress/export-large-unpolled-deadline-after.json) inclui 17 testes. Binário final reconstruído; campanhas afetadas continuam pendentes |
 | SHA-256 do binário de baseline preservado | `75c44c85a85db26195166aa1d2c6caf481e3db476801ec8131525ef62adf1be0` |
-| Candidato local007 preservado; novo008 obrigatório | `35f4a9725d7edcf571f91084c555c127e7323653`; SHA-256 `96811748f1f45ad4894114188642f9343df661c750ad22768eaf2275659081b1`; 30.484.800 bytes; build release de 93,286 s. [Proveniência](results/stress/final-local-candidate.json). Inclui as dez correções e os guias reconstruídos. Checkout limpo antes/depois do build. Smoke HTTP real dos cinco cenários aprovado; primeira endurance final em disco e oito comparações aprovadas. CI18/18 e suíte nativa12/12 passaram nas mesmas árvores de produto; primeira campanha S3 em execução, segundas passagens pendentes |
+| Candidato008 congelado | Fonte `da262d77f4d2557ff5cbd9007b9a3a6273a92221`; ELF SHA-256 `aa0967f175d13410d4085841c1e1351597b7d38c7cab8adf51963bfa57336a73`, 30.484.800 bytes. [Build limpo](results/stress/final-local-candidate-da262d7.json) release com lockfile verificado, 4 jobs, thin LTO/codegen1, 88,810 s. Inclui as onze correções. Smoke dos cinco cenários aprovado; CI completo, duas VMs PITR e campanhas longas008 ainda pendentes. |
+| Candidato local007 preservado | `35f4a9725d7edcf571f91084c555c127e7323653`; SHA-256 `96811748f1f45ad4894114188642f9343df661c750ad22768eaf2275659081b1`; 30.484.800 bytes; build release de 93,286 s. [Proveniência](results/stress/final-local-candidate.json). Inclui as dez correções e os guias reconstruídos. Checkout limpo antes/depois do build. Smoke HTTP real dos cinco cenários aprovado; primeira endurance final em disco e oito comparações aprovadas. CI18/18 e suíte nativa12/12 passaram nas mesmas árvores de produto; primeira campanha S3 em execução, segundas passagens pendentes |
 | Candidato006 preservado | Fonte `860d2f9`; ELF `c7e3d254...`; [proveniência histórica](results/stress/final-local-candidate-860d2f9.json). CI18/18, native12/12 e dois ciclos browser com sobreposição real passaram nesse produto. A décima correção posterior exige novas verificações |
 | Candidato anterior preservado | Fonte `f40774e`; ELF `9cc6cbf0...`; [proveniência histórica](results/stress/final-local-candidate-f40774e.json). CI ordinário 18/18 e suíte nativa 12/12 passaram nesse produto; esses resultados não certificam a correção posterior do SDK |
 | Candidato nativo anterior do Actions | Mesma fonte histórica de produto `f40774e`; ELF `872c3b1efc71e0118386cdd3caf36bae0de26cb213307b91396fe30c0af83d75`, 30.463.736 bytes. [12 relatórios históricos](results/stress/native-final-suite-f40774e/index.json) aprovados no mesmo ELF; diferença entre hosts registrada, sem alegar build byte a byte reproduzível |
@@ -1304,7 +1305,48 @@ A campanha S3 parcial007 foi encerrada uma vez pelo pidfd do wrapper próprio;
 o owner parou antes de avançar.219 observações,1.365 segundos registrados
 pelo executor e limpeza confirmada foram preservados, mas nenhum segundo
 adicional foi incluído no checkpoint e não houve soak de4h aprovado.
-O produto mudou: um novo008ELF e novas campanhas afetadas são obrigatórios.
+O produto mudou: o novo008ELF foi construído e suas campanhas afetadas ainda precisam executar.
 As aprovações007 continuam válidas somente para o produto007 identificado;
 não aprovam o artefato novo. Nenhuma perda/corrupção real nem PITR/S3 operacional
 é alegada a partir desse teste controlado.
+
+
+## Artefato008 e nova declaração das campanhas — 19:31 UTC
+
+O [build008](results/stress/final-local-candidate-da262d7.json) concluiu em
+88,810 segundos, com checkout limpo antes/depois, Rust1.99, lockfile preservado,
+quatro jobs, thin LTO e codegen1. ELF de30.484.800 bytes identificado por
+aa0967f175d13410d4085841c1e1351597b7d38c7cab8adf51963bfa57336a73.
+A árvore crates mudou para4a4cfb7efb49f0cb7f0e00b3aeb594c8cc75f091; manifests,
+lockfile, migrações, SDK e toolchain permaneceram nas identidades registradas.
+O smoke local de cinco cenários passou e encerrou sem outra carga local. CI008 ainda
+não encerrou; foram preparadas duas VMs independentes para o erro PITR,
+condicionadas ao CI completo e à fila manual vazia. Nenhum desses preparos
+é teste de endurance concluído.
+
+A [nova declaração008](results/stress/final-campaign-plan.json) contém19casos
+com IDs novos e vetores de argumentos idênticos aos perfis anteriores: quatro
+endurance de14.400s cada, quatro fixtures grandes, dois ciclos completos de
+faults reais e nove baselines/candidatos de1/5/10projetos. A ordem ordinária
+passa a S3, disco, S3, disco; o owner tem limite de30h e cada wrapper8h.
+A etapa posterior tem limite de24h e exige quatro encerramentos ordinários
+aprovados. O perfil completo de host também exige preflight real corrigido
+em1/5projetos, com limpeza revisada e as seis árvores008 correspondentes.
+Reservas, limites de CPU/RAM/disco/tráfego, passos de300s, critérios relativos
+e SLOs absolutos foram preservados. Não houve redução de gate após falha.
+
+
+O [smoke008 completo](results/stress/matrix-sdk008-auth-links-functional-smoke-001.json)
+encerrou às19:30:26UTC:150segundos de tráfego,31amostras, gap máximo6,061s,
+1.080ACKs/1.140COMMITs e zero perda, corrupção ou retry automático. Foram
+120respostas deliberadamente ambíguas,60delas com COMMIT confirmado. Os
+cinco cenários passaram durante suas janelas de20s. Restore local novo
+aprovou bytes/usuário/JWT estrangeiro401; RTO2,745s, RPO superior18,001s e
+rewind intencional de136linhas. Limpeza confirmada, sem violação de recursos.
+Esse diagnóstico curto não adiciona tempo ao checkpoint conservador e não
+substitui os degraus de300s nem as endurance de4h. Antes de iniciar o owner
+ordinário008, o launcher exige CI18/18, as duas VMs PITR corrigidas e esse
+smoke aprovados, além de verificar os manifestos reais do ELF e a ausência
+de recursos antigos. Rascunhos de guards não executados foram preservados;
+um deles esperava hash no completion, e foi corrigido para conferir os dois
+manifestos que realmente o registram, sem relaxar a comparação do artefato.

@@ -3,7 +3,7 @@
 Status: em execução, G05 sem aprovação. O checkpoint conservador 020 registra
 45h05min24s de intervalos de carga efetiva concluídos. O mínimo de oito horas
 foi atingido; um décimo primeiro defeito PITR foi reproduzido e corrigido.
-O candidato008 e suas campanhas afetadas ainda precisam executar. O relatório em português contém a situação atual dos 12 critérios.
+O candidato008 foi construído; suas campanhas afetadas ainda precisam executar. O relatório em português contém a situação atual dos 12 critérios.
 As passagens históricas de quatro horas com contadores incompletos continuam
 sem aprovação. O baseline posterior em disco passou no protocolo corrigido;
 a primeira passagem final007 em disco também passou, com oito comparações equivalentes.
@@ -3635,3 +3635,52 @@ em.083s. Guia e tradução atualizados; build inicial bloqueado por marked
 ausente (node_modules previamente removido). Npmci pelo lockfile, pending,
 check e rebuild posterior passaram,19,452s incluindo instalação. Assets
 gerados terão commit próprio. Não há deploy ou merge.
+
+
+### 2026-10-17, 19:31 UTC — candidato008 congelado;19novos casos equivalentes
+
+Buildsource da262d77f4d2557ff5cbd9007b9a3a6273a92221,88,8095srelease/4jobs,
+checkout limpo, ELFaa0967f175d13410d4085841c1e1351597b7d38c7cab8adf51963bfa57336a73,
+30484800bytes. [Prova](results/stress/final-local-candidate-da262d7.json).
+Prior007proveniência preservada emfinal-local-candidate-35f4a97.json.
+Após UI/build, remover somente node_modules/cache instalados por esta rodada:
+646643712bytes recuperados, sem remover dist, lockfiles, caches de outro
+projeto ou evidências. Ainda vigora o preflight real de disco de10projetos.
+
+Plano privado007tem19IDs novos; todos os argumentos são cópias exatas do
+plano006 correspondente. OrdemS3/disco/S3/disco,14400s cada. Wrapperv10 e
+chain008 selados. Pós-chain004tem15casos e novo gate explícito de preflight
+real008 de arquivos N1/N5 antes dos hosts completos. Nada foi iniciado
+automaticamente por mera criação do plano. [Declaração](results/stress/final-campaign-plan.json).
+
+Smokematrix-sdk008-auth-links-smoke-001 iniciou19:27:35UTC com5cenários20s
+e timeout600s; esse perfil não é capacidade300s nem endurance. Owner10236
+identidade32882124. Não há outro load local. Controle remoto014 preparado
+com duas passagens runtime-pitr-error, máximo2h, fonte/ref imutáveis somente
+após all18CI008 e fila vazia. Prova original013FAILED preservada.
+
+
+### 2026-10-17, 19:39 UTC — smoke008 passou; lançamento condicionado e selado
+
+Smokefinal008 fechou19:30:26:150s,31samples/gap6,061s,1200attempts,1080ACKs,
+1140COMMITs,120ambiguous/60committed, zero missing/corrupt/retry.
+Restore2,745348s/RPOupper18,000994s, rewind136rows; bytes/user/JWT401passed.
+Cleanupconfirmed e resourceviolations vazio.
+[Prova numérica completa](results/stress/matrix-sdk008-auth-links-functional-smoke-001.json).
+Primeiro projectioncollector esperava hash007, falhou antes de publicar;
+modelo ajustado somente após igualdade entre008build/launch/fixture.
+
+CI008observado17/18PASS, somentecheck em execução. WaiterCI limita1h/3GETtries.
+Launcher22966 aguarda18/18, verifica fila vazia e cria uma única ref própria
+para14duasVMsafter. Launcher23006 aguarda ambasPITR14PASS/cleanup, verifica
+smoke e sem antigos recursos locais para iniciar uma vez o owner30h008.
+Guard final usa launch-manifest+fixture manifest para hash; completion de
+fault não possui esse campo. Drafts não executados preservados; nenhuma
+comparação de artefato ou gate foi relaxada.
+
+Antes da nova carga, remover somente86archives rlib de debug, regulares
+propriedadeprópria/linkúnico e sem compiladorativo.1076798106bytes lógicos
+removidos, mas espaço realmente livre subiu só195051520bytes (camadas/COW);
+não inferir espaço recuperado pelo tamanho lógico. Source, frozenELFs,
+baselines/testbinaries/logs/evidence e recursos estrangeiros intactos.
+Preflight de10projetos ainda pode bloquear; reserva não será reduzida.
