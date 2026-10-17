@@ -1010,5 +1010,18 @@
       29.2421875
     ],
     "scope": "OS owner counts recover identically; ordinary final repeats and conditional four-hour allocator diagnostic must distinguish live use from allocator retention. No absolute leak absence claim."
+  },
+  "frozen_final_candidate": {
+    "source_commit": "7e68fd21430ac93125149f60927f8676b077811d",
+    "binary_sha256": "b047fb880feb10e41e7d0308e6037b8cd3bc770b0452a30cab59c3e2d20514a0",
+    "build_evidence": "final-local-candidate.json",
+    "status": "frozen; mandatory final load/CI pending",
+    "native_suite": {
+      "workflow_run_id": 38990677734,
+      "source_commit": "7e68fd21430ac93125149f60927f8676b077811d",
+      "status": "in progress; no pass inferred",
+      "url": "https://github.com/Nelcota/Nelcota/actions/runs/38990677734",
+      "scope": "One distinct Actions-built ELF reused in twelve fresh serial native cases"
+    }
   }
 }

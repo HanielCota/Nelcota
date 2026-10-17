@@ -2096,3 +2096,24 @@ O crescimento anônimo observado (26,668->29,242MiB nas medianas de15min)
 não recebeu atribuição automática a cache. O plano inclui verificação no
 candidato e diagnóstico separado de quatro horas com alocador, se persistir;
 instrumentação continua excluída das comparações ordinárias.
+
+
+### Final local artifact and native suite dispatched (2026-10-17 01:25 UTC)
+
+The separate tracked panel rebuild passed (`7e68fd2`). A clean locked Rust
+1.99.0 release build then passed in 93.831 seconds with four Cargo jobs, thin
+LTO, one codegen unit and no compiler/profile overrides. The retained local
+ELF is 30,469,304 bytes, SHA-256
+`b047fb880feb10e41e7d0308e6037b8cd3bc770b0452a30cab59c3e2d20514a0`.
+The [build receipt](results/stress/final-local-candidate.json) records source,
+manifest/lock hashes and product tree identities; build success is not stress
+approval. No ordinary Rust/UI suite or build overlaps local measured traffic.
+
+The predeclared `s3-retained-baseline-001` now runs separately on the retained
+old ELF, obtaining comparable current-protocol steady measurements. Its
+600-second soak cannot replace either mandatory final four-hour S3 pass.
+[Native suite 38990677734](https://github.com/Nelcota/Nelcota/actions/runs/38990677734)
+was dispatched on the same source with twelve fresh, serialized outer/guest
+VM cases and its own common Actions-built ELF. Neither its completion nor
+bit identity with the separate local build is assumed. Both final local
+backend passes and all other remaining matrix cells stay open.
