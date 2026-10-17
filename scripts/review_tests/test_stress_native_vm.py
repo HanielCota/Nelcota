@@ -20,9 +20,40 @@ import native_preflight
 import native_vm
 import native_evidence
 import native_contracts
+import native_guest
 
 
 class NativeVMBoundaries(unittest.TestCase):
+    def test_native_journal_categories_never_publish_log_payloads(self):
+        value = native_guest.journal_categories("Failed at step EXEC: Permission denied private-token\npassword authentication failed postgres://private-user:private-password@localhost/db")
+        self.assertEqual(value["exec_failure"], 1)
+        self.assertEqual(value["permission_failure"], 1)
+        self.assertEqual(value["database_authentication_failure"], 1)
+        self.assertNotIn("private", str(value))
+
+    def test_environment_and_symlink_diagnostics_publish_metadata_only(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "environment"
+            path.write_bytes(b"private-password-and-token")
+            path.chmod(0o600)
+            value = native_guest.diagnostic_file(path)
+            self.assertEqual(value["size_bytes"], 26)
+            self.assertEqual(value["mode"], 0o600)
+            self.assertNotIn("sha256", value)
+            self.assertNotIn("private", str(value))
+            link = Path(temporary) / "binary-link"
+            link.symlink_to(path)
+            linked = native_guest.diagnostic_file(link, binary=True)
+            self.assertTrue(linked["symlink"])
+            self.assertFalse(linked["regular"])
+            self.assertNotIn("sha256", linked)
+
+    def test_native_exec_status_is_retained_without_reading_a_process(self):
+        result = SimpleNamespace(stdout=b"MainPID=0\nActiveState=failed\nExecMainCode=1\nExecMainStatus=203\nStatusErrno=13\n")
+        with patch.object(native_guest, "command", return_value=result):
+            value = native_guest.unit_state("nelcota-stress.service")
+        self.assertEqual((value["ExecMainCode"], value["ExecMainStatus"], value["StatusErrno"]), (1, 203, 13))
+
     def test_configuration_fault_restores_owned_original_even_after_failure(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "config"

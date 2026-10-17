@@ -9,6 +9,7 @@ import platform
 from pathlib import Path
 import re
 import shutil
+import stat
 import subprocess
 import sys
 
@@ -66,7 +67,8 @@ def versions():
 
 def unit_state(name):
     fields = ["LoadState", "ActiveState", "SubState", "MainPID", "MemoryCurrent", "MemoryPeak", "MemoryMax",
-              "TasksCurrent", "TasksMax", "NRestarts", "CPUUsageNSec", "ControlGroup", "Result"]
+              "TasksCurrent", "TasksMax", "NRestarts", "CPUUsageNSec", "ControlGroup", "Result",
+              "ExecMainCode", "ExecMainStatus", "StatusErrno"]
     result = command(["systemctl", "show", name, "--property=" + ",".join(fields)], check=False)
     state = {}
     for line in result.stdout.decode().splitlines():
@@ -152,6 +154,41 @@ def resource_report():
             "boot_id": Path("/proc/sys/kernel/random/boot_id").read_text().strip(),
             "units": {name: unit_state(name) for name in [UNIT, "postgresql@17-main.service", "postgresql@17-sentinel.service", "caddy.service"]},
             "target_slice": unit_state("g05native.slice")}
+
+
+def journal_categories(content):
+    """Publish fixed categories only, never log messages or interpolated values."""
+    patterns = {
+        "exec_failure": ["failed to execute", "failed at step exec", "exec format error", "status=203/exec"],
+        "environment_failure": ["failed to load environment", "environment file"],
+        "permission_failure": ["permission denied", "status=217/user", "status=216/group"],
+        "namespace_failure": ["failed to set up mount", "status=226/namespace", "failed at step namespace"],
+        "database_authentication_failure": ["password authentication failed"],
+        "database_unavailable": ["connection refused", "could not connect", "database unavailable"],
+        "missing_file": ["no such file or directory", "not a directory"],
+        "readonly_filesystem": ["read-only file system"],
+        "configuration_failure": ["invalid configuration", "configuration error", "failed to parse", "invalid value"],
+        "panic": ["panicked at"],
+        "oom": ["out of memory", "oom-kill"],
+    }
+    value = content.casefold()
+    return {name: sum(value.count(pattern) for pattern in phrases) for name, phrases in patterns.items()}
+
+
+def diagnostic_file(path, *, binary=False):
+    """Metadata for fixed owned paths; environment contents are never published."""
+    if not path.exists() and not path.is_symlink():
+        return {"exists": False}
+    info = path.lstat()
+    value = {"exists": True, "regular": stat.S_ISREG(info.st_mode), "symlink": path.is_symlink(),
+             "size_bytes": info.st_size, "mode": stat.S_IMODE(info.st_mode), "uid": info.st_uid, "gid": info.st_gid}
+    if binary and value["regular"] and 4 <= info.st_size <= 64 * 1024 ** 2:
+        with path.open("rb") as stream:
+            value["ELF_header"] = stream.read(4) == b"\x7fELF"
+        if value["ELF_header"]:
+            with path.open("rb") as stream:
+                value["sha256"] = hashlib.file_digest(stream, "sha256").hexdigest()
+    return value
 
 
 def install_limits(*, sentinel=False):
@@ -286,7 +323,18 @@ def main():
     content = ""
     if log.is_file():
         content = log.read_bytes()[-1048576:].decode(errors="replace")
+    journal = command(["journalctl", "--quiet", "--no-pager", "--boot", "--unit", UNIT,
+                       "--lines", "96", "--output=cat"], check=False, timeout=10)
+    text = journal.stdout[-1048576:].decode(errors="replace")
     print(json.dumps({"error_categories": {value: content.count(value) for value in categories},
+                      "CLI_category_scope": "Failed CLI command output only; zero does not establish an error-free service journal",
+                      "journal_read_exit": journal.returncode, "journal_bytes_observed": len(journal.stdout),
+                      "journal_tail_truncated": len(journal.stdout) > 1048576,
+                      "journal_error_categories": journal_categories(text),
+                      "files": {"deployed_binary": diagnostic_file(Path("/usr/local/lib/nelcota/nelcota"), binary=True),
+                                "provided_binary": diagnostic_file(Path("/usr/local/bin/nelcota"), binary=True),
+                                "environment": diagnostic_file(ENV),
+                                "unit": diagnostic_file(Path("/etc/systemd/system") / UNIT)},
                       "resources": resource_report()}, allow_nan=False))
 
 

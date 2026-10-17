@@ -539,3 +539,33 @@ O perfil remoto de quatro slots declara o compartilhamento observador/proxy;
 o perfil local original de cinco slots permanece distinto. Até este registro,
 só sintaxe foi verificada: regressões focadas e testes reais ainda **não foram
 executados**. SMTP/OAuth e ingress público continuam fora desse perfil.
+
+
+A [verificação de equivalência](results/stress/release-test-fixture-byte-equivalence.json)
+confirmou que `e6fdfd7` mantém exatamente o ELF de30.477.344bytes/SHA-256
+`acfb2c60…` já em medição. Apenas quatro arquivos de integração diferem na
+árvore de produto. Os433artefatos estavam válidos em cache; nenhum compilador
+foi invocado. O comando terminou em0,418s, limitado à CPU do controlador.
+Não houve reinício do serviço nem alteração de workload/limites. A nova
+proveniência registra o source atualizado e a identidade binária comum;
+ainda se exigem CI da fixture e suíte nativa correspondentes, sem afrouxar
+as verificações das seis árvores de produto.
+
+
+## Falha nativa após perda da RAM da VM, ainda em investigação
+
+A suíte de `af01678` terminou com **11 de12casos aprovados**. A primeira
+passagem de runtime [falhou](results/stress/native-af-post-cut-runtime-failure.json)
+no prazo de90s de HTTPS após o corte da VM; a segunda passou, sem resolver
+a falha anterior. O app registrou40reinícios e ficou em auto-restart/MainPID0,
+com PostgreSQL e Caddy ativos, sem guard crítico e com limpeza confirmada.
+Foram38amostras e195,158s incluindo preparo. A reconciliação pós-corte de
+ACKs não foi alcançada nessa execução; sua durabilidade não está aprovada.
+
+A [investigação](results/stress/native-af-post-cut-runtime-investigation.json)
+identificou uma lacuna no diagnóstico: os zeros de categorias vinham apenas
+dos comandos CLI falhos, sem journal do serviço nem código de saída do systemd.
+A VM original foi limpa. Foram preparados campos numéricos de saída,
+categorias fixas do journal e metadados/hashes dos executáveis e arquivos
+próprios, sem publicar conteúdo de logs ou `.env`. A causa permanece
+indeterminada; reproduções e testes desses diagnósticos ainda são necessários.

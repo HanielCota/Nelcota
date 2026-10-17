@@ -1,16 +1,14 @@
 {
-  "source_commit": "af01678ac773f932232d0f37e6d0a2fa02edc343",
-  "binary_sha256": "acfb2c604a7376be95690852ef016bca90eba599a55bad4be27b6c071b59a6b2",
-  "size": 30477344,
-  "started_utc": "2026-10-17T06:53:33.258271+00:00",
-  "completed_utc": "2026-10-17T06:55:03.157931+00:00",
+  "source_commit": "e6fdfd7cca377edb0b36184a21a9a7b30a4d1d0c",
+  "status": "frozen; same bytes as the ongoing candidate003; updated fixture CI/native acceptance pending",
   "build_command": [
     "cargo",
     "build",
     "--locked",
     "--release",
     "-p",
-    "nelcota-server"
+    "nelcota-server",
+    "--message-format=json"
   ],
   "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.0\nLLVM version: 23.1.1",
   "cargo": "cargo 1.99.0 (5f94df478 2026-08-27)",
@@ -23,29 +21,31 @@
     "codegen_units": 1
   },
   "compiler_overrides": [],
+  "tmpdir": "/workspace/nelcota-g05-tmp-f3a60e",
+  "build_exit": 0,
+  "build_seconds": 0.4183550580055453,
+  "completed_utc": "2026-10-17T07:36:29.389848+00:00",
   "cpu_affinity": [
-    0,
-    1,
-    2,
-    3,
     4
   ],
-  "build_exit": 0,
-  "build_seconds": 89.89962256298168,
-  "build_log_sha256": "e3909342a85f67fcd970f65ff6ac0520db3067e486f650e92bf417ec05db828c",
-  "status": "frozen; first disk campaign running; full CI/native/repeated load pending",
+  "binary_sha256": "acfb2c604a7376be95690852ef016bca90eba599a55bad4be27b6c071b59a6b2",
+  "size": 30477344,
+  "compiler_invoked": false,
+  "all_compiler_artifacts_fresh": true,
+  "compiler_artifacts": 433,
   "certifies_g05": false,
   "architecture": "x86_64-unknown-linux-gnu",
-  "scope": "Immutable local staging release candidate after confirmed SQL and export cancellation admission bugs. Native Actions builds retain separate ELF identities; no stress approval or production release.",
+  "scope": "Clean-source cache-only release verification after integration-fixture security correction and benchmark extensions. Exact ELF bytes match the ongoing immutable AF-built artifact; no compiler invoked and no service restart. New fixture CI/native-source proof still pending.",
   "product_tree_objects": {
-    "crates": "ea0f09ed01ffc110dd077e4ba78450dc5b15d156",
+    "crates": "d51047366b0c38a027261c1a2de8e33fb2df1dc4",
     "Cargo.toml": "20a3154fea3f1883ccc42882fbd671bc0b12b17f",
     "Cargo.lock": "9150a443d0d0cec57de152e13bd9a6cb8e7a8c2d",
     "migrations": "e88cfbfd12955dc8cb9180d3324df6a5d9e62206",
     "sdk": "864119c5aa5bfd0edc1799d9de018e096f39d67e",
     "rust-toolchain.toml": "0fd1b3a84b408770d883519014b040aed30a15f0"
   },
-  "private_log": "target/stress-g05/artifacts/build-candidate-final-003.log",
-  "previous_build": "final-local-candidate-cb916d0.json",
-  "tmpdir": "/workspace/nelcota-g05-tmp-f3a60e"
+  "previous_build": "final-local-candidate-af01678.json",
+  "byte_equivalence_evidence": "release-test-fixture-byte-equivalence.json",
+  "ongoing_campaign_binary_manifest": "candidate-final-003.json",
+  "same_binary_bytes_as_ongoing_campaign": true
 }

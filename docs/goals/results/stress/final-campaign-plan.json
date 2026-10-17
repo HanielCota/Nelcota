@@ -509,10 +509,11 @@
     "approval_thresholds_reduced": false
   },
   "current_final_artifact": {
-    "source_commit": "af01678ac773f932232d0f37e6d0a2fa02edc343",
+    "source_commit": "e6fdfd7cca377edb0b36184a21a9a7b30a4d1d0c",
     "binary_sha256": "acfb2c604a7376be95690852ef016bca90eba599a55bad4be27b6c071b59a6b2",
     "evidence": "final-local-candidate.json",
-    "status": "first disk run003 started2026-10-17T06:57:06Z; full acceptance pending"
+    "byte_equivalence_evidence": "release-test-fixture-byte-equivalence.json",
+    "status": "same exact retained ELF as the ongoing disk003 campaign; no workload, process or approval-threshold change; updated test/native CI pending"
   },
   "additional_browser_auth_pressure": {
     "status": "not run; static syntax only; focused regressions and retained-artifact gates must pass before live dispatch",

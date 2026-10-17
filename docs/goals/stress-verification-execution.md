@@ -2606,3 +2606,38 @@ Six new auth-publication and three additional shared source/resource guards
 are prepared; tests will run remotely before any live dispatch. Only static
 Python/JavaScript/workflow parsing has run locally, on the controller slot where
 applicable. No Rust/UI suite or compression overlaps the local load.
+
+
+### Test-fixture correction preserves the measured release ELF exactly
+
+The clean e6fdfd7 source differs from af01678 in only four product-tree files,
+all under server integration tests. A controller-CPU-only cache verification
+refused any compiler invocation; all433artifacts were fresh, exit0,0.418s,
+and the30,477,344B ELF remained exactly acfb2c604a7376be95690852ef016bca90eba599a55bad4be27b6c071b59a6b2.
+[The receipt](results/stress/release-test-fixture-byte-equivalence.json)
+retains exact paths, stdout/stderr digests and source trees. The active service,
+workload and original003manifest were not changed or restarted. An additional
+immutable copy/current provenance records the updated source and same bytes;
+this is cache reuse, not a claimed recompilation. Keep the original full-build
+receipt. New fixture CI and a fresh native source suite remain mandatory before
+source-tree reuse; no strict product-source gate is bypassed.
+
+
+### New native post-cut runtime failure retained; cause is not inferred
+
+The af01678 native suite ended11/12passed. Its runtime pass1 failed the unchanged
+90s verified-HTTPS health deadline after guest RAM loss; pass2passed.
+[The complete failed original](results/stress/native-af-post-cut-runtime-failure.json)
+retains38resource observations,195.158s including preparation and cleanup.
+At failure the app had40restarts/MainPID0/auto-restart; PostgreSQL and Caddy
+were running, with no critical resource guard. Post-cut ACK reconciliation
+was not reached. A later passing run does not explain this failure.
+
+[The investigation receipt](results/stress/native-af-post-cut-runtime-investigation.json)
+notes an observability gap: original zero error-category counts covered failed
+CLI-command output only, not the systemd service journal. Neither ExecMainStatus
+nor StatusErrno was retained. The cleaned VM no longer provides that original
+exit reason. Add numeric exit fields, fixed journal categories and metadata/
+ELF hashes for fixed owned paths, with privacy regressions. Keep logs/env contents
+private and reproduce the exact fault on fresh VMs before assigning a cause.
+No production correction or infrastructure attribution is claimed yet.
