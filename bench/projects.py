@@ -58,6 +58,15 @@ class Project:
     def sql(self, statement):
         return self.docker('exec', '-i', '-e', 'PGOPTIONS=-cstatement_timeout=15000', self.pg, 'psql', '-Atq', '-U', 'postgres', '-v', 'ON_ERROR_STOP=1', stdin=statement)
 
+    def database_ready(self, password):
+        if not isinstance(password,str) or not password:
+            raise ValueError('Owned database readiness requires its generated credential')
+        return self.docker('exec', '-i', '-e', 'PGPASSWORD', '-e', 'PGCONNECT_TIMEOUT=2',
+                           '-e', 'PGOPTIONS=-cstatement_timeout=2000', self.pg,
+                           'psql', '-h', '127.0.0.1', '-p', '5432', '-U', 'postgres',
+                           '-d', 'postgres', '-Atq', '-v', 'ON_ERROR_STOP=1',
+                           stdin='SELECT 1', env={'PGPASSWORD':password}) == '1'
+
     def start_app(self):
         self.setup_stage = 'app-starting'
         command = ['run', '-d', '--name', self.app, '--label', LABEL+'='+self.identity, '--pids-limit', '128', '--network', 'host', '--user', f'{os.getuid()}:{os.getgid()}', *self.cpu_limits, '--cpuset-cpus', str(self.cpus[0]), '--memory', '128m', '--memory-swap', '128m', '-v', str(self.binary)+':/usr/local/bin/nelcota:ro']
@@ -104,7 +113,7 @@ class Project:
         port = published_port(self.docker,self.pg,5432,self.pg_port)
         for attempt in range(120):
             try:
-                if self.sql('SELECT 1') == '1':
+                if self.database_ready(password):
                     break
             except RuntimeError:
                 pass

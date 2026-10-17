@@ -365,6 +365,7 @@ jobs:
           began = time.monotonic()
           suite = unittest.defaultTestLoader.discover('scripts/review_tests', pattern='test_stress_matrix_pressure.py')
           suite.addTests(unittest.defaultTestLoader.discover('scripts/review_tests', pattern='test_stress_project_diagnostics.py'))
+          suite.addTests(unittest.defaultTestLoader.discover('scripts/review_tests', pattern='test_stress_database_readiness.py'))
           result = unittest.TextTestRunner(verbosity=2).run(suite)
           report = {'source_commit': os.environ['GITHUB_SHA'], 'tests': result.testsRun,
                     'failures': len(result.failures), 'errors': len(result.errors), 'skipped': len(result.skipped),
@@ -375,9 +376,16 @@ jobs:
           with target.open('x') as stream:
               stream.write(json.dumps(report, indent=2, allow_nan=False) + '\n')
           print('::notice title=Supplemental matrix regression summary::' + json.dumps(report, separators=(',', ':'), allow_nan=False))
-          if not result.wasSuccessful() or result.testsRun < 19 or result.skipped:
+          if not result.wasSuccessful() or result.testsRun < 22 or result.skipped:
               raise SystemExit(1)
           PY
+      - name: Reproduce temporary PostgreSQL readiness and verify the TCP guard
+        timeout-minutes: 3
+        run: |
+          docker pull postgres:17-alpine
+          timeout --kill-after=30s 120s nice -n19 ionice -c3 \
+            prlimit --as=134217728:134217728 --cpu=90:90 -- \
+            python3 bench/database_readiness_probe.py
       - name: Locate the retained final native ELF
         id: retained
         run: |

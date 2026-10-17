@@ -2792,3 +2792,14 @@ in this repeat. The changed staging quota did not establish isolation approval.
 Keep both quota-policy failures; neither proves a product root cause. Independent
 million-row/1MiB-object retained-baseline and final005candidate campaigns began
 at09:57:26UTC, serially, under the previously declared limits.
+
+Read-only inspection found another staging readiness risk: `Project.create`
+accepted Unix-socket SELECT1 while PostgreSQL's Docker entrypoint can still run
+its temporary Unix-only initialization server. Require generated-credential
+TCP SELECT1 before starting the app.3focused guards passed. A new bounded
+Actions regression holds the real temporary server with an initialization SQL
+sleep, requires that the old check admits it while TCP is disabled/rejected,
+then requires final authenticated TCP readiness and owned cleanup. Its real
+result is pending; do not attribute the original opaque matrix failure to this
+risk without evidence. Production Compose already uses TCP readiness and is
+unchanged; the native systemd health probe has a different startup contract.
