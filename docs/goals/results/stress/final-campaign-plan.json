@@ -261,6 +261,47 @@
       "unchanged": "All predeclared workloads, rows, sizes, CPU/RAM/disk budgets, SLO/delivery/fairness/regression thresholds, reserves and14400scontinuoussoaks remain unchanged.",
       "new_harness": "Auth-link consumption case, corrected post-pacing ledger admission, all4capacitysteps/CPU endpoints and full auxiliary-action overlap timing.308stress+3projection regressions pass; real network smoke must close before full new matrix evidence.",
       "retained_baselines_closed": "Both million-row disk/S3 retained baselines passed; short summarizer performs verified compression exactly once. Explicit extra S3compression correctly refused; original failed operator state retained with passing source/summary/checksum/cleanup reconciliation."
+    },
+    {
+      "declared_utc": "2026-10-17T13:34:36.586956+00:00",
+      "trigger": "Tenth confirmed production SDK defect fixed; fresh complete local artifact007; controlled fixture-only HTTP auth-link smoke passed",
+      "source_commit": "35f4a9725d7edcf571f91084c555c127e7323653",
+      "binary_sha256": "96811748f1f45ad4894114188642f9343df661c750ad22768eaf2275659081b1",
+      "thresholds_changed": false,
+      "replacements": [
+        {
+          "previous_run_id": "large-disk-candidate-pass-1-002",
+          "replacement_run_id": "large-disk-candidate-pass-1-003"
+        },
+        {
+          "previous_run_id": "large-disk-candidate-pass-2-002",
+          "replacement_run_id": "large-disk-candidate-pass-2-003"
+        },
+        {
+          "previous_run_id": "large-s3-candidate-pass-1-002",
+          "replacement_run_id": "large-s3-candidate-pass-1-003"
+        },
+        {
+          "previous_run_id": "large-s3-candidate-pass-2-002",
+          "replacement_run_id": "large-s3-candidate-pass-2-003"
+        },
+        {
+          "previous_run_id": "disk-candidate-pass-1-005",
+          "replacement_run_id": "disk-candidate-pass-1-006"
+        },
+        {
+          "previous_run_id": "disk-candidate-pass-2-005",
+          "replacement_run_id": "disk-candidate-pass-2-006"
+        },
+        {
+          "previous_run_id": "s3-candidate-pass-1-005",
+          "replacement_run_id": "s3-candidate-pass-1-006"
+        },
+        {
+          "previous_run_id": "s3-candidate-pass-2-005",
+          "replacement_run_id": "s3-candidate-pass-2-006"
+        }
+      ]
     }
   ],
   "native_same_artifact_suite": {
@@ -569,14 +610,18 @@
     "approval_thresholds_reduced": false
   },
   "current_final_artifact": {
-    "source_commit": "860d2f990949bfc5c8c612de3341c65a39e8d259",
-    "binary_sha256": "c7e3d25467823c9d44157aca762761c23a49cd81f8ee96915b468f7bc3d119a4",
-    "build_seconds": 90.04832498799078,
-    "status": "historical candidate006; next007artifact pending after newSDK and generated assets",
-    "previous_candidate_source": "f40774e1504a924fe6d9c801e251278cee1a8fab",
-    "previous_candidate_approval": "Historical f40774e checks and backend matrix remain preserved; browser coalescence approval does not cover the confirmed late-overlap defect. No final endurance had started.",
-    "before_after_evidence": "sdk-native-overlapping-refresh-before-after-001.json",
-    "evidence": "final-local-candidate.json"
+    "source_commit": "35f4a9725d7edcf571f91084c555c127e7323653",
+    "binary_sha256": "96811748f1f45ad4894114188642f9343df661c750ad22768eaf2275659081b1",
+    "build_seconds": 93.28642953903181,
+    "status": "frozen final007; first ordinary disk campaign started, no completed final007 endurance approval",
+    "evidence": "final-local-candidate.json",
+    "previous_candidate_evidence": "final-local-candidate-860d2f9.json",
+    "SDK_before_after": [
+      "sdk-independent-server-clients-before-001.json",
+      "sdk-independent-server-clients-after-ci-001.json",
+      "sdk-independent-server-clients-built-before-after-001.json"
+    ],
+    "functional_smoke": "matrix-sdk007-auth-links-functional-smoke-001.json"
   },
   "additional_browser_auth_pressure": {
     "status": "First corrected full pass005 passed; two further fresh owner-metric receipts are predeclared before execution. No full G05 approval.",
@@ -656,6 +701,20 @@
     }
   },
   "current_final_candidate": {
+    "source_commit": "35f4a9725d7edcf571f91084c555c127e7323653",
+    "binary_sha256": "96811748f1f45ad4894114188642f9343df661c750ad22768eaf2275659081b1",
+    "build_seconds": 93.28642953903181,
+    "status": "frozen final007; first ordinary disk campaign started, no completed final007 endurance approval",
+    "evidence": "final-local-candidate.json",
+    "previous_candidate_evidence": "final-local-candidate-860d2f9.json",
+    "SDK_before_after": [
+      "sdk-independent-server-clients-before-001.json",
+      "sdk-independent-server-clients-after-ci-001.json",
+      "sdk-independent-server-clients-built-before-after-001.json"
+    ],
+    "functional_smoke": "matrix-sdk007-auth-links-functional-smoke-001.json"
+  },
+  "historical_candidate006": {
     "source_commit": "860d2f990949bfc5c8c612de3341c65a39e8d259",
     "binary_sha256": "c7e3d25467823c9d44157aca762761c23a49cd81f8ee96915b468f7bc3d119a4",
     "build_seconds": 90.04832498799078,
@@ -663,5 +722,17 @@
     "previous_candidate_source": "f40774e1504a924fe6d9c801e251278cee1a8fab",
     "previous_candidate_approval": "Historical f40774e checks and backend matrix remain preserved; browser coalescence approval does not cover the confirmed late-overlap defect. No final endurance had started.",
     "before_after_evidence": "sdk-native-overlapping-refresh-before-after-001.json"
+  },
+  "active_campaign_checkpoint": {
+    "utc": "2026-10-17T13:36:46.806603+00:00",
+    "active_local": "disk-candidate-pass-1-006",
+    "sequence": [
+      "disk-candidate-pass-1-006",
+      "s3-candidate-pass-1-006",
+      "disk-candidate-pass-2-006",
+      "s3-candidate-pass-2-006"
+    ],
+    "continuous_soak_seconds_each": 14400,
+    "scope": "Declared source/hash guards and all previous limits/SLOs retained. Stop on any workload/evidence/cleanup/comparison failure. No approval from partial load."
   }
 }

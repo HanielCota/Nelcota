@@ -1,5 +1,5 @@
 {
-  "source_commit": "860d2f990949bfc5c8c612de3341c65a39e8d259",
+  "source_commit": "35f4a9725d7edcf571f91084c555c127e7323653",
   "build_command": [
     "cargo",
     "build",
@@ -20,8 +20,8 @@
   },
   "compiler_overrides": [],
   "build_exit": 0,
-  "build_seconds": 90.04832498799078,
-  "completed_utc": "2026-10-17T11:41:11.148392+00:00",
+  "build_seconds": 93.28642953903181,
+  "completed_utc": "2026-10-17T13:23:27.069564+00:00",
   "cpu_affinity": [
     0,
     1,
@@ -29,22 +29,20 @@
     3,
     4
   ],
-  "binary_sha256": "c7e3d25467823c9d44157aca762761c23a49cd81f8ee96915b468f7bc3d119a4",
-  "size": 30480704,
-  "scope": "Fresh frozen local staging candidate after native-browser SDK late-overlap refresh correction and rebuilt embedded guide assets, retaining SQL/export ownership corrections; no production release or deployment",
-  "status": "frozen; ordinary CI18/18 and native common-ELF12/12 passed on matching product trees; affected live campaigns pending",
+  "binary_sha256": "96811748f1f45ad4894114188642f9343df661c750ad22768eaf2275659081b1",
+  "size": 30484800,
+  "scope": "Fresh frozen local staging candidate after ten confirmed production corrections including independent default server SDK queues, native-browser late-overlap refresh and rebuilt embedded guide assets, retaining SQL/export ownership corrections; no production release or deployment",
+  "status": "frozen candidate007 after ten corrections; matching ordinary CI and new common native suite/live campaigns pending",
   "certifies_g05": false,
   "product_tree_objects": {
-    "crates": "edcd9d9f13b82a7062fb2738031ff7b5abd1b35f",
+    "crates": "2162e23a35dfcc0f04b7605a7493161817513d23",
     "Cargo.toml": "20a3154fea3f1883ccc42882fbd671bc0b12b17f",
     "Cargo.lock": "9150a443d0d0cec57de152e13bd9a6cb8e7a8c2d",
     "migrations": "e88cfbfd12955dc8cb9180d3324df6a5d9e62206",
-    "sdk": "273cc4331f10fb509e1b77590d970854d4a73a2e",
+    "sdk": "9bd7af8fc90a0a3cd5429ad40d8c3ec7b23efedd",
     "rust-toolchain.toml": "0fd1b3a84b408770d883519014b040aed30a15f0"
   },
-  "previous_build": "final-local-candidate-f40774e.json",
-  "build_receipt": "candidate-final-006.json",
-  "architecture": "x86_64-unknown-linux-gnu",
-  "ordinary_ci_evidence": "ci-sdk006-final-product-trees.json",
-  "native_suite_evidence": "native-final-suite/index.json"
+  "previous_build": "final-local-candidate-860d2f9.json",
+  "build_receipt": "candidate-final-007.json",
+  "architecture": "x86_64-unknown-linux-gnu"
 }

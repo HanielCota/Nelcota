@@ -2,7 +2,7 @@
 
 Status: em execução, G05 sem aprovação. O checkpoint conservador 019 registra
 39h53min54s de intervalos de carga efetiva concluídos. O mínimo de oito horas
-foi atingido; as campanhas afetadas no candidato final006 ainda precisam
+foi atingido; as campanhas afetadas no candidato final007 ainda precisam
 terminar. O relatório em português contém a situação atual dos 12 critérios.
 As passagens históricas de quatro horas com contadores incompletos continuam
 sem aprovação. O baseline posterior em disco passou no protocolo corrigido;
@@ -3039,3 +3039,44 @@ The embedded guide assets were regenerated separately in df77883 after guide
 translation checks, zero panel diagnostics, 37 focused tests and Vite build passed.
 The existing large-reference-chunk warning remains. The next release artifact
 and final native/live campaigns are still pending; no merge or deployment.
+
+
+### 2026-10-17, 13:36 UTC — final007 freeze and actual five-case HTTP smoke
+
+The clean release build from `35f4a9725d7edcf571f91084c555c127e7323653`
+passed in 93.286s with locked dependencies, four Cargo jobs, repository thinLTO/
+codegen-units1 and no compiler overrides. Its 30,484,800B local ELF SHA-256 is
+`96811748f1f45ad4894114188642f9343df661c750ad22768eaf2275659081b1`.
+All six product-tree identities and the complete clean checkout were checked
+before/after build. Candidate006 provenance is retained separately.
+
+The [real HTTP functional smoke](results/stress/matrix-sdk007-auth-links-functional-smoke-001.json)
+passed 150 seconds of load,32 resource samples, maximum gap 5.946s, no resource
+violations and verified owned cleanup. All five supplemental cases passed.
+Single-use recovery/signup/magiclink controls recorded 15 groups of four
+barrier-released consumers: exactly one accepted and three rejected each,
+zero unexpected sessions and zero unrevoked fixture sessions after cleanup.
+Only the selected recovery password worked; replay, expiry and wrong-kind
+rejections preserved state. Tokens were seeded in the private owned database:
+this does not establish SMTP delivery, issuance/cooldown or OAuth coverage.
+The 20-second case windows are functional smoke, not full 120-second pressure,
+five-minute capacity or continuous endurance certification.
+
+The ledger reconciled 1,080 ACKs with zero missing/corrupt identities and 60
+committed outcomes among 120 ambiguous replies, with no automatic mutation
+retries. Fresh-target restore passed: measured RTO 2.517s, RPO upper 17.995s,
+matching physical fixture bytes and rejected foreign-project credentials.
+
+At 13:34:48 UTC the bounded serial final007 owner started
+`disk-candidate-pass-1-006`; its predeclared sequence also includes real S3
+pass 1, disk pass 2 and real S3 pass 2. Every case requires 14,400 continuous seconds
+and the unchanged full prelude, quotas, reserves, sampler and SLOs. Workload,
+evidence, cleanup or comparison failure stops the sequence. Long-run resource
+compression happens only after closed passing summary/comparison. No complete
+final007 endurance result is inferred from startup.
+
+Native suite 39036557006 froze a separate common Actions ELF
+`d0d1090c91da4435a0d27dcf1dddba1b8695f18f944b1dd8cc5e472089d17432`
+from the exact same product source. Its twelve cases and ordinary Rust CI
+remain incomplete at this entry; previous native006/browser006 successes
+retain their historical source and cannot certify the new product.
