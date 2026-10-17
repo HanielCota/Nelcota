@@ -160,12 +160,21 @@ async fn active_sql(app: &TestApp) -> i64 {
     ).await.unwrap().get(0)
 }
 
-#[tokio::test]
-async fn cancelled_sql_keeps_admission_until_postgres_finishes_cleanup() {
-    let app = TestApp::spawn().await;
-    let gate = CancelGate::start(&app.admin).await;
-    let config = gate.config(&app.admin);
-    let executor = Arc::new(SqlExecutor::default());
+fn successful_read(result: Result<SqlResponse, SqlBusy>) -> bool {
+    match result {
+        Ok(SqlResponse::Success { results, .. }) => {
+            results.len() == 1 && results[0].rows == vec![vec![Some("2".to_owned())]]
+        }
+        _ => false,
+    }
+}
+
+async fn start_and_cancel_four(
+    app: &TestApp,
+    gate: &CancelGate,
+    config: &Config,
+    executor: &Arc<SqlExecutor>,
+) -> i64 {
     let mut queries = Queries(Vec::new());
     for _ in 0..4 {
         let executor = executor.clone();
@@ -175,7 +184,7 @@ async fn cancelled_sql_keeps_admission_until_postgres_finishes_cleanup() {
         }));
     }
     let deadline = Instant::now() + Duration::from_secs(3);
-    while active_sql(&app).await != 4 {
+    while active_sql(app).await != 4 {
         assert!(Instant::now() < deadline, "four SQL queries did not start");
         tokio::time::sleep(Duration::from_millis(10)).await;
     }
@@ -197,7 +206,37 @@ async fn cancelled_sql_keeps_admission_until_postgres_finishes_cleanup() {
         );
         tokio::time::sleep(Duration::from_millis(10)).await;
     }
-    let still_active = active_sql(&app).await;
+    active_sql(app).await
+}
+
+async fn recover_sql(executor: &SqlExecutor, config: &Config, budget: Duration) -> Duration {
+    let began = Instant::now();
+    let deadline = began + budget;
+    loop {
+        let (a, b, c, d) = tokio::join!(
+            executor.execute(config, "SELECT 2", None),
+            executor.execute(config, "SELECT 2", None),
+            executor.execute(config, "SELECT 2", None),
+            executor.execute(config, "SELECT 2", None),
+        );
+        assert!(
+            Instant::now() < deadline,
+            "SQL admission did not recover after backend cleanup"
+        );
+        if [a, b, c, d].into_iter().all(successful_read) {
+            return began.elapsed();
+        }
+        tokio::time::sleep(Duration::from_millis(25)).await;
+    }
+}
+
+#[tokio::test]
+async fn cancelled_sql_keeps_admission_until_postgres_finishes_cleanup() {
+    let app = TestApp::spawn().await;
+    let gate = CancelGate::start(&app.admin).await;
+    let config = gate.config(&app.admin);
+    let executor = Arc::new(SqlExecutor::default());
+    let still_active = start_and_cancel_four(&app, &gate, &config, &executor).await;
     let fifth_is_busy = executor.execute(&config, "SELECT 1", None).await.is_err();
     let (api_status, rows) = app.get("/rest/v1/products?limit=1", None).await;
     let (negative_status, _) = app
@@ -215,6 +254,7 @@ async fn cancelled_sql_keeps_admission_until_postgres_finishes_cleanup() {
         );
         tokio::time::sleep(Duration::from_millis(10)).await;
     }
+    recover_sql(&executor, &config, Duration::from_secs(3)).await;
     gate.close().await;
     println!(
         "::notice title=G05 SQL cancellation admission::{}",
@@ -226,6 +266,7 @@ async fn cancelled_sql_keeps_admission_until_postgres_finishes_cleanup() {
             "authorized_api_status": api_status.as_u16(),
             "unauthorized_api_status": negative_status.as_u16(),
             "backend_queries_after_release": 0,
+            "recovered_parallel_read_queries": 4,
             "scope": "Real owned PostgreSQL and bounded loopback CancelRequest gate; no load-time credit"
         })
     );
@@ -240,4 +281,55 @@ async fn cancelled_sql_keeps_admission_until_postgres_finishes_cleanup() {
         fifth_is_busy,
         "SQL admission reopened while four cancelled queries were still active"
     );
+}
+
+#[tokio::test]
+async fn lost_sql_transport_has_bounded_cleanup_admission_and_recovers() {
+    let app = TestApp::spawn().await;
+    let gate = CancelGate::start(&app.admin).await;
+    let config = gate.config(&app.admin);
+    let executor = Arc::new(SqlExecutor::default());
+    let still_active = start_and_cancel_four(&app, &gate, &config, &executor).await;
+    // Only this TestApp's four SQL sessions are terminated. Other databases,
+    // roles, the ordinary API pool and the cluster itself are unchanged.
+    let terminated: i64 = app.admin_client.query_one(
+        "SELECT count(*) FILTER (WHERE pg_terminate_backend(pid)) FROM pg_stat_activity WHERE datname=current_database() AND application_name='nelcota-admin-sql' AND pid<>pg_backend_pid()",
+        &[],
+    ).await.unwrap().get(0);
+    gate.release.notify_waiters();
+    let deadline = Instant::now() + Duration::from_secs(3);
+    while active_sql(&app).await != 0 {
+        assert!(
+            Instant::now() < deadline,
+            "owned SQL sessions did not terminate"
+        );
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    let blocked = executor.execute(&config, "SELECT 2", None).await.is_err();
+    let (api_status, rows) = app.get("/rest/v1/products?limit=1", None).await;
+    let recovered = recover_sql(&executor, &config, Duration::from_secs(40)).await;
+    gate.close().await;
+    println!(
+        "::notice title=G05 SQL transport cleanup::{}",
+        serde_json::json!({
+            "case": "lost_sql_transport_has_bounded_cleanup_admission_and_recovers",
+            "backend_queries_before_termination": still_active,
+            "owned_sql_sessions_terminated": terminated,
+            "admission_blocked_during_uncertain_cleanup": blocked,
+            "recovered_parallel_read_queries": 4,
+            "recovery_seconds": recovered.as_secs_f64(),
+            "recovery_budget_seconds": 40,
+            "authorized_api_status": api_status.as_u16(),
+            "scope": "Owned database sessions only; bounded degraded cleanup, no load-time credit"
+        })
+    );
+    assert_eq!(still_active, 4);
+    assert_eq!(terminated, 4);
+    assert!(blocked, "lost transport prematurely reopened SQL admission");
+    assert!(
+        recovered >= Duration::from_secs(34),
+        "uncertain cleanup did not retain its declared grace"
+    );
+    assert_eq!(api_status, StatusCode::OK);
+    assert_eq!(rows.as_array().unwrap().len(), 1);
 }

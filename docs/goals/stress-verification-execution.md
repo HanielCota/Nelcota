@@ -2435,3 +2435,55 @@ static review has run locally; measured local load remains isolated. The new
 integration-test tree differs from the frozen source, so further artifact
 reuse must satisfy explicit build/source checks. Any production correction
 requires a fresh final artifact and replacement of affected load results.
+
+
+### Confirmed SQL admission defect and bounded cleanup ownership
+
+The [original CI control](results/stress/sql-cancellation-admission-before.json)
+failed on 4eb097b: four real queries remained active behind four held protocol
+CancelRequest packets, but a fifth query was admitted. Caller cancellation
+released its semaphore permit while a separate cancellation task still owned
+unfinished PostgreSQL work. Positive API/negative JWT canaries remained 200/401;
+they do not make this concurrency failure acceptable. Preserve the red job.
+
+The permit now belongs to the connection driver, including its cancellation
+cleanup. Keep the driver running to drain the server response. A failed
+transport retains bounded admission for 35 seconds (default statement timeout
+30s plus 5s cleanup), with at most four cleanup owners. The
+[after control](results/stress/sql-cancellation-admission-after.json) identifies
+the exact locally tested file hashes and dirty diff against 4eb097b. Both real
+SQL regressions passed in 37.24s, with no ignored tests: fifth rejected while
+four backends stayed active, zero active after release, four recovered parallel
+reads and intact 200/401 canaries. Terminating only the four sessions in the
+owned test database kept admission blocked and recovered four reads in 35.261s
+inside the declared 40s. Four related architecture checks passed with the same
+production executor hash. Fresh owned PostgreSQL cleanup was confirmed; no
+foreign cluster was used or changed. No regression/preparation time is load credit.
+
+The [previous candidate campaign](results/stress/disk-candidate-before-sql-fix-interruption.json)
+was intentionally interrupted with one generation-checked pidfd SIGTERM to its
+owner. Its serial chain stopped on the failed closure. Cleanup confirmed no
+owned containers/volumes and removed the owned directory; the foreign test
+PostgreSQL remains untouched. Preserve 1559 observations and original failed
+completion. Only 4290 closed effective phase seconds exist; no partial-soak
+credit, no four-hour claim, and checkpoint014 excludes this entire campaign.
+A fresh immutable production build, CI, native suite and all affected campaign
+repetitions are required; the old B047 artifact stays retained as historical.
+
+### Provider repeat and strengthened supplemental smoke completed
+
+The [second full provider diagnostic](results/stress/provider-runtime-corrected-pass-2.json)
+passed all three fresh profiles, sixteen focused regressions, 960 verified
+object sequences, 180s pressure/600s idle, 156 exports and 157 samples per case,
+with empty logical/multipart inventories, no OOM/observer violations and cleanup.
+Default/runtime-workers/fsync-workers anonymous memory still rose during idle;
+FD/socket owners stayed stable. Both complete passes reject any claim that
+worker overrides establish a memory fix; exact live/cache attribution remains
+unverified. Direct provider work contributes no BaaS load seconds.
+
+The [strengthened matrix smoke](results/stress/matrix-backend-smoke-002.json)
+passed eleven guards, exact export content/uniqueness, late-positive deadline
+rejection and all four bounded scenarios. Its 130s requested ledger profile
+and 27 numeric samples/gap5.101s retain original source and artifact scope.
+It predates the SQL production correction and is not either full qualified
+matrix pass. Remote overlap is not added to the local effective-time ledger.

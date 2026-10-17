@@ -2,7 +2,7 @@
 
 **Estado: em execução, sem aprovação do G05.** Este relatório é atualizado
 durante as campanhas. Checkpoint de carga consolidada: 17/10/2026, 03:47 UTC.
-Atualização da investigação: 17/10/2026, 05:39 UTC.
+Atualização da investigação: 17/10/2026, 06:41 UTC.
 Não houve merge nem deploy de produção. O trabalho está na branch
 `test/g05-stress-verification`, no [PR #90](https://github.com/Nelcota/Nelcota/pull/90),
 mantido como rascunho para revisão.
@@ -18,9 +18,9 @@ O tempo parcial das campanhas ainda abertas não está somado nesse checkpoint.
 
 | Artefato | Identidade e alcance |
 |---|---|
-| Código do candidato agora sob carga local | `7e68fd21430ac93125149f60927f8676b077811d`; o ELF em execução está congelado. Um novo teste de integração posterior exige revalidar a identidade da árvore antes de reutilizar artefatos em novos cenários; nenhuma correção de produção foi aplicada após esse build até aqui |
+| Código após o novo defeito SQL confirmado | Correção local em `crates/admin/src/sql/executor.rs`, com dois testes reais aprovados e hashes em [evidência](results/stress/sql-cancellation-admission-after.json). O binário anterior foi interrompido; novo build e repetições afetadas são obrigatórios |
 | SHA-256 do binário de baseline preservado | `75c44c85a85db26195166aa1d2c6caf481e3db476801ec8131525ef62adf1be0` |
-| Candidato local final congelado | `7e68fd21430ac93125149f60927f8676b077811d`; SHA-256 `b047fb880feb10e41e7d0308e6037b8cd3bc770b0452a30cab59c3e2d20514a0`; [proveniência](results/stress/final-local-candidate.json), [18 checks ordinários aprovados](results/stress/ci-final-artifact-source.json), primeira campanha final em disco iniciada |
+| Candidato local final congelado | `7e68fd21430ac93125149f60927f8676b077811d`; SHA-256 `b047fb880feb10e41e7d0308e6037b8cd3bc770b0452a30cab59c3e2d20514a0`; [proveniência](results/stress/final-local-candidate.json), [18 checks ordinários aprovados](results/stress/ci-final-artifact-source.json), primeira campanha interrompida intencionalmente após confirmação do defeito SQL; este hash não contém a nova correção |
 | SHA-256 do workload k6 atual | `0ac01578bf19155302fe465884b480d792569086f23bb4ba3615ca5f0ce2547d` |
 | Baseline em disco no protocolo atual | Snapshot imutável de `1f391594dd8db6cccac54d6720d90c33d461d1f1`; `disk-final-pass-1-002` concluiu como baseline no binário retido, com protocolo atual |
 | Primeira execução nativa separada | [Actions 38962480993](https://github.com/Nelcota/Nelcota/actions/runs/38962480993), código congelado `e80770b3f6aa1f64d011a3d62f8ebf0f1201bdac`; reprovada no oráculo de signup antes do backup |
@@ -29,9 +29,10 @@ O tempo parcial das campanhas ainda abertas não está somado nesse checkpoint.
 | Correção de cwd, ativação nativa | [Antes](results/stress/native-default-root-before.json)/[depois](results/stress/native-default-root-after.json), código posterior `b43dc5802d6d236a3ed5b8c0253122ee12b8ae5e`; valida init/up/HTTPS; a migração no cwd/`NELCOTA_ROOT` teve defeito próprio corrigido e repetição com SQL confirmada |
 | Propriedade de um host nativo por máquina | [Antes](results/stress/native-host-root-before.json)/[depois](results/stress/native-host-root-after.json), código posterior `f560493ae6bcd8c4c94d51b6d7d049a608b30de0`; binário `27a7fb004db277ec59bd071f0cba8f009e31f416d710cda7880daa3bc5c844ae` |
 
-A execução local em andamento preserva o binário anterior como baseline.
-A correção real da CLI exige novo build e repetição das campanhas afetadas;
-o hash anterior não será apresentado como o artefato corrigido.
+O binário anterior e o baseline permanecem preservados. A nova correção SQL
+exige outro build e repetição das campanhas afetadas; o hash anterior não
+será apresentado como o artefato corrigido. A campanha interrompida ficou
+reprovada/interrompida, com limpeza confirmada e sem crédito do soak parcial.
 
 Cada campanha preserva manifesto de propriedade, limites, configuração,
 hashes das ferramentas/imagens, fases, timestamps monotônicos, métricas e
@@ -46,14 +47,14 @@ O backend de produção continua um único binário Rust, sem Node ou Python.
 | 1 | Inventário, baseline imutável e SLOs declarados | Atendido para o staging local | [Inventário](results/stress/coverage-inventory.json), [plano](results/stress/final-campaign-plan.json), manifestos por execução. A matriz registra os cenários ainda incompletos. |
 | 2 | Calibração, unidades, amostragem e oráculos | Validado nos controles corrigidos | Controles nativos de bytes, redirects, contadores esparsos, cgroups e compactação; campanhas finais ainda precisam terminar. |
 | 3 | Cancelamento, watchdogs, redação e limpeza restrita | Demonstrado nos escopos local e nativo executados | [Controle nativo de guardas/pidfd](results/stress/native-guards-pidfd.json), interrupções reais e recibos de limpeza. A VM própria também confirmou limpeza e limites reais de kernel, sem guard crítico disparado nas execuções aprovadas. |
-| 4 | Duas passagens de steady/staircase/picos/descanso | Pendente no protocolo final | Fases anteriores e falhas estão preservadas. A primeira repetição foi interrompida; sua substituta passou no protocolo atual como baseline. A primeira campanha em disco do novo artefato iniciou; as duas passagens por backend ainda precisam terminar. |
+| 4 | Duas passagens de steady/staircase/picos/descanso | Pendente no protocolo final | Fases anteriores e falhas estão preservadas. A primeira repetição foi interrompida; sua substituta passou no protocolo atual como baseline. A primeira campanha do candidato foi interrompida após o defeito SQL confirmado; as duas passagens por backend exigem o próximo artefato. |
 | 5 | Toda a matriz funcional, de segurança e concorrência | Parcial | CI funcional, primeiros browser/fault e smokes reais disponíveis; cobertura funcional não substitui stress repetido de cada célula. |
 | 6 | Isolamento/fairness em 1/5/10 projetos e controle responsivo | Reprovado/incompleto | Primeira topologia de um projeto passou no protocolo anterior; cinco/dez projetos tiveram violações reais de fairness. Dez projetos também falharam no drain de 30 s. |
-| 7 | Quatro horas contínuas em disco e S3 no artefato final | Pendente | Três execuções históricas completaram fisicamente quatro horas, com aprovação de contadores retirada. Uma nova campanha em disco passou no protocolo atual, como baseline; a primeira campanha em disco do novo candidato iniciou; nenhuma campanha final de quatro horas foi aprovada até aqui. |
+| 7 | Quatro horas contínuas em disco e S3 no artefato final | Pendente | Três execuções históricas completaram fisicamente quatro horas, com aprovação de contadores retirada. Uma nova campanha em disco passou no protocolo atual, como baseline; o candidato foi interrompido após o defeito SQL confirmado; nenhuma campanha final de quatro horas foi aprovada até aqui. |
 | 8 | Falhas, drain, restart, restore e deployment aplicável | Parcial | Primeiro fault passou com reconciliação de ACKs e restore local novo. Dois fluxos nativos passaram no escopo de restore no mesmo alvo e perda da RAM da convidada. Repetição final de faults/carga, atualização operacional, DNS/ACME públicos e recuperação fora do host continuam incompletos. |
 | 9 | Recursos, invariantes de dados/arquivos/eventos e regressão | Parcial | Invariantes locais e plateaus observados; precisam das campanhas finais comparáveis. Retenção anônima do provedor ainda exige atribuição. |
-| 10 | Correções focadas e regressões dos defeitos confirmados | Verificado nos defeitos já reproduzidos; revisão continua | Antes/depois em cinco defeitos reais: cluster incorreto, unit relativa, outro host nativo, lease aninhado na migração e sucesso indevido de remoção com limpeza incompleta. Os cenários específicos passaram em VMs novas. A falha da fixture Rust teve local original recuperado e passou 1.000 repetições após I/O de prontidão; o erro original continua visível. Fairness não recebeu causa de produção inventada. |
-| 11 | Rust/UI/SDK/lint/CI correspondentes ao SHA testado | Aprovado na fonte congelada `7e68fd2` | [18 checks ordinários](results/stress/ci-final-artifact-source.json), incluindo Rust/serviços reais, painel e assets, SDKs, supply chain e CodeQL. As 12 execuções nativas também passaram no mesmo source, com ELF próprio comum. Falhas anteriores de Rust, fixtures CodeQL e assets continuam preservadas; alterações futuras exigem a revalidação afetada. |
+| 10 | Correções focadas e regressões dos defeitos confirmados | Verificado nos defeitos já reproduzidos; revisão continua | Antes/depois em seis defeitos reais: cluster incorreto, unit relativa, outro host nativo, lease aninhado na migração, remoção com limpeza incompleta e liberação antecipada da admissão SQL. A correção SQL passou em dois testes locais reais; CI e campanhas finais ainda precisam repeti-la. Os cenários específicos passaram em VMs novas. A falha da fixture Rust teve local original recuperado e passou 1.000 repetições após I/O de prontidão; o erro original continua visível. Fairness não recebeu causa de produção inventada. |
+| 11 | Rust/UI/SDK/lint/CI correspondentes ao SHA testado | Aprovado no artefato anterior; pendente após a correção SQL | [18 checks ordinários](results/stress/ci-final-artifact-source.json), incluindo Rust/serviços reais, painel e assets, SDKs, supply chain e CodeQL. As 12 execuções nativas também passaram no mesmo source, com ELF próprio comum. Falhas anteriores de Rust, fixtures CodeQL e assets continuam preservadas; alterações futuras exigem a revalidação afetada. |
 | 12 | Relatório, limites e todos os testes falhos/bloqueados/não executados | Em consolidação | Este relatório e o [registro detalhado](stress-verification-execution.md) preservam os resultados; ainda há campanhas abertas. |
 
 ## Staging e limites
@@ -381,3 +382,54 @@ checkpoint local. Antes das passagens completas, os oráculos passaram a
 rejeitar respostas positivas tardias e a verificar IDs, campos e unicidade
 de cada linha exportada. Essas novas asserções precisam de nova execução;
 o smoke anterior não certifica a matriz completa nem o oráculo mais forte.
+
+
+## Novo defeito SQL e interrupção controlada do candidato
+
+O [controle original no CI](results/stress/sql-cancellation-admission-before.json)
+reproduziu quatro consultas ainda ativas no PostgreSQL, com seus quatro pacotes
+CancelRequest retidos na rede. A quinta consulta foi aceita indevidamente:
+o permit pertencia à requisição cancelada e era liberado antes da limpeza do
+backend. A API positiva continuou em 200 e o JWT inválido em 401; isso não
+neutraliza o defeito de admissão. O job original permanece reprovado.
+
+A correção transfere o permit para o driver da conexão. O cancelamento mantém
+o driver para drenar a resposta e só libera a vaga após limpeza confirmada.
+Se a conexão falhar, conserva uma margem limitada de 35 s, correspondente ao
+statement_timeout padrão de 30 s mais cinco de limpeza. Há no máximo quatro
+desses trabalhos de limpeza por executor; o caminho normal preserva o contrato.
+
+Os [testes locais reais](results/stress/sql-cancellation-admission-after.json)
+passaram: dois testes SQL em 37,24 s, zero falhas/ignorados, quatro consultas
+ativas antes do cancelamento, quinta recusada, zero ativas após liberação,
+quatro leituras paralelas recuperadas e canários 200/401. Na perda de transporte,
+somente as quatro sessões SQL do banco próprio foram encerradas: admissão
+bloqueada e quatro leituras recuperadas em 35,261 s, dentro de 40 s. Quatro
+testes relacionados de arquitetura também passaram com o mesmo hash do executor.
+Preparação, compilação e esses controles não entram no tempo efetivo de carga.
+
+A [campanha do artefato anterior](results/stress/disk-candidate-before-sql-fix-interruption.json)
+recebeu um único SIGTERM dirigido ao owner com PID e geração verificados.
+O encadeamento parou e confirmou remoção apenas de seus containers, volumes e
+diretório. O PostgreSQL alheio foi preservado. Foram fechados 4.290 s de fases
+úteis, ainda excluídos do checkpoint 014; o soak parcial não recebe crédito nem
+aprovação de quatro horas. Nenhum resultado anterior certifica a nova correção.
+
+## Segunda passagem do provedor e smoke com oráculos fortalecidos
+
+A [segunda passagem independente do RustFS](results/stress/provider-runtime-corrected-pass-2.json)
+passou nos três perfis, com 960 sequências verificadas, 180 s de pressão e
+600 s de descanso por perfil, 156 exports e 157 amostras, sem OOM, violações
+ou inventário lógico residual. Os 16 testes focados passaram. Os descritores
+permaneceram em 38/45/40 por perfil e os sockets em seis. Mesmo sem carga,
+a memória anônima default passou de 234.020.864 para 243.265.536 bytes;
+workers=4 de 306.294.784 para 333.144.064; fsync-workers=4 de 226.918.400
+para 250.863.616. Não há atribuição suficiente a owners vivos ou caches, nem
+justificativa para anunciar esses overrides como correção de memória.
+
+O [segundo smoke da matriz](results/stress/matrix-backend-smoke-002.json)
+passou com os onze testes de guarda, 130 s de tráfego solicitado e limpeza
+confirmada. Validou conteúdo exato e unicidade das mil linhas exportadas,
+deadlines antes de aceitar recuperação positiva e os quatro cenários limitados.
+Esses resultados são anteriores à correção SQL, não substituem duas passagens
+completas qualificadas no novo artefato e não contam tempo remoto sobreposto.
