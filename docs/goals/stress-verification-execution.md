@@ -2303,3 +2303,12 @@ not guessed. A diagnostic-only workflow update records failed test IDs and
 source locations without assertion payloads. It changes no test, receiver,
 runtime profile or approval threshold. Both complete corrected provider
 passes remain unexecuted; the independent local disk workload continues.
+
+The unchanged focused tests passed their next gate on Actions 39003974676,
+which proceeded to the isolated provider fixture. This does not resolve
+the original regression failure. The bounded public CI diagnostic now
+accepts only the failed provider-regression step, retaining its test ID,
+source line and fixed exception class. Assertion payloads and provider
+runtime logs remain private. A new parser regression covers that boundary;
+the disposable diagnostic VM runs its focused checks before downloading.
+The ordinary local final ELF and workload remain unchanged.

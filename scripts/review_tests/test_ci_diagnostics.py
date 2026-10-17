@@ -65,6 +65,17 @@ class BoundedCIDiagnostics(unittest.TestCase):
                 diagnostics.api("actions/jobs/1/../../secrets")
             opener.assert_not_called()
 
+    def test_focused_python_failure_keeps_locations_without_assertion_payloads(self):
+        text = "2026-10-17T04:45:01.123Z FAIL: test_fixture (test_stress_provider_runtime.RuntimeBoundaries.test_fixture)\n"
+        text += '2026-10-17T04:45:01.124Z   File "/home/runner/work/Nelcota/Nelcota/scripts/review_tests/test_stress_provider_runtime.py", line 250, in test_fixture\n'
+        text += "2026-10-17T04:45:01.125Z AssertionError: private-token-must-stay-private\n"
+        expected = [{"test": "test_stress_provider_runtime.RuntimeBoundaries.test_fixture",
+                     "locations": [{"file": "test_stress_provider_runtime.py", "line": 250, "function": "test_fixture"}],
+                     "category": "AssertionError"}]
+        self.assertEqual(diagnostics.focused_python_failures(text), expected)
+        self.assertNotIn("private-token", str(diagnostics.focused_python_failures(text)))
+        self.assertEqual(diagnostics.focused_python_failures("FAIL: test_fixture (unrelated_module.test_fixture)\n"), [])
+
 
 if __name__ == "__main__":
     unittest.main()

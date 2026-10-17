@@ -325,3 +325,24 @@ O coletor específico marca renovação longa, duas podas e quatro horas como
 **não executados**; o verificador obrigatório de quatro horas foi preservado.
 A primeira campanha final em disco usa o ELF b047fb88 e está em execução;
 seu tempo permanece excluído deste checkpoint até o encerramento.
+
+### Investigação do coletor de telemetria do S3
+
+O diagnóstico separado de runtime falhou duas vezes durante o descanso,
+com limpeza confirmada e 960 sequências PUT/GET/DELETE verificadas em cada
+execução. A [reprodução sem alterar os limites](results/stress/provider-runtime-reproduced-budget-failure.json)
+identificou a causa: o coletor atingiu 128 exportações, consumindo somente
+3.151.161 B do teto de 16 MiB. A janela foi dimensionada para descoberta
+curta e não cobria a observação longa. A correção permite 256 exportações
+nesse diagnóstico, preservando os 16 MiB, quotas, autenticação, limites por
+requisição e os critérios de aprovação das campanhas ordinárias.
+
+Uma tentativa posterior parou **antes da carga do provedor**: 15 regressões,
+uma falha, zero erros/skips, 1,137 s. O [recibo original](results/stress/provider-runtime-regression-first-failure.json)
+continua preservado. As mesmas regressões passaram na repetição, mas isso
+não resolve a falha anterior. A recuperação do teste e da linha original
+está em andamento; os dois diagnósticos completos corrigidos ainda precisam
+de evidência. Métricas ausentes, incompletas ou antigas reprovam a execução;
+os gauges numéricos disponíveis não demonstram bytes vivos nem atribuição
+exata da retenção a cache. Essas observações não contam como endurance do
+BaaS nem alteram o checkpoint de 34h55min54s.

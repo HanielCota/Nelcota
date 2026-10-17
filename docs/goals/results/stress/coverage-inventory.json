@@ -992,9 +992,13 @@
     "regression_evidence": "ci-native-executable-identity-after.json"
   },
   "native_final_same_artifact_suite": {
-    "status": "not run",
-    "source_extension": "ffae0e5",
-    "scope": "Two independent passes of six native cases, serialized fresh VMs, one retained ELF verified per-case and in actual running processes. Dispatch after final asset/source freeze; local performance binary and native runner binary remain separately identified builds."
+    "status": "passed",
+    "source_commit": "7e68fd21430ac93125149f60927f8676b077811d",
+    "workflow_run_id": 38990677734,
+    "evidence": "native-final-suite/index.json",
+    "cases": 12,
+    "cleanup_confirmed": true,
+    "scope": "Two independent passes of six native cases, serialized fresh VMs, one common ELF verified in actual running processes. Does not certify ordinary final load, full management/update stress, public DNS/ACME, in-flight power cut or off-host restore."
   },
   "completed_current_protocol_disk_baseline": {
     "run_id": "disk-final-pass-1-002",
@@ -1022,7 +1026,7 @@
     "source_commit": "7e68fd21430ac93125149f60927f8676b077811d",
     "binary_sha256": "b047fb880feb10e41e7d0308e6037b8cd3bc770b0452a30cab59c3e2d20514a0",
     "build_evidence": "final-local-candidate.json",
-    "status": "frozen; mandatory final load/CI pending",
+    "status": "frozen; ordinary CI and twelve native cases passed; final local load/comparison pending",
     "native_suite": {
       "workflow_run_id": 38990677734,
       "source_commit": "7e68fd21430ac93125149f60927f8676b077811d",
@@ -1044,5 +1048,16 @@
       "retained_s3_baseline": "s3-current-protocol-baseline.json",
       "retained_s3_scope": "62 current-protocol closed phases and600s soak, not four hours"
     }
+  },
+  "provider_runtime_diagnostic": {
+    "status": "not run",
+    "scope": "Both complete corrected repetitions pending. Original first run and unchanged-limit reproduction failed after128exports, cleanupconfirmed and960verifiedoperations each. Reproduction confirms telemetry cumulative_budget at3151161wirebytes, below16MiB. Count correction256 keeps16MiB ceiling; failed focused regression attempt preserved and original assertion recovery in progress. No BaaS time credit or exact live-owner attribution.",
+    "failed_evidence": [
+      "provider-runtime-first-failure.json",
+      "provider-runtime-reproduced-budget-failure.json",
+      "provider-runtime-regression-first-failure.json"
+    ],
+    "active_workflow_run_id": 39003974676,
+    "active_source_commit": "a8fd8d0c9bd1909258f242958ab47731d0cb56d6"
   }
 }
