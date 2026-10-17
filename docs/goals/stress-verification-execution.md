@@ -2406,3 +2406,12 @@ is excluded from the local checkpoint. Exact export content and late-positive
 oracle hardening require a fresh smoke and two full qualified repetitions.
 The numeric public series checksum is retained; local binary artifact
 transport failed, while the public Actions artifact remains its location.
+
+Before the remaining larger/topology measurements, five retained-binary
+baselines are additionally predeclared: million-row disk/S3 and one/five/ten
+independent projects. Each copies the corresponding candidate's exact
+arguments, budgets, durations and protocols. Their three steady samples
+provide the required before/after comparison for those fixtures. Existing
+candidate rows and active endurance arguments are unchanged. Runs remain
+serial, subject to the original reserves and full acceptance; a failed or
+blocked baseline cannot certify a candidate. No such new baseline has run.
