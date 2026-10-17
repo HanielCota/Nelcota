@@ -186,6 +186,45 @@
     "action": "Inspect exact provider runtime/allocator ownership options; if supported, perform a separate bounded default-versus-explicit-worker diagnostic without changing any ordinary baseline/final profile.",
     "ordinary_profiles_unchanged": true,
     "performance_comparison_scope": "Alternative provider runtime settings cannot certify equivalence with the default profile. Requested-live-byte accounting remains unavailable until observed; cumulative allocation is never treated as live bytes.",
-    "production_deployment": false
+    "production_deployment": false,
+    "manual_target": "provider-runtime",
+    "status": "implemented; remote regressions and actual dispatch pending",
+    "profiles": [
+      {},
+      {
+        "RUSTFS_RUNTIME_WORKER_THREADS": "4"
+      },
+      {
+        "RUSTFS_RUNTIME_FSYNC_BLOCKING_THREADS": "4"
+      }
+    ],
+    "independent_passes": 2,
+    "provider": {
+      "cpus": 0.5,
+      "memory_mib": 1024,
+      "pids": 256,
+      "data_and_writable_layer_mib_each": 512
+    },
+    "controller": {
+      "cpus": 0.5,
+      "memory_mib": 256,
+      "pids": 128,
+      "systemd_seconds": 3900
+    },
+    "load": {
+      "seconds": 180,
+      "bursts": 60,
+      "concurrency": 16,
+      "burst_interval_seconds": 3,
+      "payload_bytes": 64,
+      "maximum_signed_requests_per_case": 4096
+    },
+    "idle_seconds": 600,
+    "maximum_case_seconds": 1080,
+    "maximum_total_seconds": 3600,
+    "maximum_network_bytes": 4294967296,
+    "sample_seconds": 5,
+    "maximum_observation_gap_seconds": 30,
+    "scope": "Two independent disposable Actions runs, three fresh sequential providers each. Container environment only shows passed settings; actual process owner counts/gauges determine observations. No assumption that a setting was honored or that anonymous memory is cache/live allocation. Direct provider diagnostics have zero BaaS load-time credit."
   }
 }

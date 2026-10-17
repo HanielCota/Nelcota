@@ -2203,3 +2203,32 @@ pending. The provider cgroup peak 225 tasks/617,418,752 memory.current bytes
 adds an ownership investigation, not a cache/live-allocation conclusion.
 Any alternative-worker diagnostic will be separate and cannot replace or
 silently reconfigure the ordinary default-provider comparisons.
+
+
+### Separate provider runtime owner diagnostic prepared (2026-10-17)
+
+The current S3 baseline observed a 225-task provider cgroup peak, 113 tasks
+after the first short pressure/rest pause and 73 after 180 idle seconds.
+Anonymous memory remained 269.73 MiB in that final idle snapshot; task
+release alone does not attribute the retained bytes. Public RustFS 1.0.1
+source exposes separate runtime-worker and fsync-pool settings. Source
+reference is not an attestation that a particular setting is honored by
+the measured image; actual owners are sampled independently.
+
+A separate manual `provider-runtime` target now prepares three fresh pinned
+providers: default, runtime workers 4 alone and fsync workers 4 alone. Each
+performs 960 byte-verified 64-byte PUT/GET/DELETE operations in sixty bursts
+of 16 over 180 seconds, then ten idle minutes, with empty final object and
+multipart inventories. Per-case independent watchdogs, five-second owner/
+OOM/disk sampling, private nonce/peer-checked OTLP and fixed request/network
+budgets remain enabled. The controller/provider quotas, global duration
+and two independent planned dispatches are predeclared in the campaign plan.
+These diagnostics change no ordinary runtime profile and earn zero BaaS
+endurance time. They cannot infer live bytes or maximum throughput.
+
+Nine focused regressions cover concurrent admission, immediate byte-error
+stop, response closure, safe environment projection, cleanup failure and
+bounded publication. They have only had syntax/guard-flow review locally;
+the disposable Actions job runs them before starting any provider. Local
+ordinary tests/builds remain suspended during the active final disk campaign.
+No remote diagnostic is reported as executed or passed at this checkpoint.

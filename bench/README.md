@@ -215,6 +215,28 @@ for 90 seconds after preparation; lack of allocator export stays `blocked`.
 Only structured public first/last observations and cleanup receipts are
 uploaded; generated credentials, receiver nonce and raw attributes stay private.
 
+`target=provider-runtime` runs a separate owner diagnostic on a fresh disposable
+Actions VM. Three sequential fresh RustFS fixtures use the same pinned image:
+default settings, `RUSTFS_RUNTIME_WORKER_THREADS=4` alone, then
+`RUSTFS_RUNTIME_FSYNC_BLOCKING_THREADS=4` alone. Each performs sixty bursts of
+sixteen signed 64-byte PUT/GET/DELETE operations over 180 seconds, verifies
+downloaded bytes and private-bucket rejection, then observes ten idle minutes.
+The final provider API inventory and multipart state must be empty. This does
+not change ordinary campaign settings or certify an equivalent performance
+profile; passed environment variables alone do not prove runtime behavior.
+
+The provider has 0.5 CPU/1 GiB/256 tasks, with 512-MiB data/writable-layer
+guards. The separate controller has 0.5 CPU/256 MiB/128 tasks. Per-case watchdogs
+allow 1,080 seconds; the whole diagnostic allows 3,600 seconds and 4 GiB of
+observed network traffic, backed by a 3,900-second systemd limit. Five-second
+samples retain the existing 30-second gap and 10% RAM/15% disk/inode reserves.
+Signed requests are capped at 4,096 per case, and byte mismatches stop new
+traffic immediately. Public evidence contains OS owner counts and typed
+allocator capabilities, with no raw thread names, credentials or payloads.
+It earns zero BaaS endurance time and cannot establish exact live allocation
+ownership or explain anonymous retention without further evidence. G05 plans
+two independent dispatches of this diagnostic before drawing recommendations.
+
 `native_case=default-root` follows the documented command from the application
 directory without `-C` or an inherited `NELCOTA_ROOT`. It checks the actual
 systemd environment-file path, `systemd-analyze verify`, activation and verified

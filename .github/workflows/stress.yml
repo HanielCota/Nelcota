@@ -6,7 +6,7 @@ on:
       target:
         description: Dedicated benchmark, disposable VM inventory or native acceptance
         type: choice
-        options: [benchmark, native-preflight, native-vm, provider-preflight, native-identity, native-suite]
+        options: [benchmark, native-preflight, native-vm, provider-preflight, native-identity, native-suite, provider-runtime]
         default: benchmark
       evidence_run:
         description: Optional earlier native workflow artifact to republish before native-vm
@@ -184,6 +184,39 @@ jobs:
         with:
           name: provider-memory-capabilities
           path: target/stress-g05/native-provider-*-public
+          if-no-files-found: ignore
+          retention-days: 14
+
+  provider-runtime:
+    if: inputs.target == 'provider-runtime'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Inventory the disposable provider runtime VM
+        run: python3 bench/native_preflight.py
+      - name: Check the bounded runtime diagnostic regressions
+        run: nice -n19 ionice -c3 python3 -m unittest discover -s scripts/review_tests -p 'test_stress_provider_runtime.py' -v
+      - name: Compare provider runtime owners on fresh fixtures
+        timeout-minutes: 70
+        run: |
+          sudo -n systemd-run --wait --pipe --collect \
+            --unit="g05-provider-runtime-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --working-directory="$GITHUB_WORKSPACE" \
+            --property=CPUQuota=50% --property=MemoryMax=256M --property=MemorySwapMax=0 \
+            --property=Nice=19 --property=IOSchedulingClass=idle \
+            --property=TasksMax=128 --property=RuntimeMaxSec=3900 --property=KillMode=control-group \
+            env GITHUB_ACTIONS="$GITHUB_ACTIONS" RUNNER_ENVIRONMENT="$RUNNER_ENVIRONMENT" \
+              GITHUB_SHA="$GITHUB_SHA" GITHUB_RUN_ID="$GITHUB_RUN_ID" GITHUB_RUN_ATTEMPT="$GITHUB_RUN_ATTEMPT" \
+              python3 bench/provider_runtime.py
+      - name: Public provider runtime evidence only
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: provider-runtime-owners
+          path: target/stress-g05/native-provider-runtime-*-public
           if-no-files-found: ignore
           retention-days: 14
 
