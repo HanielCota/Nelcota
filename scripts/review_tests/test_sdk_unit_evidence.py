@@ -9,7 +9,7 @@ from sdk_unit_evidence import TITLE, project
 
 class SdkUnitProjection(unittest.TestCase):
     def value(self):
-        return {'numTotalTests': 2, 'numPassedTests': 0, 'numFailedTests': 2, 'numPendingTests': 0,
+        return {'success': False, 'numTotalTests': 2, 'numPassedTests': 0, 'numFailedTests': 2, 'numPendingTests': 0,
                 'private': 'private-token', 'testResults': [{'assertionResults': [
                     {'fullName': TITLE + state + ')', 'status': 'failed', 'failureMessages': ['private-token']}
                     for state in ['false', 'true']]}]}
@@ -29,6 +29,14 @@ class SdkUnitProjection(unittest.TestCase):
         value = self.value();value['testResults'][0]['assertionResults'].pop()
         with self.assertRaises(ValueError):
             project(value, 'a' * 40)
+
+    def test_framework_failure_cannot_be_approved_from_green_case_counts(self):
+        value = self.value();value.update(numPassedTests=2, numFailedTests=0)
+        for test in value['testResults'][0]['assertionResults']:
+            test['status'] = 'passed'
+        self.assertFalse(project(value, 'a' * 40)['successful'])
+        value['success'] = True
+        self.assertTrue(project(value, 'a' * 40)['successful'])
 
 
 if __name__ == '__main__':

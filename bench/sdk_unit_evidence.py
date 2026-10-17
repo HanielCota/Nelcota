@@ -12,6 +12,8 @@ TITLE = 'isolated default server clients keeps an independent cached session rea
 def project(value, source):
     if not isinstance(source, str) or re.fullmatch('[0-9a-f]{40}', source) is None:
         raise ValueError('Invalid SDK unit source')
+    if not isinstance(value, dict) or type(value.get('success')) is not bool:
+        raise ValueError('Invalid SDK unit framework verdict')
     names = ['numTotalTests', 'numPassedTests', 'numFailedTests', 'numPendingTests']
     if any(type(value.get(name)) is not int or not 0 <= value[name] <= 1000 for name in names):
         raise ValueError('Invalid SDK unit counts')
@@ -27,7 +29,8 @@ def project(value, source):
     return {'source_commit': source, 'tests': value['numTotalTests'], 'passed': value['numPassedTests'],
             'failed': value['numFailedTests'], 'pending': value['numPendingTests'],
             'independent_server_clients': found,
-            'successful': value['numFailedTests'] == value['numPendingTests'] == 0
+            'framework_successful': value['success'],
+            'successful': value['success'] and value['numFailedTests'] == value['numPendingTests'] == 0
                           and all(item['status'] == 'passed' for item in found),
             'scope': 'SDK unit regressions only; no backend load or G05 effective-time credit.'}
 
