@@ -212,7 +212,7 @@ jobs:
           with target.open('x') as stream:
               stream.write(json.dumps(report, indent=2, allow_nan=False) + '\n')
           print('::notice title=Provider runtime regression summary::' + json.dumps(report, separators=(',', ':'), allow_nan=False))
-          if not result.wasSuccessful() or result.testsRun < 12 or result.skipped:
+          if not result.wasSuccessful() or result.testsRun < 15 or result.skipped:
               raise SystemExit(1)
           PY
       - name: Compare provider runtime owners on fresh fixtures

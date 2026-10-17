@@ -2283,3 +2283,14 @@ changes to 256 for the long probe. The initially prepared 32-MiB allowance
 was never used in a provider campaign; observed 3.15 MiB did not justify
 raising that independent bound. The regression rejects even 17 MiB before
 opening a listener. All process/parser/traffic/approval limits stay fixed.
+
+Before either corrected run, the diagnostic also retains the actual three
+available allocator gauges, with no resource attributes or invented zero
+values. A case requires repeated, fresh, complete observations. Invalid
+or ambiguous evidence marks the case failed and returns control to owned
+fixture cleanup and heartbeat release. Three additional regressions cover
+safe projection, missing/stale/partial evidence and the cleanup-safe error
+path, bringing the focused module to fifteen tests. Syntax/whitespace
+checks passed locally; execution remains assigned to the independent
+Actions VM so it cannot interfere with the measured local disk workload.
+These gauges still do not establish live allocation or cache ownership.

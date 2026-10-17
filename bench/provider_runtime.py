@@ -11,6 +11,7 @@ import gzip
 import hashlib
 import ipaddress
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -42,6 +43,8 @@ PROFILES = {
 }
 RUNTIME_KEYS = {"RUSTFS_RUNTIME_WORKER_THREADS", "RUSTFS_RUNTIME_FSYNC_BLOCKING_THREADS",
                 "RUSTFS_RUNTIME_MAX_BLOCKING_THREADS"}
+ALLOCATOR_GAUGES = {"rustfs_memory_allocator_reserved_bytes", "rustfs_memory_allocator_committed_bytes",
+                    "rustfs_memory_allocator_page_committed_bytes"}
 PROFILE = {"provider_cpus": .5, "provider_memory_mib": 1024, "provider_pids": 256,
            "data_mib": 512, "writable_layer_mib": 512, "concurrency": 16, "bursts": 60,
            "burst_interval_seconds": 3, "pressure_seconds": 180, "idle_seconds": 600,
@@ -58,6 +61,7 @@ CASE_FIELDS = {"name", "status", "overrides", "snapshots", "requests_attempted",
                "unauthorized_collector_status", "container_runtime_environment", "unauthorized_provider_status",
                "physical_inventory", "failure", "exports_received", "allocator_capabilities", "resource_samples",
                "telemetry_wire_bytes", "telemetry_failure",
+               "allocator_first_observation", "allocator_last_observation",
                "maximum_gap_seconds", "peaks", "resource_series_sha256", "resource_violations", "cleanup_confirmed",
                "cleanup_errors", "elapsed_seconds", "measured_pressure_seconds", "measured_idle_seconds", "heap_ownership_status"}
 
@@ -151,6 +155,51 @@ def runtime_environment(configuration):
         require(separator == "=" and value.isdigit() and 1 <= int(value) <= 1024, "Invalid runtime worker evidence")
         result[name] = int(value)
     return result
+
+
+def allocator_observation(snapshot):
+    if snapshot is None:
+        return None
+    observed = snapshot["observed_monotonic"]
+    require(type(observed) in {int, float} and math.isfinite(observed) and observed >= 0, "Invalid allocator observation time")
+    gauges = {}
+    for point in snapshot["points"]:
+        if point["name"] not in ALLOCATOR_GAUGES or point["kind"] != "gauge" or point["available"] is not True:
+            continue
+        value = point["value"]
+        require(type(value) in {int, float} and math.isfinite(value) and 0 <= value <= 2 ** 53,
+                "Invalid allocator gauge value")
+        require(point["name"] not in gauges, "Ambiguous duplicate allocator gauge")
+        gauges[point["name"]] = value
+    return {"observed_monotonic": observed, "gauges_bytes": gauges}
+
+
+def require_telemetry(receiver):
+    with receiver.lock:
+        last = allocator_observation(receiver.last)
+        require(receiver.exports >= 3 and last is not None, "Missing repeated allocator observations")
+        require(0 <= time.monotonic() - last["observed_monotonic"] <= 15
+                and set(last["gauges_bytes"]) == ALLOCATOR_GAUGES, "Missing fresh complete allocator gauges")
+
+
+def retain_receiver_evidence(receiver, report, directory, errors):
+    """Malformed observations must fail the case without bypassing fixture cleanup."""
+    try:
+        with receiver.lock:
+            report.update(exports_received=receiver.exports, telemetry_wire_bytes=receiver.received,
+                          allocator_capabilities=allocator_capabilities((receiver.last or {}).get("points", [])))
+            report["allocator_first_observation"] = allocator_observation(receiver.first)
+            report["allocator_last_observation"] = allocator_observation(receiver.last)
+            report["telemetry_failure"] = None
+            if receiver.failure is not None:
+                atomic_json(directory / "telemetry-failure.private.json", receiver.failure)
+                category = "validation_or_transport"
+                if receiver.failure.get("reason") == "Provider telemetry exceeded its cumulative budget":
+                    category = "cumulative_budget"
+                report["telemetry_failure"] = {"type": receiver.failure["type"], "category": category}
+    except Exception as error:
+        report["status"] = "failed"
+        errors.append("telemetry_evidence_" + type(error).__name__)
 
 
 def public_payload(report):
@@ -404,6 +453,9 @@ def case(name, identity, output, provider_cpu, deadline, initial_network):
             wait(idle_at + seconds - time.monotonic())
             retain_snapshot("idle-" + str(seconds))
         report["measured_idle_seconds"] = time.monotonic() - idle_at
+        stage = "telemetry-completeness"
+        require_telemetry(receiver)
+        stage = "final-provider-inventory"
         physical = client.inventory()
         require(not physical["keys"] and physical["bytes"] == 0 and physical["multipart_uploads"] == 0,
                 "Provider API retained objects or multipart state")
@@ -433,16 +485,7 @@ def case(name, identity, output, provider_cpu, deadline, initial_network):
                 receiver_thread.join(timeout=10)
                 if receiver_thread.is_alive():
                     errors.append("receiver_join_timeout")
-            with receiver.lock:
-                report.update(exports_received=receiver.exports, telemetry_wire_bytes=receiver.received,
-                              allocator_capabilities=allocator_capabilities((receiver.last or {}).get("points", [])))
-                report["telemetry_failure"] = None
-                if receiver.failure is not None:
-                    atomic_json(directory / "telemetry-failure.private.json", receiver.failure)
-                    category = "validation_or_transport"
-                    if receiver.failure.get("reason") == "Provider telemetry exceeded its cumulative budget":
-                        category = "cumulative_budget"
-                    report["telemetry_failure"] = {"type": receiver.failure["type"], "category": category}
+            retain_receiver_evidence(receiver, report, directory, errors)
         if observations:
             report["resource_samples"] = len(observations)
             report["maximum_gap_seconds"] = max([b["monotonic"] - a["monotonic"] for a, b in zip(observations, observations[1:])], default=0)

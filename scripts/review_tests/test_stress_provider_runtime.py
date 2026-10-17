@@ -12,6 +12,7 @@ import sys
 import tempfile
 import threading
 import time
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 import urllib.error
@@ -163,6 +164,46 @@ class RuntimePublication(unittest.TestCase):
                    if line.startswith("::notice title=Provider runtime evidence::")]
         raw = gzip.decompress(base64.b64decode("".join(value["payload"] for value in notices)))
         self.assertEqual(json.loads(raw), report)
+
+    def test_allocator_projection_does_not_invent_missing_values_or_publish_attributes(self):
+        metric = sorted(runtime.ALLOCATOR_GAUGES)[0]
+        point = {"name": metric, "kind": "gauge", "available": True, "value": 123,
+                 "attributes": {"Authorization": "must stay private"}}
+        snapshot = {"observed_monotonic": time.monotonic(), "points": [point]}
+        observed = runtime.allocator_observation(snapshot)
+        self.assertEqual(observed["gauges_bytes"], {metric: 123})
+        self.assertNotIn("must stay private", json.dumps(observed))
+        self.assertIsNone(runtime.allocator_observation(None))
+        self.assertEqual(runtime.allocator_observation({**snapshot, "points": [{**point, "available": False}]})["gauges_bytes"], {})
+        with self.assertRaisesRegex(RuntimeError, "Ambiguous duplicate"):
+            runtime.allocator_observation({**snapshot, "points": [point, point]})
+        with self.assertRaisesRegex(RuntimeError, "Invalid allocator gauge"):
+            runtime.allocator_observation({**snapshot, "points": [{**point, "value": float("nan")}]})
+
+    def test_missing_stale_or_partial_allocator_evidence_cannot_certify_a_case(self):
+        receiver = SimpleNamespace(lock=threading.Lock(), exports=0, last=None)
+        with self.assertRaisesRegex(RuntimeError, "Missing repeated"):
+            runtime.require_telemetry(receiver)
+        points = [{"name": name, "kind": "gauge", "available": True, "value": 10} for name in runtime.ALLOCATOR_GAUGES]
+        receiver.exports = 3
+        receiver.last = {"observed_monotonic": time.monotonic() - 60, "points": points}
+        with self.assertRaisesRegex(RuntimeError, "Missing fresh"):
+            runtime.require_telemetry(receiver)
+        receiver.last = {"observed_monotonic": time.monotonic(), "points": points[:1]}
+        with self.assertRaisesRegex(RuntimeError, "Missing fresh"):
+            runtime.require_telemetry(receiver)
+        receiver.last = {"observed_monotonic": time.monotonic(), "points": points}
+        runtime.require_telemetry(receiver)
+
+    def test_invalid_telemetry_evidence_returns_a_failure_without_skipping_cleanup(self):
+        receiver = SimpleNamespace(lock=threading.Lock(), exports=3, received=100, first=None,
+                                   last={"points": [], "observed_monotonic": float("nan")}, failure=None)
+        report, errors = {"status": "passed"}, []
+        with tempfile.TemporaryDirectory() as root:
+            runtime.retain_receiver_evidence(receiver, report, Path(root), errors)
+        self.assertEqual(report["status"], "failed")
+        self.assertEqual(errors, ["telemetry_evidence_RuntimeError"])
+        self.assertNotIn("NaN", json.dumps(report, allow_nan=False))
 
 
 class RuntimeTelemetryWindow(unittest.TestCase):
