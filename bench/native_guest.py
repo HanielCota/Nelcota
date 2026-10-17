@@ -175,7 +175,7 @@ def journal_categories(content):
     return {name: sum(value.count(pattern) for pattern in phrases) for name, phrases in patterns.items()}
 
 
-def diagnostic_file(path, *, binary=False):
+def diagnostic_file(path, *, binary=False, environment=False):
     """Metadata for fixed owned paths; environment contents are never published."""
     if not path.exists() and not path.is_symlink():
         return {"exists": False}
@@ -188,6 +188,20 @@ def diagnostic_file(path, *, binary=False):
         if value["ELF_header"]:
             with path.open("rb") as stream:
                 value["sha256"] = hashlib.file_digest(stream, "sha256").hexdigest()
+    if environment and value["regular"] and info.st_size <= 65536:
+        with path.open("rb") as stream:
+            data = stream.read(65537)
+        value["content_shape_available"] = len(data) <= 65536
+        if value["content_shape_available"]:
+            value["contains_NUL"] = b"\x00" in data
+            value["UTF8_valid"] = False
+            try:
+                text = data.decode("utf-8")
+                value["UTF8_valid"] = True
+                value["declared_keys"] = {key: any(line.lstrip().startswith(key + "=") for line in text.splitlines())
+                                          for key in ["NELCOTA_DATABASE_URL", "NELCOTA_AUTHENTICATOR_PASSWORD", "NELCOTA_STORAGE_DIR"]}
+            except UnicodeDecodeError:
+                pass
     return value
 
 
@@ -333,7 +347,7 @@ def main():
                       "journal_error_categories": journal_categories(text),
                       "files": {"deployed_binary": diagnostic_file(Path("/usr/local/lib/nelcota/nelcota"), binary=True),
                                 "provided_binary": diagnostic_file(Path("/usr/local/bin/nelcota"), binary=True),
-                                "environment": diagnostic_file(ENV),
+                                "environment": diagnostic_file(ENV, environment=True),
                                 "unit": diagnostic_file(Path("/etc/systemd/system") / UNIT)},
                       "resources": resource_report()}, allow_nan=False))
 

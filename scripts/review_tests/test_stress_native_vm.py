@@ -36,11 +36,14 @@ class NativeVMBoundaries(unittest.TestCase):
             path = Path(temporary) / "environment"
             path.write_bytes(b"private-password-and-token")
             path.chmod(0o600)
-            value = native_guest.diagnostic_file(path)
+            value = native_guest.diagnostic_file(path, environment=True)
             self.assertEqual(value["size_bytes"], 26)
             self.assertEqual(value["mode"], 0o600)
             self.assertNotIn("sha256", value)
             self.assertNotIn("private", str(value))
+            self.assertTrue(value["UTF8_valid"])
+            self.assertFalse(value["contains_NUL"])
+            self.assertTrue(value["content_shape_available"])
             link = Path(temporary) / "binary-link"
             link.symlink_to(path)
             linked = native_guest.diagnostic_file(link, binary=True)

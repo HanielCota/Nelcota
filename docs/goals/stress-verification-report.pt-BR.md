@@ -1,16 +1,16 @@
 # G05 — relatório técnico de stress
 
 **Estado: em execução, sem aprovação do G05.** Este relatório é atualizado
-durante as campanhas. Checkpoint de carga consolidada: 17/10/2026, 03:47 UTC.
-Atualização da investigação: 17/10/2026, 07:31 UTC.
+durante as campanhas. Checkpoint de carga consolidada: 17/10/2026, 08:29 UTC.
+Atualização da investigação: 17/10/2026, 08:29 UTC.
 Não houve merge nem deploy de produção. O trabalho está na branch
 `test/g05-stress-verification`, no [PR #90](https://github.com/Nelcota/Nelcota/pull/90),
 mantido como rascunho para revisão.
 
 ## Tempo efetivo e artefatos
 
-O [checkpoint 014](results/stress/load-time-checkpoint-014.json) registra
-**125.754 segundos, ou 34h55min54s, de carga efetiva concluída**. O cálculo
+O [checkpoint 015](results/stress/load-time-checkpoint-015.json) registra
+**134.334 segundos, ou 37h18min54s, de carga efetiva concluída**. O cálculo
 conservador exclui preparação, aquecimento, descanso, fases interrompidas,
 controles artificiais e dupla contagem de janelas simultâneas. Tempo mínimo
 de oito horas atingido não significa aprovação dos demais critérios.
@@ -20,7 +20,7 @@ O tempo parcial das campanhas ainda abertas não está somado nesse checkpoint.
 |---|---|
 | Código após o novo defeito SQL confirmado | Correção local em `crates/admin/src/sql/executor.rs`, com dois testes reais aprovados e hashes em [evidência](results/stress/sql-cancellation-admission-after.json). O binário anterior foi interrompido; novo build e repetições afetadas são obrigatórios |
 | SHA-256 do binário de baseline preservado | `75c44c85a85db26195166aa1d2c6caf481e3db476801ec8131525ef62adf1be0` |
-| Novo candidato local congelado | `af01678ac773f932232d0f37e6d0a2fa02edc343`; SHA-256 `acfb2c604a7376be95690852ef016bca90eba599a55bad4be27b6c071b59a6b2`; [proveniência](results/stress/final-local-candidate.json). Build release passou em 89,900 s; primeira campanha em disco iniciou às06:57 UTC. CI, suíte nativa e campanhas finais ainda pendentes. Artefatos anteriores preservados |
+| Candidato anterior, agora substituído | Build de `af01678`, com equivalência byte a byte verificada em `e6fdfd7`: SHA-256 `acfb2c604a7376be95690852ef016bca90eba599a55bad4be27b6c071b59a6b2`. A campanha `disk-candidate-pass-1-003` foi interrompida após o defeito de exportações grandes, com limpeza confirmada. Novo build e repetições afetadas são obrigatórios |
 | SHA-256 do workload k6 atual | `0ac01578bf19155302fe465884b480d792569086f23bb4ba3615ca5f0ce2547d` |
 | Baseline em disco no protocolo atual | Snapshot imutável de `1f391594dd8db6cccac54d6720d90c33d461d1f1`; `disk-final-pass-1-002` concluiu como baseline no binário retido, com protocolo atual |
 | Primeira execução nativa separada | [Actions 38962480993](https://github.com/Nelcota/Nelcota/actions/runs/38962480993), código congelado `e80770b3f6aa1f64d011a3d62f8ebf0f1201bdac`; reprovada no oráculo de signup antes do backup |
@@ -54,7 +54,7 @@ O backend de produção continua um único binário Rust, sem Node ou Python.
 | 8 | Falhas, drain, restart, restore e deployment aplicável | Parcial | Primeiro fault passou com reconciliação de ACKs e restore local novo. Dois fluxos nativos passaram no escopo de restore no mesmo alvo e perda da RAM da convidada. Repetição final de faults/carga, atualização operacional, DNS/ACME públicos e recuperação fora do host continuam incompletos. |
 | 9 | Recursos, invariantes de dados/arquivos/eventos e regressão | Parcial | Invariantes locais e plateaus observados; precisam das campanhas finais comparáveis. Retenção anônima do provedor ainda exige atribuição. |
 | 10 | Correções focadas e regressões dos defeitos confirmados | Verificado nos defeitos já reproduzidos; revisão continua | Antes/depois em sete defeitos reais: cluster incorreto, unit relativa, outro host nativo, lease aninhado na migração, remoção com limpeza incompleta e liberação antecipada da admissão SQL e de exportações. A correção SQL passou em dois testes locais reais; CI e campanhas finais ainda precisam repeti-la. Os cenários específicos passaram em VMs novas. A falha da fixture Rust teve local original recuperado e passou 1.000 repetições após I/O de prontidão; o erro original continua visível. Fairness não recebeu causa de produção inventada. |
-| 11 | Rust/UI/SDK/lint/CI correspondentes ao SHA testado | Reprovado no CodeQL de af01678; correção da fixture em validação | [18 checks ordinários](results/stress/ci-final-artifact-source.json), incluindo Rust/serviços reais, painel e assets, SDKs, supply chain e CodeQL. As 12 execuções nativas também passaram no mesmo source, com ELF próprio comum. Falhas anteriores de Rust, fixtures CodeQL e assets continuam preservadas; alterações futuras exigem a revalidação afetada. |
+| 11 | Rust/UI/SDK/lint/CI correspondentes ao SHA testado | Aprovado no source intermediário e6fdfd7; nova correção exige CI próprio | [18 checks de e6fdfd7](results/stress/ci-e6fdfd7-final-product-source.json) e [12 casos nativos](results/stress/native-suite-e6fdfd7/index.json) passaram. O teste novo de exportações em `7468c3a` falhou conforme a [evidência original](results/stress/export-large-unpolled-deadline-before.json). A correção local passou 17 regressões; novo build, CI e suíte nativa ainda são necessários |
 | 12 | Relatório, limites e todos os testes falhos/bloqueados/não executados | Em consolidação | Este relatório e o [registro detalhado](stress-verification-execution.md) preservam os resultados; ainda há campanhas abertas. |
 
 ## Staging e limites
@@ -569,3 +569,57 @@ A VM original foi limpa. Foram preparados campos numéricos de saída,
 categorias fixas do journal e metadados/hashes dos executáveis e arquivos
 próprios, sem publicar conteúdo de logs ou `.env`. A causa permanece
 indeterminada; reproduções e testes desses diagnósticos ainda são necessários.
+
+
+Os [18 checks de e6fdfd7](results/stress/ci-e6fdfd7-final-product-source.json)
+passaram, incluindo o [CodeQL após a correção da fixture](results/stress/codeql-authenticator-fixture-after.json).
+A regra continua habilitada e a reprovação original de af01678 permanece
+visível. Isso valida o source do produto e o segredo de testes atualizado;
+não resolve a falha nativa pós-corte nem aprova o G05. Os diagnósticos novos
+adicionados depois, em8c5a868, têm sua validação própria ainda pendente.
+
+
+## Prazo de exportações grandes sem consumo da resposta
+
+O [controle anterior](results/stress/export-large-unpolled-deadline-before.json)
+reprovou no CI de `7468c3a`: duas respostas de 8.192 linhas de 1 KiB cada,
+sem leitura do corpo, retiveram duas conexões após o prazo de 500 ms e toda
+a observação de três segundos. Ambas só foram liberadas depois do consumo.
+A causa foi a contrapressão do canal limitado do `RowStream`, que impedia
+avançar o driver mantido para confirmar o cancelamento no PostgreSQL.
+
+A correção permite ao supervisor fechar e liberar o fluxo de linhas, além
+de acordar uma leitura pendente, sem depender de consumo do cliente. A
+anexação tardia do stream e seu fechamento usam a mesma seção crítica curta;
+nenhum mutex atravessa um await. Permanecem o prazo, a rejeição do rodapé
+vencido e a retenção da admissão até a confirmação limitada da limpeza.
+
+O [controle corrigido](results/stress/export-large-unpolled-deadline-after.json)
+passou **17 testes**: três de cancelamento, dez de performance administrativa
+e quatro de arquitetura, com 34 outros casos administrativos filtrados.
+O teste exato passou com zero conexões retidas sem consumir os corpos;
+ambos os corpos expirados continuaram inválidos. A fixture própria foi
+limpa e não houve violação de recursos. Novo ELF e campanhas afetadas
+continuam obrigatórios; a execução interrompida não aprova endurance.
+
+Duas validações locais [falharam](results/stress/export-deadline-validation-fixture-failures.json)
+antes da aprovação. O tmpfs próprio de 256 MiB acumulava bancos deixados
+pelo encerramento dos runtimes de teste; o diagnóstico confirmou
+`53100` (`disk_full`) e 11.661.312 bytes livres. A limpeza entre processos
+remove agora somente nomes exatos gerados dentro do cluster exclusivamente
+próprio, sem alterar a cota. A repetição preservou ao menos 37,17% livre,
+com zero bancos de fixture ao terminar cada suíte. O PostgreSQL compartilhado
+alheio à campanha permaneceu intocado.
+
+A [campanha interrompida](results/stress/disk-candidate-before-large-export-fix-interruption.json)
+encerrou com 871 observações e limpeza confirmada. O checkpoint 015 soma
+apenas os 4.290 segundos de fases concluídas de cada uma das duas campanhas
+interrompidas após descobertas de produção; nenhum soak parcial é somado.
+
+A [suíte nativa e6fdfd7](results/stress/native-suite-e6fdfd7/index.json)
+aprovou seus 12 relatórios originais. A [reprodução posterior](results/stress/native-enhanced-runtime-reproduction-001.json),
+com os novos diagnósticos, também passou e confirmou a limpeza. Esses
+resultados não demonstram a causa da falha anterior de inicialização de
+af01678. Ela continua aberta, com novas reproduções limitadas necessárias.
+Os 20 testes focados dos diagnósticos nativos passaram, incluindo publicação
+sem conteúdo de journal ou ambiente.

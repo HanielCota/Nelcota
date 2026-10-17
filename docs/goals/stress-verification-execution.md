@@ -2641,3 +2641,54 @@ exit reason. Add numeric exit fields, fixed journal categories and metadata/
 ELF hashes for fixed owned paths, with privacy regressions. Keep logs/env contents
 private and reproduce the exact fault on fresh VMs before assigning a cause.
 No production correction or infrastructure attribution is claimed yet.
+
+
+All18ordinary checks passed on e6fdfd7, including CodeQL with the random
+process-stable integration credential. [Exact-source metadata](results/stress/ci-e6fdfd7-final-product-source.json)
+and the [security before/after](results/stress/codeql-authenticator-fixture-after.json)
+retain the earlier critical failed verdict and keep the rule enabled. This
+covers the updated product/test source and same release ELF; it does not
+resolve the original native post-cut boot failure or certify G05. New8c5a868
+redacted diagnostics have their own still-pending checks/reproduction.
+
+
+### Large unpolled export deadline: confirmed product fault and correction
+
+The test-only source7468c3a failed CI39016496402/job117349580901 on real owned
+PostgreSQL: two8192-row/1KiB responses retained two connections beyond a500ms
+response deadline and the3s observation while neither body was polled. Consuming
+the expired bodies rejected both and finally released the connections. The
+[original](results/stress/export-large-unpolled-deadline-before.json) remains failed.
+
+The PostgreSQL driver was backpressured on the retained RowStream response
+channel. The supervisor now closes/drops shared response rows and wakes pending
+body polls before draining backend cancellation, with late attachment serialized
+by the same brief mutex. Deadline/footer and cancellation-admission bounds remain.
+The [after control](results/stress/export-large-unpolled-deadline-after.json)
+passed17 related tests:3cancellation,10admin performance,4architecture;34other
+admin tests filtered. Cleanup passed, no resource guard failed, and each test
+binary left zero owned fixture databases after explicit inter-process cleanup.
+
+Two runner validations failed before that passing result. The instrumented
+repeat returned SQLSTATE53100 for the fixed architecture query; the exclusive
+256MiB tmpfs had only11661312bytes free due to generated databases surviving
+Tokio runtime teardown. The [failed attempts](results/stress/export-deadline-validation-fixture-failures.json)
+remain visible. Keep the quota, clean only exact generated database names after
+each successful test binary, and guard15% fixture filesystem reserves. The
+passing run's minimum observed free fraction was37.17%; the foreign shared
+PostgreSQL was untouched.
+
+Candidate003 disk pass1 was stopped once through a generation-verified pidfd
+only after confirmation of the product defect. Its original failed completion,
+871observations, empty owned-resource census and cleanup are [retained](results/stress/disk-candidate-before-large-export-fix-interruption.json).
+No partial soak is credited. [Checkpoint015](results/stress/load-time-checkpoint-015.json)
+now records134334completed effective seconds(37h18m54s), adding only closed
+prelude intervals from the two deliberately interrupted product candidates.
+Fresh production bytes and affected repetitions remain mandatory.
+
+The [e6 native suite](results/stress/native-suite-e6fdfd7/index.json) passed12/12
+original reports on its actual common ELF2a850024...; it is historical after this
+new production correction. The enhanced runtime [reproduction](results/stress/native-enhanced-runtime-reproduction-001.json)
+on8c5a868 also passed. Neither success establishes the cause of the original
+af01678startup failure. Keep that investigation open.20focused native diagnostic
+checks passed locally, including environment-shape privacy and numeric exit fields.
