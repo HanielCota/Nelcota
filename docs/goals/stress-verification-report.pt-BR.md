@@ -2,7 +2,7 @@
 
 **Estado: em execução, sem aprovação do G05.** Este relatório é atualizado
 durante as campanhas. Checkpoint de carga consolidada: 17/10/2026, 13:07 UTC.
-Atualização da investigação: 17/10/2026, 13:36 UTC.
+Atualização da investigação: 17/10/2026, 14:00 UTC.
 Não houve merge nem deploy de produção. O trabalho está na branch
 `test/g05-stress-verification`, no [PR #90](https://github.com/Nelcota/Nelcota/pull/90),
 mantido como rascunho para revisão.
@@ -20,12 +20,12 @@ O tempo parcial das campanhas ainda abertas não está somado nesse checkpoint.
 |---|---|
 | Código após as correções de cancelamento SQL/export e de exportação grande não consumida | Regressões reais aprovadas; [último antes/depois](results/stress/export-large-unpolled-deadline-after.json) inclui 17 testes. Binário final reconstruído; campanhas afetadas continuam pendentes |
 | SHA-256 do binário de baseline preservado | `75c44c85a85db26195166aa1d2c6caf481e3db476801ec8131525ef62adf1be0` |
-| Último candidato local congelado (007) | `35f4a9725d7edcf571f91084c555c127e7323653`; SHA-256 `96811748f1f45ad4894114188642f9343df661c750ad22768eaf2275659081b1`; 30.484.800 bytes; build release de 93,286 s. [Proveniência](results/stress/final-local-candidate.json). Inclui as dez correções e os guias reconstruídos. Checkout limpo antes/depois do build. Smoke HTTP real dos cinco cenários aprovado; primeira nova campanha de endurance iniciada. CI completo, suíte nativa e campanhas finais ainda precisam encerrar |
+| Último candidato local congelado (007) | `35f4a9725d7edcf571f91084c555c127e7323653`; SHA-256 `96811748f1f45ad4894114188642f9343df661c750ad22768eaf2275659081b1`; 30.484.800 bytes; build release de 93,286 s. [Proveniência](results/stress/final-local-candidate.json). Inclui as dez correções e os guias reconstruídos. Checkout limpo antes/depois do build. Smoke HTTP real dos cinco cenários aprovado; primeira nova campanha de endurance iniciada. CI18/18 e suíte nativa12/12 passaram nas mesmas árvores de produto; campanhas finais e comparações ainda precisam encerrar |
 | Candidato006 preservado | Fonte `860d2f9`; ELF `c7e3d254...`; [proveniência histórica](results/stress/final-local-candidate-860d2f9.json). CI18/18, native12/12 e dois ciclos browser com sobreposição real passaram nesse produto. A décima correção posterior exige novas verificações |
 | Candidato anterior preservado | Fonte `f40774e`; ELF `9cc6cbf0...`; [proveniência histórica](results/stress/final-local-candidate-f40774e.json). CI ordinário 18/18 e suíte nativa 12/12 passaram nesse produto; esses resultados não certificam a correção posterior do SDK |
 | Candidato nativo anterior do Actions | Mesma fonte histórica de produto `f40774e`; ELF `872c3b1efc71e0118386cdd3caf36bae0de26cb213307b91396fe30c0af83d75`, 30.463.736 bytes. [12 relatórios históricos](results/stress/native-final-suite-f40774e/index.json) aprovados no mesmo ELF; diferença entre hosts registrada, sem alegar build byte a byte reproduzível |
-| Suíte nativa publicada do candidato006 | Fonte `860d2f9`; ELF `6aa5d48e502dc9b2ac46c595bc24bea4e56a5960f07af81c291e8f8b2708aedc`, 30.463.736 bytes. [12 casos originais](results/stress/native-final-suite/index.json) aprovados, com limpeza, dois restores e reconciliação de 30 ACKs após perda da RAM da VM em cada passagem. Não resolve a falha nativa original nem certifica o candidato007 |
-| Novo candidato nativo007 do Actions | Fonte `35f4a9`; ELF comum `d0d1090c91da4435a0d27dcf1dddba1b8695f18f944b1dd8cc5e472089d17432`, 30.463.736 bytes. Build concluído na [suíte39036557006](https://github.com/Nelcota/Nelcota/actions/runs/39036557006); casos ainda em execução/fila. ELF local e remoto são identificados separadamente, sem alegar reprodução byte a byte |
+| Suíte nativa publicada do candidato006 | Fonte `860d2f9`; ELF `6aa5d48e502dc9b2ac46c595bc24bea4e56a5960f07af81c291e8f8b2708aedc`, 30.463.736 bytes. [12 casos originais](results/stress/native-final-suite-860d2f9/index.json) aprovados, com limpeza, dois restores e reconciliação de 30 ACKs após perda da RAM da VM em cada passagem. Não resolve a falha nativa original nem certifica o candidato007 |
+| Novo candidato nativo007 do Actions | Fonte `35f4a9`; ELF comum `d0d1090c91da4435a0d27dcf1dddba1b8695f18f944b1dd8cc5e472089d17432`, 30.463.736 bytes. [Suíte39036557006](https://github.com/Nelcota/Nelcota/actions/runs/39036557006) aprovada nos12casos, com limpeza e sem guardas críticos. Os dois runtimes reconciliaram30ACKs cada; restore1,634/2,174s, retorno da convidada13,653/17,043s. Nenhum dos dois cortes coincidiu com write em voo observado. [Relatórios](results/stress/native-final-suite/index.json). ELF local e remoto são identificados separadamente, sem alegar reprodução byte a byte |
 | SHA-256 do workload k6 atual | `0ac01578bf19155302fe465884b480d792569086f23bb4ba3615ca5f0ce2547d` |
 | Baseline em disco no protocolo atual | Snapshot imutável de `1f391594dd8db6cccac54d6720d90c33d461d1f1`; `disk-final-pass-1-002` concluiu como baseline no binário retido, com protocolo atual |
 | Primeira execução nativa separada | [Actions 38962480993](https://github.com/Nelcota/Nelcota/actions/runs/38962480993), código congelado `e80770b3f6aa1f64d011a3d62f8ebf0f1201bdac`; reprovada no oráculo de signup antes do backup |
@@ -60,7 +60,7 @@ O backend de produção continua um único binário Rust, sem Node ou Python.
 | 8 | Falhas, drain, restart, restore e deployment aplicável | Parcial | Primeiro fault passou com reconciliação de ACKs e restore local novo. Dois fluxos nativos passaram no escopo de restore no mesmo alvo e perda da RAM da convidada. Repetição final de faults/carga, atualização operacional, DNS/ACME públicos e recuperação fora do host continuam incompletos. |
 | 9 | Recursos, invariantes de dados/arquivos/eventos e regressão | Parcial | Invariantes locais e plateaus observados; precisam das campanhas finais comparáveis. Retenção anônima do provedor ainda exige atribuição. |
 | 10 | Correções focadas e regressões dos defeitos confirmados | Dez defeitos reproduzidos; regressões focadas aprovadas, campanhas finais pendentes | Cinco falhas na CLI, três de SQL/export e duas no SDK. A nova falha bloqueava clientes independentes no servidor: 202 aprovados/2 reprovados antes, 204/204 aprovados depois. A falha nativa original e a fairness ainda exigem investigação. |
-| 11 | Rust/UI/SDK/lint/CI correspondentes ao SHA testado | Freeze007 concluído; CI completo e campanhas pendentes | O candidato006 tinha CI18/18 e native12/12. O novo SDK passou em Node22/24/26, com204/204unit e budgets inalterados. O dist foi regenerado em commit separado. O candidato007 foi compilado com checkout limpo e seis árvores guardadas; check Rust e nova suíte nativa ainda não encerraram neste registro. |
+| 11 | Rust/UI/SDK/lint/CI correspondentes ao SHA testado | CI ordinário e nativo aprovados no produto007; campanhas pendentes | [CI18/18](results/stress/ci-sdk007-final-product-trees.json), SDK204/204 e [native12/12](results/stress/native-final-suite/index.json). O merge sintético realmente checado tem árvore completa igual ao head; as seis árvores de produto correspondem ao build congelado. Isso não aprova os cenários de stress restantes. |
 | 12 | Relatório, limites e todos os testes falhos/bloqueados/não executados | Em consolidação | Este relatório e o [registro detalhado](stress-verification-execution.md) preservam os resultados; ainda há campanhas abertas. |
 
 ## Décima correção: isolamento do SDK no servidor
@@ -268,7 +268,14 @@ reclamação automática até 1 MiB com namespace de trash vazio após mais de
 330 s. As falhas originais dos oráculos 002/003 foram preservadas; o
 [verificador posterior](results/stress/native-s3-trash-reclamation.json)
 validou as observações congeladas sem forçar GC. Essa conclusão física não
-explica toda a retenção de memória anônima. A descoberta remota com o digest
+explica toda a retenção de memória anônima. As duas passagens independentes
+do diagnóstico de runtime também passaram: três perfis novos por passagem,
+960 ciclos PUT/GET/DELETE com bytes verificados e157 amostras por perfil.
+Os perfis alteraram somente workers normais ou de fsync, individualmente;
+o perfil com quatro workers normais teve picos maiores de memória e tarefas.
+Esses resultados não justificam mudar os defaults do provedor e continuam
+sem atribuir bytes vivos. [Passagem1](results/stress/provider-runtime-corrected-pass-1.json)
+e [passagem2](results/stress/provider-runtime-corrected-pass-2.json). A descoberta remota com o digest
 exato recebeu 17 exports OTLP autenticados e observou gauges MiMalloc de
 reserved/committed/page-committed. A flag
 `malloc_requested_bytes_available = 0` impede interpretar requested-total como
@@ -563,7 +570,7 @@ A primeira validação falha permanece publicada; novo build/CI/campanhas penden
 O checkout limpo `af01678` produziu um novo ELF de 30.477.344 bytes em
 89,900 s, SHA-256 `acfb2c604a7376be95690852ef016bca90eba599a55bad4be27b6c071b59a6b2`.
 O perfil release locked/quatro jobs/thinLTO/codegen-units=1 foi mantido.
-A [proveniência atual](results/stress/final-local-candidate.json) e as duas
+A [proveniência dessa revisão](results/stress/final-local-candidate-af01678.json) e as duas
 anteriores preservam hashes, árvores de produto e builds distintos. Nenhuma
 campanha foi feita no candidato intermediário com somente a correção SQL.
 
@@ -702,7 +709,7 @@ sem conteúdo de journal ou ambiente.
 
 
 O novo build de `f40774e1504a924fe6d9c801e251278cee1a8fab` passou em
-90,633 s, com quatro jobs e Rust 1.99.0. A [proveniência atual](results/stress/final-local-candidate.json)
+90,633 s, com quatro jobs e Rust 1.99.0. A [proveniência dessa revisão](results/stress/final-local-candidate-f40774e.json)
 fixa o ELF de **30.480.704 bytes**, SHA-256
 `9cc6cbf0be68d38ba1c9e138cbeee7c4fac0324e91c406fae977eba591c76f44`.
 As quatro campanhas de endurance substitutas têm sufixo `004`; o artefato
@@ -746,7 +753,7 @@ passaram, incluindo a suíte Rust e CodeQL. A suíte nativa final e as campanhas
 ainda precisam concluir; CI ordinário não aprova esses critérios.
 
 
-A [suíte nativa final](results/stress/native-final-suite/index.json), fonte
+A [suíte nativa dessa revisão](results/stress/native-final-suite-f40774e/index.json), fonte
 `f40774e`, concluiu seus 12 relatórios aprovados em duas passagens de seis
 casos, com limpeza e um ELF comum de 30.463.736 bytes, SHA-256
 `872c3b1efc71e0118386cdd3caf36bae0de26cb213307b91396fe30c0af83d75`.

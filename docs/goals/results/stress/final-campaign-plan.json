@@ -613,7 +613,7 @@
     "source_commit": "35f4a9725d7edcf571f91084c555c127e7323653",
     "binary_sha256": "96811748f1f45ad4894114188642f9343df661c750ad22768eaf2275659081b1",
     "build_seconds": 93.28642953903181,
-    "status": "frozen final007; first ordinary disk campaign started, no completed final007 endurance approval",
+    "status": "frozen final007; ordinaryCI18/native12passed; first ordinary disk campaign active, final endurance and comparisons pending",
     "evidence": "final-local-candidate.json",
     "previous_candidate_evidence": "final-local-candidate-860d2f9.json",
     "SDK_before_after": [
@@ -621,7 +621,11 @@
       "sdk-independent-server-clients-after-ci-001.json",
       "sdk-independent-server-clients-built-before-after-001.json"
     ],
-    "functional_smoke": "matrix-sdk007-auth-links-functional-smoke-001.json"
+    "functional_smoke": "matrix-sdk007-auth-links-functional-smoke-001.json",
+    "ordinary_CI_evidence": "ci-sdk007-final-product-trees.json",
+    "ordinary_CI_checks_passed": 18,
+    "native_suite_evidence": "native-final-suite/index.json",
+    "native_cases_passed": 12
   },
   "additional_browser_auth_pressure": {
     "status": "First corrected full pass005 passed; two further fresh owner-metric receipts are predeclared before execution. No full G05 approval.",
@@ -704,7 +708,7 @@
     "source_commit": "35f4a9725d7edcf571f91084c555c127e7323653",
     "binary_sha256": "96811748f1f45ad4894114188642f9343df661c750ad22768eaf2275659081b1",
     "build_seconds": 93.28642953903181,
-    "status": "frozen final007; first ordinary disk campaign started, no completed final007 endurance approval",
+    "status": "frozen final007; ordinaryCI18/native12passed; first ordinary disk campaign active, final endurance and comparisons pending",
     "evidence": "final-local-candidate.json",
     "previous_candidate_evidence": "final-local-candidate-860d2f9.json",
     "SDK_before_after": [
@@ -712,7 +716,11 @@
       "sdk-independent-server-clients-after-ci-001.json",
       "sdk-independent-server-clients-built-before-after-001.json"
     ],
-    "functional_smoke": "matrix-sdk007-auth-links-functional-smoke-001.json"
+    "functional_smoke": "matrix-sdk007-auth-links-functional-smoke-001.json",
+    "ordinary_CI_evidence": "ci-sdk007-final-product-trees.json",
+    "ordinary_CI_checks_passed": 18,
+    "native_suite_evidence": "native-final-suite/index.json",
+    "native_cases_passed": 12
   },
   "historical_candidate006": {
     "source_commit": "860d2f990949bfc5c8c612de3341c65a39e8d259",
@@ -734,5 +742,174 @@
     ],
     "continuous_soak_seconds_each": 14400,
     "scope": "Declared source/hash guards and all previous limits/SLOs retained. Stop on any workload/evidence/cleanup/comparison failure. No approval from partial load."
+  },
+  "post_endurance_final007_predeclaration": {
+    "declared_utc": "2026-10-17T13:51:54.695537+00:00",
+    "status": "prepared; not run; ordinary final007 endurance still active",
+    "precondition": "No overlap with local load. Every prior case must pass workload/resource/integrity/evidence/owned-cleanup/comparison gates before automatic advancement; preserve failures and stop for investigation.",
+    "source_commit": "35f4a9725d7edcf571f91084c555c127e7323653",
+    "binary_sha256": "96811748f1f45ad4894114188642f9343df661c750ad22768eaf2275659081b1",
+    "retained_baseline_binary_sha256": "75c44c85a85db26195166aa1d2c6caf481e3db476801ec8131525ef62adf1be0",
+    "topology_profile": {
+      "projects": [
+        1,
+        5,
+        10
+      ],
+      "fresh_baseline_cases": 3,
+      "fresh_candidate_passes_per_topology": 2,
+      "seconds_each_step": 300,
+      "rows_each_project": 1000,
+      "aggregate_postgres_disk_ceiling_mib": 1536,
+      "disk_ceiling_reason": "A stricter aggregate fixture cap protects unchanged host reserves on this bounded workspace. Same declared dataset, rates, memory/CPU and gates on baseline/candidate. It is not a smaller workload or waiver of any previous failed latency/fairness result.",
+      "CPU_period_microseconds": 100000,
+      "one_project_CPU_policy": "quota",
+      "five_and_ten_CPU_policy": "shared target CPU; explicit aggregate pinning/CPU-sharing manifest and kernel proof retained",
+      "nominal_iterations_per_second_each_project": {
+        "1": 8,
+        "5": 8,
+        "10": 4
+      },
+      "provisional_capacity_iterations_per_second_each_project": {
+        "1": 32,
+        "5": 32,
+        "10": 8
+      },
+      "absolute_SLOs_and_relative_fairness_unchanged": true,
+      "minimum_available_host_memory_fraction": 0.1,
+      "minimum_filesystem_and_inode_fraction": 0.15,
+      "host10_startup_preflight_minimum_free_bytes": 16062994022.4,
+      "insufficient_headroom_behavior": "Refuse preparation before owned resource creation. Do not lower reserves or delete unrelated resources."
+    },
+    "full_fault_profile": {
+      "fresh_final_passes": 2,
+      "capacity_qualification_steps": 4,
+      "capacity_step_seconds": 300,
+      "provisional_rate": 64,
+      "real_local_RustFS": true,
+      "recovery_deadline_seconds": 35,
+      "focus": "all",
+      "separate_supplemental_full_matrix_required": true
+    },
+    "conditional_allocator_profile": {
+      "run_id": "allocation-final007-disk-four-hours-001",
+      "status": "predeclared; conditional, not run",
+      "trigger": "Investigate persistent unexplained late post-warm anonymous-memory growth in final ordinary campaigns",
+      "continuous_mixed_load_seconds": 14400,
+      "observer_library_sha256": "a5396ed7b8ed580f27dbfe7358444c734b1a486e9566e41114fa6ef5636f9ec3",
+      "one_extra_thread": true,
+      "one_extra_descriptor": true,
+      "forced_trim": false,
+      "ordinary_performance_certification": false,
+      "scope": "glibc in-use including thread caches versus free arena, correlated with load/idle; exact application object ownership is not inferred."
+    },
+    "new_cases": [
+      {
+        "run_id": "host1-candidate-pass-1-002",
+        "kind": "host",
+        "artifact_role": "frozen final candidate"
+      },
+      {
+        "run_id": "host1-candidate-pass-2-002",
+        "kind": "host",
+        "artifact_role": "frozen final candidate"
+      },
+      {
+        "run_id": "host5-candidate-pass-1-002",
+        "kind": "host",
+        "artifact_role": "frozen final candidate"
+      },
+      {
+        "run_id": "host5-candidate-pass-2-002",
+        "kind": "host",
+        "artifact_role": "frozen final candidate"
+      },
+      {
+        "run_id": "host10-candidate-pass-1-002",
+        "kind": "host",
+        "artifact_role": "frozen final candidate"
+      },
+      {
+        "run_id": "host10-candidate-pass-2-002",
+        "kind": "host",
+        "artifact_role": "frozen final candidate"
+      },
+      {
+        "run_id": "host1-retained-baseline-002",
+        "kind": "host",
+        "artifact_role": "retained baseline"
+      },
+      {
+        "run_id": "host5-retained-baseline-002",
+        "kind": "host",
+        "artifact_role": "retained baseline"
+      },
+      {
+        "run_id": "host10-retained-baseline-002",
+        "kind": "host",
+        "artifact_role": "retained baseline"
+      },
+      {
+        "run_id": "host1-retained-baseline-002",
+        "kind": "host",
+        "artifact_role": "retained baseline"
+      },
+      {
+        "run_id": "host1-candidate-pass-1-002",
+        "kind": "host",
+        "artifact_role": "frozen final007"
+      },
+      {
+        "run_id": "host1-candidate-pass-2-002",
+        "kind": "host",
+        "artifact_role": "frozen final007"
+      },
+      {
+        "run_id": "host5-retained-baseline-002",
+        "kind": "host",
+        "artifact_role": "retained baseline"
+      },
+      {
+        "run_id": "host5-candidate-pass-1-002",
+        "kind": "host",
+        "artifact_role": "frozen final007"
+      },
+      {
+        "run_id": "host5-candidate-pass-2-002",
+        "kind": "host",
+        "artifact_role": "frozen final007"
+      },
+      {
+        "run_id": "host10-retained-baseline-002",
+        "kind": "host",
+        "artifact_role": "retained baseline"
+      },
+      {
+        "run_id": "host10-candidate-pass-1-002",
+        "kind": "host",
+        "artifact_role": "frozen final007"
+      },
+      {
+        "run_id": "host10-candidate-pass-2-002",
+        "kind": "host",
+        "artifact_role": "frozen final007"
+      },
+      {
+        "run_id": "fault-final007-pass-1-001",
+        "kind": "fault",
+        "artifact_role": "frozen final007"
+      },
+      {
+        "run_id": "fault-final007-pass-2-001",
+        "kind": "fault",
+        "artifact_role": "frozen final007"
+      },
+      {
+        "run_id": "allocation-final007-disk-four-hours-001",
+        "kind": "single",
+        "artifact_role": "frozen candidate007 after independent default server SDK isolation and regenerated embedded guide assets"
+      }
+    ],
+    "approval_thresholds_reduced": false
   }
 }

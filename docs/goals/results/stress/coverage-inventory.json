@@ -1008,7 +1008,7 @@
         {
           "run_id": "native-suite-39017663454",
           "status": "passed",
-          "evidence": "native-final-suite/index.json",
+          "evidence": "native-final-suite-f40774e/index.json",
           "scope": "Final product-source common ELF; all six native cases twice, fresh VMs, verified runtime inode/digest, same-target restore,30ACKs per runtime after guest RAM loss, cleanup. Original af01678startup failure still unresolved; no combined controller/update stress or off-host certification."
         }
       ]
@@ -1040,7 +1040,7 @@
         {
           "run_id": "native-suite-39017663454",
           "status": "passed",
-          "evidence": "native-final-suite/index.json",
+          "evidence": "native-final-suite-f40774e/index.json",
           "scope": "Final product-source common ELF; all six native cases twice, fresh VMs, verified runtime inode/digest, same-target restore,30ACKs per runtime after guest RAM loss, cleanup. Original af01678startup failure still unresolved; no combined controller/update stress or off-host certification."
         }
       ]
@@ -1096,7 +1096,7 @@
         {
           "run_id": "native-suite-39017663454",
           "status": "passed",
-          "evidence": "native-final-suite/index.json",
+          "evidence": "native-final-suite-f40774e/index.json",
           "scope": "Final product-source common ELF; all six native cases twice, fresh VMs, verified runtime inode/digest, same-target restore,30ACKs per runtime after guest RAM loss, cleanup. Original af01678startup failure still unresolved; no combined controller/update stress or off-host certification."
         },
         {
@@ -1237,7 +1237,7 @@
         {
           "run_id": "native-suite-39017663454",
           "status": "passed",
-          "evidence": "native-final-suite/index.json",
+          "evidence": "native-final-suite-f40774e/index.json",
           "scope": "Final product-source common ELF; all six native cases twice, fresh VMs, verified runtime inode/digest, same-target restore,30ACKs per runtime after guest RAM loss, cleanup. Original af01678startup failure still unresolved; no combined controller/update stress or off-host certification."
         }
       ]
@@ -1320,14 +1320,14 @@
     "regression_evidence": "ci-native-executable-identity-after.json"
   },
   "native_final_same_artifact_suite": {
+    "workflow_run_id": 39036557006,
+    "source_commit": "35f4a9725d7edcf571f91084c555c127e7323653",
+    "binary_sha256": "d0d1090c91da4435a0d27dcf1dddba1b8695f18f944b1dd8cc5e472089d17432",
     "status": "passed",
-    "workflow_run_id": 39029580219,
-    "source_commit": "860d2f990949bfc5c8c612de3341c65a39e8d259",
-    "binary_sha256": "6aa5d48e502dc9b2ac46c595bc24bea4e56a5960f07af81c291e8f8b2708aedc",
+    "scope": "Two fresh independent passes of all six native/KVM scenarios on the common SDK/assets-corrected product source and ELF. This does not explain the original af01678 startup failure or certify endurance/capacity, physical host power loss, public DNS/ACME, PITR or off-host restore. Remote windows earn no overlapping local effective-time credit.",
     "cases": 12,
     "evidence": "native-final-suite/index.json",
-    "scope": "Historical candidate006 suite only; final007 common-ELF suite39036557006 is now running. Preserve all twelve original reports; later source has no inferred approval.",
-    "previous_suite": "native-final-suite-f40774e/index.json"
+    "previous_suite": "native-final-suite-860d2f9/index.json"
   },
   "completed_current_protocol_disk_baseline": {
     "run_id": "disk-final-pass-1-002",
@@ -1380,21 +1380,20 @@
     }
   },
   "provider_runtime_diagnostic": {
-    "status": "in progress",
-    "scope": "Three fresh cases passed in first corrected probe,960operations/156exports/157samples each; cleanupconfirmed. Second independent probe pending completion. Clock fixture failure reproduced and1000 corrected repetitions passed; runtime helper objects unchanged. OS/gauges do not attribute live heap or justify worker changes; no BaaS time credit.",
+    "status": "passed scoped diagnostic twice; live heap ownership not verified",
+    "scope": "Both independent controlled RustFS diagnostics completed with cleanup: default/runtime-workers/fsync-workers; each verified960PUT/GET/DELETE byte cycles,157resource samples and bounded private telemetry per profile. No requested-live-byte measurement or exact heap-owner attribution. Changing worker defaults is not justified by these OS/gauge results.",
     "failed_evidence": [
       "provider-runtime-first-failure.json",
       "provider-runtime-reproduced-budget-failure.json",
       "provider-runtime-regression-first-failure.json"
     ],
-    "active_workflow_run_id": 39006884440,
-    "active_source_commit": "6e6b51e666681b2d472cb886a0001e59fc0b6f51",
-    "completed_independent_passes": 1,
+    "completed_independent_passes": 2,
     "first_pass_evidence": "provider-runtime-corrected-pass-1.json",
-    "clock_fixture_before_after": "provider-fixture-clock-before-after.json"
+    "clock_fixture_before_after": "provider-fixture-clock-before-after.json",
+    "second_pass_evidence": "provider-runtime-corrected-pass-2.json"
   },
   "current_final_candidate": {
-    "status": "frozen final007; first ordinary disk campaign started, no completed final007 endurance approval",
+    "status": "frozen final007; CI18/18 and native12/12 passed, first ordinary disk campaign active, no completed final007 endurance approval",
     "latest_fix_commit": "9bca03bc689c425a7660c5da9305180450aeaa7c",
     "generated_asset_commit": "df77883b1d149938979ba7a76bde2b125b7dbf44",
     "last_frozen_artifact_evidence": "final-local-candidate.json",
@@ -1409,7 +1408,11 @@
     "SDK_projection_regressions_passed": 3,
     "source_commit": "35f4a9725d7edcf571f91084c555c127e7323653",
     "binary_sha256": "96811748f1f45ad4894114188642f9343df661c750ad22768eaf2275659081b1",
-    "functional_smoke": "matrix-sdk007-auth-links-functional-smoke-001.json"
+    "functional_smoke": "matrix-sdk007-auth-links-functional-smoke-001.json",
+    "CI_evidence": "ci-sdk007-final-product-trees.json",
+    "ordinary_CI_checks_passed": 18,
+    "native_evidence": "native-final-suite/index.json",
+    "native_cases_passed": 12
   },
   "current_campaign_checkpoint": {
     "checkpoint": "load-time-checkpoint-019.json",

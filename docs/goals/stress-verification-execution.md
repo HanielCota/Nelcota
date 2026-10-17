@@ -2103,7 +2103,7 @@ The separate tracked panel rebuild passed (`7e68fd2`). A clean locked Rust
 LTO, one codegen unit and no compiler/profile overrides. The retained local
 ELF is 30,469,304 bytes, SHA-256
 `b047fb880feb10e41e7d0308e6037b8cd3bc770b0452a30cab59c3e2d20514a0`.
-The [build receipt](results/stress/final-local-candidate.json) records source,
+The [build receipt](results/stress/final-local-candidate-7e68fd2.json) records source,
 manifest/lock hashes and product tree identities; build success is not stress
 approval. No ordinary Rust/UI suite or build overlaps local measured traffic.
 
@@ -2124,7 +2124,7 @@ on the frozen product source `7e68fd2` passed, including the panel asset drift
 guard, Rust/real services, SDKs, supply chain and CodeQL. The original failed
 asset/identity/CodeQL receipts remain unchanged.
 
-[Native suite 38990677734](results/stress/native-final-suite/index.json)
+[Native suite 38990677734](results/stress/native-final-suite-7e68fd2/index.json)
 completed all twelve serial cases successfully on fresh disposable outer/guest
 VMs, with confirmed cleanup and no critical guard failure. Every case used
 the same 30,452,336-byte Actions-built ELF, SHA-256
@@ -2492,7 +2492,7 @@ matrix pass. Remote overlap is not added to the local effective-time ledger.
 The clean cb916d04 release build passed in89.251s, Rust1.99.0/locked/fourjobs,
 thinLTO/codegen-units1/no overrides. The new30,473,688B ELF is
 48aec40eb643133dbc7bc8aba91cea1705f7534aae93947bc5d8a7782278774a.
-[Current provenance](results/stress/final-local-candidate.json) retains all six
+[Current provenance](results/stress/final-local-candidate-cb916d0.json) retains all six
 product tree objects; [previous provenance](results/stress/final-local-candidate-7e68fd2.json)
 remains immutable history. Four replacement endurance IDs end in002, copying
 all existing arguments, budgets and approval gates. The new native suite
@@ -2693,7 +2693,7 @@ checks passed locally, including environment-shape privacy and numeric exit fiel
 
 
 Fresh candidate005 built successfully fromf40774e in90.633s, with the declared
-four-job Rust1.99/thinLTO/codegen-unit1 profile. The [public receipt](results/stress/final-local-candidate.json)
+four-job Rust1.99/thinLTO/codegen-unit1 profile. The [public receipt](results/stress/final-local-candidate-f40774e.json)
 fixes30480704bytes and SHA2569cc6cbf0be68d38ba1c9e138cbeee7c4fac0324e91c406fae977eba591c76f44.
 All prior build identities remain preserved. New endurance IDs end004; the
 36-row private command ledger preserves old requests and their original
@@ -2727,7 +2727,7 @@ local compiler or UI dependencies before any further related local checks.
 on exact product sourcef40774e. Final native acceptance and stress remain separate.
 
 
-[Final native suite39017663454](results/stress/native-final-suite/index.json)
+[Final native suite39017663454](results/stress/native-final-suite-f40774e/index.json)
 passed all12original reports on sourcef40774e and common ActionsELF872c3b1e...
 (30463736bytes). Each runtime reconciled30externalACKs with no missing,
 duplicates or extras; all cases confirmed cleanup. The local performance
@@ -3080,3 +3080,28 @@ Native suite 39036557006 froze a separate common Actions ELF
 from the exact same product source. Its twelve cases and ordinary Rust CI
 remain incomplete at this entry; previous native006/browser006 successes
 retain their historical source and cannot certify the new product.
+
+
+### 2026-10-17, 14:00 UTC — final007 ordinary CI and native common-ELF suite close
+
+All eighteen ordinary checks on `b704316` completed successfully. The actual
+SDK checkout was the PR merge `f441cf6`; GitHub commit metadata proves its
+complete root tree equals the branch head. The public notice records
+204/204 units, zero failures/pending, and framework success. All six product
+trees match the frozen local build35f4a. [CI proof](results/stress/ci-sdk007-final-product-trees.json).
+
+Native suite39036557006 completed all twelve cases with passing reports,
+checksummed common ELF, verified owned cleanup and no safety guard failure.
+Both runtime passes reconciled30ACKs with zero missing/duplicate/extra rows.
+Restores measured1.634/2.174s and guest recovery13.653/17.043s. Neither runtime
+cut occurred during an observed in-flight write; no such coverage is inferred.
+The original unexplained af01678startup failure remains open.
+[All final007 native cases](results/stress/native-final-suite/index.json) and
+[all thirteen preserved native006 files](results/stress/native-final-suite-860d2f9/index.json)
+retain their distinct sources and executables. Historical prose now links
+to its original source-specific archive instead of a moving current index.
+
+The first local final007 disk campaign is still active. No four-hour final
+interval, regression comparison, full five-case matrix or final browser
+repetition is approved by ordinary/native CI success alone. New bounded remote
+controls will use an immutable ref containing this committed final007 index.
