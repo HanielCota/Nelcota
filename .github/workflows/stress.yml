@@ -200,13 +200,16 @@ jobs:
       - name: Check the bounded runtime diagnostic regressions
         run: |
           nice -n19 ionice -c3 python3 - <<'PY'
-          import json, os, pathlib, time, unittest
+          import json, os, pathlib, re, time, unittest
           began = time.monotonic()
           suite = unittest.defaultTestLoader.discover('scripts/review_tests', pattern='test_stress_provider_runtime.py')
           result = unittest.TextTestRunner(verbosity=2).run(suite)
           report = {'source_commit': os.environ['GITHUB_SHA'], 'tests': result.testsRun,
                     'failures': len(result.failures), 'errors': len(result.errors), 'skipped': len(result.skipped),
                     'elapsed_seconds': time.monotonic() - began, 'successful': result.wasSuccessful()}
+          report['failure_locations'] = [
+              {'test': test.id(), 'locations': re.findall(r'File "[^"\n]*/scripts/review_tests/([a-z0-9_]+\.py)", line ([0-9]+)', trace)}
+              for test, trace in [*result.failures, *result.errors]]
           target = pathlib.Path('target/provider-runtime-regressions-public.json')
           target.parent.mkdir(exist_ok=True)
           with target.open('x') as stream:

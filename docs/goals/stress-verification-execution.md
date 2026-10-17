@@ -2294,3 +2294,12 @@ path, bringing the focused module to fifteen tests. Syntax/whitespace
 checks passed locally; execution remains assigned to the independent
 Actions VM so it cannot interfere with the measured local disk workload.
 These gauges still do not establish live allocation or cache ownership.
+
+The first corrected dispatch, [Actions 39003851274](https://github.com/Nelcota/Nelcota/actions/runs/39003851274),
+stopped before provider creation: fifteen focused tests ran in 1.137s, with
+one failure and no errors/skips. The [original failed regression receipt](results/stress/provider-runtime-regression-first-failure.json)
+is retained. Bounded job-log transport was unavailable; the assertion is
+not guessed. A diagnostic-only workflow update records failed test IDs and
+source locations without assertion payloads. It changes no test, receiver,
+runtime profile or approval threshold. Both complete corrected provider
+passes remain unexecuted; the independent local disk workload continues.
