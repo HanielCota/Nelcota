@@ -246,5 +246,46 @@
         "evidence": "Unchanged-limit reproduction received3151161 bytes, below the original byte ceiling."
       }
     }
+  },
+  "supplemental_backend_matrix": {
+    "declared_utc": "2026-10-17T05:05:43.723694+00:00",
+    "status": "prepared; not dispatched",
+    "manual_target": "matrix",
+    "smoke_first": true,
+    "full_independent_passes": 2,
+    "artifact_source": "7e68fd21430ac93125149f60927f8676b077811d",
+    "artifact_sha256": "010d0fc52f5cc5961f56baf6902294abfcc2c9d855ccbf7605e4b91e8a89a45c",
+    "product_tree_equality_required": true,
+    "controller": {
+      "cpus": 1,
+      "memory_mib": 512,
+      "swap": 0,
+      "pids": 128,
+      "systemd_maximum_seconds": 3000
+    },
+    "scenarios": [
+      "admin-budgets",
+      "admin-cancellation",
+      "catalog-recovery",
+      "hostile-backend"
+    ],
+    "full_seconds_each": 120,
+    "smoke_seconds_each": 20,
+    "foreground": "Existing atomic-transfer ledger plus positive/negative work, four300s qualification steps and80% qualified rate in full mode; unchanged delivery/p95/p99 gates",
+    "bounds": {
+      "requests": 4096,
+      "request_or_consumed_response_mib_each": 2,
+      "consumed_responses_mib": 64,
+      "unread_exports_upper_bound_mib": 256,
+      "partial_header_body_clients_each_cycle": 2,
+      "partial_client_seconds": 2,
+      "pressure_cycles": 5,
+      "SQL_connection_release_seconds": 3,
+      "export_connection_release_seconds": 5,
+      "sampler_gap_seconds": 30,
+      "disk_mib_each_database": 512
+    },
+    "scope": "Supplemental real-backend HTTP admin/catalog/security subset only. Forced catalog-refresh failure, SMTP/OAuth, public ingress and full management/update matrix remain separate. No BaaS overlap time credit and no ordinary profile changes.",
+    "approval_thresholds_reduced": false
   }
 }

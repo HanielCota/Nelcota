@@ -6,7 +6,7 @@ on:
       target:
         description: Dedicated benchmark, disposable VM inventory or native acceptance
         type: choice
-        options: [benchmark, native-preflight, native-vm, provider-preflight, native-identity, native-suite, provider-runtime]
+        options: [benchmark, native-preflight, native-vm, provider-preflight, native-identity, native-suite, provider-runtime, matrix]
         default: benchmark
       evidence_run:
         description: Optional earlier native workflow artifact to republish before native-vm
@@ -28,6 +28,10 @@ on:
         default: disk
       endurance:
         description: Four uninterrupted hours after capacity qualification
+        type: boolean
+        default: false
+      matrix_full:
+        description: Qualify four five-minute ledger rates and hold each supplemental matrix scenario for 120 seconds
         type: boolean
         default: false
 
@@ -238,6 +242,81 @@ jobs:
           path: |
             target/stress-g05/native-provider-runtime-*-public
             target/provider-runtime-regressions-public.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+  matrix:
+    if: inputs.target == 'matrix'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Inventory the disposable supplemental VM
+        run: python3 bench/native_preflight.py
+      - name: Check supplemental artifact and request guards
+        run: |
+          nice -n19 ionice -c3 python3 - <<'PY'
+          import json, os, pathlib, time, unittest
+          began = time.monotonic()
+          suite = unittest.defaultTestLoader.discover('scripts/review_tests', pattern='test_stress_matrix_pressure.py')
+          result = unittest.TextTestRunner(verbosity=2).run(suite)
+          report = {'source_commit': os.environ['GITHUB_SHA'], 'tests': result.testsRun,
+                    'failures': len(result.failures), 'errors': len(result.errors), 'skipped': len(result.skipped),
+                    'elapsed_seconds': time.monotonic() - began, 'successful': result.wasSuccessful(),
+                    'failed_tests': [test.id() for test, _ in [*result.failures, *result.errors]]}
+          target = pathlib.Path('target/matrix-regressions-public.json')
+          target.parent.mkdir(exist_ok=True)
+          with target.open('x') as stream:
+              stream.write(json.dumps(report, indent=2, allow_nan=False) + '\n')
+          print('::notice title=Supplemental matrix regression summary::' + json.dumps(report, separators=(',', ':'), allow_nan=False))
+          if not result.wasSuccessful() or result.testsRun < 9 or result.skipped:
+              raise SystemExit(1)
+          PY
+      - name: Locate the retained final native ELF
+        id: retained
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib
+          index = json.loads(pathlib.Path('docs/goals/results/stress/native-final-suite/index.json').read_text())
+          assert type(index['workflow_run_id']) is int and index['status'] == 'passed'
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as stream:
+              stream.write('run=' + str(index['workflow_run_id']) + '\n')
+          PY
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: native-suite-candidate
+          path: target/matrix-retained-input
+          run-id: ${{ steps.retained.outputs.run }}
+          github-token: ${{ github.token }}
+      - name: Probe real backend HTTP during ledger traffic
+        timeout-minutes: 55
+        env:
+          MATRIX_FULL: ${{ inputs.matrix_full }}
+        run: |
+          arguments=()
+          if [ "$MATRIX_FULL" = true ]; then arguments+=(--full); fi
+          sudo -n systemd-run --wait --pipe --collect \
+            --unit="g05-matrix-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --uid="$(id -u)" --gid="$(id -g)" --working-directory="$GITHUB_WORKSPACE" \
+            --property=CPUQuota=100% --property=MemoryMax=512M --property=MemorySwapMax=0 \
+            --property=Nice=19 --property=IOSchedulingClass=idle \
+            --property=TasksMax=128 --property=RuntimeMaxSec=3000 --property=KillMode=control-group \
+            env GITHUB_ACTIONS="$GITHUB_ACTIONS" RUNNER_ENVIRONMENT="$RUNNER_ENVIRONMENT" \
+              GITHUB_SHA="$GITHUB_SHA" GITHUB_RUN_ID="$GITHUB_RUN_ID" GITHUB_RUN_ATTEMPT="$GITHUB_RUN_ATTEMPT" \
+              python3 bench/matrix_probe.py --artifact target/matrix-retained-input "${arguments[@]}"
+      - name: Public supplemental evidence only
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: supplemental-backend-matrix
+          path: |
+            target/stress-g05/native-matrix-*-public
+            target/matrix-regressions-public.json
           if-no-files-found: ignore
           retention-days: 14
 

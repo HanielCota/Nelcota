@@ -730,3 +730,37 @@ Correlate its current process and post-load idle samples with cgroup/RSS evidenc
 allocator-held free arenas and thread caches are not an application-object
 census or an absolute proof of leak absence. The production executable and its
 runtime requirements remain unchanged.
+
+## Supplemental backend matrix
+
+The manual `matrix` workflow target uses the retained ELF from the completed
+native suite on a fresh disposable Actions VM. Its artifact digest, size and
+all six current product tree identities must match the recorded build before
+any fixture is created. The local performance ELF remains separately identified.
+
+Start with `matrix_full=false` for an explicit smoke. After reviewing it, use
+two fresh dispatches with `matrix_full=true`. Full mode qualifies four
+five-minute RPC rates, then holds each supplemental scenario for 120 seconds
+at 80% of its qualified rate. The existing foreground ledger delivery/latency,
+negative JWT, ambiguous-reply, snapshot/restore, sampling and teardown gates
+remain enabled. Named probes exercise SQL row/batch/admission limits, actual
+HTTP disconnect cancellation, two unpolled exports and their dedicated slots,
+concurrent introspection/committed DDL, malformed/deep/null/nonfinite JSON,
+admin cookie/origin rejection and expiring partial header/body connections.
+
+The new probes allow at most 4,096 requests, 2 MiB per consumed body/response,
+64 MiB consumed responses and a conservative 256 MiB bound on intentionally
+unread exports. Five pressure cycles close every partial socket; cancelled
+SQL must release its dedicated connection within three seconds and exports
+within five. The controller has one CPU, 512 MiB, no swap and 128 tasks in an
+owned systemd unit with a 3,000-second hard deadline. The existing fault fixture
+retains per-app/database quotas, 512-MiB database disk guards, 10% RAM/15%
+filesystem reserves, five-second sampling and the 30-second gap gate.
+
+Nine focused safety regressions run before artifact download or backend
+traffic. Public receipts retain failed source locations without assertion or
+SQL payloads and a bounded, checksummed numeric cgroup series. This subset does
+not certify forced catalog-refresh failures,
+all security/mutation scenarios, public TLS/DNS/ingress, SMTP/OAuth or the full
+G05 matrix. Remote time overlapping local load earns no extra local checkpoint
+credit. These profiles are prepared until their actual receipts exist.

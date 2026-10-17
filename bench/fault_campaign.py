@@ -445,6 +445,19 @@ def run(args):
                 raise RuntimeError('No ledger workload rate qualified for faults')
             args.rate=max(1,int(qualified*.8))
             atomic_json(output/'capacity.json',{'qualified_lower_bound_iterations_per_second':qualified,'fault_rate':args.rate,'ratio':args.rate/qualified,'workload':'90% acknowledged atomic-transfer RPC plus negative JWT probe, 5% pre-response disconnects, 5% discarded real upstream commit replies; ambiguous outcomes reconciled without retries'})
+        if args.focus=='matrix':
+            from matrix_pressure import Probes, PROFILE, failure_receipt
+            scope['supplemental_matrix']={**PROFILE,'seconds_per_scenario':args.matrix_step_seconds,
+                                         'full_duration':args.matrix_step_seconds==120}
+            atomic_json(output/'manifest.json',scope)
+            probes=Probes(source,output,lambda:require_running(critical,watchdog,[]))
+            for label,action in [('admin-budgets',probes.admin_budgets),('admin-cancellation',probes.admin_cancellation),
+                                 ('catalog-recovery',probes.catalog_recovery),('hostile-backend',probes.hostile_backend)]:
+                try:
+                    traffic('matrix-'+label,args.matrix_step_seconds,action)
+                except Exception as error:
+                    atomic_json(output/'matrix-failure.json',failure_receipt(error,label))
+                    raise
         def database_stop():
             fault_window.set({'name':'database-unavailable','container':source.pg,'expires':time.monotonic()+20})
             try:
@@ -850,7 +863,8 @@ def main():
     parser.add_argument('--capacity',action='store_true')
     parser.add_argument('--provisional-rate',type=int,default=64)
     parser.add_argument('--s3-faults',action='store_true')
-    parser.add_argument('--focus',choices=['all','filesystem','provider'],default='all',help='A named subset is diagnostic only and cannot certify the complete fault matrix')
+    parser.add_argument('--focus',choices=['all','filesystem','provider','matrix'],default='all',help='A named subset is diagnostic only and cannot certify the complete fault matrix')
+    parser.add_argument('--matrix-step-seconds',type=int,choices=[20,120],default=120,help='Twenty seconds is an explicit supplemental smoke; full matrix steps use120')
     args=parser.parse_args()
     if not 1<=args.rate<=64 or not 4<=args.provisional_rate<=64:
         parser.error('Functional canary rate must be 1..64 iterations/second')
@@ -858,6 +872,8 @@ def main():
         parser.error('S3 fault profile requires four effective CPUs')
     if args.focus=='provider' and not args.s3_faults:
         parser.error('Provider focus requires --s3-faults')
+    if args.focus=='matrix' and args.s3_faults:
+        parser.error('Supplemental backend matrix is a separate disk profile, not the real-S3 fault campaign')
     run(args)
 
 

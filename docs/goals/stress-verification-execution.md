@@ -2312,3 +2312,23 @@ source line and fixed exception class. Assertion payloads and provider
 runtime logs remain private. A new parser regression covers that boundary;
 the disposable diagnostic VM runs its focused checks before downloading.
 The ordinary local final ELF and workload remain unchanged.
+
+### Supplemental real-HTTP matrix predeclared
+
+The remaining sustained admin/catalog/backend-security cells now have a
+separate `matrix` manual target. It reuses the verified final native ELF,
+refusing changed product tree objects or a different artifact digest/size,
+on an empty disposable Actions VM. An explicit smoke precedes two fresh
+full runs; no such execution is claimed yet. Four supplemental 120-second
+scenarios run during the existing qualified open-loop ledger workload,
+covering real network cancellation, SQL/export admission and release,
+concurrent committed DDL discovery and bounded hostile backend clients.
+The manifest and README predeclare all quotas, deadlines and traffic bounds.
+No ordinary final workload, backend bytes, SLO or reserve is changed.
+
+Nine new guard regressions are syntax-reviewed, awaiting isolated remote
+execution; local tests/builds remain suspended during the continuous disk
+soak. Source locations/classes are retained on failure, with no SQL/cookies
+or assertion payloads in public evidence. Full forced catalog-refresh,
+SMTP/OAuth/public-ingress and remaining management/update combinations stay
+separate incomplete cells rather than being inferred from this subset.
