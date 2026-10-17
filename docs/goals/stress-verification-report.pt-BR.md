@@ -1,7 +1,7 @@
 # G05 — relatório técnico de stress
 
 **Estado: em execução, sem aprovação do G05.** Este relatório é atualizado
-durante as campanhas. Data deste checkpoint: 17/10/2026, 00:07 UTC.
+durante as campanhas. Data deste checkpoint: 17/10/2026, 00:26 UTC.
 Não houve merge nem deploy de produção. O trabalho está na branch
 `test/g05-stress-verification`, no [PR #90](https://github.com/Nelcota/Nelcota/pull/90),
 mantido como rascunho para revisão.
@@ -51,7 +51,7 @@ O backend de produção continua um único binário Rust, sem Node ou Python.
 | 8 | Falhas, drain, restart, restore e deployment aplicável | Parcial | Primeiro fault passou com reconciliação de ACKs e restore local novo. Dois fluxos nativos passaram no escopo de restore no mesmo alvo e perda da RAM da convidada. Repetição final, atualização operacional, DNS/ACME públicos e recuperação fora do host continuam incompletos. |
 | 9 | Recursos, invariantes de dados/arquivos/eventos e regressão | Parcial | Invariantes locais e plateaus observados; precisam das campanhas finais comparáveis. Retenção anônima do provedor ainda exige atribuição. |
 | 10 | Correções focadas e regressões dos defeitos confirmados | Verificado nos defeitos já reproduzidos; revisão continua | Antes/depois em cinco defeitos reais: cluster incorreto, unit relativa, outro host nativo, lease aninhado na migração e sucesso indevido de remoção com limpeza incompleta. Os cenários específicos passaram em VMs novas. A falha da fixture Rust teve local original recuperado e passou 1.000 repetições após I/O de prontidão; o erro original continua visível. Fairness não recebeu causa de produção inventada. |
-| 11 | Rust/UI/SDK/lint/CI correspondentes ao SHA testado | Parcial | [18 checks de `1f39159`](results/stress/ci-1f39159.json) passaram. O [CodeQL corrigido](results/stress/codeql-invalid-fixtures-before-after.json) passou em `f560493`; Rust de `3b56b25` e CodeQL de `14725d6` passaram em seus próprios SHAs, mas a falha Rust de `14725d6` permanece registrada e sob investigação. CI final ainda incompleto. `dist` continua pendente de rebuild separado. Falhas anteriores permanecem registradas. |
+| 11 | Rust/UI/SDK/lint/CI correspondentes ao SHA testado | Parcial | [18 checks de `1f39159`](results/stress/ci-1f39159.json) passaram. O [CodeQL corrigido](results/stress/codeql-invalid-fixtures-before-after.json) passou em `f560493`; [CI de `85b3c5a`](results/stress/ci-85b3c5a.json): 18 success, quatro skipped e falha somente no guard de assets do painel. Job Rust completo e CodeQL passaram, incluindo as novas regressões de limpeza. A falha Rust original de `14725d6` continua preservada com diagnóstico e correção da fixture; CI final após assets ainda incompleto. `dist` continua pendente de rebuild separado. Falhas anteriores permanecem registradas. |
 | 12 | Relatório, limites e todos os testes falhos/bloqueados/não executados | Em consolidação | Este relatório e o [registro detalhado](stress-verification-execution.md) preservam os resultados; ainda há campanhas abertas. |
 
 ## Staging e limites
@@ -189,6 +189,12 @@ de descoberta/publicação. O relatório original permanece bloqueado e o job or
 | `ffae0e5` | Suite manual de seis cenários nativos em duas passagens com o mesmo ELF; verificação do processo ativo; execução final ainda pendente. |
 | `a9bb8c2` | Diagnóstico CI HTTPS limitado, sem encaminhamento de token nem publicação de assertions. |
 | `e4e89d3` / `5abdf2a` | Fixtures aleatórias e distinção entre candidato de validação e credencial efetiva; segunda falha preservada e CodeQL posterior aprovado. |
+
+O [CI completo registrado de `85b3c5a`](results/stress/ci-85b3c5a.json)
+mostra 18 checks aprovados, quatro jobs opcionais ignorados e uma falha, no
+guard de assets do painel. As etapas de check/test/build do painel e o job
+Rust completo (com as quatro regressões novas de limpeza) passaram.
+CodeQL também passou; o source final depois dos assets continua pendente.
 
 Os 246 testes Python anteriores ao executor nativo passaram em 13,399 s.
 Os doze testes focados do executor nativo corrigido passaram em

@@ -2046,3 +2046,15 @@ o mesmo perfil de steady/capacidade, com soak diagnóstico de 600 s, apenas
 para comparar as três amostras steady no protocolo atual. Não substitui
 nenhuma endurance final nem equipara a janela curta a quatro horas. A suite
 nativa terá um ELF para os doze casos, separado do build local de performance.
+
+### 17/10, 00:26 UTC — CI da quinta correção concluído
+
+O [recibo de CI](results/stress/ci-85b3c5a.json) registra todos os 23
+check-runs de 85b3c5a: **18 success, quatro skipped e um failure**. Os skips
+são os outros targets opcionais do workflow manual; não foram contados como
+testes executados. O único failure é admin-ui, especificamente o step
+`versioned dist is up to date`; checks/testes/build anteriores passaram.
+O job Rust completo, incluindo Clippy, cargo test --all, onboarding, ciclo
+de vida/restore e S3 real, passou, assim como CodeQL e seus quatro analisadores.
+Assim, as quatro regressões Rust de backup_config estão verificadas no SHA
+correspondente. O source final após assets ainda terá seu próprio CI.
