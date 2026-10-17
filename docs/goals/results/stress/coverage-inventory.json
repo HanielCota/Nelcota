@@ -8,7 +8,7 @@
       "area": "Authentication and independent consumers",
       "entrypoints": "crates/server/tests/auth.rs; concurrency.rs; scripts/test-auth-package.py",
       "status": "not run",
-      "scope_or_limit": "Real login/refresh/expiry and independent browser consumers have scoped evidence; historical four-hour counter verdicts were withdrawn. Final-protocol continuous replacements and second browser pass remain pending.",
+      "scope_or_limit": "First final-ELF raw browser auth pressure passed560requests/40users/0unrevokedgeneratedsessions across2actualconsumers, including replay/family/logout negatives. Final endurance, further independent browser pass, SMTP/OAuth stress and remaining auth clauses are not inferred.",
       "functional_subset": {
         "status": "passed",
         "source_commit": "3203330cf3df2b9b7dd68efebc79412a8564e9fd",
@@ -111,6 +111,12 @@
           "status": "failed",
           "evidence": "browser-auth-driver-diagnostic-failure-004.json",
           "scope": "MissingPlaywright import atdriverline12,before anydriver-ready marker. Both apps/PG active,noOOM/restarts;18focusedguards passed,cleanup. Explicitownedpackageentry fix passed28localbrowser tests; realcorrected lifecycle pending."
+        },
+        {
+          "run_id": "native-browser-auth-39024051590-1",
+          "status": "passed",
+          "evidence": "browser-auth-full-final-pass-1-005.json",
+          "scope": "First final-ELF full real browser/auth pass:560requests/40users/0unrevokedgeneratedsessions,5cycles,3tabs,823navigations/p95feedback267.2ms,2511SDKRLSreads,actual900sTTL/1082.087sobservation,expired401/logoutrefresh400,bothrealconsumers,219resourcesamples/gap5.297s,noOOM/restarts,cleanup. Existingheap/node/listenerguards applied but detailedplateauvalues were not exported; subsequent strengthened receipts retain them. Other pass/SMTP/OAuth/endurance clauses remain separate;0overlappinglocaltimecredit."
         }
       ]
     },
@@ -676,7 +682,7 @@
       "area": "Panel tabs, request lifetime and retained resources",
       "entrypoints": "crates/admin/ui/e2e; src/lib/query-client.test.ts",
       "status": "not run",
-      "scope_or_limit": "First full native profile passed with 511 actual foreground navigations and zero page/external-request errors. Startup/oracle failures remain recorded; second independent pass and final comparison are pending.",
+      "scope_or_limit": "Historical local and first final-ELF real browser/auth lifecycles passed in distinct profiles. Full final pass observed823navigations/p95feedback267.2ms,3tabs/5cycles,219resourcesamples and actualexpiration/disposal. Two strengthened owner-metric receipts and final comparison remain pending; no cross-profile performance improvement is inferred.",
       "functional_subset": {
         "status": "passed",
         "source_commit": "3203330cf3df2b9b7dd68efebc79412a8564e9fd",
@@ -726,6 +732,12 @@
           "status": "failed",
           "evidence": "browser-auth-driver-diagnostic-failure-004.json",
           "scope": "MissingPlaywright import atdriverline12,before anydriver-ready marker. Both apps/PG active,noOOM/restarts;18focusedguards passed,cleanup. Explicitownedpackageentry fix passed28localbrowser tests; realcorrected lifecycle pending."
+        },
+        {
+          "run_id": "native-browser-auth-39024051590-1",
+          "status": "passed",
+          "evidence": "browser-auth-full-final-pass-1-005.json",
+          "scope": "First final-ELF full real browser/auth pass:560requests/40users/0unrevokedgeneratedsessions,5cycles,3tabs,823navigations/p95feedback267.2ms,2511SDKRLSreads,actual900sTTL/1082.087sobservation,expired401/logoutrefresh400,bothrealconsumers,219resourcesamples/gap5.297s,noOOM/restarts,cleanup. Existingheap/node/listenerguards applied but detailedplateauvalues were not exported; subsequent strengthened receipts retain them. Other pass/SMTP/OAuth/endurance clauses remain separate;0overlappinglocaltimecredit."
         }
       ]
     },
@@ -774,6 +786,12 @@
           "status": "failed",
           "evidence": "browser-auth-driver-diagnostic-failure-004.json",
           "scope": "MissingPlaywright import atdriverline12,before anydriver-ready marker. Both apps/PG active,noOOM/restarts;18focusedguards passed,cleanup. Explicitownedpackageentry fix passed28localbrowser tests; realcorrected lifecycle pending."
+        },
+        {
+          "run_id": "native-browser-auth-39024051590-1",
+          "status": "passed",
+          "evidence": "browser-auth-full-final-pass-1-005.json",
+          "scope": "First final-ELF full real browser/auth pass:560requests/40users/0unrevokedgeneratedsessions,5cycles,3tabs,823navigations/p95feedback267.2ms,2511SDKRLSreads,actual900sTTL/1082.087sobservation,expired401/logoutrefresh400,bothrealconsumers,219resourcesamples/gap5.297s,noOOM/restarts,cleanup. Existingheap/node/listenerguards applied but detailedplateauvalues were not exported; subsequent strengthened receipts retain them. Other pass/SMTP/OAuth/endurance clauses remain separate;0overlappinglocaltimecredit."
         }
       ]
     },
@@ -1036,6 +1054,12 @@
           "status": "passed",
           "evidence": "matrix-full-final-pass-1-002.json",
           "scope": "First full retained final-ELF backend subset:1730effective seconds,4x300sledgercapacity,4x120sadmin/cancellation/catalog/hostile scenarios,347samples/gap6.045s,44092ACKs0missing,2279ambiguouscommitsreconciled,restoreRTO1.850366s/RPOupper17.998048s,cleanup. Second full pass and broader area clauses remain separate; remote overlap adds0localcheckpointcredit."
+        },
+        {
+          "run_id": "native-browser-auth-39024051590-1",
+          "status": "passed",
+          "evidence": "browser-auth-full-final-pass-1-005.json",
+          "scope": "First final-ELF full real browser/auth pass:560requests/40users/0unrevokedgeneratedsessions,5cycles,3tabs,823navigations/p95feedback267.2ms,2511SDKRLSreads,actual900sTTL/1082.087sobservation,expired401/logoutrefresh400,bothrealconsumers,219resourcesamples/gap5.297s,noOOM/restarts,cleanup. Existingheap/node/listenerguards applied but detailedplateauvalues were not exported; subsequent strengthened receipts retain them. Other pass/SMTP/OAuth/endurance clauses remain separate;0overlappinglocaltimecredit."
         }
       ]
     },

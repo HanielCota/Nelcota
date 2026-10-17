@@ -324,6 +324,7 @@ jobs:
           suite.addTests(unittest.defaultTestLoader.discover('scripts/review_tests', pattern='test_stress_browser_images.py'))
           suite.addTests(unittest.defaultTestLoader.discover('scripts/review_tests', pattern='test_stress_browser_diagnostics.py'))
           suite.addTests(unittest.defaultTestLoader.discover('scripts/review_tests', pattern='test_stress_browser_entry.py'))
+          suite.addTests(unittest.defaultTestLoader.discover('scripts/review_tests', pattern='test_stress_browser_owners.py'))
           result = unittest.TextTestRunner(verbosity=2).run(suite)
           report = {'source_commit': os.environ['GITHUB_SHA'], 'tests': result.testsRun,
                     'failures': len(result.failures), 'errors': len(result.errors), 'skipped': len(result.skipped),
@@ -334,7 +335,7 @@ jobs:
           with target.open('x') as stream:
               stream.write(json.dumps(report, indent=2, allow_nan=False) + '\n')
           print('::notice title=Browser auth regression summary::' + json.dumps(report, separators=(',', ':'), allow_nan=False))
-          if not result.wasSuccessful() or result.testsRun < 21 or result.skipped:
+          if not result.wasSuccessful() or result.testsRun < 24 or result.skipped:
               raise SystemExit(1)
           PYTEST
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0

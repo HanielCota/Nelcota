@@ -13,6 +13,7 @@ import time
 
 from browser_auth import PROFILE, complete, validate_failure_receipt
 from browser_diagnostics import validate as validate_diagnostics
+from browser_owners import complete as complete_owners
 from campaign import docker
 from matrix_probe import export_resources, input_artifact, kernel_budget, read_receipt, require
 from native_evidence import notices
@@ -85,6 +86,7 @@ def main():
                 'actual_expired_access_status','actual_expires_in_seconds','auth_observation_seconds','logout_refresh_status',
                 'cross_tab_refresh_coalesced','actual_credential_renewal','disposed_clients_collected','page_errors','external_requests_blocked']
         report['checks']['browser']={key:live[key] for key in fields}
+        report['checks']['browser_owners']=complete_owners(read_receipt(output/'live-panel-SDK/browser-plateaus.json'))
         require(live['authoritative_visual_feedback_p95_ms']<=1000,'Browser feedback missed its original SLO')
         report['status']='passed'
     except Exception as error:

@@ -2845,3 +2845,26 @@ source/verdict; reject duplicate JSON keys, private fields, nonfinite values,
 gzip hidden metadata and trailing streams before publication.5focused privacy,
 corruption and lossless-roundtrip tests passed. No service starts, load-time
 credit or replacement verdict is created. Actual provider recovery is pending.
+
+The [corrected real browser/auth lifecycle](results/stress/browser-auth-full-final-pass-1-005.json)
+passed on final retainedELF872c3b1e..., source df51f80, with21focused remote
+guards and cleanup.560raw-auth requests/40users/0unrevokedgeneratedsessions,
+5cycles,3tabs,823authoritative navigations/p95feedback267.2ms,2511SDKRLSreads,
+actual900s accessTTL/1082.087sobservation, expired401 and logged-out-refresh400
+were observed. Both auth consumers handled traffic(1543/1542observations).
+219numeric resource samples/gap5.297s, no OOM/restarts; browser peak1260036096B
+within1536MiB. No cross-environment performance improvement is inferred.
+
+Keep the already collected browser heap/DOM plateaus in subsequent public
+receipts: baseline,5rest phases and final disposal for3tabs. Independently
+validate exact numeric fields and existing8MiB/250node/32listener growth gates.
+The workload is unchanged;3privacy/completeness/failed-growth regressions passed,
+31focused local browser tests total. The first full pass applied those driver
+gates but did not export the detailed plateau values; do not invent them.
+
+The corrected real PostgreSQL readiness step completed successfully in the
+second matrix workflow39024053691 before backend load started. Its notices are
+not available through the checks API while the job is in progress; preserve
+the original detailed report after closure. A brief GitHubHTTP401 incident
+affected reads/writes around10:28UTC; scoped API access recovered by10:30UTC,
+without changing credentials or environment bindings. Local traffic continued.

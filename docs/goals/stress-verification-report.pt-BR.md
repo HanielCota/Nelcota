@@ -2,7 +2,7 @@
 
 **Estado: em execução, sem aprovação do G05.** Este relatório é atualizado
 durante as campanhas. Checkpoint de carga consolidada: 17/10/2026, 10:04 UTC.
-Atualização da investigação: 17/10/2026, 10:04 UTC.
+Atualização da investigação: 17/10/2026, 10:38 UTC.
 Não houve merge nem deploy de produção. O trabalho está na branch
 `test/g05-stress-verification`, no [PR #90](https://github.com/Nelcota/Nelcota/pull/90),
 mantido como rascunho para revisão.
@@ -49,7 +49,7 @@ O backend de produção continua um único binário Rust, sem Node ou Python.
 | 2 | Calibração, unidades, amostragem e oráculos | Validado nos controles corrigidos | Controles nativos de bytes, redirects, contadores esparsos, cgroups e compactação; campanhas finais ainda precisam terminar. |
 | 3 | Cancelamento, watchdogs, redação e limpeza restrita | Demonstrado nos escopos local e nativo executados | [Controle nativo de guardas/pidfd](results/stress/native-guards-pidfd.json), interrupções reais e recibos de limpeza. A VM própria também confirmou limpeza e limites reais de kernel, sem guard crítico disparado nas execuções aprovadas. |
 | 4 | Duas passagens de steady/staircase/picos/descanso | Pendente no artefato final005 | Fases anteriores e falhas preservadas; interrupções após defeitos confirmados não aprovam o candidato. Duas passagens por backend ainda exigem conclusão no ELF final. |
-| 5 | Toda a matriz funcional, de segurança e concorrência | Parcial | CI funcional, primeiros browser/fault e smokes reais disponíveis; cobertura funcional não substitui stress repetido de cada célula. |
+| 5 | Toda a matriz funcional, de segurança e concorrência | Parcial | Primeira matriz completa final do backend e primeiro ciclo completo final browser/auth aprovados; segunda matriz em execução. CI funcional e subconjuntos não substituem os demais cenários e repetições. |
 | 6 | Isolamento/fairness em 1/5/10 projetos e controle responsivo | Reprovado/incompleto | Cinco/dez projetos tiveram falhas anteriores de fairness/drain. Novo smoke compartilhado falhou com 101 registros, incluindo 8 SLOs absolutos. Smoke de cotas de 10ms falhou com 106 registros relativos, sem falhas absolutas; 1.381 eventos íntegros e limpeza completa. Nenhum smoke substitui os passos obrigatórios de cinco minutos. |
 | 7 | Quatro horas contínuas em disco e S3 no artefato final | Pendente | Três execuções históricas completaram fisicamente quatro horas, com aprovação de contadores retirada. Uma nova campanha em disco passou no protocolo atual, como baseline; correções posteriores invalidaram as campanhas afetadas do candidato. Nenhuma campanha final005 de quatro horas foi aprovada até aqui. |
 | 8 | Falhas, drain, restart, restore e deployment aplicável | Parcial | Primeiro fault passou com reconciliação de ACKs e restore local novo. Dois fluxos nativos passaram no escopo de restore no mesmo alvo e perda da RAM da convidada. Repetição final de faults/carga, atualização operacional, DNS/ACME públicos e recuperação fora do host continuam incompletos. |
@@ -802,3 +802,38 @@ espaço de endereçamento; isso foi reproduzido em controle local somente de
 leitura, exit2 em 0,004164 s. Substituí esse mecanismo por cgroup de memória
 de 256 MiB, mantendo CPU, tarefas, swap e duração limitados. As 22 guardas
 passaram, mas a reprodução real de prontidão PostgreSQL continua pendente.
+
+## Browser final aprovado e segunda matriz em execução — 10:38 UTC
+
+O [ciclo corrigido real browser/auth](results/stress/browser-auth-full-final-pass-1-005.json)
+passou no ELF nativo final, com 21 guardas focadas remotas e limpeza completa.
+Foram cinco ciclos, três abas, **560 requisições auth concluídas**, 40 usuários
+gerados e zero sessões desses usuários ainda válidas ao final. Houve 823
+navegações com confirmação autoritativa, p95 visual de 267,2 ms, 2.511 leituras
+RLS pelo SDK e tráfego real nos dois consumidores de autenticação, com
+1.543/1.542 observações. O token expirou efetivamente após TTL de 900 segundos;
+a observação durou 1.082,087 segundos, com acesso expirado 401 e refresh após
+logout 400. Renovação, coordenação entre abas e coleta dos clientes descartados
+passaram; zero erros de página e zero pedidos externos bloqueados.
+
+As 219 amostras tiveram intervalo máximo de 5,297 segundos, sem OOM ou
+reinícios. O pico do navegador foi 1.260.036.096 bytes, dentro de 1.536 MiB.
+Os valores detalhados de heap/DOM dos sete plateaus foram medidos e usados
+pelas guardas do driver, mas não foram exportados nesse primeiro relatório;
+não invento esses números. A próxima publicação inclui esses valores e
+revalida independentemente os limites existentes de crescimento: 8 MiB,
+250 nós e 32 listeners por aba. Três regressões de privacidade/completude/
+crescimento passaram, totalizando 31 testes focados locais de browser.
+Não se infere melhoria de performance contra o browser local histórico:
+hardware, Chromium e perfil de CPU são diferentes.
+
+A segunda matriz completa `39024053691` passou no step de reprodução real
+da prontidão PostgreSQL e iniciou a carga. Os notices detalhados só ficam
+disponíveis após o encerramento do job; o relatório original será recuperado
+então. Uma tentativa antecipada de coleta encontrou zero notices e não
+produziu evidência ou aprovação artificial. A recuperação da série numérica
+original da primeira matriz está na fila, em um job somente de leitura;
+o ZIP remoto é limitado a 2 MiB, e cinco testes de privacidade/corrupção
+passaram. A indisponibilidade HTTP 401 do GitHub por volta de 10:28 foi
+transitória; o acesso voltou às 10:30 sem trocar credenciais ou bindings,
+enquanto a carga local continuou.

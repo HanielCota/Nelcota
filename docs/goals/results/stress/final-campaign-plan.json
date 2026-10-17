@@ -547,7 +547,7 @@
     "evidence": "final-local-candidate.json"
   },
   "additional_browser_auth_pressure": {
-    "status": "not run; static syntax only; focused regressions and retained-artifact gates must pass before live dispatch",
+    "status": "First corrected full pass005 passed; two further fresh owner-metric receipts are predeclared before execution. No full G05 approval.",
     "fresh_passes": 2,
     "profile": {
       "cycles": 5,
@@ -601,7 +601,27 @@
       "minimum_host_memory_reserve_fraction": 0.1,
       "minimum_filesystem_reserve_fraction": 0.15
     },
-    "scope": "Raw signup/login/password-worker concurrency, grace retry versus stale-token family revocation, independent-session survival, logout and cross-user RLS during the five existing UI pressure/rest cycles. Verified owned TLS, 48SDK-caller singleflight and real expiry remain enabled. SMTP/OAuth not exercised. No local endurance overlap credited and no new production runtime dependency."
+    "scope": "Raw signup/login/password-worker concurrency, grace retry versus stale-token family revocation, independent-session survival, logout and cross-user RLS during the five existing UI pressure/rest cycles. Verified owned TLS, 48SDK-caller singleflight and real expiry remain enabled. SMTP/OAuth not exercised. No local endurance overlap credited and no new production runtime dependency.",
+    "completed_corrected_passes": [
+      {
+        "workflow_run_id": 39024051590,
+        "source": "df51f80b29bcd0edaacd91270cd19d610381afff",
+        "evidence": "browser-auth-full-final-pass-1-005.json",
+        "status": "passed"
+      }
+    ],
+    "owner_metric_repetitions": {
+      "declared_utc": "2026-10-17T10:39:28.740303+00:00",
+      "fresh_additional_passes": 2,
+      "profile_unchanged": true,
+      "driver_workload_unchanged": true,
+      "existing_measured_plateaus_exported": 7,
+      "tabs": 3,
+      "heap_growth_bytes_maximum": 8388608,
+      "nodes_growth_maximum": 250,
+      "listeners_growth_maximum": 32,
+      "reason": "The first corrected full pass applied existing owner gates but did not publish detailed plateau values. Preserve its passed control; retain and independently validate all already measured numeric values in two further fresh receipts. No reduced SLO, input, resource, arrival or duration criterion."
+    }
   },
   "current_final_candidate": {
     "source_commit": "f40774e1504a924fe6d9c801e251278cee1a8fab",
