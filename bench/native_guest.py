@@ -281,10 +281,15 @@ def backup():
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("identity")
-    parser.add_argument("action", choices=["prepare", "resources", "identity", "token", "backup", "restore", "remove", "diagnostics", "cluster-routing", "default-root", "host-root", "remove-boundary"])
+    parser.add_argument("action", choices=["prepare", "resources", "identity", "token", "backup", "restore", "remove", "diagnostics", "cluster-routing", "default-root", "host-root", "remove-boundary",
+                                        "inflight-arm", "inflight-hold", "inflight-status", "inflight-disarm"])
     parser.add_argument("--dump")
     args = parser.parse_args()
     owned(args.identity)
+    if args.action.startswith("inflight-"):
+        from native_inflight import run
+        print(json.dumps(run(args.identity, args.action), allow_nan=False))
+        return
     if args.action in {"default-root", "host-root", "remove-boundary"}:
         from native_contracts import run
         print(json.dumps(run(args.action), allow_nan=False))

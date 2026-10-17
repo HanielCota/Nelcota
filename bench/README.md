@@ -160,6 +160,19 @@ credentials, request bodies and private logs stay on the disposable runner.
 The guest power cut discards guest RAM after acknowledged writes and proves
 a new kernel boot; it does not certify an in-flight write, physical host
 power loss, public DNS/ACME, PITR or an off-host/fresh-target restore.
+`native_case=runtime-inflight` is an additional, separate control. After the
+same thirty externally fsynced acknowledgements, an owned transient helper
+holds a table lock for at most thirty seconds. One additional real HTTPS
+write must be observed waiting on that lock before the guest is killed;
+the witness may be at most two seconds old and the request must still be
+unfinished. Recovery must preserve every acknowledged row and value, reject
+the anonymous probe, roll back the blocked write and leave no helper or lock.
+The helper has a five-percent CPU quota, 48 MiB RAM, no swap, sixteen tasks
+and a forty-second systemd deadline within the existing aggregate slice.
+Its failure cleanup cancels only the owned marker/table's lock holder.
+This proves a blocked write's rollback across guest RAM loss. It does not
+claim a cut during COMMIT, physical host power loss, off-host durability,
+ordinary performance or completion of the original twelve-case suite.
 The optional `evidence_run` input downloads the already-public structured
 report from a previous native run before repeating the campaign. Reports are
 also published in bounded, checksummed notice fragments: a single long Actions

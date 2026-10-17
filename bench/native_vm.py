@@ -24,6 +24,7 @@ import sys
 import threading
 import time
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 
 from native_preflight import inventory
 from native_evidence import publish
@@ -34,6 +35,7 @@ ORIGIN = "https://cloud-images.ubuntu.com/releases/noble/release/"
 GIB = 1024 ** 3
 MIB = 1024 ** 2
 MAXIMUM_SECONDS = 1800
+SCENARIOS = ("runtime", "runtime-inflight", "cluster-routing", "default-root", "host-root", "clock-drift", "remove-boundary")
 
 
 def require(condition, message):
@@ -92,7 +94,8 @@ def unit_fields(identity):
     return dict(line.split("=", 1) for line in output.decode().splitlines() if "=" in line)
 
 
-def stop_owned(identity, *, power_cut=False):
+def stop_owned(identity, *, power_cut=False, before_signal=None):
+    require(before_signal is None or power_cut and callable(before_signal), "Invalid owned cut witness callback")
     state = unit_fields(identity)
     if state.get("LoadState") == "not-found":
         return state
@@ -102,6 +105,8 @@ def stop_owned(identity, *, power_cut=False):
     arguments = ["systemctl", "stop", unit(identity)]
     if power_cut:
         arguments = ["systemctl", "kill", "--signal=SIGKILL", "--kill-whom=all", unit(identity)]
+    if before_signal is not None:
+        before_signal()
     command(arguments)
     until = time.monotonic() + 15
     while time.monotonic() < until:
@@ -415,7 +420,7 @@ def campaign_identity(run, attempt, scenario, pass_index=None):
     identity = "native-vm-" + run + "-" + attempt
     if pass_index is not None:
         require(type(pass_index) is int and pass_index in {1, 2} and
-                scenario in {"runtime", "cluster-routing", "default-root", "host-root", "clock-drift", "remove-boundary"},
+                scenario in SCENARIOS,
                 "Unknown bounded native suite case")
         identity += "-p" + str(pass_index) + "-" + scenario
     return identity
@@ -435,6 +440,8 @@ def campaign(binary, output, scenario, pass_index=None):
     cpu_sum = 2.25
     if scenario == "cluster-routing":
         cpu_sum = 3.25
+    if scenario == "runtime-inflight":
+        cpu_sum += .05
     identity = campaign_identity(os.environ["GITHUB_RUN_ID"], os.environ["GITHUB_RUN_ATTEMPT"], scenario, pass_index)
     unit(identity)
     require(unit_fields(identity).get("LoadState") == "not-found", "VM service already exists")
@@ -462,6 +469,11 @@ def campaign(binary, output, scenario, pass_index=None):
         "ssh_host_key_verification": "fresh controller-generated Ed25519 host key injected through owned cloud-init seed",
         "host_power_loss_certified": False, "off_host_restore_certified": False,
         "public_dns_acme_certified": False, "workload_maximum_mutations_per_second": 1,
+        "in_flight_cut": {"enabled": scenario == "runtime-inflight", "blocked_writes": 1,
+                          "helper_cpu_quota": .05, "helper_memory_mib": 48, "helper_pids": 16,
+                          "maximum_table_lock_seconds": 30, "helper_runtime_seconds": 40,
+                          "maximum_observation_age_seconds": 2,
+                          "scope": "Owned guest table lock; blocked before COMMIT, no physical host power loss"},
         "controlled_guest_clock": {"enabled": scenario == "clock-drift", "maximum_forward_seconds": 1800,
                                    "step_verification_tolerance_seconds": 5,
                                    "maximum_restored_offset_seconds": 5, "restore_command_timeout_seconds": 15,
@@ -513,6 +525,9 @@ def campaign(binary, output, scenario, pass_index=None):
         guest.ssh(["sudo", "-n", "install", "-m", "600", "/tmp/native_guest.py", "/opt/g05-tools/native_guest.py"])
         guest.ssh(["sudo", "-n", "install", "-m", "600", "/tmp/native_cluster.py", "/opt/g05-tools/native_cluster.py"])
         guest.ssh(["sudo", "-n", "install", "-m", "600", "/tmp/native_contracts.py", "/opt/g05-tools/native_contracts.py"])
+        if scenario == "runtime-inflight":
+            guest.copy(Path(__file__).with_name("native_inflight.py"), "/tmp/native_inflight.py")
+            guest.ssh(["sudo", "-n", "install", "-m", "600", "/tmp/native_inflight.py", "/opt/g05-tools/native_inflight.py"])
         guest.ready = True
         guest.last_guest_sample = time.monotonic()
         if scenario in {"default-root", "host-root", "remove-boundary"}:
@@ -653,7 +668,44 @@ def campaign(binary, output, scenario, pass_index=None):
         guest.ready = False
         guest.fault_until = time.monotonic() + 180
         fault_began = time.monotonic()
-        report["power_cut_unit_state"] = stop_owned(identity, power_cut=True)
+        if scenario == "runtime-inflight":
+            from native_cut import BLOCKED_ID, capture, witness
+            guest.ready = True
+            arm = guest.action("inflight-arm", timeout=12)
+            try:
+                with ThreadPoolExecutor(max_workers=1) as pressure:
+                    pending = pressure.submit(api.request, "POST", "/rest/v1/native_probe", token=users[0],
+                                              value={"id": BLOCKED_ID, "value": BLOCKED_ID}, expected=(201,))
+                    waiting_at = time.monotonic()
+                    observed = None
+                    observed_at = waiting_at
+                    while time.monotonic() - waiting_at <= 3:
+                        guest.assert_safe()
+                        require(not pending.done(), "Controlled write completed before the cut witness")
+                        observed, observed_at = capture(lambda: guest.action("inflight-status", timeout=8))
+                        if observed == {"lockers": 1, "waiting_writes": 1, "helper_active": True}:
+                            break
+                        time.sleep(.025)
+                    def before_cut_signal():
+                        nonlocal fault_began
+                        control = witness(observed, time.monotonic() - observed_at, pending.done())
+                        report["in_flight_cut_control"] = {"arm": arm, "before_cut": control}
+                        guest.ready = False
+                        fault_began = time.monotonic()
+                    report["power_cut_unit_state"] = stop_owned(identity, power_cut=True, before_signal=before_cut_signal)
+                    require("in_flight_cut_control" in report, "Guest stopped before its actual cut witness")
+                    disconnected = False
+                    try:
+                        pending.result(timeout=6)
+                    except (OSError, http.client.HTTPException):
+                        disconnected = True
+                    require(disconnected, "Blocked write did not disconnect across the guest cut")
+                    report["in_flight_cut_control"]["blocked_request_disconnected"] = True
+            finally:
+                if guest.ready:
+                    guest.action("inflight-disarm", timeout=12)
+        if scenario != "runtime-inflight":
+            report["power_cut_unit_state"] = stop_owned(identity, power_cut=True)
         guest.start()
         guest.ready = True
         guest.last_guest_sample = time.monotonic()
@@ -673,6 +725,17 @@ def campaign(binary, output, scenario, pass_index=None):
                                                "running_binary_identity": recovered_identity,
                                                "fault_during_in_flight_write": False,
                                                "scope": "loss of guest RAM after completed durable acknowledgements; no host power loss claim"}
+        if scenario == "runtime-inflight":
+            from native_cut import reconcile
+            values = json.loads(api.request("GET", "/rest/v1/native_probe?select=id,value&order=id", token=users[0]))
+            result = reconcile(values, acknowledged)
+            after_lock = guest.action("inflight-status", timeout=8)
+            require(after_lock == {"lockers": 0, "waiting_writes": 0, "helper_active": False},
+                    "Interrupted native write or helper survived recovery")
+            report["in_flight_cut_control"]["after_recovery"] = after_lock
+            report["power_cut_reconciliation"].update(result, fault_during_in_flight_write=True,
+                scope="Loss of guest RAM with one observed table-lock-blocked unacknowledged write; thirty ACKs and row values retained, blocked write rolled back. No cut-during-COMMIT or physical host power-loss claim")
+            report["checks"].append("external witness of one blocked write at guest cut; acknowledged row values survive and uncommitted write rolls back")
         guest.phase = "post-load-idle"
         for _ in range(6):
             guest.assert_safe()
@@ -725,7 +788,7 @@ def main():
     parser.add_argument("--output", type=Path)
     parser.add_argument("--watchdog", type=Path)
     parser.add_argument("--pass-index", type=int, choices=[1, 2])
-    parser.add_argument("--scenario", choices=["runtime", "cluster-routing", "default-root", "host-root", "clock-drift", "remove-boundary"], default="runtime")
+    parser.add_argument("--scenario", choices=SCENARIOS, default="runtime")
     args = parser.parse_args()
     if args.watchdog is not None:
         watchdog(args.watchdog.resolve(strict=True))

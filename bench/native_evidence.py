@@ -14,7 +14,7 @@ FIELDS = {"identity", "source", "binary_sha256", "scenario", "cluster_routing", 
           "diagnostic_failure_type", "elapsed_seconds_including_preparation", "resource_samples",
           "cleanup_confirmed", "cleanup_scope", "safety_guard_failure", "backup",
           "restore_elapsed_seconds", "completed_effective_load_seconds", "power_cut_unit_state",
-          "guest_power_cut_recovery_seconds", "power_cut_reconciliation", "idle_resources", "native_remove"}
+          "guest_power_cut_recovery_seconds", "power_cut_reconciliation", "in_flight_cut_control", "idle_resources", "native_remove"}
 
 
 def notices(report):
@@ -80,7 +80,7 @@ if __name__ == "__main__":
                       "profile_file_sha256": hashlib.sha256(raw).hexdigest(),
                       "scenario": value.get("scenario", "runtime"),
                       "scope": "Artifact identity from the original public predeclared native profile; no verdict is changed"}
-        if projection["scenario"] not in {"runtime", "cluster-routing", "default-root", "host-root", "clock-drift", "remove-boundary"}:
+        if projection["scenario"] not in {"runtime", "runtime-inflight", "cluster-routing", "default-root", "host-root", "clock-drift", "remove-boundary"}:
             raise SystemExit("Invalid prior native scenario")
         print("::notice title=Native VM profile::" + json.dumps(projection, separators=(",", ":")), flush=True)
         raise SystemExit(0)

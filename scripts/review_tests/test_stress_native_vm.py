@@ -21,6 +21,115 @@ import native_vm
 import native_evidence
 import native_contracts
 import native_guest
+import native_cut
+import native_inflight
+
+
+class NativeInflightCutBoundaries(unittest.TestCase):
+    def test_status_transport_delay_cannot_hide_an_expired_witness(self):
+        state = {"lockers": 1, "waiting_writes": 1, "helper_active": True}
+        clock = [10.0]
+        def delayed_status():
+            clock[0] = 12.1
+            return state
+        with patch.object(native_cut.time, "monotonic", side_effect=lambda: clock[0]):
+            value, started = native_cut.capture(delayed_status)
+            with self.assertRaisesRegex(RuntimeError, "fresh"):
+                native_cut.witness(value, time.monotonic() - started, False)
+
+    def test_stale_final_witness_prevents_the_cut_after_owner_lookup(self):
+        state = {"LoadState": "loaded", "ActiveState": "active", "Description": "native-vm-owned", "MainPID": "99"}
+        with patch.object(native_vm, "unit_fields", return_value=state):
+            with patch.object(native_vm, "command") as execute:
+                callback = Mock(side_effect=RuntimeError("stale cut witness"))
+                with self.assertRaisesRegex(RuntimeError, "stale cut witness"):
+                    native_vm.stop_owned("native-vm-owned", power_cut=True, before_signal=callback)
+                callback.assert_called_once_with()
+                execute.assert_not_called()
+
+    def test_cut_requires_a_fresh_live_write_and_one_owned_lock(self):
+        state = {"lockers": 1, "waiting_writes": 1, "helper_active": True}
+        receipt = native_cut.witness(state, .2, False)
+        self.assertEqual(receipt["waiting_writes"], 1)
+        self.assertIn("before COMMIT", receipt["scope"])
+        for changed in [{"waiting_writes": 0}, {"lockers": 0}, {"helper_active": False},
+                        {"waiting_writes": True}, {"lockers": 2}, {"private_payload": "must never publish"}]:
+            with self.subTest(changed=changed), self.assertRaises(RuntimeError):
+                native_cut.witness({**state, **changed}, .2, False)
+        for age in [-1, 2.01, True, None, float("nan"), float("inf")]:
+            with self.subTest(age=age), self.assertRaises(RuntimeError):
+                native_cut.witness(state, age, False)
+        with self.assertRaises(RuntimeError):
+            native_cut.witness(state, .2, True)
+
+    def test_cut_reconciles_actual_values_and_the_uncommitted_write(self):
+        acknowledged = list(range(100, 130))
+        rows = [{"id": value, "value": value} for value in [1, *acknowledged]]
+        result = native_cut.reconcile(rows, acknowledged)
+        self.assertEqual((result["acknowledged"], result["verified_row_values"]), (30, 31))
+        self.assertFalse(result["blocked_write_visible_after_recovery"])
+        for changed in [rows[:-1], [rows[0], *rows[:-1]],
+                        [*rows, {"id": native_cut.BLOCKED_ID, "value": native_cut.BLOCKED_ID}],
+                        [{"id": 1, "value": -1}, *rows[1:]], [{"id": True, "value": 1}, *rows[1:]],
+                        list(reversed(rows))]:
+            with self.subTest(changed=changed[:2]), self.assertRaises(RuntimeError):
+                native_cut.reconcile(changed, acknowledged)
+        with self.assertRaises(RuntimeError):
+            native_cut.reconcile(rows, acknowledged[:-1])
+
+    def test_guest_census_rejects_missing_or_ambiguous_owners(self):
+        for value in [{"lockers": 1, "waiting_writes": 1}, {"lockers": 0, "waiting_writes": 0}]:
+            with patch.object(native_inflight, "sql", return_value=json.dumps(value).encode()):
+                self.assertEqual(native_inflight.census(), value)
+        for value in [{}, {"lockers": True, "waiting_writes": 1}, {"lockers": 1, "waiting_writes": 2},
+                      {"lockers": 1, "waiting_writes": -1}, {"lockers": 1, "waiting_writes": None}]:
+            with self.subTest(value=value), patch.object(native_inflight, "sql", return_value=json.dumps(value).encode()):
+                with self.assertRaises(RuntimeError):
+                    native_inflight.census()
+
+    def test_foreign_guest_helper_is_never_stopped(self):
+        with patch.object(native_inflight, "owned"), patch.object(native_inflight, "unit_state", return_value={"LoadState": "loaded", "ActiveState": "active"}):
+            with patch.object(native_inflight, "command", return_value=SimpleNamespace(stdout=b"foreign helper\n")) as execute:
+                with self.assertRaisesRegex(RuntimeError, "foreign"):
+                    native_inflight.disarm("native-vm-owned")
+                self.assertEqual(len(execute.call_args_list), 1)
+                self.assertEqual(execute.call_args.args[0][1], "show")
+
+    def test_no_helper_mutation_can_precede_vm_ownership(self):
+        for action in ["inflight-arm", "inflight-hold", "inflight-status", "inflight-disarm"]:
+            with self.subTest(action=action), patch.object(native_inflight, "owned", side_effect=RuntimeError("foreign VM")):
+                with patch.object(native_inflight, "command") as execute:
+                    with self.assertRaisesRegex(RuntimeError, "foreign VM"):
+                        native_inflight.run("native-vm-owned", action)
+                    execute.assert_not_called()
+
+    def test_failed_helper_start_is_disarmed_before_propagating_failure(self):
+        with patch.object(native_inflight, "owned"), patch.object(native_inflight, "unit_state", return_value={"LoadState": "not-found"}):
+            with patch.object(native_inflight, "census", return_value={"lockers": 0, "waiting_writes": 0}):
+                with patch.object(native_inflight, "command", side_effect=RuntimeError("bounded startup failure")):
+                    with patch.object(native_inflight, "disarm") as disarm:
+                        with self.assertRaisesRegex(RuntimeError, "bounded startup failure"):
+                            native_inflight.arm("native-vm-owned")
+                        disarm.assert_called_once_with("native-vm-owned")
+
+    def test_foreign_or_malformed_helper_namespace_is_rejected(self):
+        for value in ["postgresql", "../native-vm-owned", "native-vm-", "native-vm-a\n", "native-vm-a;stop", True, None]:
+            with self.subTest(value=value), self.assertRaises(RuntimeError):
+                native_inflight.identity(value)
+
+    def test_live_helper_cannot_escape_its_predeclared_kernel_budget(self):
+        budget = {"cpu_quota_usec": 5000, "cpu_period_usec": 100000,
+                  "memory_bytes": 48 * 1024 ** 2, "swap_bytes": 0, "pids": 16}
+        original = {"LoadState": "loaded", "ActiveState": "active", "kernel_budget": budget,
+                    "memory_events": {"oom_kill": 0}}
+        with patch.object(native_inflight, "command", return_value=SimpleNamespace(stdout=b"g05-inflight:native-vm-owned\n")):
+            with patch.object(native_inflight, "unit_state", return_value=original):
+                self.assertEqual(native_inflight.checked_unit("native-vm-owned", active=True), original)
+            for change in [{"kernel_budget": {**budget, "memory_bytes": 128 * 1024 ** 2}},
+                           {"memory_events": {"oom_kill": 1}}, {"ActiveState": "inactive"}]:
+                with self.subTest(change=change), patch.object(native_inflight, "unit_state", return_value={**original, **change}):
+                    with self.assertRaises(RuntimeError):
+                        native_inflight.checked_unit("native-vm-owned", active=True)
 
 
 class NativeVMBoundaries(unittest.TestCase):
