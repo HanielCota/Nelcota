@@ -7,6 +7,7 @@ cookies, tokens or SQL. Public ingress and SMTP/OAuth remain separate targets.
 from concurrent.futures import ThreadPoolExecutor
 import http.client
 import json
+import math
 from pathlib import Path
 import re
 import secrets
@@ -18,7 +19,7 @@ import urllib.parse
 
 from watchdog import atomic_json
 
-PROFILE = {"scenarios": ["admin-budgets", "admin-cancellation", "catalog-recovery", "hostile-backend"],
+PROFILE = {"scenarios": ["admin-budgets", "admin-cancellation", "catalog-recovery", "hostile-backend", "auth-links"],
            "maximum_requests": 4096, "maximum_body_bytes": 2 * 1024 ** 2,
            "maximum_read_bytes": 2 * 1024 ** 2, "maximum_consumed_bytes": 64 * 1024 ** 2,
            "maximum_unread_export_bytes": 256 * 1024 ** 2,
@@ -35,12 +36,23 @@ def require(condition, message):
         raise RuntimeError(message)
 
 
+def action_window(started, ended, phase_started, seconds):
+    require(all(type(value) in {int, float} and math.isfinite(value)
+                for value in [started, ended, phase_started, seconds])
+            and 0 <= phase_started <= started <= ended and seconds > 0,
+            'Invalid supplemental action timing')
+    return {'started_after_seconds': started - phase_started,
+            'ended_after_seconds': ended - phase_started,
+            'duration_seconds': ended - started,
+            'entire_action_within_offered_window': ended <= phase_started + seconds}
+
+
 def failure_receipt(error, scenario):
     require(scenario in PROFILE["scenarios"], "Unknown failed supplemental scenario")
     locations = []
     for frame in traceback.extract_tb(error.__traceback__):
         name = Path(frame.filename).name
-        if name in {"matrix_pressure.py", "fault_campaign.py"} and len(locations) < 8:
+        if name in {"matrix_pressure.py", "fault_campaign.py", "auth_link_pressure.py"} and len(locations) < 8:
             locations.append({"file": name, "line": frame.lineno})
     return {"case": scenario, "type": type(error).__name__, "locations": locations}
 
@@ -142,6 +154,10 @@ class Probes:
                     {"status": "passed", "requests_so_far": self.requests,
                      "consumed_bytes_so_far": self.consumed_bytes,
                      "unread_export_upper_bound_bytes": self.unread_export_bytes, **values})
+
+    def auth_links(self):
+        from auth_link_pressure import run
+        run(self)
 
     def admin_budgets(self):
         value = self.sql("SELECT i FROM generate_series(1,10000)i")

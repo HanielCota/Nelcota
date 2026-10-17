@@ -13,7 +13,7 @@ import zlib
 GAUGES={'memory_current_bytes','memory_peak_bytes','anonymous_bytes','tasks','oom_events','oom_kills','cpu_throttled_usec'}
 MATRIX_PHASES={'preparation','ready','baseline','snapshot','snapshot-under-writers','restore-preparation','reconciliation','teardown',
                *{'capacity-'+str(percent) for percent in [25,50,75,100]},
-               *{'matrix-'+name for name in ['admin-budgets','admin-cancellation','catalog-recovery','hostile-backend']}}
+               *{'matrix-'+name for name in ['admin-budgets','admin-cancellation','catalog-recovery','hostile-backend','auth-links']}}
 BROWSER_PHASES={'preparation','untrusted-ca','live-panel-sdk','teardown'}
 
 

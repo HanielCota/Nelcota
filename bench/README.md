@@ -747,6 +747,25 @@ remain enabled. Named probes exercise SQL row/batch/admission limits, actual
 HTTP disconnect cancellation, two unpolled exports and their dedicated slots,
 concurrent introspection/committed DDL, malformed/deep/null/nonfinite JSON,
 admin cookie/origin rejection and expiring partial header/body connections.
+The `auth-links` case adds five cycles of recovery, signup confirmation and
+magic-link verification. Four barrier-released HTTP consumers submit each
+generated token once; exactly one must receive the correct user's session.
+Expired, wrong-kind and reused links must fail. The case checks predecessor
+refresh behavior, committed recovery passwords (four distinct competing values
+with only the winner remaining valid), retired unconfirmed-account
+credentials and final session revocation. Tokens are seeded privately in the
+owned database: SMTP delivery, issuance/cooldown and external OAuth remain
+separate gates. This barrier establishes concurrent client attempts, without
+claiming that all four requests overlapped inside one server transaction.
+
+Full public reports retain all four capacity steps, including failed
+qualification, with phase-boundary generator process/current-cgroup CPU and
+host steal counters. These diagnostics investigate variation; they do not
+identify a bottleneck by themselves or relax the existing acceptance gates.
+Full runs also require each entire supplemental action, including every link
+pressure cycle, to finish inside its offered ledger-traffic window. Functional
+smokes record timing separately and cannot certify full overlap after traffic
+has drained.
 
 The new probes allow at most 4,096 requests, 2 MiB per consumed body/response,
 64 MiB consumed responses and a conservative 256 MiB bound on intentionally
@@ -757,7 +776,7 @@ owned systemd unit with a 3,000-second hard deadline. The existing fault fixture
 retains per-app/database quotas, 512-MiB database disk guards, 10% RAM/15%
 filesystem reserves, five-second sampling and the 30-second gap gate.
 
-Eleven focused safety regressions run before artifact download or backend
+Thirty-three focused safety regressions run before artifact download or backend
 traffic. Public receipts retain failed source locations without assertion or
 SQL payloads and a bounded, checksummed numeric cgroup series. This subset does
 not certify forced catalog-refresh failures,

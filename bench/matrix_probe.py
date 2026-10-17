@@ -187,6 +187,9 @@ def main():
             require(probes["status"] == "passed" and foreground["nominal_qualified"] is True
                     and foreground["requested_seconds"] == step and foreground["elapsed_seconds"] >= step,
                     "Supplemental case or nominal foreground evidence is incomplete")
+            if args.full:
+                require(foreground['supplemental_action']['entire_action_within_offered_window'] is True,
+                        'Full supplemental action extended beyond its offered ledger traffic')
             report["checks"]["cases"][name] = probes
             report["checks"]["foreground_phases"][name] = foreground
         report["resource_samples"] = completion["resource_observations"]

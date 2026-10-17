@@ -351,12 +351,17 @@ def run(args):
             success_latencies=[]
             in_flight=set()
             action_error=[]
+            action_times={}
             action_thread=None
             if action is not None:
                 def invoke():
                     try:
                         time.sleep(2)
-                        action()
+                        action_times['started']=time.monotonic()
+                        try:
+                            action()
+                        finally:
+                            action_times['ended']=time.monotonic()
                     except Exception as error:
                         action_error.append(error)
                         atomic_json(output/(label+'-action-error.json'),{'type':type(error).__name__,'diagnostic':redacted_diagnostic(error,[*source.environment.values(),*target.environment.values()])})
@@ -396,6 +401,9 @@ def run(args):
             latency=successful_latency_evidence(success_latencies)
             qualified=latency is not None and latency['p95_ms']<=500 and latency['p99_ms']<=1500 and counts['dropped_arrivals']<=seconds*rate*.01 and not counts['503'] and not counts['504'] and not counts['connection-unavailable']
             report={'counts':dict(counts),'requested_seconds':seconds,'elapsed_seconds':elapsed,'offered_iterations':seconds*rate,'rate':rate,'fault_injected':action is not None,'exploratory':exploratory,'success_latency':latency,'nominal_qualified':qualified}
+            if args.focus=='matrix' and action is not None:
+                from matrix_pressure import action_window
+                report['supplemental_action']=action_window(action_times['started'],action_times['ended'],start,seconds)
             if scheduling_before is not None:
                 from generator_cpu import evidence, observe
                 report['generator_cpu']=evidence(scheduling_before,observe(cpus))
@@ -454,7 +462,8 @@ def run(args):
             atomic_json(output/'manifest.json',scope)
             probes=Probes(source,output,lambda:require_running(critical,watchdog,[]))
             for label,action in [('admin-budgets',probes.admin_budgets),('admin-cancellation',probes.admin_cancellation),
-                                 ('catalog-recovery',probes.catalog_recovery),('hostile-backend',probes.hostile_backend)]:
+                                 ('catalog-recovery',probes.catalog_recovery),('hostile-backend',probes.hostile_backend),
+                                 ('auth-links',probes.auth_links)]:
                 try:
                     traffic('matrix-'+label,args.matrix_step_seconds,action)
                 except Exception as error:

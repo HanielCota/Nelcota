@@ -15,6 +15,18 @@ import matrix_probe as runner
 
 
 class SupplementalProbeGuards(unittest.TestCase):
+    def test_completed_action_after_foreground_drain_is_not_full_overlap(self):
+        self.assertTrue(matrix.action_window(12, 129, 10, 120)['entire_action_within_offered_window'])
+        value = matrix.action_window(12, 131, 10, 120)
+        self.assertFalse(value['entire_action_within_offered_window'])
+        self.assertEqual(value['duration_seconds'], 119)
+
+    def test_invalid_or_reversed_action_clocks_cannot_approve_overlap(self):
+        for started, ended, phase, seconds in [(12, float('nan'), 10, 120), (12, 13, 10, True),
+                                               (12, 11, 10, 120), (9, 12, 10, 120)]:
+            with self.subTest(started=started, ended=ended), self.assertRaises(RuntimeError):
+                matrix.action_window(started, ended, phase, seconds)
+
     def project(self, base="http://127.0.0.1:19000"):
         return SimpleNamespace(base=base, fixture={"cookie": "private-cookie", "service": "private-token"})
 
