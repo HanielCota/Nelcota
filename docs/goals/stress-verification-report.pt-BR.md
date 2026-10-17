@@ -1,15 +1,15 @@
 # G05 — relatório técnico de stress
 
 **Estado: em execução, sem aprovação do G05.** Este relatório é atualizado
-durante as campanhas. Data deste checkpoint: 17/10/2026, 00:26 UTC.
+durante as campanhas. Data deste checkpoint: 17/10/2026, 01:19 UTC.
 Não houve merge nem deploy de produção. O trabalho está na branch
 `test/g05-stress-verification`, no [PR #90](https://github.com/Nelcota/Nelcota/pull/90),
 mantido como rascunho para revisão.
 
 ## Tempo efetivo e artefatos
 
-O [checkpoint 011](results/stress/load-time-checkpoint-011.json) registra
-**100.044 segundos, ou 27h47min24s, de carga efetiva concluída**. O cálculo
+O [checkpoint 012](results/stress/load-time-checkpoint-012.json) registra
+**118.734 segundos, ou 32h58min54s, de carga efetiva concluída**. O cálculo
 conservador exclui preparação, aquecimento, descanso, fases interrompidas,
 controles artificiais e dupla contagem de janelas simultâneas. Tempo mínimo
 de oito horas atingido não significa aprovação dos demais critérios.
@@ -20,7 +20,7 @@ O tempo parcial das campanhas ainda abertas não está somado nesse checkpoint.
 | Código do backend sob carga local | `2efede8c27ee12119142170e8bd9742ff7cb900e` |
 | SHA-256 do binário local preservado | `75c44c85a85db26195166aa1d2c6caf481e3db476801ec8131525ef62adf1be0` |
 | SHA-256 do workload k6 atual | `0ac01578bf19155302fe465884b480d792569086f23bb4ba3615ca5f0ce2547d` |
-| Protocolo da repetição local em andamento | Snapshot imutável de `1f391594dd8db6cccac54d6720d90c33d461d1f1`, fixture nova `disk-final-pass-1-002` |
+| Protocolo da repetição local em andamento | Snapshot imutável de `1f391594dd8db6cccac54d6720d90c33d461d1f1`; `disk-final-pass-1-002` concluiu como baseline no binário retido, com protocolo atual |
 | Primeira execução nativa separada | [Actions 38962480993](https://github.com/Nelcota/Nelcota/actions/runs/38962480993), código congelado `e80770b3f6aa1f64d011a3d62f8ebf0f1201bdac`; reprovada no oráculo de signup antes do backup |
 | Primeiro fluxo nativo completo | [Evidência](results/stress/native-vm-runtime-pass-1.json), código `7e1bd25b20a706c66d0be549c6f85851b6db843f`; aprovado no escopo funcional declarado |
 | Candidato nativo com correção PostgreSQL | [Evidência](results/stress/native-vm-runtime-candidate-pass-1.json), código `6f8a3e727b85b869318c2a2712982293c0724125`; binário `0cccc84840b5d09ee76b1ab2005b52e7d702bd44c9f9c7662df5c6bde82e110f`, verificado dentro da VM |
@@ -44,10 +44,10 @@ O backend de produção continua um único binário Rust, sem Node ou Python.
 | 1 | Inventário, baseline imutável e SLOs declarados | Atendido para o staging local | [Inventário](results/stress/coverage-inventory.json), [plano](results/stress/final-campaign-plan.json), manifestos por execução. A matriz registra os cenários ainda incompletos. |
 | 2 | Calibração, unidades, amostragem e oráculos | Validado nos controles corrigidos | Controles nativos de bytes, redirects, contadores esparsos, cgroups e compactação; campanhas finais ainda precisam terminar. |
 | 3 | Cancelamento, watchdogs, redação e limpeza restrita | Demonstrado nos escopos local e nativo executados | [Controle nativo de guardas/pidfd](results/stress/native-guards-pidfd.json), interrupções reais e recibos de limpeza. A VM própria também confirmou limpeza e limites reais de kernel, sem guard crítico disparado nas execuções aprovadas. |
-| 4 | Duas passagens de steady/staircase/picos/descanso | Pendente no protocolo final | Fases anteriores e falhas estão preservadas. A primeira repetição final foi interrompida; sua substituta está em execução. |
+| 4 | Duas passagens de steady/staircase/picos/descanso | Pendente no protocolo final | Fases anteriores e falhas estão preservadas. A primeira repetição foi interrompida; sua substituta passou no protocolo atual como baseline. As duas passagens do novo artefato final ainda precisam executar. |
 | 5 | Toda a matriz funcional, de segurança e concorrência | Parcial | CI funcional, primeiros browser/fault e smokes reais disponíveis; cobertura funcional não substitui stress repetido de cada célula. |
 | 6 | Isolamento/fairness em 1/5/10 projetos e controle responsivo | Reprovado/incompleto | Primeira topologia de um projeto passou no protocolo anterior; cinco/dez projetos tiveram violações reais de fairness. Dez projetos também falharam no drain de 30 s. |
-| 7 | Quatro horas contínuas em disco e S3 no artefato final | Pendente | Três execuções completaram fisicamente quatro horas, mas a aprovação dos contadores foi retirada após auditoria. Nenhuma substituta final foi aprovada neste checkpoint. |
+| 7 | Quatro horas contínuas em disco e S3 no artefato final | Pendente | Três execuções históricas completaram fisicamente quatro horas, com aprovação de contadores retirada. Uma nova campanha em disco passou no protocolo atual, como baseline; as campanhas de quatro horas do novo candidato ainda não executaram. |
 | 8 | Falhas, drain, restart, restore e deployment aplicável | Parcial | Primeiro fault passou com reconciliação de ACKs e restore local novo. Dois fluxos nativos passaram no escopo de restore no mesmo alvo e perda da RAM da convidada. Repetição final, atualização operacional, DNS/ACME públicos e recuperação fora do host continuam incompletos. |
 | 9 | Recursos, invariantes de dados/arquivos/eventos e regressão | Parcial | Invariantes locais e plateaus observados; precisam das campanhas finais comparáveis. Retenção anônima do provedor ainda exige atribuição. |
 | 10 | Correções focadas e regressões dos defeitos confirmados | Verificado nos defeitos já reproduzidos; revisão continua | Antes/depois em cinco defeitos reais: cluster incorreto, unit relativa, outro host nativo, lease aninhado na migração e sucesso indevido de remoção com limpeza incompleta. Os cenários específicos passaram em VMs novas. A falha da fixture Rust teve local original recuperado e passou 1.000 repetições após I/O de prontidão; o erro original continua visível. Fairness não recebeu causa de produção inventada. |
@@ -125,6 +125,7 @@ uma análise posterior não reescreve seus veredictos.
 | S3 histórico 1 | 14.400 s contínuos, 4.031.965 operações úteis, 249.824 eventos reconciliados, 16 renovações de sessão e dois ciclos de poda | RustFS real local; aprovação dos contadores retirada. Não representa AWS, rede remota ou durabilidade fora do host. |
 | Disco histórico 2 | 14.400 s contínuos, 4.030.874 operações úteis e 249.795 eventos reconciliados | 1.127 drops retidos por observador suplementar; protocolo original insuficiente, mantido como diagnóstico. |
 | Disco final 001 | 4.290 s efetivos concluídos, 833 amostras, calibração de 400/s repetida | Interrompido automaticamente pela reserva TSDB de 522 MiB. Soak parcial excluído do tempo efetivo; invariantes finais não alcançadas; limpeza confirmada. |
+| Disco no protocolo atual, baseline | 14.400 s contínuos, 4.032.001 operações úteis, 4.035.938 requisições do tráfego principal, 3.937 negativas esperadas, zero drops/erros inesperados; 257.500 eventos reconciliados | Binário retido `75c44c85`, fonte `2efede8`; 3.283 amostras, gap máximo observado de 11,0 s, 16 renovações, dois ciclos de poda e limpeza. Não certifica o novo artefato. |
 | Um projeto/Caddy | 2.490 s de carga, 506 amostras, 32/s qualificados e nominal de 25/s, 2.928 eventos reconciliados | Primeira execução no protocolo anterior de latência/telemetria; requer duas passagens finais comparáveis. |
 | Cinco projetos compartilhados, smoke | Todos os cinco cenários concentrados falharam em fairness; RLS saudável p95 chegou a 217,638 ms contra meta de 200 ms | 1.129 eventos reconciliados e drain/limpeza aprovados não promovem o resultado de desempenho. |
 | Cinco projetos compartilhados, completo | 2.790 s concluídos, 604 amostras, 24 falhas prévias de latência em noisy-mixed | Interrompido em noisy-login por timeout do observador; invariantes finais não alcançadas, limpeza confirmada. |
@@ -134,6 +135,37 @@ uma análise posterior não reescreve seus veredictos.
 | Runtime nativo corrigido | Inicialização, migrations repetíveis, HTTPS validado, RLS, backup/restore e boot após interrupção da VM; 30 ACKs externos reconciliados sem perdas/duplicações/extras | 168,203 s incluindo preparo, 32 amostras, limpeza confirmada. Restore no mesmo alvo de 2,108 s e recuperação da convidada de 16,367 s; sem escrita em andamento no corte e sem alegação de durabilidade fora do host. |
 | Relógio em VM descartável | Passo observado de 1.018,326 s, JWT expirado 401, serviço preservado/anônimo negado; relógio/NTP restaurados, offset final 0,471 s e acesso ordinário recuperado | [Evidência](results/stress/native-clock-drift-pass-1.json), sem alterar o relógio do host/controlador e sem crédito de endurance. |
 | Contratos de instalação nativa | Caminho de ativação no cwd e recusa de outro diretório passaram em VMs próprias | Não substituem a repetição completa de runtime após todas as correções; cwd/`NELCOTA_ROOT` migrate agora passou com tabela, journal e contagem SQL confirmados. |
+
+A [campanha atual em disco](results/stress/disk-current-protocol-baseline.json)
+fechou **62 fases** com contadores contínuos HTTP/arrivals, 400 iterações/s
+qualificadas em passos de cinco minutos no teto pré-declarado e soak a
+280/s (70%). O teto de 400/s continua sendo limite da investigação, sem
+alegação de capacidade máxima física. App e PostgreSQL preservaram seus
+processos durante os 14.400 s. O census read-only confirmou 100.000 linhas
+products, 100.000 private, 10.129 objetos e zero transações ociosas abertas.
+Invariantes finais: zero pendências, assinaturas inválidas, eventos perdidos,
+duplicados ou extras; 129 objetos verificados e 10.129 objetos físicos com
+2.195 bytes. SQLite fechado passou integrity_check sem sidecars.
+
+Os cinco descansos após picos e o descanso final de 180 s tiveram os mesmos
+**24 descritores, quatro tarefas e 18 sockets**, sem transações presas/locks.
+RSS máximo geral: 49,1 MiB; no soak: 47,4 MiB. Disco PostgreSQL: máximo
+452 MiB. Não houve OOM. A mediana dos primeiros/últimos 15 minutos do soak
+subiu de **44,824 para 47,395 MiB de RSS** e de **26,668 para 29,242 MiB
+anônimos**. Essa elevação ainda exige atribuição; censos estáveis de recursos
+não provam ausência absoluta de vazamento de heap. A repetição no candidato
+e, se persistir, um diagnóstico de alocação de quatro horas foram mantidos
+no plano, separado das comparações ordinárias.
+
+![Recursos medidos no baseline atual](results/stress/disk-current-protocol-baseline-resources.png)
+
+[CSV numérico](results/stress/disk-current-protocol-baseline-resources.csv.gz),
+[índice/checksums](results/stress/disk-current-protocol-baseline-resources.csv.index.json),
+[SVG](results/stress/disk-current-protocol-baseline-resources.svg) e
+[recibo da figura](results/stress/disk-current-protocol-baseline-resources.json)
+preservam o encadeamento entre observações, harness e binário. A figura
+mostra tempo de observação, incluindo aquecimento/descanso, que não substitui
+o tempo efetivo de carga do checkpoint.
 
 No fault pass, o restore em alvo local novo levou **2,636 s**, com RPO
 superior medido de **17,997 s**. O snapshot tinha 49.692 operações contra
@@ -196,6 +228,11 @@ guard de assets do painel. As etapas de check/test/build do painel e o job
 Rust completo (com as quatro regressões novas de limpeza) passaram.
 CodeQL também passou; o source final depois dos assets continua pendente.
 
+Os 290 testes Python atuais passaram em 14,987 s. A execução anterior
+teve dois erros porque TMPDIR estava em target/, ignorado pelo Oxlint:
+o engine informou zero arquivos e seu aviso precedeu o JSON. O temporário
+foi movido para uma pasta própria fora do repositório; não se alteraram
+assertions, regras ou binário do lint. O log reprovado foi preservado.
 Os 246 testes Python anteriores ao executor nativo passaram em 13,399 s.
 Os doze testes focados do executor nativo corrigido passaram em
 0,012 s, sem serviços locais. A falha inicial da fixture do mock também foi

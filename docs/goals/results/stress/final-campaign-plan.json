@@ -160,5 +160,15 @@
     "case_controller_maximum_seconds": 1800,
     "source": "final source after generated asset rebuild",
     "certifies_endurance": false
+  },
+  "allocator_follow_up": {
+    "declared_utc": "2026-10-17T01:19:02.464282+00:00",
+    "trigger": "Ordinary final repetitions retain unexplained late anonymous growth like the retained baseline first/last15m median26.668->29.242MiB",
+    "action": "Separate four-hour glibc allocation diagnostic on the same frozen candidate, with the validated probe, two pruning cohorts and final idle census",
+    "continuous_soak_seconds": 14400,
+    "performance_comparisons_must_reject_instrumented_runs": true,
+    "expected_extra_threads": 1,
+    "expected_extra_descriptors": 1,
+    "scope": "App allocation accounting only; does not attribute RustFS MiMalloc live owners or replace any ordinary final pass."
   }
 }

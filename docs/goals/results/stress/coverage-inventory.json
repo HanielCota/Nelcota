@@ -90,6 +90,12 @@
           "status": "failed",
           "scope": "4290 completed load seconds and 833 samples. Stopped safely on 522-MiB transient metrics disk reservation against unchanged 512-MiB guard. Partial soak/final invariants not approved; cleanup confirmed.",
           "evidence": "disk-final-pass-1-failed.json"
+        },
+        {
+          "run_id": "disk-final-pass-1-002",
+          "status": "passed",
+          "evidence": "disk-current-protocol-baseline.json",
+          "scope": "Retained baseline only: current counter/logical-latency/TSDB protocol, 62 closed phases, 14400s continuous at280/s, zero drops/unexpected, 3937 negatives, 257500 events reconciled, same app/PG, two pruning cohorts,16 renewals,3283 samples/gap11s, six identical idle owner censuses and owned cleanup. Final candidate and remaining row clauses still separate."
         }
       ]
     },
@@ -180,6 +186,12 @@
           "status": "failed",
           "scope": "80 completed seconds in larger million-row/one-MiB profile before physical S3 storage exceeded original 1024-MiB budget. Final integrity not reached; cleanup confirmed.",
           "evidence": "s3-http-latency-smoke-failed.json"
+        },
+        {
+          "run_id": "disk-final-pass-1-002",
+          "status": "passed",
+          "evidence": "disk-current-protocol-baseline.json",
+          "scope": "Retained baseline only: current counter/logical-latency/TSDB protocol, 62 closed phases, 14400s continuous at280/s, zero drops/unexpected, 3937 negatives, 257500 events reconciled, same app/PG, two pruning cohorts,16 renewals,3283 samples/gap11s, six identical idle owner censuses and owned cleanup. Final candidate and remaining row clauses still separate."
         }
       ]
     },
@@ -215,6 +227,12 @@
           "status": "passed",
           "scope": "complete local fault pass at 79.167% of qualified RPC rate, 1580 effective load seconds; second independent pass and external deployment targets remain pending",
           "evidence": "fault-pass-1.json"
+        },
+        {
+          "run_id": "disk-final-pass-1-002",
+          "status": "passed",
+          "evidence": "disk-current-protocol-baseline.json",
+          "scope": "Retained baseline only: current counter/logical-latency/TSDB protocol, 62 closed phases, 14400s continuous at280/s, zero drops/unexpected, 3937 negatives, 257500 events reconciled, same app/PG, two pruning cohorts,16 renewals,3283 samples/gap11s, six identical idle owner censuses and owned cleanup. Final candidate and remaining row clauses still separate."
         }
       ]
     },
@@ -243,7 +261,15 @@
           ],
           "scope": "Existing functional subset repeated in matching CI; no new load/topology or production certification."
         }
-      }
+      },
+      "native_diagnostics": [
+        {
+          "run_id": "disk-final-pass-1-002",
+          "status": "passed",
+          "evidence": "disk-current-protocol-baseline.json",
+          "scope": "Retained baseline only: current counter/logical-latency/TSDB protocol, 62 closed phases, 14400s continuous at280/s, zero drops/unexpected, 3937 negatives, 257500 events reconciled, same app/PG, two pruning cohorts,16 renewals,3283 samples/gap11s, six identical idle owner censuses and owned cleanup. Final candidate and remaining row clauses still separate."
+        }
+      ]
     },
     {
       "id": "disk",
@@ -323,6 +349,12 @@
           "status": "failed",
           "scope": "4290 completed load seconds and 833 samples. Stopped safely on 522-MiB transient metrics disk reservation against unchanged 512-MiB guard. Partial soak/final invariants not approved; cleanup confirmed.",
           "evidence": "disk-final-pass-1-failed.json"
+        },
+        {
+          "run_id": "disk-final-pass-1-002",
+          "status": "passed",
+          "evidence": "disk-current-protocol-baseline.json",
+          "scope": "Retained baseline only: current counter/logical-latency/TSDB protocol, 62 closed phases, 14400s continuous at280/s, zero drops/unexpected, 3937 negatives, 257500 events reconciled, same app/PG, two pruning cohorts,16 renewals,3283 samples/gap11s, six identical idle owner censuses and owned cleanup. Final candidate and remaining row clauses still separate."
         }
       ]
     },
@@ -451,6 +483,12 @@
           "status": "failed",
           "scope": "4290 completed load seconds and 833 samples. Stopped safely on 522-MiB transient metrics disk reservation against unchanged 512-MiB guard. Partial soak/final invariants not approved; cleanup confirmed.",
           "evidence": "disk-final-pass-1-failed.json"
+        },
+        {
+          "run_id": "disk-final-pass-1-002",
+          "status": "passed",
+          "evidence": "disk-current-protocol-baseline.json",
+          "scope": "Retained baseline only: current counter/logical-latency/TSDB protocol, 62 closed phases, 14400s continuous at280/s, zero drops/unexpected, 3937 negatives, 257500 events reconciled, same app/PG, two pruning cohorts,16 renewals,3283 samples/gap11s, six identical idle owner censuses and owned cleanup. Final candidate and remaining row clauses still separate."
         }
       ]
     },
@@ -492,6 +530,12 @@
           "status": "failed",
           "scope": "4290 completed load seconds and 833 samples. Stopped safely on 522-MiB transient metrics disk reservation against unchanged 512-MiB guard. Partial soak/final invariants not approved; cleanup confirmed.",
           "evidence": "disk-final-pass-1-failed.json"
+        },
+        {
+          "run_id": "disk-final-pass-1-002",
+          "status": "passed",
+          "evidence": "disk-current-protocol-baseline.json",
+          "scope": "Retained baseline only: current counter/logical-latency/TSDB protocol, 62 closed phases, 14400s continuous at280/s, zero drops/unexpected, 3937 negatives, 257500 events reconciled, same app/PG, two pruning cohorts,16 renewals,3283 samples/gap11s, six identical idle owner censuses and owned cleanup. Final candidate and remaining row clauses still separate."
         }
       ]
     },
@@ -944,5 +988,27 @@
     "status": "not run",
     "source_extension": "ffae0e5",
     "scope": "Two independent passes of six native cases, serialized fresh VMs, one retained ELF verified per-case and in actual running processes. Dispatch after final asset/source freeze; local performance binary and native runner binary remain separately identified builds."
+  },
+  "completed_current_protocol_disk_baseline": {
+    "run_id": "disk-final-pass-1-002",
+    "status": "passed",
+    "evidence": "disk-current-protocol-baseline.json",
+    "scope": "Retained baseline only: current counter/logical-latency/TSDB protocol, 62 closed phases, 14400s continuous at280/s, zero drops/unexpected, 3937 negatives, 257500 events reconciled, same app/PG, two pruning cohorts,16 renewals,3283 samples/gap11s, six identical idle owner censuses and owned cleanup. Final candidate and remaining row clauses still separate."
+  },
+  "latest_local_python_regressions": {
+    "status": "passed",
+    "tests": 290,
+    "elapsed_seconds": 14.987,
+    "earlier_failed_log": "python-checks-024.log",
+    "scope": "All review-tool/harness regressions, after correcting a task TMPDIR under an ignored target directory; not BaaS load credit."
+  },
+  "unattributed_app_anonymous_growth": {
+    "status": "under investigation",
+    "baseline_evidence": "disk-current-protocol-baseline.json",
+    "first_last_15m_medians_mib": [
+      26.66796875,
+      29.2421875
+    ],
+    "scope": "OS owner counts recover identically; ordinary final repeats and conditional four-hour allocator diagnostic must distinguish live use from allocator retention. No absolute leak absence claim."
   }
 }

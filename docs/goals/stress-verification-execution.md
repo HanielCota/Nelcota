@@ -2058,3 +2058,41 @@ O job Rust completo, incluindo Clippy, cargo test --all, onboarding, ciclo
 de vida/restore e S3 real, passou, assim como CodeQL e seus quatro analisadores.
 Assim, as quatro regressões Rust de backup_config estão verificadas no SHA
 correspondente. O source final após assets ainda terá seu próprio CI.
+
+### 17/10, 01:19 UTC — disco completo no protocolo atual e intervalo de preparação
+
+A campanha disk-final-pass-1-002 passou com limpeza: 14.400 s contínuos,
+4.032.001 operações úteis, zero drops/inesperados, 3.937 rejeições esperadas
+e 257.500 eventos sem perdas/duplicações/extras. Os 62 relatórios de fases
+fecharam os counters; app/PG preservaram identidade, 16 renovações e dois
+ciclos de poda. Foram 3.283 amostras, gap11,0 s, census100k/100k/10.129 e
+seis censos de descanso iguais (24FD/4tarefas/18sockets), zero transações
+presas. É baseline ELF75/fonte2ef, não o novo candidato. O checkpoint012
+chegou a 118.734 s (32h58min54s), excluindo warmup/preparo/descanso/parciais.
+
+O CSV allowlisted foi exportado antes de qualquer compressão de raw. PNG/SVG
+foram renderizados e inspecionados: a primeira execução teve aviso não fatal
+de cache Fontconfig; ela e seu produtor foram retidos privadamente. Cache
+XDG/MPL próprio corrigiu o aviso; segunda renderização manteve o mesmo PNG
+SHA5569c46e, com recibo novo e nenhum aviso. Nenhum dado foi alterado.
+A projeção de owners passou a computar igualdade, sem presumir recuperação.
+
+A suíte Python024 executou290 testes com dois erros de Oxlint: o TMPDIR
+que defini em target/ fez o engine ignorar fixtures e emitir aviso antes
+do JSON. Reproduzido explicitamente com number_of_files0; não era defeito
+do binário. TMPDIR próprio fora do repositório, no filesystem workspace,
+resolveu. A suíte025 passou290/290 em14,987 s, sem ignorar testes nem alterar
+assertions/regras. A probe HEAD404 de100iterações com GCdesativado manteve
+5->5FD; sem defeito reproduzido, não foi feito patch nesse helper.
+
+No intervalo, archive003 foi revalidado (SHA98248025,1.068.449.450B), assim
+como os121 outputs debug restaurados: hashes, modos, mtime e hardlinks.
+A remoção somente desses caches rebuildáveis liberou3.740.049.408B em6,986s.
+Release-cache, dados, baseline e Git foram preservados. Debug checks precisam
+restauração/rebuild; o build planejado é release-only. Nenhum Rustbuild/test
+local ocorreu desde a restauração anterior, apenas rustfmt.
+
+O crescimento anônimo observado (26,668->29,242MiB nas medianas de15min)
+não recebeu atribuição automática a cache. O plano inclui verificação no
+candidato e diagnóstico separado de quatro horas com alocador, se persistir;
+instrumentação continua excluída das comparações ordinárias.
