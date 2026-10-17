@@ -340,6 +340,10 @@ def run(args):
             phase=label
             if rate is None:
                 rate=args.rate
+            scheduling_before=None
+            if args.focus=='matrix':
+                from generator_cpu import observe
+                scheduling_before=observe(cpus)
             print('Running',label,rate,'iterations/s for',seconds,'seconds',flush=True)
             start=time.monotonic()
             counts=Counter()
@@ -397,6 +401,9 @@ def run(args):
             latency=successful_latency_evidence(success_latencies)
             qualified=latency is not None and latency['p95_ms']<=500 and latency['p99_ms']<=1500 and counts['dropped_arrivals']<=seconds*rate*.01 and not counts['503'] and not counts['504'] and not counts['connection-unavailable']
             report={'counts':dict(counts),'requested_seconds':seconds,'elapsed_seconds':elapsed,'offered_iterations':seconds*rate,'rate':rate,'fault_injected':action is not None,'exploratory':exploratory,'success_latency':latency,'nominal_qualified':qualified}
+            if scheduling_before is not None:
+                from generator_cpu import evidence, observe
+                report['generator_cpu']=evidence(scheduling_before,observe(cpus))
             atomic_json(output/(label+'.json'),report)
             with (output/'traffic-ledger.jsonl').open('a') as ledger:
                 ledger.write(json.dumps({'phase':label,'requested_seconds':seconds,'elapsed_seconds':elapsed,'completed':True,'started_monotonic':start,'ended_monotonic':time.monotonic()})+'\n')

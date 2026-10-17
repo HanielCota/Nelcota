@@ -194,6 +194,12 @@ def main():
         report["checks"]["capacity"] = None
         if args.full:
             report["checks"]["capacity"] = read_receipt(output / "capacity.json")
+            probes = read_receipt(output / 'capacity-probes.json')
+            require(isinstance(probes, list) and len(probes) == 4
+                    and [probe['rate'] for probe in probes] == [8, 16, 24, 32]
+                    and all(probe['requested_seconds'] == 300 for probe in probes),
+                    'Missing complete five-minute capacity qualification evidence')
+            report['checks']['capacity_probes'] = probes
         for name in ["invariants.json", "restore.json", "lost-commit-replies.json", "launch-manifest.json"]:
             report["checks"][name] = read_receipt(output / name)
         with (output / "resources.jsonl").open("rb") as stream:
@@ -201,6 +207,9 @@ def main():
         report["status"] = "passed"
     except Exception as error:
         report["failure"] = {"type": type(error).__name__}
+        path = output / 'capacity-probes.json'
+        if path.is_file():
+            report['checks']['capacity_probes'] = read_receipt(path)
         preparation = output / 'preparation-failure.json'
         if preparation.exists():
             from project_diagnostics import validate as validate_setup
