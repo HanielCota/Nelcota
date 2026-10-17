@@ -93,6 +93,12 @@
           "status": "passed",
           "evidence": "disk-current-protocol-baseline.json",
           "scope": "Retained baseline only: current counter/logical-latency/TSDB protocol, 62 closed phases, 14400s continuous at280/s, zero drops/unexpected, 3937 negatives, 257500 events reconciled, same app/PG, two pruning cohorts,16 renewals,3283 samples/gap11s, six identical idle owner censuses and owned cleanup. Final candidate and remaining row clauses still separate."
+        },
+        {
+          "run_id": "s3-retained-baseline-002",
+          "status": "passed",
+          "evidence": "s3-current-protocol-baseline.json",
+          "scope": "Retained old binary comparison baseline only:62 closed phases, three steady per workload, qualified400/s ceiling and600s soak at280/s;168001 useful/171036 physical HTTP/128 negatives, zero drops/unexpected,64248 events reconciled,843 samples/gap11.5s, final idle/census/cleanup. No four-hour or final-candidate approval."
         }
       ]
     },
@@ -186,6 +192,12 @@
           "status": "passed",
           "evidence": "disk-current-protocol-baseline.json",
           "scope": "Retained baseline only: current counter/logical-latency/TSDB protocol, 62 closed phases, 14400s continuous at280/s, zero drops/unexpected, 3937 negatives, 257500 events reconciled, same app/PG, two pruning cohorts,16 renewals,3283 samples/gap11s, six identical idle owner censuses and owned cleanup. Final candidate and remaining row clauses still separate."
+        },
+        {
+          "run_id": "s3-retained-baseline-002",
+          "status": "passed",
+          "evidence": "s3-current-protocol-baseline.json",
+          "scope": "Retained old binary comparison baseline only:62 closed phases, three steady per workload, qualified400/s ceiling and600s soak at280/s;168001 useful/171036 physical HTTP/128 negatives, zero drops/unexpected,64248 events reconciled,843 samples/gap11.5s, final idle/census/cleanup. No four-hour or final-candidate approval."
         }
       ]
     },
@@ -224,6 +236,12 @@
           "status": "passed",
           "evidence": "disk-current-protocol-baseline.json",
           "scope": "Retained baseline only: current counter/logical-latency/TSDB protocol, 62 closed phases, 14400s continuous at280/s, zero drops/unexpected, 3937 negatives, 257500 events reconciled, same app/PG, two pruning cohorts,16 renewals,3283 samples/gap11s, six identical idle owner censuses and owned cleanup. Final candidate and remaining row clauses still separate."
+        },
+        {
+          "run_id": "s3-retained-baseline-002",
+          "status": "passed",
+          "evidence": "s3-current-protocol-baseline.json",
+          "scope": "Retained old binary comparison baseline only:62 closed phases, three steady per workload, qualified400/s ceiling and600s soak at280/s;168001 useful/171036 physical HTTP/128 negatives, zero drops/unexpected,64248 events reconciled,843 samples/gap11.5s, final idle/census/cleanup. No four-hour or final-candidate approval."
         }
       ]
     },
@@ -393,6 +411,12 @@
           "status": "failed",
           "scope": "80 completed seconds in larger million-row/one-MiB profile before physical S3 storage exceeded original 1024-MiB budget. Final integrity not reached; cleanup confirmed.",
           "evidence": "s3-http-latency-smoke-failed.json"
+        },
+        {
+          "run_id": "s3-retained-baseline-002",
+          "status": "passed",
+          "evidence": "s3-current-protocol-baseline.json",
+          "scope": "Retained old binary comparison baseline only:62 closed phases, three steady per workload, qualified400/s ceiling and600s soak at280/s;168001 useful/171036 physical HTTP/128 negatives, zero drops/unexpected,64248 events reconciled,843 samples/gap11.5s, final idle/census/cleanup. No four-hour or final-candidate approval."
         }
       ]
     },
@@ -468,6 +492,12 @@
           "status": "passed",
           "evidence": "disk-current-protocol-baseline.json",
           "scope": "Retained baseline only: current counter/logical-latency/TSDB protocol, 62 closed phases, 14400s continuous at280/s, zero drops/unexpected, 3937 negatives, 257500 events reconciled, same app/PG, two pruning cohorts,16 renewals,3283 samples/gap11s, six identical idle owner censuses and owned cleanup. Final candidate and remaining row clauses still separate."
+        },
+        {
+          "run_id": "s3-retained-baseline-002",
+          "status": "passed",
+          "evidence": "s3-current-protocol-baseline.json",
+          "scope": "Retained old binary comparison baseline only:62 closed phases, three steady per workload, qualified400/s ceiling and600s soak at280/s;168001 useful/171036 physical HTTP/128 negatives, zero drops/unexpected,64248 events reconciled,843 samples/gap11.5s, final idle/census/cleanup. No four-hour or final-candidate approval."
         }
       ]
     },
@@ -512,6 +542,12 @@
           "status": "passed",
           "evidence": "disk-current-protocol-baseline.json",
           "scope": "Retained baseline only: current counter/logical-latency/TSDB protocol, 62 closed phases, 14400s continuous at280/s, zero drops/unexpected, 3937 negatives, 257500 events reconciled, same app/PG, two pruning cohorts,16 renewals,3283 samples/gap11s, six identical idle owner censuses and owned cleanup. Final candidate and remaining row clauses still separate."
+        },
+        {
+          "run_id": "s3-retained-baseline-002",
+          "status": "passed",
+          "evidence": "s3-current-protocol-baseline.json",
+          "scope": "Retained old binary comparison baseline only:62 closed phases, three steady per workload, qualified400/s ceiling and600s soak at280/s;168001 useful/171036 physical HTTP/128 negatives, zero drops/unexpected,64248 events reconciled,843 samples/gap11.5s, final idle/census/cleanup. No four-hour or final-candidate approval."
         }
       ]
     },
@@ -1001,6 +1037,12 @@
       "ordinary_checks": 18,
       "source_commit": "7e68fd21430ac93125149f60927f8676b077811d",
       "evidence": "ci-final-artifact-source.json"
+    },
+    "local_campaign_status": {
+      "active": "disk-candidate-pass-1-001",
+      "status": "first final run started; no four-hour result yet",
+      "retained_s3_baseline": "s3-current-protocol-baseline.json",
+      "retained_s3_scope": "62 current-protocol closed phases and600s soak, not four hours"
     }
   }
 }

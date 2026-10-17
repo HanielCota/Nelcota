@@ -179,5 +179,13 @@
     "traffic_limits_and_slos": "unchanged; same predeclared baseline profile and600s soak",
     "operator": "Bounded detached controller with independent per-campaign watchdogs and generation receipts; serialize the retry and all four final endurance runs, stop on failed workload/evidence/cleanup/comparison. It changes no test or approval criterion.",
     "final_candidates_started_before_interruption": false
+  },
+  "provider_owner_follow_up": {
+    "declared_utc": "2026-10-17T03:47:43.729685+00:00",
+    "trigger": "Current S3 baseline observed provider cgroup peak225 tasks,617418752 memory.current bytes and297971712 anonymous bytes without OOM. Task count is not an attribution of anonymous bytes.",
+    "action": "Inspect exact provider runtime/allocator ownership options; if supported, perform a separate bounded default-versus-explicit-worker diagnostic without changing any ordinary baseline/final profile.",
+    "ordinary_profiles_unchanged": true,
+    "performance_comparison_scope": "Alternative provider runtime settings cannot certify equivalence with the default profile. Requested-live-byte accounting remains unavailable until observed; cumulative allocation is never treated as live bytes.",
+    "production_deployment": false
   }
 }

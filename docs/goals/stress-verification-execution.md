@@ -2174,3 +2174,32 @@ free bytes, unlike the previously restored upper-layer cache003. No logical
 size is presented as reclaimed headroom. The private 163,161,294-byte archive
 and restoration manifest remain retained; no source, release ELF, data or
 original failure was discarded. Ten-project startup reserves are unchanged.
+
+
+### Retained S3 retry closed; first final disk candidate started (2026-10-17 03:47 UTC)
+
+[Retained S3 baseline002](results/stress/s3-current-protocol-baseline.json)
+passed 62 closed current-protocol phases, all three steady measurements per
+workload, the 400/s declared qualification ceiling and a 600-second soak
+at 280/s. It recorded 168,001 useful operations/171,036 physical HTTP/128
+expected negatives, zero drops/unexpected errors, 64,248 reconciled events,
+843 observations with 11.5-second maximum gap, final read-only census and
+confirmed cleanup. Short idle FD counts 26–28 returned to 24 after 180s;
+OS tasks stayed four. These are OS owners, not an exact Tokio-future or
+heap-object census. Session renewal, two pruning cohorts and four-hour
+endurance remain explicitly not run in this short baseline.
+
+The dedicated short evidence collector corrected two preparation errors
+(invalid taskset option and assuming a long-session canary file existed).
+The private preparation-failure receipt is retained; the mandatory strict
+four-hour summarizer was not relaxed.
+[Checkpoint014](results/stress/load-time-checkpoint-014.json) excludes the
+active candidate entirely and records 125,754 completed seconds (34h55m54s).
+
+The bounded detached controller started the first final disk candidate only
+after verified S3 closure. Its product tree still matches build source 7e68fd2
+and immutable local ELF b047fb88; four-hour and regression approval remain
+pending. The provider cgroup peak 225 tasks/617,418,752 memory.current bytes
+adds an ownership investigation, not a cache/live-allocation conclusion.
+Any alternative-worker diagnostic will be separate and cannot replace or
+silently reconfigure the ordinary default-provider comparisons.

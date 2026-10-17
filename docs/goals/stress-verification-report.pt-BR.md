@@ -1,15 +1,15 @@
 # G05 — relatório técnico de stress
 
 **Estado: em execução, sem aprovação do G05.** Este relatório é atualizado
-durante as campanhas. Data deste checkpoint: 17/10/2026, 02:13 UTC.
+durante as campanhas. Data deste checkpoint: 17/10/2026, 03:47 UTC.
 Não houve merge nem deploy de produção. O trabalho está na branch
 `test/g05-stress-verification`, no [PR #90](https://github.com/Nelcota/Nelcota/pull/90),
 mantido como rascunho para revisão.
 
 ## Tempo efetivo e artefatos
 
-O [checkpoint 013](results/stress/load-time-checkpoint-013.json) registra
-**120.864 segundos, ou 33h34min24s, de carga efetiva concluída**. O cálculo
+O [checkpoint 014](results/stress/load-time-checkpoint-014.json) registra
+**125.754 segundos, ou 34h55min54s, de carga efetiva concluída**. O cálculo
 conservador exclui preparação, aquecimento, descanso, fases interrompidas,
 controles artificiais e dupla contagem de janelas simultâneas. Tempo mínimo
 de oito horas atingido não significa aprovação dos demais critérios.
@@ -17,11 +17,11 @@ O tempo parcial das campanhas ainda abertas não está somado nesse checkpoint.
 
 | Artefato | Identidade e alcance |
 |---|---|
-| Código do backend sob carga local | `2efede8c27ee12119142170e8bd9742ff7cb900e` |
-| SHA-256 do binário local preservado | `75c44c85a85db26195166aa1d2c6caf481e3db476801ec8131525ef62adf1be0` |
-| Candidato local final congelado | `7e68fd21430ac93125149f60927f8676b077811d`; SHA-256 `b047fb880feb10e41e7d0308e6037b8cd3bc770b0452a30cab59c3e2d20514a0`; [proveniência](results/stress/final-local-candidate.json), [18 checks ordinários aprovados](results/stress/ci-final-artifact-source.json), carga final pendente |
+| Código do candidato agora sob carga local | `7e68fd21430ac93125149f60927f8676b077811d`; a fonte de build permanece congelada após commits somente de evidência/documentação |
+| SHA-256 do binário de baseline preservado | `75c44c85a85db26195166aa1d2c6caf481e3db476801ec8131525ef62adf1be0` |
+| Candidato local final congelado | `7e68fd21430ac93125149f60927f8676b077811d`; SHA-256 `b047fb880feb10e41e7d0308e6037b8cd3bc770b0452a30cab59c3e2d20514a0`; [proveniência](results/stress/final-local-candidate.json), [18 checks ordinários aprovados](results/stress/ci-final-artifact-source.json), primeira campanha final em disco iniciada |
 | SHA-256 do workload k6 atual | `0ac01578bf19155302fe465884b480d792569086f23bb4ba3615ca5f0ce2547d` |
-| Protocolo da repetição local em andamento | Snapshot imutável de `1f391594dd8db6cccac54d6720d90c33d461d1f1`; `disk-final-pass-1-002` concluiu como baseline no binário retido, com protocolo atual |
+| Baseline em disco no protocolo atual | Snapshot imutável de `1f391594dd8db6cccac54d6720d90c33d461d1f1`; `disk-final-pass-1-002` concluiu como baseline no binário retido, com protocolo atual |
 | Primeira execução nativa separada | [Actions 38962480993](https://github.com/Nelcota/Nelcota/actions/runs/38962480993), código congelado `e80770b3f6aa1f64d011a3d62f8ebf0f1201bdac`; reprovada no oráculo de signup antes do backup |
 | Primeiro fluxo nativo completo | [Evidência](results/stress/native-vm-runtime-pass-1.json), código `7e1bd25b20a706c66d0be549c6f85851b6db843f`; aprovado no escopo funcional declarado |
 | Candidato nativo com correção PostgreSQL | [Evidência](results/stress/native-vm-runtime-candidate-pass-1.json), código `6f8a3e727b85b869318c2a2712982293c0724125`; binário `0cccc84840b5d09ee76b1ab2005b52e7d702bd44c9f9c7662df5c6bde82e110f`, verificado dentro da VM |
@@ -45,10 +45,10 @@ O backend de produção continua um único binário Rust, sem Node ou Python.
 | 1 | Inventário, baseline imutável e SLOs declarados | Atendido para o staging local | [Inventário](results/stress/coverage-inventory.json), [plano](results/stress/final-campaign-plan.json), manifestos por execução. A matriz registra os cenários ainda incompletos. |
 | 2 | Calibração, unidades, amostragem e oráculos | Validado nos controles corrigidos | Controles nativos de bytes, redirects, contadores esparsos, cgroups e compactação; campanhas finais ainda precisam terminar. |
 | 3 | Cancelamento, watchdogs, redação e limpeza restrita | Demonstrado nos escopos local e nativo executados | [Controle nativo de guardas/pidfd](results/stress/native-guards-pidfd.json), interrupções reais e recibos de limpeza. A VM própria também confirmou limpeza e limites reais de kernel, sem guard crítico disparado nas execuções aprovadas. |
-| 4 | Duas passagens de steady/staircase/picos/descanso | Pendente no protocolo final | Fases anteriores e falhas estão preservadas. A primeira repetição foi interrompida; sua substituta passou no protocolo atual como baseline. As duas passagens do novo artefato final ainda precisam executar. |
+| 4 | Duas passagens de steady/staircase/picos/descanso | Pendente no protocolo final | Fases anteriores e falhas estão preservadas. A primeira repetição foi interrompida; sua substituta passou no protocolo atual como baseline. A primeira campanha em disco do novo artefato iniciou; as duas passagens por backend ainda precisam terminar. |
 | 5 | Toda a matriz funcional, de segurança e concorrência | Parcial | CI funcional, primeiros browser/fault e smokes reais disponíveis; cobertura funcional não substitui stress repetido de cada célula. |
 | 6 | Isolamento/fairness em 1/5/10 projetos e controle responsivo | Reprovado/incompleto | Primeira topologia de um projeto passou no protocolo anterior; cinco/dez projetos tiveram violações reais de fairness. Dez projetos também falharam no drain de 30 s. |
-| 7 | Quatro horas contínuas em disco e S3 no artefato final | Pendente | Três execuções históricas completaram fisicamente quatro horas, com aprovação de contadores retirada. Uma nova campanha em disco passou no protocolo atual, como baseline; as campanhas de quatro horas do novo candidato ainda não executaram. |
+| 7 | Quatro horas contínuas em disco e S3 no artefato final | Pendente | Três execuções históricas completaram fisicamente quatro horas, com aprovação de contadores retirada. Uma nova campanha em disco passou no protocolo atual, como baseline; a primeira campanha em disco do novo candidato iniciou; nenhuma campanha final de quatro horas foi aprovada até aqui. |
 | 8 | Falhas, drain, restart, restore e deployment aplicável | Parcial | Primeiro fault passou com reconciliação de ACKs e restore local novo. Dois fluxos nativos passaram no escopo de restore no mesmo alvo e perda da RAM da convidada. Repetição final de faults/carga, atualização operacional, DNS/ACME públicos e recuperação fora do host continuam incompletos. |
 | 9 | Recursos, invariantes de dados/arquivos/eventos e regressão | Parcial | Invariantes locais e plateaus observados; precisam das campanhas finais comparáveis. Retenção anônima do provedor ainda exige atribuição. |
 | 10 | Correções focadas e regressões dos defeitos confirmados | Verificado nos defeitos já reproduzidos; revisão continua | Antes/depois em cinco defeitos reais: cluster incorreto, unit relativa, outro host nativo, lease aninhado na migração e sucesso indevido de remoção com limpeza incompleta. Os cenários específicos passaram em VMs novas. A falha da fixture Rust teve local original recuperado e passou 1.000 repetições após I/O de prontidão; o erro original continua visível. Fairness não recebeu causa de produção inventada. |
@@ -149,7 +149,7 @@ duplicados ou extras; 129 objetos verificados e 10.129 objetos físicos com
 2.195 bytes. SQLite fechado passou integrity_check sem sidecars.
 
 Os cinco descansos após picos e o descanso final de 180 s tiveram os mesmos
-**24 descritores, quatro tarefas e 18 sockets**, sem transações presas/locks.
+**24 descritores, quatro tarefas do SO e 18 sockets**, sem transações presas/locks.
 RSS máximo geral: 49,1 MiB; no soak: 47,4 MiB. Disco PostgreSQL: máximo
 452 MiB. Não houve OOM. A mediana dos primeiros/últimos 15 minutos do soak
 subiu de **44,824 para 47,395 MiB de RSS** e de **26,668 para 29,242 MiB
@@ -303,3 +303,25 @@ a fase parcial, soak não executado e invariantes finais ausentes não
 receberam aprovação. Nenhuma campanha do candidato começou. O retry
 `002` mantém exatamente o tráfego, limites e SLOs e usará controlador
 limitado, independente da conexão com a ferramenta.
+
+
+O [novo baseline S3](results/stress/s3-current-protocol-baseline.json)
+concluiu 62 fases e um soak de **600 s**, com 168.001 operações úteis,
+171.036 HTTP físicos, 128 negativas esperadas, zero drops/erros inesperados
+e 64.248 eventos reconciliados. Foram 843 amostras, gap máximo 11,5 s,
+100.000 products/private, 10.129 objetos e limpeza completa. O censo final
+do app voltou a 24 descritores/quatro tarefas do SO/18 sockets, contra
+26–28 descritores nas pausas curtas; não há inferência de vazamento a
+partir de uma comparação de igualdade. O censo do SO não conta todas as
+futures Tokio ou todos os objetos vivos do heap.
+
+O RustFS atingiu 617.418.752 B de memory.current, pico kernel 630.173.696 B,
+297.971.712 B anônimos e 225 tarefas no cgroup, sem OOM. Isso motivou
+investigação separada das opções de runtime/alocador; não atribui a memória
+a threads/cache sem prova nem altera a configuração das campanhas ordinárias.
+A coleta deste resumo teve dois erros de preparação: opção taskset inválida
+e expectativa incorreta de um arquivo de canary longo no teste de 600 s.
+O coletor específico marca renovação longa, duas podas e quatro horas como
+**não executados**; o verificador obrigatório de quatro horas foi preservado.
+A primeira campanha final em disco usa o ELF b047fb88 e está em execução;
+seu tempo permanece excluído deste checkpoint até o encerramento.
