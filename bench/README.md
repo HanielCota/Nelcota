@@ -884,3 +884,23 @@ shared app/PG quota sums intentionally exceed each role's single pinned CPU;
 their configured sum is 11.8 CPUs, with a 3.8-CPU affinity bound. These numbers
 are declared, not a guarantee about an unmeasured host.
 Full host1/5/10 baselines and two candidate passes remain separately required.
+
+
+### Native restore error fencing control
+
+The optional `native-vm` case `runtime-pitr-error` runs only in an explicitly
+owned fresh guest. It temporarily substitutes the installed pgBackRest adapter
+with a fixed program that writes one inert owned marker and returns72. It accepts
+only the exact restore argument list and cannot overwrite an existing marker or
+follow its symlink. Real PostgreSQL data files are not changed. The actual CLI
+error path must leave app and PostgreSQL stopped before explicit fixture recovery.
+The original executable/hash, rows, private bytes and unauthorized-access canaries
+must then recover. Private command output remains bounded and unpublished.
+
+The helper is confined to the existing1.5-CPU/2-GiB target slice, with10percent
+CPU,96MiB/no swap,32tasks and120seconds; actual unit PID/kernel limits are checked
+before mutation. CLI failure/explicit recovery timeouts are35/60seconds. This
+controlled adapter probe is not successful PITR, real S3 recovery or evidence of
+data corruption. The first actual run must establish or refute the source-review
+hypothesis before a product correction is claimed. The ordinary twelve-case native
+suite remains unchanged. See the G05 execution record for actual verdicts.

@@ -3485,3 +3485,51 @@ Both additional guest cases require the live blocked-write witness, thirty ACKs,
 31row values, rollback/lock cleanup and actual post-recovery401/empty RLS/404.
 The new optional host-file real preflight still waits for both cases and queue
 cleanup. No local load-time credit, deployment or merge occurs.
+
+
+### 2026-10-17, 18:43 UTC — actual interrupted-write controls passed; restore-error probe prepared
+
+Both actual EC runtime-inflight guest cases passed, with33/31resource samples
+and cleanup. Each preserves30ACKs/31row values while one additional HTTPS write
+is blocked by the owned table lock before the cut. Witness ages are0.389811 and
+0.329620seconds, including observer roundtrip/VM lookup, below the unchanged2s
+limit. The blocked write rolls back; helper/locks are gone; actual post-recovery
+anonymous REST401/other-user empty RLS/private-file404 pass. Restore takes
+2.145765/1.845059seconds, guest recovery16.988847/15.409275seconds. Actual native
+ELFs are separately identified on the same final007 product trees; there is no
+COMMIT-flush, physical-host-loss, off-host or performance claim.
+[Both original reports](results/stress/native-final007-inflight-controls-001/index.json).
+
+The original supervisor stopped after one failed read-only GitHub metadata query.
+The independently bounded first workflow kept running and later passed. Its
+original identity39057126426 was adopted without redispatch; only the second
+workflow was newly dispatched. The replacement retains the original stage and
+workflow deadlines, allows at most three read attempts and never retries a
+mutation. Five mocked safety controls passed in0.004seconds framework/
+0.164675seconds operator. The old failed reader record is preserved; no HTTP
+status or test failure was inferred from the lost query.
+[Recovery and safety proof](results/stress/native-inflight-supervisor-read-recovery-001.json).
+The environment reconnection preserved both controller PID generations and fresh
+local samples; it restarted no fixture and earns no extra time credit.
+[Observed continuity](results/stress/environment-reconnect-continuity-20261017-1828.json).
+
+A further source review found a hypothesis in the PITR error handler: any
+pgBackRest restore error currently attempts to start app/PostgreSQL, although an
+adapter may have changed files before returning failure. Prepare a separately
+bounded actual-CLI control with an inert marker-only failing adapter, original
+package restoration and explicit fixture recovery. No production change or new
+defect count is claimed before actual reproduction. Forty-four focused native/
+artifact/control tests passed, including nine new boundaries and real isolated
+adapter subprocesses, zero skips,0.071801seconds framework/0.264915seconds
+operator on idle providerCPU3 during disk soak, under128MiB address-space/
+3CPU-second/15-second limits. No actual VM/PITR/DB or effective load credit.
+[Unrun probe and exact bounds](results/stress/native-pitr-error-control-predeclaration-001.json).
+
+The first real host-file preflight subsequently failed in preparation after
+14.697989seconds, with zero load/resource observations and complete cleanup.
+Its one-project private before-graph passed; five-project and pressure phases did
+not run. The original report is retained. A cold-image dependency gap is now
+reproduced separately, but the original failed VM did not export its exact
+preparation stage, so sole-cause attribution remains unproven. A new image/stage
+fix and another real preflight are required; no acceptance gate is waived.
+[Original failed preflight](results/stress/host-private-files-bootstrap-failure-001.json).

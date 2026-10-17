@@ -1173,3 +1173,33 @@ não têm resultado aprovado. O preflight real de arquivos privados permanece
 preparado, aguardando esses dois encerramentos. A endurance local em disco
 continua; intervalos remotos sobrepostos e soak parcial não aumentam o piso
 consolidado de 39h53m54s. O PR continua draft, sem merge ou deploy de produção.
+
+
+## Cortes em voo aprovados e preflight de arquivos reprovado — 18:43 UTC
+
+Os [dois cortes com escrita observada em voo](results/stress/native-final007-inflight-controls-001/index.json)
+passaram. A idade dos testemunhos foi 0,389811/0,329620 s, abaixo de 2 s. Cada VM
+preservou 30 ACKs e 31 valores, desfez a escrita bloqueada, liberou locks/helper
+e comprovou rejeições 401/404 e isolamento RLS após recuperar. Restore:
+2,145765/1,845059 s; recuperação da convidada: 16,988847/15,409275 s; 33/31
+amostras e limpeza confirmada. Não é corte durante COMMIT, perda física do host
+ou recuperação off-host. O supervisor perdeu uma consulta GitHub; a mesma
+execução foi adotada sem redisparo, com prazo original e retentativas apenas de
+leitura. [Erro original e cinco controles](results/stress/native-inflight-supervisor-read-recovery-001.json).
+
+O [preflight real de arquivos](results/stress/host-private-files-bootstrap-failure-001.json)
+falhou na preparação em 14,697989 s, com zero carga, zero amostras e limpeza
+confirmada. O grafo inicial de 1 projeto passou, mas pressão e 5 projetos não
+executaram. Há uma lacuna reproduzida na preparação das imagens numa VM vazia;
+a etapa exata da falha antiga não foi exportada, então a causa exclusiva ainda
+não está demonstrada. O caso permanece reprovado até nova execução real.
+
+Preparei também um [controle de erro do PITR](results/stress/native-pitr-error-control-predeclaration-001.json):
+um adaptador controlado escreve apenas um marcador inerte e falha; o CLI deve
+manter os serviços parados até recuperação explícita. O binário original, os
+bytes privados, as linhas e as rejeições de acesso precisam ser verificados.
+Os 44 testes focados do executor passaram, incluindo 9 novos; a VM desse caso
+não executou ainda. Não há nova falha de produto ou corrupção confirmada.
+O total continua em dez defeitos corrigidos; PITR/S3 real e off-host continuam
+com seus vereditos separados. A reconexão do ambiente preservou os processos e
+as amostras recentes; a validação final de continuidade ainda precisa fechar.

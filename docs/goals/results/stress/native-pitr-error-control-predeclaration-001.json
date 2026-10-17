@@ -1,0 +1,69 @@
+{
+  "utc": "2026-10-17T18:43:18.664860+00:00",
+  "status": "not run; controlled native CLI restore-error probe prepared",
+  "certifies_g05": false,
+  "hypothesis_confirmed": false,
+  "confirmed_production_defect_count_unchanged": 10,
+  "scenario": "runtime-pitr-error",
+  "focused_result": {
+    "tests": 44,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "successful": true,
+    "elapsed_seconds": 0.07180073397466913,
+    "failed_tests": []
+  },
+  "operator": {
+    "utc": "2026-10-17T18:34:02.489505+00:00",
+    "command": [
+      "timeout",
+      "--signal=TERM",
+      "--kill-after=3s",
+      "15s",
+      "taskset",
+      "-c",
+      "3",
+      "nice",
+      "-n",
+      "19",
+      "ionice",
+      "-c3",
+      "prlimit",
+      "--as=134217728:134217728",
+      "--cpu=3:3",
+      "--",
+      "python3",
+      "target/stress-g05/artifacts/run-native-pitr-focused-001.py"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.2649151649675332,
+    "source_sha256": {
+      "bench/native_pitr_failure.py": "9d266d2f6a9115ac8f31ba5700c4548153677d0250a792dd1fbab6e359cadbf7",
+      "bench/native_vm.py": "65f2f515031fd87217ed4115432ba7742186ce1b84c0396c29fc071484c1b620",
+      "bench/native_evidence.py": "9924e488a1e3decfcd89bfd892c981314fa9b1a336321768b4d403c1401409b5",
+      "scripts/review_tests/test_stress_native_pitr_error.py": "96494ae5b735885601938ac3a153064d0881495cb60036dbe5a91a67c234d31b",
+      ".github/workflows/stress.yml": "1b13356f39e6d1d4f064b99f70957c42a858a20341f733aff1bc7ec8c38f613c"
+    },
+    "log_sha256": "1277fff3ca5d0a5d83b41e08b551303d9c46351d97b28c064a88a4dae2f57993",
+    "scope": "Focused native/PITR harness guards, including isolated Python adapter subprocesses writing only temporary fixtures. Idle providerCPU3 during DISK, lowpriority per-process128MiBAS/3CPU-s/15s. No actual VM/systemd/PITR/DB traffic or effective load credit."
+  },
+  "profile": {
+    "VM_vcpus": 2,
+    "VM_memory_mib": 3072,
+    "target_parent_CPU": 1.5,
+    "target_parent_memory_mib": 2048,
+    "helper_CPU_percent": 10,
+    "helper_memory_mib": 96,
+    "helper_swap_bytes": 0,
+    "helper_tasks": 32,
+    "helper_RuntimeMax_seconds": 120,
+    "failure_CLI_timeout_seconds": 35,
+    "explicit_recovery_timeout_seconds": 60,
+    "parent_individual_CPU_quota_sum": 2.35,
+    "maximum_private_command_bytes": 65536
+  },
+  "safety": "Fresh explicitly owned native VM only; verify marker, actual own unit PID and kernel limits, installed package identity and PG17/main/archive-off. Exclusive fixed inert marker, O_NOFOLLOW, no PG database-file rewrite. Restore original pgBackRest binary/hash and remove only the controlled flag/marker, then explicitly recover the known marker-only fixture. Keep private command output bounded and unpublished.",
+  "oracle": "Actual CLI must fail after the controlled potentially modifying adapter error and leave app/Postgres stopped until explicit recovery. Numeric unit snapshots occur before explicit recovery. Real row digest/private bytes and actual unauthorized401/emptyRLS/404 are checked after explicit fixture recovery. Missing marker or failed cleanup cannot certify the control.",
+  "scope": "Adapter fault injection with the actual CLI, not a real successful/partial pgBackRest restore, S3, corruption or off-host PITR certificate. Read-only source review alone is not a confirmed defect. Production code remains unchanged until an actual reproduction. Separate from the already passed two observed-inflight guest cuts."
+}

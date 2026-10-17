@@ -35,7 +35,7 @@ ORIGIN = "https://cloud-images.ubuntu.com/releases/noble/release/"
 GIB = 1024 ** 3
 MIB = 1024 ** 2
 MAXIMUM_SECONDS = 1800
-SCENARIOS = ("runtime", "runtime-inflight", "cluster-routing", "default-root", "host-root", "clock-drift", "remove-boundary")
+SCENARIOS = ("runtime", "runtime-inflight", "runtime-pitr-error", "cluster-routing", "default-root", "host-root", "clock-drift", "remove-boundary")
 
 
 def require(condition, message):
@@ -442,6 +442,8 @@ def campaign(binary, output, scenario, pass_index=None):
         cpu_sum = 3.25
     if scenario == "runtime-inflight":
         cpu_sum += .05
+    if scenario == "runtime-pitr-error":
+        cpu_sum += .1
     identity = campaign_identity(os.environ["GITHUB_RUN_ID"], os.environ["GITHUB_RUN_ATTEMPT"], scenario, pass_index)
     unit(identity)
     require(unit_fields(identity).get("LoadState") == "not-found", "VM service already exists")
@@ -474,6 +476,11 @@ def campaign(binary, output, scenario, pass_index=None):
                           "maximum_table_lock_seconds": 30, "helper_runtime_seconds": 40,
                           "maximum_observation_age_seconds": 2,
                           "scope": "Owned guest table lock; blocked before COMMIT, no physical host power loss"},
+        "controlled_PITR_adapter_error": {"enabled": scenario == "runtime-pitr-error",
+                                         "helper_cpu_quota": .1, "helper_memory_mib": 96,
+                                         "helper_pids": 32, "helper_runtime_seconds": 120,
+                                         "real_PG_files_modified": False,
+                                         "scope": "Actual CLI error handling after inert owned marker; no real PITR/S3/data-corruption claim"},
         "controlled_guest_clock": {"enabled": scenario == "clock-drift", "maximum_forward_seconds": 1800,
                                    "step_verification_tolerance_seconds": 5,
                                    "maximum_restored_offset_seconds": 5, "restore_command_timeout_seconds": 15,
@@ -528,6 +535,9 @@ def campaign(binary, output, scenario, pass_index=None):
         if scenario == "runtime-inflight":
             guest.copy(Path(__file__).with_name("native_inflight.py"), "/tmp/native_inflight.py")
             guest.ssh(["sudo", "-n", "install", "-m", "600", "/tmp/native_inflight.py", "/opt/g05-tools/native_inflight.py"])
+        if scenario == "runtime-pitr-error":
+            guest.copy(Path(__file__).with_name("native_pitr_failure.py"), "/tmp/native_pitr_failure.py")
+            guest.ssh(["sudo", "-n", "install", "-m", "600", "/tmp/native_pitr_failure.py", "/opt/g05-tools/native_pitr_failure.py"])
         guest.ready = True
         guest.last_guest_sample = time.monotonic()
         if scenario in {"default-root", "host-root", "remove-boundary"}:
@@ -636,6 +646,44 @@ def campaign(binary, output, scenario, pass_index=None):
                     expected=(201,), headers={"Content-Type": "application/octet-stream"})
         require(api.request("GET", "/storage/v1/object/native/kept.bin", token=service) == original, "Native uploaded bytes differ")
         api.request("GET", "/storage/v1/object/native/kept.bin", expected=(404,))
+        if scenario == "runtime-pitr-error":
+            from native_pitr_failure import PROFILE as PITR_PROFILE, helper_name
+            guest.phase = "controlled-pitr-error"
+            helper = helper_name(identity)
+            raw = guest.ssh(["sudo", "-n", "systemd-run", "--quiet", "--wait", "--pipe", "--collect",
+                             "--unit=" + helper, "--description=g05-pitr-error:" + identity,
+                             "--slice=g05native.slice", "--property=CPUQuota=10%", "--property=CPUQuotaPeriodSec=100ms",
+                             "--property=MemoryMax=96M", "--property=MemorySwapMax=0", "--property=TasksMax=32",
+                             "--property=RuntimeMaxSec=120", "--property=TimeoutStopSec=5",
+                             "--property=Nice=19", "--property=IOSchedulingClass=idle", "--property=KillMode=control-group",
+                             "/usr/bin/python3", "/opt/g05-tools/native_pitr_failure.py", identity], timeout=145).stdout
+            require(len(raw) <= 65536, "Controlled PITR report exceeded its byte boundary")
+            report["native_contract"] = json.loads(raw)
+            control = report["native_contract"]
+            require(control.get("profile") == PITR_PROFILE and control.get("real_PG_files_modified") is False
+                    and control.get("owned_marker_written_before_adapter_failure") is True
+                    and control.get("controlled_adapter_and_flag_removed") is True
+                    and control.get("fixture_rows_preserved") is True
+                    and type(control.get("restore_exit_code")) is int and control["restore_exit_code"] != 0,
+                    "Controlled native restore error or explicit fixture recovery was not verified")
+            api.ready()
+            require(api.request("GET", "/storage/v1/object/native/kept.bin", token=service) == original,
+                    "PITR adapter control changed private fixture bytes")
+            require(json.loads(api.request("GET", "/rest/v1/native_probe?select=id", token=users[1])) == [],
+                    "PITR adapter control lost RLS isolation")
+            api.request("GET", "/rest/v1/native_probe", expected=(401,))
+            api.request("GET", "/storage/v1/object/native/kept.bin", expected=(404,))
+            control["post_explicit_recovery_unauthorized_API_status"] = 401
+            control["post_explicit_recovery_other_user_rows"] = 0
+            control["post_explicit_recovery_private_file_status"] = 404
+            require(control.get("unknown_state_kept_stopped") is True,
+                    "Unknown native restore error automatically reopened the project")
+            report["checks"].append("controlled native restore adapter error stays closed; original executable, rows, private bytes and authorization recover explicitly")
+            guest.phase = "native-remove"
+            report["native_remove"] = guest.action("remove", timeout=200)
+            guest.assert_safe()
+            report["status"] = "passed"
+            return
         guest.phase = "native-backup"
         backup = guest.action("backup", timeout=150)
         report["backup"] = {key: value for key, value in backup.items() if key != "dump"}

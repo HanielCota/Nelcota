@@ -1023,11 +1023,12 @@
         }
       ],
       "private_file_extension": {
-        "status": "not run",
+        "status": "real preflight failed in preparation; no under-load graph or five-project evidence yet",
         "focused_guards": "host-private-file-guards-001.json",
         "real_preflight_declaration": "host-private-file-preflight-guards-002.json",
         "full_host_predeclaration": "post-endurance-private-files-predeclaration-001.json",
-        "scope": "Existing failed fairness results remain failed. New full1/5/10 baselines and two candidate passes add identical bounded private-file pressure; short real-service preflight is prepared only."
+        "scope": "Existing failed fairness results remain failed. New full1/5/10 baselines and two candidate passes add identical bounded private-file pressure; short real-service preflight is prepared only.",
+        "failed_preflight": "host-private-files-bootstrap-failure-001.json"
       }
     },
     {
@@ -1533,17 +1534,19 @@
     "scope": "019conservative completed local load floor; current final007 disk soak is incomplete/uncredited. Two corrected remote matrices, eight native startup reproductions and both measured browser passes now passed. Two additional in-flight guest controls active. Remote overlap earns zero local time credit."
   },
   "native_inflight_cut": {
-    "status": "running; first actual fresh VM dispatched, no passing result yet",
+    "status": "passed scoped control twice",
     "scenario": "runtime-inflight",
     "required_independent_passes": 2,
-    "scope": "Separate additional interrupted-write guest control after existing native startup reproductions; blocked before COMMIT, no physical host power loss, commit-flush, off-host or ordinary performance claim. No local overlapping effective load credit.",
+    "scope": "Two guest RAM cuts with one observed table-lock-blocked write before COMMIT; thirtyACKs/31values retained, blocked write absent and helper/locks released. No physical host power loss, COMMIT-flush, off-host or ordinary performance claim.",
     "focused_guards": "native-inflight-cut-guards-002.json",
-    "recovery_negatives": "planned actual anonymous REST401/second-user empty RLS/private-file404; not run",
+    "recovery_negatives": "actual401/other-user0/private-file404 verified in both fresh guests",
     "first_workflow_run_id": 39057126426,
-    "source_commit": "ec9701225176c497c580bdb099ff06021e272981"
+    "source_commit": "ec9701225176c497c580bdb099ff06021e272981",
+    "completed_independent_passes": 2,
+    "evidence": "native-final007-inflight-controls-001/index.json"
   },
   "private_file_host_preflight": {
-    "status": "not run",
+    "status": "failed during preparation; corrective harness change not yet revalidated on real services",
     "evidence": "host-private-file-preflight-guards-002.json",
     "source_CI": "all18ordinarychecks passed; actual preflight not run",
     "focused_guards_passed": 55,
@@ -1555,7 +1558,11 @@
       ".github/workflows/stress.yml": "f9e99ea373017503b319dca1ba95868fd419d829b1c90ba29e5a92e504b3de5a"
     },
     "source_commit": "3cc1b83bfb83a7daa4747cfbd8119d95d2615550",
-    "CI_evidence": "ci-host-private-files-product-trees.json"
+    "CI_evidence": "ci-host-private-files-product-trees.json",
+    "failed_evidence": "host-private-files-bootstrap-failure-001.json",
+    "workload_effective_seconds": 0,
+    "resource_samples": 0,
+    "scope": "One-project initial owner/anonymous/metadata graph passed. Later preparation failed and owned cleanup passed; five-project and pressure stages did not run. Original exact failing stage was not exported. A cold dependency gap is reproduced separately; no sole-cause claim or relaxed gate."
   },
   "latest_inventory_update_utc": "2026-10-17T18:14:34.893203+00:00",
   "native_startup_reproductions": {
@@ -1563,5 +1570,13 @@
     "count": 8,
     "evidence": "native-final007-startup-reproductions-001/index.json",
     "scope": "Separate actual ELFs on the same final007product trees, same guest image, completedACKcuts only. Additional in-flight controls not run."
+  },
+  "native_pitr_error_hypothesis": {
+    "status": "not run; source hypothesis unconfirmed",
+    "evidence": "native-pitr-error-control-predeclaration-001.json",
+    "focused_native_and_control_tests_passed": 44,
+    "real_adapter_process_controls": "passed only on isolated temporary marker fixtures",
+    "confirmed_production_defects": 10,
+    "scope": "New controlled actual-CLI adapter-error case prepared, no actual PITR/S3/corruption certificate or production change."
   }
 }
