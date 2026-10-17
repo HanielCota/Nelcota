@@ -1,0 +1,38 @@
+{
+  "utc": "2026-10-17T19:22:14.942070+00:00",
+  "steps": [
+    {
+      "command": [
+        "npm",
+        "ci",
+        "--no-audit",
+        "--no-fund"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 14.377322657965124
+    },
+    {
+      "command": [
+        "npm",
+        "run",
+        "guides:pending"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.267896831035614
+    },
+    {
+      "command": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 4.8063954139943235
+    }
+  ],
+  "elapsed_seconds": 19.452034474990796,
+  "log_sha256": "a8d329d004045e58a0c1b85b3fcbc947569b9c99090c5ff2850ffd3486c80f3d",
+  "successful": true,
+  "prior_failed_attempt": "pitr-error-guide-assets-build-001.json; no node_modules after owned cache cleanup, marked import failed, build did not run",
+  "scope": "Install locked build-only dependencies; PITR restore-error recovery prose/Portuguese translation and regenerated embedded assets; sequential after focusedRust/Python, no campaign overlap."
+}

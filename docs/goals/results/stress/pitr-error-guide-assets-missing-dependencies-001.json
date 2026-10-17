@@ -1,0 +1,18 @@
+{
+  "utc": "2026-10-17T19:21:24.737674+00:00",
+  "steps": [
+    {
+      "command": [
+        "npm",
+        "run",
+        "guides:pending"
+      ],
+      "exit_code": 1,
+      "elapsed_seconds": 0.31477016396820545
+    }
+  ],
+  "elapsed_seconds": 0.3149647180107422,
+  "log_sha256": "7a21b7058094a59b37515fe3780d4316334d7c97716900772d4280aa040d0bc0",
+  "successful": false,
+  "scope": "PITR restore-error recovery prose/Portuguese translation and regenerated embedded assets; sequential after focusedRust/Python, no campaign overlap."
+}
