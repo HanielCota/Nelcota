@@ -1449,14 +1449,14 @@
     "regression_evidence": "ci-native-executable-identity-after.json"
   },
   "native_final_same_artifact_suite": {
-    "workflow_run_id": 39036557006,
-    "source_commit": "35f4a9725d7edcf571f91084c555c127e7323653",
-    "binary_sha256": "d0d1090c91da4435a0d27dcf1dddba1b8695f18f944b1dd8cc5e472089d17432",
+    "workflow_run_id": 39064489119,
+    "source_commit": "da262d77f4d2557ff5cbd9007b9a3a6273a92221",
+    "binary_sha256": "e03125c940dd6e533ce6c0f98aab296ec04d9fa7e5eea3ebf0fadf11a38c590d",
     "status": "passed",
-    "scope": "Two fresh independent passes of all six native/KVM scenarios on the common SDK/assets-corrected product source and ELF. This does not explain the original af01678 startup failure or certify endurance/capacity, physical host power loss, public DNS/ACME, PITR or off-host restore. Remote windows earn no overlapping local effective-time credit.",
     "cases": 12,
     "evidence": "native-final-suite/index.json",
-    "previous_suite": "native-final-suite-860d2f9/index.json"
+    "scope": "Two fresh independent passes of all six native/KVM scenarios on the common008 product source and ELF after the uncertainPITR-error stopped-service fix and rebuilt guide assets. This does not explain the original af01678 startup failure or certify endurance/capacity, physical host power loss, public DNS/ACME, PITR or off-host restore. Remote windows earn no overlapping local effective-time credit.",
+    "previous_suite": "native-final-suite-35f4a97/index.json"
   },
   "completed_current_protocol_disk_baseline": {
     "run_id": "disk-final-pass-1-002",
@@ -1544,7 +1544,7 @@
     "second_pass_evidence": "provider-runtime-corrected-pass-2.json"
   },
   "current_final_candidate": {
-    "status": "frozen008; ordinarysourceCI18/18, SDK204, five-scenariosmoke andtwoactualcorrectedPITRVMspassed; firstS3active, commonnative008suitepending",
+    "status": "frozen008; sourceCI18/SDK204, nativecommon12, immediatePITR2VMs andfive-scenariosmokepassed; firstS3active, bootpersistencehypothesispending",
     "latest_fix_commit": "3cd1b8a",
     "generated_asset_commit": "da262d77f4d2557ff5cbd9007b9a3a6273a92221",
     "source_commit": "da262d77f4d2557ff5cbd9007b9a3a6273a92221",
@@ -1560,7 +1560,9 @@
     "CI_evidence": "ci-final008-product-source.json",
     "SDK_unit_passed": 204,
     "active_endurance": "s3-final008-pass-1-001",
-    "native_complete_suite_workflow": 39064489119
+    "native_complete_suite_workflow": 39064489119,
+    "native_evidence": "native-final-suite/index.json",
+    "native_cases_passed": 12
   },
   "current_campaign_checkpoint": {
     "checkpoint": "load-time-checkpoint-020.json",
@@ -1602,7 +1604,7 @@
     "corrective_evidence": "host-resource-and-collected-watchdog-correction-001.json",
     "latest_focused_evidence": "host-Docker-name-and-watchdog-guards-001.json"
   },
-  "latest_inventory_update_utc": "2026-10-17T19:59:11.432585+00:00",
+  "latest_inventory_update_utc": "2026-10-17T20:28:04.514055+00:00",
   "native_startup_reproductions": {
     "status": "passed scoped repetitions; original failure unresolved",
     "count": 8,
@@ -1634,7 +1636,7 @@
     "status": "source-bound historical007 only; first disk4h/comparisons passed, laterPITRdefect requires008. PartialS3stopped/cleaned.",
     "latest_fix_commit": "9bca03bc689c425a7660c5da9305180450aeaa7c",
     "generated_asset_commit": "df77883b1d149938979ba7a76bde2b125b7dbf44",
-    "last_frozen_artifact_evidence": "final-local-candidate.json",
+    "last_frozen_artifact_evidence": "final-local-candidate-35f4a97.json",
     "last_frozen_scope": "final007 includes all ten confirmed production corrections and regenerated assets; no complete final endurance result yet",
     "SDK_before_after": [
       "sdk-independent-server-clients-before-001.json",
@@ -1649,7 +1651,7 @@
     "functional_smoke": "matrix-sdk007-auth-links-functional-smoke-001.json",
     "CI_evidence": "ci-host-private-files-product-trees.json",
     "ordinary_CI_checks_passed": 18,
-    "native_evidence": "native-final-suite/index.json",
+    "native_evidence": "native-final-suite-35f4a97/index.json",
     "native_cases_passed": 12,
     "browser_final007_status": "Both measured full final007 browser passes completed with same retained ELF/profiles; original refresh-SLO failure still unexplained.",
     "browser_final007_failure": "browser-sdk007-refresh-slo-first-failure-001.json",
@@ -1670,5 +1672,22 @@
     "resource_creation_started": false,
     "thresholds_reduced": false,
     "scope": "Exact existingvfsimage profiles,1536MiBPGdisk,8440MiBstartup,15percentreserve. Re-evaluate onlyafterlocalcampaignsclose with safeownedcachemaintenance; no speculativefreebyteclaim or foreigncleanup."
+  },
+  "historical_native_same_artifact_suite007": {
+    "workflow_run_id": 39036557006,
+    "source_commit": "35f4a9725d7edcf571f91084c555c127e7323653",
+    "binary_sha256": "d0d1090c91da4435a0d27dcf1dddba1b8695f18f944b1dd8cc5e472089d17432",
+    "status": "passed",
+    "scope": "Two fresh independent passes of all six native/KVM scenarios on the common SDK/assets-corrected product source and ELF. This does not explain the original af01678 startup failure or certify endurance/capacity, physical host power loss, public DNS/ACME, PITR or off-host restore. Remote windows earn no overlapping local effective-time credit.",
+    "cases": 12,
+    "evidence": "native-final-suite-35f4a97/index.json",
+    "previous_suite": "native-final-suite-860d2f9/index.json"
+  },
+  "native_PITR_boot_persistence": {
+    "status": "hypothesis unconfirmed; notrun",
+    "source_commit": "65d5ce498e8f63edd6a69d5938cd6e607c4faeb3",
+    "evidence": "native-pitr-boot-persistence-predeclaration-001.json",
+    "confirmed_production_defects": 11,
+    "pending": "CI18newharness andfreshactualVM; no productionchangebeforeproof"
   }
 }

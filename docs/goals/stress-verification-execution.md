@@ -3097,7 +3097,7 @@ Both runtime passes reconciled30ACKs with zero missing/duplicate/extra rows.
 Restores measured1.634/2.174s and guest recovery13.653/17.043s. Neither runtime
 cut occurred during an observed in-flight write; no such coverage is inferred.
 The original unexplained af01678startup failure remains open.
-[All final007 native cases](results/stress/native-final-suite/index.json) and
+[All final007 native cases](results/stress/native-final-suite-35f4a97/index.json) and
 [all thirteen preserved native006 files](results/stress/native-final-suite-860d2f9/index.json)
 retain their distinct sources and executables. Historical prose now links
 to its original source-specific archive instead of a moving current index.
@@ -3742,3 +3742,24 @@ rodou ao lado deS3. CI completo e fim de015/fila vazia precedem a VM nova.
 Produto008/ELF e seus seis trees não mudaram; não alterar produção antes de
 reprodução real. Mantém11defeitos confirmados e as falhas originais.
 [Protocolo/limites/hashes](results/stress/native-pitr-boot-persistence-predeclaration-001.json).
+
+
+### 2026-10-17, 20:28 UTC — suíte nativa008 fechada e publicada
+
+Remote015/workflow39064489119 fechou12/12 e12relatórios verificados às
+20:24:36UTC. ELFcomume03125c940dd6e533ce6c0f98aab296ec04d9fa7e5eea3ebf0fadf11a38c590d,
+30467704bytes, fonteDA e seis árvores008. Runtimepass1:32samples,30ACKs,
+restore2,167807s,guest18,002599s. Pass2:31samples,30ACKs,restore1,909764s,
+guest15,441738s. Nenhum cut coincide com write em voo nesse par. Cleanup
+true/criticalguardnone emtodos. Promover somente apósownercompleted e
+checksums originais;13arquivos007 copiados/verificados em
+native-final-suite-35f4a97 antes de remover as entradas anteriores do índice.
+[12originais/índice](results/stress/native-final-suite/index.json).
+
+Nova fonte65d5ce498e8f63edd6a69d5938cd6e607c4faeb3 tem controle
+runtime-pitr-reboot e testes preparados, sem mutação emRust/assets.
+WatcherCIaguarda18/18 dessa fonte; launcher217463 esperaCI+015complete
+e fila vazia antes de criarref própria e lançar remote016 (umaVM).
+Actualbootprobe não executado; fontehipótese não é confirmação de novo
+defeito. Não pausar/alterarS3 por hipótese. Proteção local de recursos e
+contadores continuam no snapshot ativo; timefloor020unchanged.

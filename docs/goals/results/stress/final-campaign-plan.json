@@ -305,14 +305,13 @@
     }
   ],
   "native_same_artifact_suite": {
-    "workflow_run_id": 39017663454,
-    "source_commit": "f40774e1504a924fe6d9c801e251278cee1a8fab",
-    "binary_sha256": "872c3b1efc71e0118386cdd3caf36bae0de26cb213307b91396fe30c0af83d75",
+    "workflow_run_id": 39064489119,
+    "source_commit": "da262d77f4d2557ff5cbd9007b9a3a6273a92221",
+    "binary_sha256": "e03125c940dd6e533ce6c0f98aab296ec04d9fa7e5eea3ebf0fadf11a38c590d",
     "status": "passed",
     "cases": 12,
     "evidence": "native-final-suite/index.json",
-    "historical_7e_suite": "native-final-suite-7e68fd2/index.json",
-    "scope": "Native functional scope only; final load/other matrices and unresolved earlier startup failure remain separate."
+    "scope": "Two fresh independent passes of all six native/KVM scenarios on the common008 product source and ELF after the uncertainPITR-error stopped-service fix and rebuilt guide assets. This does not explain the original af01678 startup failure or certify endurance/capacity, physical host power loss, public DNS/ACME, PITR or off-host restore. Remote windows earn no overlapping local effective-time credit."
   },
   "allocator_follow_up": {
     "declared_utc": "2026-10-17T01:19:02.464282+00:00",
@@ -759,7 +758,9 @@
     "identity": "008",
     "status": "frozen; actual150ssmokepassed, fullCI/2actualPITRbeforeordinary gated",
     "build_evidence": "final-local-candidate-da262d7.json",
-    "functional_smoke": "matrix-sdk008-auth-links-functional-smoke-001.json"
+    "functional_smoke": "matrix-sdk008-auth-links-functional-smoke-001.json",
+    "native_suite_evidence": "native-final-suite/index.json",
+    "native_cases_passed": 12
   },
   "historical_candidate006": {
     "source_commit": "860d2f990949bfc5c8c612de3341c65a39e8d259",
@@ -1704,7 +1705,7 @@
     "binary_sha256": "96811748f1f45ad4894114188642f9343df661c750ad22768eaf2275659081b1",
     "build_seconds": 93.28642953903181,
     "status": "frozen final007; ordinaryCI18/native12passed; first ordinary disk campaign active, final endurance and comparisons pending",
-    "evidence": "final-local-candidate.json",
+    "evidence": "final-local-candidate-35f4a97.json",
     "previous_candidate_evidence": "final-local-candidate-860d2f9.json",
     "SDK_before_after": [
       "sdk-independent-server-clients-before-001.json",
@@ -1714,10 +1715,27 @@
     "functional_smoke": "matrix-sdk007-auth-links-functional-smoke-001.json",
     "ordinary_CI_evidence": "ci-sdk007-auth-metrics-product-trees.json",
     "ordinary_CI_checks_passed": 18,
-    "native_suite_evidence": "native-final-suite/index.json",
+    "native_suite_evidence": "native-final-suite-35f4a97/index.json",
     "native_cases_passed": 12,
     "current_browser_passes": 1,
     "current_browser_evidence": "browser-sdk007-measured-auth-pass-1-001.json",
     "original_browser_failure": "browser-sdk007-refresh-slo-first-failure-001.json"
+  },
+  "historical_native_same_artifact_suite_f40774e": {
+    "workflow_run_id": 39017663454,
+    "source_commit": "f40774e1504a924fe6d9c801e251278cee1a8fab",
+    "binary_sha256": "872c3b1efc71e0118386cdd3caf36bae0de26cb213307b91396fe30c0af83d75",
+    "status": "passed",
+    "cases": 12,
+    "evidence": "native-final-suite-f40774e/index.json",
+    "historical_7e_suite": "native-final-suite-7e68fd2/index.json",
+    "scope": "Native functional scope only; final load/other matrices and unresolved earlier startup failure remain separate."
+  },
+  "PITR_boot_persistence_predeclaration": {
+    "evidence": "native-pitr-boot-persistence-predeclaration-001.json",
+    "status": "notrun; newsourceCI/freshVMpending",
+    "scenario": "runtime-pitr-reboot",
+    "new_production_fix_applied": false,
+    "confirmed_defects": 11
   }
 }

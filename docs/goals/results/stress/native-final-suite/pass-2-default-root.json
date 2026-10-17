@@ -1,12 +1,12 @@
 {
   "scope": "Complete original public native report reconstructed losslessly from bounded checksummed Actions notices; original verdict and source preserved",
-  "notice_report_sha256": "bdd4eb91b60c8aa9e85d07faffc61a3f6fdf7c1432889320abc67fa5cfeb4599",
+  "notice_report_sha256": "9d5b9c103c0e8464458b9155d19e06e242e3f8908aab092bb982e736fa9f5851",
   "notice_encoding": "gzip+base64",
   "notice_parts": 1,
   "report": {
-    "identity": "native-vm-39036557006-1-p2-default-root",
-    "source": "35f4a9725d7edcf571f91084c555c127e7323653",
-    "binary_sha256": "d0d1090c91da4435a0d27dcf1dddba1b8695f18f944b1dd8cc5e472089d17432",
+    "identity": "native-vm-39064489119-1-p2-default-root",
+    "source": "da262d77f4d2557ff5cbd9007b9a3a6273a92221",
+    "binary_sha256": "e03125c940dd6e533ce6c0f98aab296ec04d9fa7e5eea3ebf0fadf11a38c590d",
     "scenario": "default-root",
     "certifies_g05": false,
     "checks": [
@@ -43,16 +43,16 @@
       "up_exit_code": 0,
       "up_timed_out": false,
       "app_unit": {
-        "MainPID": 6070,
+        "MainPID": 6119,
         "StatusErrno": 0,
         "Result": "success",
         "NRestarts": 0,
         "ExecMainCode": 0,
         "ExecMainStatus": 0,
         "ControlGroup": "/g05native.slice/nelcota-stress.service",
-        "MemoryCurrent": 2727936,
-        "MemoryPeak": 22536192,
-        "CPUUsageNSec": 62587000,
+        "MemoryCurrent": 2732032,
+        "MemoryPeak": 22573056,
+        "CPUUsageNSec": 86630000,
         "TasksCurrent": 3,
         "MemoryMax": 134217728,
         "TasksMax": 128,
@@ -75,11 +75,11 @@
           "pids": 128
         },
         "cpu_stat": {
-          "usage_usec": 62587,
-          "user_usec": 38738,
-          "system_usec": 23849,
+          "usage_usec": 86630,
+          "user_usec": 43836,
+          "system_usec": 42793,
           "core_sched.force_idle_usec": 0,
-          "nr_periods": 10,
+          "nr_periods": 13,
           "nr_throttled": 0,
           "throttled_usec": 0,
           "nr_bursts": 0,
@@ -90,8 +90,8 @@
         "task_count": 3
       },
       "running_binary_identity": {
-        "running_binary_sha256": "d0d1090c91da4435a0d27dcf1dddba1b8695f18f944b1dd8cc5e472089d17432",
-        "provided_binary_sha256": "d0d1090c91da4435a0d27dcf1dddba1b8695f18f944b1dd8cc5e472089d17432",
+        "running_binary_sha256": "e03125c940dd6e533ce6c0f98aab296ec04d9fa7e5eea3ebf0fadf11a38c590d",
+        "provided_binary_sha256": "e03125c940dd6e533ce6c0f98aab296ec04d9fa7e5eea3ebf0fadf11a38c590d",
         "same_deployed_inode": true
       },
       "cwd_migration_exit_code": 0,
@@ -103,8 +103,8 @@
       "applied_fixture_migrations": 1
     },
     "status": "passed",
-    "elapsed_seconds_including_preparation": 74.15734857399998,
-    "resource_samples": 15,
+    "elapsed_seconds_including_preparation": 87.18998916599999,
+    "resource_samples": 17,
     "cleanup_confirmed": true,
     "cleanup_scope": "owned QEMU service stopped; private guest disk/keys remain only on the disposable runner until its destruction",
     "safety_guard_failure": null

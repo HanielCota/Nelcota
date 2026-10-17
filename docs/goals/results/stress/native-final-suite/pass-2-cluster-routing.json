@@ -1,12 +1,12 @@
 {
   "scope": "Complete original public native report reconstructed losslessly from bounded checksummed Actions notices; original verdict and source preserved",
-  "notice_report_sha256": "aa3944d0201d1f7f2d2d791d41dd1cff2f70b41e4236238129d32a247feadd2c",
+  "notice_report_sha256": "d546b0d78d0ea9bb3927000d63c1538da3ddc87e3cc5236ffff711ec7cd1a81b",
   "notice_encoding": "gzip+base64",
   "notice_parts": 1,
   "report": {
-    "identity": "native-vm-39036557006-1-p2-cluster-routing",
-    "source": "35f4a9725d7edcf571f91084c555c127e7323653",
-    "binary_sha256": "d0d1090c91da4435a0d27dcf1dddba1b8695f18f944b1dd8cc5e472089d17432",
+    "identity": "native-vm-39064489119-1-p2-cluster-routing",
+    "source": "da262d77f4d2557ff5cbd9007b9a3a6273a92221",
+    "binary_sha256": "e03125c940dd6e533ce6c0f98aab296ec04d9fa7e5eea3ebf0fadf11a38c590d",
     "scenario": "cluster-routing",
     "certifies_g05": false,
     "checks": [
@@ -36,16 +36,16 @@
       "native_postgres_configuration_written": false,
       "units": {
         "postgresql@17-main.service": {
-          "MainPID": 5411,
+          "MainPID": 5412,
           "StatusErrno": 0,
           "Result": "success",
           "NRestarts": 0,
           "ExecMainCode": 0,
           "ExecMainStatus": 0,
           "ControlGroup": "/g05native.slice/postgresql@17-main.service",
-          "MemoryCurrent": 20697088,
-          "MemoryPeak": 29057024,
-          "CPUUsageNSec": 126996000,
+          "MemoryCurrent": 20709376,
+          "MemoryPeak": 29278208,
+          "CPUUsageNSec": 126291000,
           "TasksCurrent": 6,
           "MemoryMax": 536870912,
           "TasksMax": 256,
@@ -68,9 +68,9 @@
             "pids": 256
           },
           "cpu_stat": {
-            "usage_usec": 126996,
-            "user_usec": 59470,
-            "system_usec": 67525,
+            "usage_usec": 126291,
+            "user_usec": 54119,
+            "system_usec": 72171,
             "core_sched.force_idle_usec": 0,
             "nr_periods": 11,
             "nr_throttled": 0,
@@ -83,16 +83,16 @@
           "task_count": 1
         },
         "postgresql@17-sentinel.service": {
-          "MainPID": 5367,
+          "MainPID": 5376,
           "StatusErrno": 0,
           "Result": "success",
           "NRestarts": 0,
           "ExecMainCode": 0,
           "ExecMainStatus": 0,
           "ControlGroup": "/g05native.slice/postgresql@17-sentinel.service",
-          "MemoryCurrent": 21762048,
-          "MemoryPeak": 29118464,
-          "CPUUsageNSec": 155958000,
+          "MemoryCurrent": 21770240,
+          "MemoryPeak": 29249536,
+          "CPUUsageNSec": 154519000,
           "TasksCurrent": 6,
           "MemoryMax": 402653184,
           "TasksMax": 256,
@@ -115,11 +115,11 @@
             "pids": 256
           },
           "cpu_stat": {
-            "usage_usec": 155958,
-            "user_usec": 51948,
-            "system_usec": 104009,
+            "usage_usec": 154519,
+            "user_usec": 67527,
+            "system_usec": 86992,
             "core_sched.force_idle_usec": 0,
-            "nr_periods": 18,
+            "nr_periods": 14,
             "nr_throttled": 0,
             "throttled_usec": 0,
             "nr_bursts": 0,
@@ -133,8 +133,8 @@
       "scope": "Both clusters are generated fixtures in the uniquely owned VM. No existing host data or production resources were used."
     },
     "status": "passed",
-    "elapsed_seconds_including_preparation": 79.12855696499999,
-    "resource_samples": 15,
+    "elapsed_seconds_including_preparation": 79.150544947,
+    "resource_samples": 16,
     "cleanup_confirmed": true,
     "cleanup_scope": "owned QEMU service stopped; private guest disk/keys remain only on the disposable runner until its destruction",
     "safety_guard_failure": null
