@@ -2027,3 +2027,22 @@ somente ao final, além de recusa de up no host antigo vazio. Foram 16 amostras,
 80,168 s incluindo preparo e limpeza, sem aprovação de endurance/throughput.
 As quatro regressões Rust novas aguardam conclusão do CI de seu próprio SHA;
 o teste real valida o fluxo de remoção, não PITR remoto ainda não configurado.
+
+### 17/10, 00:11 UTC — continuidade após atualização de estado e plano final preservado
+
+O estado do ambiente foi republicado como starting/ready, mas o heartbeat
+continuou recente. A verificação somente leitura em 00:09:28 confirmou os
+mesmos IDs, PIDs e StartedAt do app e PostgreSQL registrados antes do soak;
+não houve restart provocado pelo agente. A validação final de toda a janela
+ainda depende do encerramento, sem atribuir passe apenas a esse checkpoint.
+O skill de onboarding foi consultado para revalidar o ambiente disponível;
+não foi necessário reconfigurar ferramentas nem salvar um novo draft.
+
+O [plano pré-declarado](results/stress/final-campaign-plan.json) foi ampliado
+antes das próximas medições: o disco local congelado permanece baseline;
+os dois passes finais de quatro horas por backend continuam obrigatórios
+no novo candidato. Um baseline S3 ordinário novo no binário retido usará
+o mesmo perfil de steady/capacidade, com soak diagnóstico de 600 s, apenas
+para comparar as três amostras steady no protocolo atual. Não substitui
+nenhuma endurance final nem equipara a janela curta a quatro horas. A suite
+nativa terá um ELF para os doze casos, separado do build local de performance.

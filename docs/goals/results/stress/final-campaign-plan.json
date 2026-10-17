@@ -126,6 +126,39 @@
       ],
       "approval_slos_or_integrity_thresholds_reduced": false,
       "ordinary_four_hour_disk_and_s3_criteria_unchanged": true
+    },
+    {
+      "declared_utc": "2026-10-17T00:11:37.793706+00:00",
+      "trigger": "Five CLI/runtime management defects were fixed while the local retained-binary disk campaign remained frozen; old S3 counter/latency approval is withdrawn",
+      "change": "Keep disk-final-pass-1-002 as retained baseline only. Rebuild tracked panel assets, freeze the new local release and repeat both four-hour final passes per backend. Add one fresh retained-binary ordinary S3 capacity/steady baseline with a 600-second diagnostic soak for equivalent steady before/after comparisons.",
+      "reason": "The fresh S3 baseline supplies current closed-counter/logical-latency/TSDB evidence for the three steady samples; its short diagnostic soak has no four-hour endurance claim. It does not replace either final four-hour S3 pass.",
+      "conditions": [
+        "Use the same ordinary S3 CPU/RAM/disk/WAL/metrics/steady/write/capacity/spike profile; only the baseline diagnostic soak duration differs",
+        "Compare the three equivalent steady samples; do not claim equivalence of the short and four-hour endurance windows",
+        "Identify retained baseline and new candidate by explicit build-source and binary hashes, independent of the harness checkout SHA",
+        "Keep two fresh final-candidate 14400-second continuous runs for each backend",
+        "Use the final native source in the single-ELF twelve-case native suite; identify the native-runner and local-performance builds separately"
+      ],
+      "approval_slos_or_integrity_thresholds_reduced": false,
+      "ordinary_four_hour_disk_and_s3_criteria_unchanged": true
     }
-  ]
+  ],
+  "native_same_artifact_suite": {
+    "target": "native-suite",
+    "passes": 2,
+    "cases_each_pass": [
+      "cluster-routing",
+      "default-root",
+      "host-root",
+      "remove-boundary",
+      "clock-drift",
+      "runtime"
+    ],
+    "one_retained_elf_across_all_cases": true,
+    "fresh_disposable_runner_and_guest_each_case": true,
+    "max_parallel_jobs": 1,
+    "case_controller_maximum_seconds": 1800,
+    "source": "final source after generated asset rebuild",
+    "certifies_endurance": false
+  }
 }
