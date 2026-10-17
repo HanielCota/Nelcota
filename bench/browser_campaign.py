@@ -238,6 +238,7 @@ def campaign(args):
                        '--mount', f'type=bind,source={runtime/"libs"},target=/usr/lib/x86_64-linux-gnu,readonly',
                        '--mount', f'type=bind,source={Path(__file__).with_name("browser_driver.py")},target=/driver.py,readonly',
                        '--mount', f'type=bind,source={Path(__file__).with_name("browser_auth.js")},target=/auth-pressure.js,readonly',
+                       '--mount', f'type=bind,source={Path(__file__).with_name("browser_auth.py")},target=/auth-evidence.py,readonly',
                        '--mount', f'type=bind,source={input_file},target=/fixture.json,readonly',
                        '--mount', f'type=bind,source={home},target=/home/ubuntu',
                        '--mount', f'type=bind,source={evidence},target=/evidence',

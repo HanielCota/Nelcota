@@ -11,7 +11,7 @@ import subprocess
 import sys
 import time
 
-from browser_auth import PROFILE, complete, validate_failure_receipt, singleflight_control
+from browser_auth import PROFILE, complete, validate_failure_receipt, singleflight_control, failed_cycle
 from browser_diagnostics import validate as validate_diagnostics
 from browser_owners import complete as complete_owners
 from campaign import docker
@@ -78,6 +78,8 @@ def main():
                 and live['logout_refresh_status']==400 and live['disposed_clients_collected'] is True
                 and live['external_requests_blocked']==0 and live['page_errors']==0,'Incomplete live auth/browser invariants')
         cycles=complete(live['auth_pressure'])
+        require(live.get('auth_measurement_cycles')==list(range(5)), 'Missing five persisted numeric auth measurements')
+        report['checks']['auth_measurement_cycles']=live['auth_measurement_cycles']
         census=read_receipt(output/'auth-pressure-census.json')
         require(census=={'created_users':40,'unrevoked_sessions':0},'Auth row/session owners did not reconcile')
         report['checks']['auth_cycles']=cycles;report['checks']['auth_census']=census
@@ -122,6 +124,12 @@ def main():
             value=json.loads(critical.read_text());reason=value.get('reason')
             if isinstance(reason,str) and re.fullmatch('[a-z0-9_]{1,100}',reason):
                 report['failure']['reason']=reason
+                measured = output/'live-panel-SDK/browser-auth-measurement.json'
+                if reason in {'g05_auth_login_slo','g05_auth_refresh_slo','g05_auth_user_slo','g05_auth_rls_slo'} and measured.exists():
+                    try:
+                        report['checks']['failed_auth_pressure'] = failed_cycle(read_receipt(measured), reason)
+                    except Exception:
+                        report['checks']['failed_auth_pressure_invalid'] = True
     finally:
         if child is not None and child.poll() is None:
             child.send_signal(signal.SIGTERM)

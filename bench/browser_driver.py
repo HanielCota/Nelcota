@@ -5,6 +5,7 @@ import json
 import math
 import os
 import re
+import runpy
 from pathlib import Path
 import time
 import urllib.parse
@@ -111,7 +112,7 @@ async def main():
         }''', {'user':fixture['user'], 'body':fixture['label']})
         require(value, 'live_browser_SDK_RLS_oracle')
     plateaus, timings = [], []
-    auth_jobs, auth_pressure = set(), []
+    auth_jobs, auth_pressure, auth_measurements = set(), [], set()
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(executable_path='/runtime/chrome/chromium', headless=True,
             chromium_sandbox=False, args=['--disable-gpu', '--disable-background-networking', '--no-first-run'])
@@ -379,6 +380,18 @@ async def main():
             for page in pages:
                 await navigate(page, 'bench_alternate', 'alternate:')
                 await navigate(page, 'bench_products', 'project-0:')
+            if fixture.get('auth_pressure') is True:
+                measure_auth = runpy.run_path('/auth-evidence.py')['measurement']
+                def record_auth_measurement(value):
+                    require(isinstance(value,dict), 'invalid_auth_measurement')
+                    index = value.get('cycle')
+                    require(type(index) is int and 0<=index<5, 'invalid_auth_measurement_cycle')
+                    require(index not in auth_measurements and state['phase']=='navigation-pressure-'+str(index+1),
+                            'duplicate_or_out_of_phase_auth_measurement')
+                    proof = measure_auth({**value, 'independent_browser_request_count':raw_auth_requests[str(index)]}, index)
+                    save(output/'browser-auth-measurement.json', proof)
+                    auth_measurements.add(index)
+                await pages[0].expose_function('g05RecordAuthMeasurement', record_auth_measurement)
             await sample('baseline')
             for cycle in range(5):
                 state['phase'] = 'navigation-pressure-'+str(cycle+1)
@@ -418,6 +431,7 @@ async def main():
                     proof = await asyncio.wait_for(auth_job, timeout=45)
                     require(proof['status']=='passed' and proof['requests_completed']==112, 'backend_auth_pressure_incomplete')
                     require(raw_auth_requests[str(cycle)]==112, 'backend_auth_pressure_wire_accounting')
+                    require(cycle in auth_measurements, 'backend_auth_pressure_measurement_missing')
                     proof['independent_browser_request_count'] = raw_auth_requests[str(cycle)]
                     auth_pressure.append(proof)
                     auth_jobs.discard(auth_job)
@@ -474,7 +488,7 @@ async def main():
                       'temporary_clients_checked_per_tab_per_cycle':20, 'navigation_requires_different_table':True,
                       'authoritative_visual_feedback_p95_ms':p95, 'feedback_SLO_ms':1000, 'api_requests':state['api_requests'],
                       'decoded_network_bytes':state['decoded_network_bytes'], 'auth_grants':dict(grants), 'auth_consumers':dict(consumers),
-                      'auth_pressure':auth_pressure,
+                      'auth_pressure':auth_pressure, 'auth_measurement_cycles':sorted(auth_measurements),
                       'sdk_RLS_reads':reads, 'cross_tab_refresh_coalesced':True, 'actual_credential_renewal':True,
                       'offline_reconnect':True, 'offline_read_error':disconnected['code'],
                       'offline_read_attempts':offline_attempts, 'configured_additional_read_retries':2,

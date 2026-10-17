@@ -102,4 +102,57 @@ class BrowserSingleflightEvidence(unittest.TestCase):
         with self.assertRaises(ValueError):singleflight_control(value)
 
 
+class FailedAuthSLOEvidence(unittest.TestCase):
+    def measured(self):
+        value = proof()
+        value['status'] = 'measured'
+        value['successful_latency']['refresh'].update(p95_ms=250, p99_ms=350)
+        return value
+
+    def test_actual_failure_preserves_latency_and_all_denominators(self):
+        value = self.measured()
+        measured = browser_auth.measurement(value, 0)
+        failed = browser_auth.failed_cycle(measured, 'g05_auth_refresh_slo')
+        self.assertEqual(failed['status'], 'failed')
+        self.assertEqual(failed['failed_SLO_classes'], ['refresh'])
+        self.assertEqual(failed['successful_latency']['refresh']['p95_ms'], 250)
+        self.assertEqual(failed['requests_completed'], 112)
+        self.assertEqual(failed['counts'], COUNTS)
+        with self.assertRaises(ValueError):
+            cycle({**value, 'status':'passed'}, 0)
+
+    def test_failure_reason_must_match_first_actual_violation(self):
+        value = self.measured()
+        for reason in ['g05_auth_login_slo', 'g05_auth_user_slo', 'private-token', None, []]:
+            with self.subTest(reason=reason), self.assertRaises(ValueError):
+                browser_auth.failed_cycle(value, reason)
+        value['successful_latency']['refresh'].update(p95_ms=20, p99_ms=30)
+        with self.assertRaises(ValueError):
+            browser_auth.failed_cycle(value, 'g05_auth_refresh_slo')
+
+    def test_partial_boolean_and_nonfinite_failures_cannot_be_published(self):
+        for key, bad in [('requests_completed',111), ('independent_browser_request_count',True),
+                         ('elapsed_seconds',float('nan'))]:
+            value = self.measured(); value[key] = bad
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                browser_auth.failed_cycle(value, 'g05_auth_refresh_slo')
+        value = self.measured()
+        value['successful_latency']['refresh']['p99_ms'] = float('inf')
+        with self.assertRaises(ValueError):
+            browser_auth.failed_cycle(value, 'g05_auth_refresh_slo')
+        value = self.measured()
+        value['successful_latency']['refresh']['p99_ms'] = 8000
+        with self.assertRaises(ValueError):
+            browser_auth.failed_cycle(value, 'g05_auth_refresh_slo')
+
+    def test_failed_projection_never_publishes_private_payloads(self):
+        value = self.measured()
+        value.update(access_token='private-token', email='private@example.test', scope='private data')
+        failed = browser_auth.failed_cycle(value, 'g05_auth_refresh_slo')
+        self.assertNotIn('private', str(failed))
+        value['successful_latency']['refresh']['payload'] = 'private-token'
+        with self.assertRaises(ValueError):
+            browser_auth.failed_cycle(value, 'g05_auth_refresh_slo')
+
+
 if __name__=='__main__':unittest.main()

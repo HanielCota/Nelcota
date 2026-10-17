@@ -61,6 +61,7 @@ COUNTS = {'signup':8, 'login':8, 'invalid_password':8, 'user':8, 'rls':16,
           'refresh':32, 'reuse_rejected':8, 'family_revoked':8, 'logout':8,
           'logout_refresh_rejected':8}
 SUCCESS = {name:COUNTS[name] for name in ['signup','login','user','rls','refresh','logout']}
+SLOS = {'login':(750,1500), 'refresh':(200,500), 'user':(200,500), 'rls':(200,500)}
 
 
 def require(condition, message):
@@ -72,8 +73,8 @@ def finite(value):
     return type(value) in {int,float} and math.isfinite(value)
 
 
-def cycle(value, index):
-    require(isinstance(value,dict) and value.get('status')=='passed' and type(value.get('cycle')) is int
+def _measurement(value, index, status):
+    require(isinstance(value,dict) and value.get('status')==status and type(value.get('cycle')) is int
             and value['cycle']==index and 0<=index<5, 'Missing successful auth pressure cycle')
     for key in ['requests_attempted','requests_completed','independent_browser_request_count']:
         require(type(value.get(key)) is int and value[key]==112, 'Auth pressure request census differs')
@@ -98,15 +99,39 @@ def cycle(value, index):
         require(isinstance(row,dict) and set(row)=={'samples','p50_ms','p95_ms','p99_ms'}
                 and type(row['samples']) is int and row['samples']==expected
                 and all(finite(row[key]) for key in ['p50_ms','p95_ms','p99_ms'])
-                and 0<row['p50_ms']<=row['p95_ms']<=row['p99_ms'], 'Invalid successful auth latency evidence')
-        if name=='login':
-            require(row['p95_ms']<=750 and row['p99_ms']<=1500, 'Login missed its declared SLO')
-        if name in {'refresh','user','rls'}:
-            require(row['p95_ms']<=200 and row['p99_ms']<=500, 'Read/refresh missed its declared SLO')
+                and 0<row['p50_ms']<=row['p95_ms']<=row['p99_ms']<=value['elapsed_seconds']*1000,
+                'Invalid successful auth latency evidence')
     fields=['cycle','status','requests_attempted','requests_completed','independent_browser_request_count',
             'maximum_inflight','maximum_arrivals_per_second','accounts_created','counts',
             'successful_latency','elapsed_seconds','response_bytes_consumed','mutation_retries']
     return {key:value[key] for key in fields}
+
+
+def measurement(value, index):
+    """Retain complete numeric observations before the browser asserts its SLOs."""
+    return _measurement(value, index, 'measured')
+
+
+def cycle(value, index):
+    result = _measurement(value, index, 'passed')
+    for name, (p95, p99) in SLOS.items():
+        row = result['successful_latency'][name]
+        require(row['p95_ms']<=p95 and row['p99_ms']<=p99, 'Auth missed its declared SLO')
+    return result
+
+
+def failed_cycle(value, reason):
+    """A failed SLO needs full denominators and its actual measured violation."""
+    require(isinstance(value,dict), 'Missing failed auth measurement')
+    result = measurement(value, value.get('cycle'))
+    names = {f'g05_auth_{name}_slo':name for name in SLOS}
+    require(isinstance(reason,str) and reason in names, 'Unknown fixed auth SLO failure')
+    violations = [name for name, (p95, p99) in SLOS.items()
+                  if result['successful_latency'][name]['p95_ms']>p95
+                  or result['successful_latency'][name]['p99_ms']>p99]
+    require(violations and names[reason]==violations[0], 'Auth failure contradicts measured SLOs')
+    result.update(status='failed', failed_SLO_classes=violations)
+    return result
 
 
 def singleflight_control(value):

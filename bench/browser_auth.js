@@ -134,11 +134,15 @@
     const percentile = (fraction) => values[Math.max(0, Math.ceil(values.length * fraction) - 1)];
     latencies[name] = { samples: values.length, p50_ms: percentile(0.5), p95_ms: percentile(0.95), p99_ms: percentile(0.99) };
   }
-  require(latencies.login.p95_ms <= 750 && latencies.login.p99_ms <= 1500, 'login_slo');
-  for (const name of ['refresh', 'user', 'rls']) require(latencies[name].p95_ms <= 200 && latencies[name].p99_ms <= 500, `${name}_slo`);
-  return { cycle, status: 'passed', requests_attempted: attempted, requests_completed: completed,
+  const measurement = { cycle, status: 'measured', requests_attempted: attempted, requests_completed: completed,
     maximum_inflight: maximumInflight, maximum_arrivals_per_second: maximumArrivals, accounts_created: 8,
     counts, successful_latency: latencies, elapsed_seconds: (performance.now() - began) / 1000,
     response_bytes_consumed: consumedBytes,
-    mutation_retries: 0, scope: 'Raw backend auth across both real consumers; expected retry grace and stale-token reuse are distinct. SMTP/OAuth not exercised.' };
+    mutation_retries: 0 };
+  require(typeof globalThis.g05RecordAuthMeasurement === 'function', 'measurement_bridge');
+  await globalThis.g05RecordAuthMeasurement(measurement);
+  require(latencies.login.p95_ms <= 750 && latencies.login.p99_ms <= 1500, 'login_slo');
+  for (const name of ['refresh', 'user', 'rls']) require(latencies[name].p95_ms <= 200 && latencies[name].p99_ms <= 500, `${name}_slo`);
+  return { ...measurement, status: 'passed', elapsed_seconds: (performance.now() - began) / 1000,
+    scope: 'Raw backend auth across both real consumers; expected retry grace and stale-token reuse are distinct. SMTP/OAuth not exercised.' };
 })

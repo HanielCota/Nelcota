@@ -3105,3 +3105,35 @@ The first local final007 disk campaign is still active. No four-hour final
 interval, regression comparison, full five-case matrix or final browser
 repetition is approved by ordinary/native CI success alone. New bounded remote
 controls will use an immutable ref containing this committed final007 index.
+
+
+### 2026-10-17, 14:13 UTC — final007 browser refresh SLO failure and missing measurements
+
+The first immutable final007 browser run39039043833/job117414599992 failed
+with `g05_auth_refresh_slo`, after27focused guards passed. Seven resource
+samples covered the48.516s stage, maximum gap5.133s; no OOM, restart or
+resource-guard failure. Owned cleanup passed. The genuine overlap control
+recorded48callers, one actual refresh, one held/two queued native Web Locks.
+The [original failed report](results/stress/browser-sdk007-refresh-slo-first-failure-001.json)
+retains the failure, source, common ELF and diagnostics. No five-cycle/auth
+census or numerical latency result is inferred: JavaScript threw its SLO
+exception before returning the already computed numeric observations.
+
+The serial remote owner stopped before any next matrix/native/browser case.
+Local ordinary disk remains frozen and active; no production cause is yet
+confirmed. The benchmark now sends its complete numeric auth measurement to
+a bounded private Python bridge before enforcing exactly the same SLOs.
+The bridge is installed before baseline owner sampling. Its helper is mounted
+read-only from the frozen harness; public failure projection requires112
+completed wire requests, all positive/rejection denominators, finite ordered
+latencies and a fixed reason matching the first actual failed threshold.
+Unknown/private payloads are excluded. Positive evidence still rejects any
+SLO failure. No rate, duration, CPU, memory or latency limit changed.
+
+Four new failure/privacy regressions passed among38focused browser controls
+(0.066s framework,0.215s operator). JavaScript syntax passed in0.065s. These
+lightweight checks ran at low priority on the reserved OS CPU4 with explicit
+time/memory limits; no Rust/UI/build workload or stress-time credit. The
+[focused proof](results/stress/browser-auth-failed-slo-publication-regressions-001.json)
+is not evidence that the live bridge or the original latency problem is fixed.
+A fresh immutable remote repetition is required to obtain actual measurements.

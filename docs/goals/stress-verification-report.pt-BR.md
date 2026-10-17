@@ -2,7 +2,7 @@
 
 **Estado: em execução, sem aprovação do G05.** Este relatório é atualizado
 durante as campanhas. Checkpoint de carga consolidada: 17/10/2026, 13:07 UTC.
-Atualização da investigação: 17/10/2026, 14:00 UTC.
+Atualização da investigação: 17/10/2026, 14:13 UTC.
 Não houve merge nem deploy de produção. O trabalho está na branch
 `test/g05-stress-verification`, no [PR #90](https://github.com/Nelcota/Nelcota/pull/90),
 mantido como rascunho para revisão.
@@ -62,6 +62,24 @@ O backend de produção continua um único binário Rust, sem Node ou Python.
 | 10 | Correções focadas e regressões dos defeitos confirmados | Dez defeitos reproduzidos; regressões focadas aprovadas, campanhas finais pendentes | Cinco falhas na CLI, três de SQL/export e duas no SDK. A nova falha bloqueava clientes independentes no servidor: 202 aprovados/2 reprovados antes, 204/204 aprovados depois. A falha nativa original e a fairness ainda exigem investigação. |
 | 11 | Rust/UI/SDK/lint/CI correspondentes ao SHA testado | CI ordinário e nativo aprovados no produto007; campanhas pendentes | [CI18/18](results/stress/ci-sdk007-final-product-trees.json), SDK204/204 e [native12/12](results/stress/native-final-suite/index.json). O merge sintético realmente checado tem árvore completa igual ao head; as seis árvores de produto correspondem ao build congelado. Isso não aprova os cenários de stress restantes. |
 | 12 | Relatório, limites e todos os testes falhos/bloqueados/não executados | Em consolidação | Este relatório e o [registro detalhado](stress-verification-execution.md) preservam os resultados; ainda há campanhas abertas. |
+
+## Reprovação atual do navegador: SLO de refresh
+
+A [primeira repetição final007](results/stress/browser-sdk007-refresh-slo-first-failure-001.json)
+falhou em `g05_auth_refresh_slo`, após27guardas aprovadas. O teste antigo
+lançou a exceção antes de exportar os percentis calculados; o valor exato
+não foi preservado e não é inventado. O controle de sobreposição passou:
+48chamadas SDK, uma requisição real de refresh e uma trava ocupada/duas na
+fila. As7amostras não registraram OOM, reinício ou violação de recursos, e a
+limpeza foi confirmada. Isso não prova a causa da latência nem aprova o ciclo.
+
+O controlador remoto parou na falha. A campanha local de disco continua
+em seu binário e executor congelados. A publicação de métricas foi estendida
+para persistir somente dados numéricos completos antes da validação, com
+as mesmas taxas, budgets e SLOs. Quatro regressões novas passaram entre38
+controles focados; o [registro](results/stress/browser-auth-failed-slo-publication-regressions-001.json)
+explicita que a ponte real e o problema de latência ainda precisam repetir.
+Não é uma décima primeira correção confirmada de produto.
 
 ## Décima correção: isolamento do SDK no servidor
 
