@@ -1,8 +1,12 @@
 //! Dedicated SQL admission must include database cleanup after caller cancellation.
 mod common;
 
-use axum::http::StatusCode;
+use axum::{
+    body::Body,
+    http::{Request, StatusCode},
+};
 use common::TestApp;
+use http_body_util::BodyExt;
 use nelcota_admin::{SqlBusy, SqlExecutor, contracts::SqlResponse};
 use std::{
     net::SocketAddr,
@@ -20,6 +24,7 @@ use tokio::{
     time::{Instant, timeout},
 };
 use tokio_postgres::{Config, config::Host};
+use tower::ServiceExt;
 
 /// Forward real PostgreSQL traffic, holding only CancelRequest packets until
 /// the test releases them. No SQL, password or cancellation key is recorded.
@@ -332,4 +337,150 @@ async fn lost_sql_transport_has_bounded_cleanup_admission_and_recovers() {
     );
     assert_eq!(api_status, StatusCode::OK);
     assert_eq!(rows.as_array().unwrap().len(), 1);
+}
+
+async fn active_exports(app: &TestApp) -> i64 {
+    app.admin_client.query_one(
+        "SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND application_name='nelcota-admin-export' AND state='active'",
+        &[],
+    ).await.unwrap().get(0)
+}
+
+async fn export_response(
+    router: axum::Router,
+    cookie: String,
+    table: &str,
+) -> axum::response::Response {
+    router
+        .oneshot(
+            Request::builder()
+                .uri(format!("/admin/api/tables/{table}/export?format=json"))
+                .header("cookie", cookie)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap()
+}
+
+async fn recover_exports(router: &axum::Router, cookie: &str, budget: Duration) -> Duration {
+    let began = Instant::now();
+    loop {
+        let (a, b) = tokio::join!(
+            export_response(router.clone(), cookie.to_owned(), "products"),
+            export_response(router.clone(), cookie.to_owned(), "products"),
+        );
+        let mut valid = true;
+        for response in [a, b] {
+            let status = response.status();
+            let bytes = response.into_body().collect().await.unwrap().to_bytes();
+            let rows: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+            valid &= status == StatusCode::OK
+                && rows.as_array().is_some_and(|rows| {
+                    let mut ids: Vec<_> = rows.iter().map(|row| row["id"].as_i64()).collect();
+                    ids.sort();
+                    ids == [Some(1), Some(2), Some(3), Some(4)]
+                });
+        }
+        assert!(began.elapsed() < budget, "export admission did not recover");
+        if valid {
+            return began.elapsed();
+        }
+        tokio::time::sleep(Duration::from_millis(25)).await;
+    }
+}
+
+#[tokio::test]
+async fn cancelled_exports_keep_admission_until_postgres_finishes_cleanup() {
+    let app = TestApp::spawn().await;
+    app.admin_client
+        .batch_execute(
+            "CREATE VIEW public.slow_cancel_export AS SELECT pg_sleep(20)::text AS value",
+        )
+        .await
+        .unwrap();
+    app.catalog.reload(&app.pool).await.unwrap();
+    let cookie = common::panel::login(&app).await;
+    let gate = CancelGate::start(&app.admin).await;
+    let panel = nelcota_admin::AdminState {
+        db_config: gate.config(&app.admin),
+        ..app.panel.clone()
+    };
+    let router = nelcota_admin::router(panel);
+    let mut requests = JoinSet::new();
+    for _ in 0..2 {
+        let router = router.clone();
+        let cookie = cookie.clone();
+        requests.spawn(async move { export_response(router, cookie, "slow_cancel_export").await });
+    }
+    let deadline = Instant::now() + Duration::from_secs(3);
+    while active_exports(&app).await != 2 {
+        assert!(
+            Instant::now() < deadline,
+            "two export queries did not start"
+        );
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    requests.abort_all();
+    while let Some(result) = requests.join_next().await {
+        assert!(result.unwrap_err().is_cancelled());
+    }
+    let deadline = Instant::now() + Duration::from_secs(3);
+    while gate.seen.load(Ordering::Acquire) != 2 {
+        assert!(
+            Instant::now() < deadline,
+            "export cancellation did not reach the gate"
+        );
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    // Exceed only the existing two-second cancellation write timeout. The
+    // backend queries remain inside their original twenty-second sleep.
+    tokio::time::sleep(Duration::from_millis(2200)).await;
+    let still_active = active_exports(&app).await;
+    let third = export_response(router.clone(), cookie.clone(), "products").await;
+    let third_status = third.status();
+    let third_body = third.into_body().collect().await.unwrap().to_bytes();
+    let third_json: serde_json::Value = serde_json::from_slice(&third_body).unwrap();
+    let (api_status, rows) = app.get("/rest/v1/products?limit=1", None).await;
+    let (negative_status, _) = app
+        .get("/rest/v1/products?limit=1", Some("invalid-jwt"))
+        .await;
+    gate.release.notify_waiters();
+    let deadline = Instant::now() + Duration::from_secs(3);
+    while active_exports(&app).await != 0 {
+        assert!(
+            Instant::now() < deadline,
+            "cancelled export backend did not stop"
+        );
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    let recovered = recover_exports(&router, &cookie, Duration::from_secs(3)).await;
+    gate.close().await;
+    println!(
+        "::notice title=G05 export cancellation admission::{}",
+        serde_json::json!({
+            "case": "cancelled_exports_keep_admission_until_postgres_finishes_cleanup",
+            "backend_queries_before_releasing_cancellation": still_active,
+            "held_cancellation_packets": 2,
+            "third_export_status_while_cleanup_pending": third_status.as_u16(),
+            "third_export_busy_code": third_json.get("code").and_then(|value| value.as_str()),
+            "authorized_api_status": api_status.as_u16(),
+            "unauthorized_api_status": negative_status.as_u16(),
+            "backend_queries_after_release": 0,
+            "recovered_parallel_exports": 2,
+            "recovered_exact_product_ids": [1, 2, 3, 4],
+            "recovery_seconds": recovered.as_secs_f64(),
+            "scope": "Real owned PostgreSQL, two bounded export queries, delayed CancelRequest only; no load-time credit"
+        })
+    );
+    assert_eq!(still_active, 2);
+    assert_eq!(api_status, StatusCode::OK);
+    assert_eq!(negative_status, StatusCode::UNAUTHORIZED);
+    assert_eq!(rows.as_array().unwrap().len(), 1);
+    assert_eq!(
+        third_status,
+        StatusCode::SERVICE_UNAVAILABLE,
+        "export admission reopened before backend cleanup"
+    );
+    assert_eq!(third_json["code"], "export_busy");
 }

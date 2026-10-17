@@ -141,6 +141,25 @@
       ],
       "approval_slos_or_integrity_thresholds_reduced": false,
       "ordinary_four_hour_disk_and_s3_criteria_unchanged": true
+    },
+    {
+      "declared_utc": "2026-10-17T06:43:37.667383+00:00",
+      "trigger": "Confirmed real-PostgreSQL SQL admission bug; previous final disk candidate intentionally stopped with cleanup",
+      "change": "Fresh candidate002 disk/S3 passes1/2 using source cb916d04 and new48aec40e ELF; all existing workload arguments, limits, SLOs and comparison thresholds unchanged",
+      "previous_artifact_evidence": "final-local-candidate-7e68fd2.json",
+      "replacement_run_ids": [
+        "disk-candidate-pass-1-002",
+        "s3-candidate-pass-1-002",
+        "disk-candidate-pass-2-002",
+        "s3-candidate-pass-2-002"
+      ],
+      "conditions": [
+        "Preserve original failed/interrupted evidence",
+        "No partial-soak approval",
+        "Source/ELF pinning and full owned cleanup",
+        "Two independent 14400-second continuous runs per backend",
+        "Native-suite and full supplemental matrix must use new product trees"
+      ]
     }
   ],
   "native_same_artifact_suite": {
@@ -455,5 +474,11 @@
     ],
     "scope": "Three comparable steady samples on each side require a fresh retained baseline for each larger dataset and1/5/10 topology. Candidate repetitions alone cannot establish before/after regression. Run serially only with unchanged declared reserves; failed baselines cannot certify candidates.",
     "approval_thresholds_reduced": false
+  },
+  "current_final_artifact": {
+    "source_commit": "cb916d04fa43679152b2a463870c466a17bd9e91",
+    "binary_sha256": "48aec40eb643133dbc7bc8aba91cea1705f7534aae93947bc5d8a7782278774a",
+    "evidence": "final-local-candidate.json",
+    "status": "new artifact frozen after SQL admission correction; affected campaign repetitions pending"
   }
 }

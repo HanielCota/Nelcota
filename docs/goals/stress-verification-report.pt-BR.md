@@ -2,7 +2,7 @@
 
 **Estado: em execução, sem aprovação do G05.** Este relatório é atualizado
 durante as campanhas. Checkpoint de carga consolidada: 17/10/2026, 03:47 UTC.
-Atualização da investigação: 17/10/2026, 06:41 UTC.
+Atualização da investigação: 17/10/2026, 06:52 UTC.
 Não houve merge nem deploy de produção. O trabalho está na branch
 `test/g05-stress-verification`, no [PR #90](https://github.com/Nelcota/Nelcota/pull/90),
 mantido como rascunho para revisão.
@@ -20,7 +20,7 @@ O tempo parcial das campanhas ainda abertas não está somado nesse checkpoint.
 |---|---|
 | Código após o novo defeito SQL confirmado | Correção local em `crates/admin/src/sql/executor.rs`, com dois testes reais aprovados e hashes em [evidência](results/stress/sql-cancellation-admission-after.json). O binário anterior foi interrompido; novo build e repetições afetadas são obrigatórios |
 | SHA-256 do binário de baseline preservado | `75c44c85a85db26195166aa1d2c6caf481e3db476801ec8131525ef62adf1be0` |
-| Candidato local final congelado | `7e68fd21430ac93125149f60927f8676b077811d`; SHA-256 `b047fb880feb10e41e7d0308e6037b8cd3bc770b0452a30cab59c3e2d20514a0`; [proveniência](results/stress/final-local-candidate.json), [18 checks ordinários aprovados](results/stress/ci-final-artifact-source.json), primeira campanha interrompida intencionalmente após confirmação do defeito SQL; este hash não contém a nova correção |
+| Novo candidato local congelado | `cb916d04fa43679152b2a463870c466a17bd9e91`; SHA-256 `48aec40eb643133dbc7bc8aba91cea1705f7534aae93947bc5d8a7782278774a`; [proveniência](results/stress/final-local-candidate.json). Build release passou em 89,251 s; CI e repetições finais ainda pendentes. O [artefato anterior](results/stress/final-local-candidate-7e68fd2.json) continua preservado |
 | SHA-256 do workload k6 atual | `0ac01578bf19155302fe465884b480d792569086f23bb4ba3615ca5f0ce2547d` |
 | Baseline em disco no protocolo atual | Snapshot imutável de `1f391594dd8db6cccac54d6720d90c33d461d1f1`; `disk-final-pass-1-002` concluiu como baseline no binário retido, com protocolo atual |
 | Primeira execução nativa separada | [Actions 38962480993](https://github.com/Nelcota/Nelcota/actions/runs/38962480993), código congelado `e80770b3f6aa1f64d011a3d62f8ebf0f1201bdac`; reprovada no oráculo de signup antes do backup |
@@ -53,7 +53,7 @@ O backend de produção continua um único binário Rust, sem Node ou Python.
 | 7 | Quatro horas contínuas em disco e S3 no artefato final | Pendente | Três execuções históricas completaram fisicamente quatro horas, com aprovação de contadores retirada. Uma nova campanha em disco passou no protocolo atual, como baseline; o candidato foi interrompido após o defeito SQL confirmado; nenhuma campanha final de quatro horas foi aprovada até aqui. |
 | 8 | Falhas, drain, restart, restore e deployment aplicável | Parcial | Primeiro fault passou com reconciliação de ACKs e restore local novo. Dois fluxos nativos passaram no escopo de restore no mesmo alvo e perda da RAM da convidada. Repetição final de faults/carga, atualização operacional, DNS/ACME públicos e recuperação fora do host continuam incompletos. |
 | 9 | Recursos, invariantes de dados/arquivos/eventos e regressão | Parcial | Invariantes locais e plateaus observados; precisam das campanhas finais comparáveis. Retenção anônima do provedor ainda exige atribuição. |
-| 10 | Correções focadas e regressões dos defeitos confirmados | Verificado nos defeitos já reproduzidos; revisão continua | Antes/depois em seis defeitos reais: cluster incorreto, unit relativa, outro host nativo, lease aninhado na migração, remoção com limpeza incompleta e liberação antecipada da admissão SQL. A correção SQL passou em dois testes locais reais; CI e campanhas finais ainda precisam repeti-la. Os cenários específicos passaram em VMs novas. A falha da fixture Rust teve local original recuperado e passou 1.000 repetições após I/O de prontidão; o erro original continua visível. Fairness não recebeu causa de produção inventada. |
+| 10 | Correções focadas e regressões dos defeitos confirmados | Verificado nos defeitos já reproduzidos; revisão continua | Antes/depois em sete defeitos reais: cluster incorreto, unit relativa, outro host nativo, lease aninhado na migração, remoção com limpeza incompleta e liberação antecipada da admissão SQL e de exportações. A correção SQL passou em dois testes locais reais; CI e campanhas finais ainda precisam repeti-la. Os cenários específicos passaram em VMs novas. A falha da fixture Rust teve local original recuperado e passou 1.000 repetições após I/O de prontidão; o erro original continua visível. Fairness não recebeu causa de produção inventada. |
 | 11 | Rust/UI/SDK/lint/CI correspondentes ao SHA testado | Aprovado no artefato anterior; pendente após a correção SQL | [18 checks ordinários](results/stress/ci-final-artifact-source.json), incluindo Rust/serviços reais, painel e assets, SDKs, supply chain e CodeQL. As 12 execuções nativas também passaram no mesmo source, com ELF próprio comum. Falhas anteriores de Rust, fixtures CodeQL e assets continuam preservadas; alterações futuras exigem a revalidação afetada. |
 | 12 | Relatório, limites e todos os testes falhos/bloqueados/não executados | Em consolidação | Este relatório e o [registro detalhado](stress-verification-execution.md) preservam os resultados; ainda há campanhas abertas. |
 
@@ -433,3 +433,50 @@ confirmada. Validou conteúdo exato e unicidade das mil linhas exportadas,
 deadlines antes de aceitar recuperação positiva e os quatro cenários limitados.
 Esses resultados são anteriores à correção SQL, não substituem duas passagens
 completas qualificadas no novo artefato e não contam tempo remoto sobreposto.
+
+
+O novo ELF local foi congelado a partir do checkout limpo `cb916d04`, após
+build release locked Rust 1.99.0 com quatro jobs, thin LTO e codegen-units=1,
+sem overrides de compilação. São 30.473.688 bytes, hash `48aec40e…`, com
+identidade completa das seis árvores de produto. A suíte nativa independente
+[39010804764](https://github.com/Nelcota/Nelcota/actions/runs/39010804764)
+e o CI da correção estão em andamento; nenhum check pendente é aprovado.
+As quatro substitutas foram predeclaradas com IDs novos e argumentos idênticos.
+
+
+## Mesmo defeito confirmado no cancelamento de exportações
+
+A [reprodução em PostgreSQL real](results/stress/export-cancellation-admission-before.json)
+manteve duas consultas ativas e dois CancelRequests retidos. Depois do timeout
+de escrita de cancelamento de dois segundos, uma terceira exportação recebeu
+**200**, em vez do **503/export_busy** obrigatório. O driver era descartado
+no select de cancelamento e o permit liberado depois de enviar/tentar enviar
+o pacote, sem confirmar o fim do trabalho. Canários 200/401 e limpeza foram
+confirmados; a reprodução original continua reprovada.
+
+A correção mantém o driver e a admissão até a drenagem, com margem limitada
+de 35 s se a conexão não confirmar a limpeza. O supervisor mantém outro owner
+do cliente até o fim/cancelamento/expiração da resposta e só então o solta.
+Uma [primeira validação da correção](results/stress/export-cancellation-fix-first-validation-failure.json)
+passou nos três controles de cancelamento, mas falhou em um dos nove testes
+de performance/admin: o cliente era solto cedo demais, encerrando a conexão
+de um export pequeno ainda não consumido antes do prazo. A regressão existente
+foi preservada e a propriedade do cliente foi ajustada; a repetição completa
+está em andamento. Nenhuma asserção existente foi reduzida.
+
+O artefato local `48aec40e…` contém somente a correção SQL. Nenhuma campanha
+foi iniciada nele; a correção de exportações exige outro build congelado.
+O CI e a suíte nativa de `cb916d04` continuam vinculados àquela fonte anterior,
+sem aprovação implícita para a correção posterior de exportações.
+
+
+A [repetição local da correção completa](results/stress/export-cancellation-admission-after.json)
+passou em **16 testes**: três de cancelamento SQL/export (39,30 s), nove de
+performance/admin (11,25 s) e quatro de arquitetura (6,93 s), sem falhas ou
+ignorados nesses escopos. Outros 34 testes do alvo admin ficaram filtrados,
+sem alegação de terem sido executados. Os dois exports cancelados mantiveram
+a terceira requisição em 503/export_busy, com API 200/JWT inválido 401;
+após limpeza, duas exportações paralelas recuperaram os IDs exatos 1–4.
+A expiração de resposta não consumida e o footer atrasado voltaram a passar
+sem mudar suas asserções. Foram 16 amostras, zero violações e limpeza confirmada.
+A primeira validação falha permanece publicada; novo build/CI/campanhas pendentes.

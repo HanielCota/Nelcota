@@ -2487,3 +2487,53 @@ rejection and all four bounded scenarios. Its 130s requested ledger profile
 and 27 numeric samples/gap5.101s retain original source and artifact scope.
 It predates the SQL production correction and is not either full qualified
 matrix pass. Remote overlap is not added to the local effective-time ledger.
+
+
+### New post-SQL-correction local artifact frozen
+
+The clean cb916d04 release build passed in89.251s, Rust1.99.0/locked/fourjobs,
+thinLTO/codegen-units1/no overrides. The new30,473,688B ELF is
+48aec40eb643133dbc7bc8aba91cea1705f7534aae93947bc5d8a7782278774a.
+[Current provenance](results/stress/final-local-candidate.json) retains all six
+product tree objects; [previous provenance](results/stress/final-local-candidate-7e68fd2.json)
+remains immutable history. Four replacement endurance IDs end in002, copying
+all existing arguments, budgets and approval gates. The new native suite
+run39010804764 and ordinary source CI are running; full matrix dispatch waits
+for verified new native evidence. No pending check is inferred successful.
+
+
+### Export cancellation independently reproduced the admission defect
+
+[The original real PostgreSQL export control](results/stress/export-cancellation-admission-before.json)
+failed: two backend queries stayed active behind two held CancelRequests,
+but a third export returned200 after the2s cancellation write timeout, instead
+of503/export_busy. The export select dropped its driver before the cancellation
+attempt and released its permit without confirmed backend cleanup. Positive API
+and invalid-JWT canaries remained200/401, and owned cleanup passed.
+
+Keep the driver pinned through cancellation/draining, with35s bounded grace
+when transport cannot confirm cleanup. The supervisor also retains a client
+owner until response completion/cancellation/expiry. The
+[first correction validation](results/stress/export-cancellation-fix-first-validation-failure.json)
+passed all3 cancellation controls but failed1/9 existing admin-performance tests:
+dropping the client immediately after RowStream creation prematurely closed a
+small unpolled export connection before its response lifetime. The existing
+assertion is unchanged; shared client ownership corrects that behavior and the
+focused full repetition is running. Architecture was not executed after the
+failed preceding step. All originals and cleanup receipts remain retained.
+
+The48aec40e local candidate contains only the preceding SQL correction, and
+no campaign started on it. Export production changes require a third fresh
+local artifact and updated native/CI/source proof. Current cb916d04 CI/native
+results remain confined to that historical source.
+
+
+The [complete local correction repeat](results/stress/export-cancellation-admission-after.json)
+passed16 tests:3SQL/export cancellation39.30s,9admin-performance11.25s,
+4architecture6.93s, zero failures/ignored in those scopes;34other admin cases
+were filtered, not executed. The third export remained503/export_busy while
+two cancelled backends stayed active; ordinary200/invalid-JWT401 canaries
+survived, and two parallel complete exports recovered exact product IDs1–4.
+Existing unpolled-response expiry and delayed-footer assertions passed unchanged.
+Sixteen resource samples,zero violations,owned cleanup confirmed. Preserve the
+first failed correction attempt; final build/CI/campaign repetitions are pending.

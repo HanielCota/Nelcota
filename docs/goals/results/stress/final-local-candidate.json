@@ -1,10 +1,9 @@
 {
-  "source_commit": "7e68fd21430ac93125149f60927f8676b077811d",
-  "binary_sha256": "b047fb880feb10e41e7d0308e6037b8cd3bc770b0452a30cab59c3e2d20514a0",
-  "size": 30469304,
-  "status": "frozen; load and final CI pending",
-  "started_utc": "2026-10-17T01:23:44.905640+00:00",
-  "completed_utc": "2026-10-17T01:25:18.801373+00:00",
+  "source_commit": "cb916d04fa43679152b2a463870c466a17bd9e91",
+  "binary_sha256": "48aec40eb643133dbc7bc8aba91cea1705f7534aae93947bc5d8a7782278774a",
+  "size": 30473688,
+  "started_utc": "2026-10-17T06:41:10.094860+00:00",
+  "completed_utc": "2026-10-17T06:42:39.345467+00:00",
   "build_command": [
     "cargo",
     "build",
@@ -32,18 +31,20 @@
     4
   ],
   "build_exit": 0,
-  "build_seconds": 93.83057219203329,
-  "build_log_sha256": "6464cfaab34b5b2cab26fa07fe56de3dd8f25f5fcd06046d3227d6fab1145389",
+  "build_seconds": 89.25060852902243,
+  "build_log_sha256": "e3909342a85f67fcd970f65ff6ac0520db3067e486f650e92bf417ec05db828c",
+  "status": "frozen; CI and final load repetitions pending",
   "certifies_g05": false,
   "architecture": "x86_64-unknown-linux-gnu",
-  "scope": "Immutable local release candidate. This build receipt establishes bytes/source/profile, not stress approval or a production release. Native Actions builds retain distinct executable identities.",
+  "scope": "New immutable local staging release candidate after confirmed SQL cancellation admission bug. Native Actions builds retain separate ELF identities. Previous final-local-candidate-7e68fd2.json is retained; no stress approval or production release.",
   "product_tree_objects": {
-    "crates": "982c1e0337e3ec82ebd269a1e4bef286554eb170",
-    "sdk": "864119c5aa5bfd0edc1799d9de018e096f39d67e",
-    "migrations": "e88cfbfd12955dc8cb9180d3324df6a5d9e62206",
+    "crates": "6137177cbe349adaa87fb2c52fc1b7b52543dd93",
     "Cargo.toml": "20a3154fea3f1883ccc42882fbd671bc0b12b17f",
     "Cargo.lock": "9150a443d0d0cec57de152e13bd9a6cb8e7a8c2d",
+    "migrations": "e88cfbfd12955dc8cb9180d3324df6a5d9e62206",
+    "sdk": "864119c5aa5bfd0edc1799d9de018e096f39d67e",
     "rust-toolchain.toml": "0fd1b3a84b408770d883519014b040aed30a15f0"
   },
-  "private_log": "target/stress-g05/artifacts/build-candidate-final-001.log"
+  "private_log": "target/stress-g05/artifacts/build-candidate-final-002.log",
+  "previous_build": "final-local-candidate-7e68fd2.json"
 }

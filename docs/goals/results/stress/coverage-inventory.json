@@ -99,6 +99,12 @@
           "status": "passed",
           "evidence": "s3-current-protocol-baseline.json",
           "scope": "Retained old binary comparison baseline only:62 closed phases, three steady per workload, qualified400/s ceiling and600s soak at280/s;168001 useful/171036 physical HTTP/128 negatives, zero drops/unexpected,64248 events reconciled,843 samples/gap11.5s, final idle/census/cleanup. No four-hour or final-candidate approval."
+        },
+        {
+          "run_id": "disk-candidate-pass-1-001",
+          "status": "failed",
+          "evidence": "disk-candidate-before-sql-fix-interruption.json",
+          "scope": "Intentionally interrupted after confirmed SQL admission bug;1559samples,4290closed effective seconds outside checkpoint014, partial soak uncredited,cleanup confirmed. New artifact and fresh replacements required."
         }
       ]
     },
@@ -198,6 +204,12 @@
           "status": "passed",
           "evidence": "s3-current-protocol-baseline.json",
           "scope": "Retained old binary comparison baseline only:62 closed phases, three steady per workload, qualified400/s ceiling and600s soak at280/s;168001 useful/171036 physical HTTP/128 negatives, zero drops/unexpected,64248 events reconciled,843 samples/gap11.5s, final idle/census/cleanup. No four-hour or final-candidate approval."
+        },
+        {
+          "run_id": "disk-candidate-pass-1-001",
+          "status": "failed",
+          "evidence": "disk-candidate-before-sql-fix-interruption.json",
+          "scope": "Intentionally interrupted after confirmed SQL admission bug;1559samples,4290closed effective seconds outside checkpoint014, partial soak uncredited,cleanup confirmed. New artifact and fresh replacements required."
         }
       ]
     },
@@ -280,6 +292,12 @@
           "status": "passed",
           "evidence": "matrix-backend-smoke-001.json",
           "scope": "First20s-per-case real-HTTP transport/admission subset at8ledgeriterations/s; no full capacity/matrix approval. Query/export release,20committedtables,malformed/origin/JWT/partialclients and ledgerrestore reconciled. Fresh smoke and two full runs with stronger exact-export/deadline oracles pending."
+        },
+        {
+          "run_id": "matrix-backend-smoke-002",
+          "status": "passed",
+          "evidence": "matrix-backend-smoke-002.json",
+          "scope": "Pre-SQL-fix ELF only;11 focused guards and four bounded real-HTTP scenarios, exact1000-row export, late-positive deadlines,130srequested load,cleanup. Two full new-artifact passes pending."
         }
       ]
     },
@@ -364,6 +382,12 @@
           "status": "passed",
           "evidence": "disk-current-protocol-baseline.json",
           "scope": "Retained baseline only: current counter/logical-latency/TSDB protocol, 62 closed phases, 14400s continuous at280/s, zero drops/unexpected, 3937 negatives, 257500 events reconciled, same app/PG, two pruning cohorts,16 renewals,3283 samples/gap11s, six identical idle owner censuses and owned cleanup. Final candidate and remaining row clauses still separate."
+        },
+        {
+          "run_id": "disk-candidate-pass-1-001",
+          "status": "failed",
+          "evidence": "disk-candidate-before-sql-fix-interruption.json",
+          "scope": "Intentionally interrupted after confirmed SQL admission bug;1559samples,4290closed effective seconds outside checkpoint014, partial soak uncredited,cleanup confirmed. New artifact and fresh replacements required."
         }
       ]
     },
@@ -423,6 +447,12 @@
           "status": "passed",
           "evidence": "s3-current-protocol-baseline.json",
           "scope": "Retained old binary comparison baseline only:62 closed phases, three steady per workload, qualified400/s ceiling and600s soak at280/s;168001 useful/171036 physical HTTP/128 negatives, zero drops/unexpected,64248 events reconciled,843 samples/gap11.5s, final idle/census/cleanup. No four-hour or final-candidate approval."
+        },
+        {
+          "run_id": "provider-runtime-corrected-pass-2",
+          "status": "passed",
+          "evidence": "provider-runtime-corrected-pass-2.json",
+          "scope": "Second complete direct-provider diagnostic, all three profiles; stable FD/socket owners but anonymous memory still rises during idle. No exact heap/cache attribution or BaaS load credit."
         }
       ]
     },
@@ -504,6 +534,12 @@
           "status": "passed",
           "evidence": "s3-current-protocol-baseline.json",
           "scope": "Retained old binary comparison baseline only:62 closed phases, three steady per workload, qualified400/s ceiling and600s soak at280/s;168001 useful/171036 physical HTTP/128 negatives, zero drops/unexpected,64248 events reconciled,843 samples/gap11.5s, final idle/census/cleanup. No four-hour or final-candidate approval."
+        },
+        {
+          "run_id": "disk-candidate-pass-1-001",
+          "status": "failed",
+          "evidence": "disk-candidate-before-sql-fix-interruption.json",
+          "scope": "Intentionally interrupted after confirmed SQL admission bug;1559samples,4290closed effective seconds outside checkpoint014, partial soak uncredited,cleanup confirmed. New artifact and fresh replacements required."
         }
       ]
     },
@@ -512,7 +548,7 @@
       "area": "SQL/export admission and cancellation",
       "entrypoints": "crates/server/tests/architecture.rs; admin/sql.rs; hardening.rs",
       "status": "not run",
-      "scope_or_limit": "Existing real-PostgreSQL export/admission/slow-consumer cancellation/deadline regressions passed CI. Panel load samples exist; complete sustained combined admin/API pressure remains incomplete.",
+      "scope_or_limit": "SQL and export delayed-cancellation admission defects confirmed and locally fixed.16 related real-service regressions passed; initial failed correction validation retained. New immutable artifact, full CI and two qualified combined-pressure repetitions remain pending.",
       "functional_subset": {
         "status": "passed",
         "source_commit": "3203330cf3df2b9b7dd68efebc79412a8564e9fd",
@@ -560,6 +596,48 @@
           "status": "passed",
           "evidence": "matrix-backend-smoke-001.json",
           "scope": "First20s-per-case real-HTTP transport/admission subset at8ledgeriterations/s; no full capacity/matrix approval. Query/export release,20committedtables,malformed/origin/JWT/partialclients and ledgerrestore reconciled. Fresh smoke and two full runs with stronger exact-export/deadline oracles pending."
+        },
+        {
+          "run_id": "sql-cancellation-before",
+          "status": "failed",
+          "evidence": "sql-cancellation-admission-before.json",
+          "scope": "Four backend queries active behind held CancelRequests; fifth wrongly accepted. Original failing CI preserved."
+        },
+        {
+          "run_id": "sql-cancellation-after-local",
+          "status": "passed",
+          "evidence": "sql-cancellation-admission-after.json",
+          "scope": "Two real owned-PostgreSQL regressions passed plus four related architecture checks; source hashes retained. Full final-artifact load and CI pending."
+        },
+        {
+          "run_id": "matrix-backend-smoke-002",
+          "status": "passed",
+          "evidence": "matrix-backend-smoke-002.json",
+          "scope": "Pre-SQL-fix ELF only;11 focused guards and four bounded real-HTTP scenarios, exact1000-row export, late-positive deadlines,130srequested load,cleanup. Two full new-artifact passes pending."
+        },
+        {
+          "run_id": "disk-candidate-pass-1-001",
+          "status": "failed",
+          "evidence": "disk-candidate-before-sql-fix-interruption.json",
+          "scope": "Intentionally interrupted after confirmed SQL admission bug;1559samples,4290closed effective seconds outside checkpoint014, partial soak uncredited,cleanup confirmed. New artifact and fresh replacements required."
+        },
+        {
+          "run_id": "export-cancellation-before",
+          "status": "failed",
+          "evidence": "export-cancellation-admission-before.json",
+          "scope": "Two real backend queries active behind held CancelRequests; third export wrongly accepted200."
+        },
+        {
+          "run_id": "export-cancellation-first-fix-validation",
+          "status": "failed",
+          "evidence": "export-cancellation-fix-first-validation-failure.json",
+          "scope": "New reproduction passed, existing unpolled-response lifetime test failed; original assertions retained."
+        },
+        {
+          "run_id": "export-cancellation-after-local",
+          "status": "passed",
+          "evidence": "export-cancellation-admission-after.json",
+          "scope": "16related real-service checks passed:3cancellation,9admin-performance,4architecture;34admincases filtered. New production artifact and load/CI repetitions pending."
         }
       ]
     },
@@ -866,6 +944,12 @@
           "status": "passed",
           "evidence": "matrix-backend-smoke-001.json",
           "scope": "First20s-per-case real-HTTP transport/admission subset at8ledgeriterations/s; no full capacity/matrix approval. Query/export release,20committedtables,malformed/origin/JWT/partialclients and ledgerrestore reconciled. Fresh smoke and two full runs with stronger exact-export/deadline oracles pending."
+        },
+        {
+          "run_id": "matrix-backend-smoke-002",
+          "status": "passed",
+          "evidence": "matrix-backend-smoke-002.json",
+          "scope": "Pre-SQL-fix ELF only;11 focused guards and four bounded real-HTTP scenarios, exact1000-row export, late-positive deadlines,130srequested load,cleanup. Two full new-artifact passes pending."
         }
       ]
     },
@@ -1080,5 +1164,11 @@
     "completed_independent_passes": 1,
     "first_pass_evidence": "provider-runtime-corrected-pass-1.json",
     "clock_fixture_before_after": "provider-fixture-clock-before-after.json"
+  },
+  "current_final_candidate": {
+    "source_commit": "cb916d04fa43679152b2a463870c466a17bd9e91",
+    "binary_sha256": "48aec40eb643133dbc7bc8aba91cea1705f7534aae93947bc5d8a7782278774a",
+    "evidence": "final-local-candidate.json",
+    "status": "new artifact frozen after SQL admission correction; affected campaign repetitions pending"
   }
 }
