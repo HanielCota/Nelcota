@@ -243,6 +243,24 @@
         "log_sha256": "ae2d867b42024637e0779e90b3a3e9c5b6b4730d8d3a559a242e68f637a93b5f"
       },
       "next_order": "Run the still-unstarted retained million-row S3 baseline while new CI/native checks execute remotely; prioritize the four final disk/S3 continuous endurance runs after candidate006 verification before remaining larger/topology profiles. Stop and diagnose every failed workload or comparison."
+    },
+    {
+      "declared_utc": "2026-10-17T13:20:21.799734+00:00",
+      "approval_thresholds_reduced": false,
+      "reason": "Tenth confirmed production defect: independent default server SDK clients share a global lock, causing unrelated cached reads to wait for sign-in HTTP. Before202pass2fail, after204pass0fail; actual built-SDK beforeaborted/afterownreadpassed.",
+      "fix_commit": "9bca03bc689c425a7660c5da9305180450aeaa7c",
+      "generated_asset_commit": "df77883b1d149938979ba7a76bde2b125b7dbf44",
+      "next_artifact": "candidate007, not yet built",
+      "future_fresh_endurance_ids": [
+        "disk-candidate-pass-1-006",
+        "s3-candidate-pass-1-006",
+        "disk-candidate-pass-2-006",
+        "s3-candidate-pass-2-006"
+      ],
+      "future_larger_candidate_suffix": "003",
+      "unchanged": "All predeclared workloads, rows, sizes, CPU/RAM/disk budgets, SLO/delivery/fairness/regression thresholds, reserves and14400scontinuoussoaks remain unchanged.",
+      "new_harness": "Auth-link consumption case, corrected post-pacing ledger admission, all4capacitysteps/CPU endpoints and full auxiliary-action overlap timing.308stress+3projection regressions pass; real network smoke must close before full new matrix evidence.",
+      "retained_baselines_closed": "Both million-row disk/S3 retained baselines passed; short summarizer performs verified compression exactly once. Explicit extra S3compression correctly refused; original failed operator state retained with passing source/summary/checksum/cleanup reconciliation."
     }
   ],
   "native_same_artifact_suite": {
@@ -554,7 +572,7 @@
     "source_commit": "860d2f990949bfc5c8c612de3341c65a39e8d259",
     "binary_sha256": "c7e3d25467823c9d44157aca762761c23a49cd81f8ee96915b468f7bc3d119a4",
     "build_seconds": 90.04832498799078,
-    "status": "frozen; new affected CI/native/live browser and candidate campaigns pending",
+    "status": "historical candidate006; next007artifact pending after newSDK and generated assets",
     "previous_candidate_source": "f40774e1504a924fe6d9c801e251278cee1a8fab",
     "previous_candidate_approval": "Historical f40774e checks and backend matrix remain preserved; browser coalescence approval does not cover the confirmed late-overlap defect. No final endurance had started.",
     "before_after_evidence": "sdk-native-overlapping-refresh-before-after-001.json",
@@ -641,7 +659,7 @@
     "source_commit": "860d2f990949bfc5c8c612de3341c65a39e8d259",
     "binary_sha256": "c7e3d25467823c9d44157aca762761c23a49cd81f8ee96915b468f7bc3d119a4",
     "build_seconds": 90.04832498799078,
-    "status": "frozen; new affected CI/native/live browser and candidate campaigns pending",
+    "status": "historical candidate006; superseded after tenth confirmed SDK defect, next007freeze required",
     "previous_candidate_source": "f40774e1504a924fe6d9c801e251278cee1a8fab",
     "previous_candidate_approval": "Historical f40774e checks and backend matrix remain preserved; browser coalescence approval does not cover the confirmed late-overlap defect. No final endurance had started.",
     "before_after_evidence": "sdk-native-overlapping-refresh-before-after-001.json"

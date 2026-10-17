@@ -127,6 +127,21 @@
           "status": "passed",
           "evidence": "sdk-native-overlapping-refresh-before-after-001.json",
           "scope": "Focused ninth-defect correction only: deterministic SDK two-to-one rotations, 202 unit and 15 type tests, 37 guide tests and rebuilt assets. Full repaired browser repetitions remain pending."
+        },
+        {
+          "status": "passed",
+          "evidence": "sdk-independent-server-clients-built-before-after-001.json",
+          "scope": "Tenth confirmed defect fixed: independent default-memory server clients no longer wait behind another client sign-in;204units pass, Node22/24/26 full SDK jobs pass. Does not complete backend endurance, SMTP/OAuth or every SDK stress clause."
+        },
+        {
+          "status": "passed",
+          "evidence": "browser-sdk006-genuine-overlap-pass-1-007.json",
+          "scope": "Complete historical candidate006 genuine-overlap browser pass, one refresh for48callers,sevenownerplateaus,cleanup. NewSDKisolation correction requires final-source repetitions."
+        },
+        {
+          "status": "passed",
+          "evidence": "browser-sdk006-genuine-overlap-pass-2-008.json",
+          "scope": "Complete historical candidate006 genuine-overlap browser pass, one refresh for48callers,sevenownerplateaus,cleanup. NewSDKisolation correction requires final-source repetitions."
         }
       ]
     },
@@ -238,6 +253,11 @@
           "status": "passed",
           "evidence": "matrix-full-final-pass-1-002.json",
           "scope": "First full retained final-ELF backend subset:1730effective seconds,4x300sledgercapacity,4x120sadmin/cancellation/catalog/hostile scenarios,347samples/gap6.045s,44092ACKs0missing,2279ambiguouscommitsreconciled,restoreRTO1.850366s/RPOupper17.998048s,cleanup. Second full pass and broader area clauses remain separate; remote overlap adds0localcheckpointcredit."
+        },
+        {
+          "status": "passed",
+          "evidence": "large-s3-retained-baseline-001.json",
+          "scope": "Retained-source baseline only:1Mrows/table,1MiBobjects,7612signedevents0missing/extra/duplicate,4170effective seconds,786samples,maxgap11.6s,cleanup.600ssoak does not satisfy4h; separate postprocessing duplicate-compression refusal preserved."
         }
       ]
     },
@@ -503,6 +523,11 @@
           "status": "passed",
           "evidence": "provider-runtime-corrected-pass-2.json",
           "scope": "Second complete direct-provider diagnostic, all three profiles; stable FD/socket owners but anonymous memory still rises during idle. No exact heap/cache attribution or BaaS load credit."
+        },
+        {
+          "status": "passed",
+          "evidence": "large-s3-retained-baseline-001.json",
+          "scope": "Retained-source baseline only:1Mrows/table,1MiBobjects,7612signedevents0missing/extra/duplicate,4170effective seconds,786samples,maxgap11.6s,cleanup.600ssoak does not satisfy4h; separate postprocessing duplicate-compression refusal preserved."
         }
       ]
     },
@@ -590,6 +615,11 @@
           "status": "failed",
           "evidence": "disk-candidate-before-sql-fix-interruption.json",
           "scope": "Intentionally interrupted after confirmed SQL admission bug;1559samples,4290closed effective seconds outside checkpoint014, partial soak uncredited,cleanup confirmed. New artifact and fresh replacements required."
+        },
+        {
+          "status": "passed",
+          "evidence": "large-s3-retained-baseline-001.json",
+          "scope": "Retained-source baseline only:1Mrows/table,1MiBobjects,7612signedevents0missing/extra/duplicate,4170effective seconds,786samples,maxgap11.6s,cleanup.600ssoak does not satisfy4h; separate postprocessing duplicate-compression refusal preserved."
         }
       ]
     },
@@ -773,6 +803,16 @@
           "status": "passed",
           "evidence": "sdk-native-overlapping-refresh-before-after-001.json",
           "scope": "Focused ninth-defect correction only: deterministic SDK two-to-one rotations, 202 unit and 15 type tests, 37 guide tests and rebuilt assets. Full repaired browser repetitions remain pending."
+        },
+        {
+          "status": "passed",
+          "evidence": "browser-sdk006-genuine-overlap-pass-1-007.json",
+          "scope": "Complete historical candidate006 genuine-overlap browser pass, one refresh for48callers,sevenownerplateaus,cleanup. NewSDKisolation correction requires final-source repetitions."
+        },
+        {
+          "status": "passed",
+          "evidence": "browser-sdk006-genuine-overlap-pass-2-008.json",
+          "scope": "Complete historical candidate006 genuine-overlap browser pass, one refresh for48callers,sevenownerplateaus,cleanup. NewSDKisolation correction requires final-source repetitions."
         }
       ]
     },
@@ -837,6 +877,21 @@
           "status": "passed",
           "evidence": "sdk-native-overlapping-refresh-before-after-001.json",
           "scope": "Focused ninth-defect correction only: deterministic SDK two-to-one rotations, 202 unit and 15 type tests, 37 guide tests and rebuilt assets. Full repaired browser repetitions remain pending."
+        },
+        {
+          "status": "passed",
+          "evidence": "sdk-independent-server-clients-built-before-after-001.json",
+          "scope": "Tenth confirmed defect fixed: independent default-memory server clients no longer wait behind another client sign-in;204units pass, Node22/24/26 full SDK jobs pass. Does not complete backend endurance, SMTP/OAuth or every SDK stress clause."
+        },
+        {
+          "status": "passed",
+          "evidence": "browser-sdk006-genuine-overlap-pass-1-007.json",
+          "scope": "Complete historical candidate006 genuine-overlap browser pass, one refresh for48callers,sevenownerplateaus,cleanup. NewSDKisolation correction requires final-source repetitions."
+        },
+        {
+          "status": "passed",
+          "evidence": "browser-sdk006-genuine-overlap-pass-2-008.json",
+          "scope": "Complete historical candidate006 genuine-overlap browser pass, one refresh for48callers,sevenownerplateaus,cleanup. NewSDKisolation correction requires final-source repetitions."
         }
       ]
     },
@@ -1282,10 +1337,11 @@
   },
   "latest_local_python_regressions": {
     "status": "passed",
-    "tests": 300,
-    "elapsed_seconds": 12.586,
+    "stress_tests": 308,
+    "SDK_projection_tests": 3,
+    "stress_elapsed_seconds": 13.611865555052646,
     "skipped": 0,
-    "scope": "Complete stress harness suite after SDK overlap and generator CPU diagnostics; a new auth-links extension is prepared but not yet tested or measured. No BaaS load credit."
+    "scope": "All stress harness and fixed public SDK projection regressions after retained S3 load closed and before new campaigns; real auth-links network smoke still pending."
   },
   "unattributed_app_anonymous_growth": {
     "status": "under investigation",
@@ -1338,30 +1394,25 @@
     "clock_fixture_before_after": "provider-fixture-clock-before-after.json"
   },
   "current_final_candidate": {
-    "source_commit": "860d2f990949bfc5c8c612de3341c65a39e8d259",
-    "binary_sha256": "c7e3d25467823c9d44157aca762761c23a49cd81f8ee96915b468f7bc3d119a4",
-    "build_seconds": 90.04832498799078,
-    "status": "ordinary CI18/18 and native common-ELF12/12 passed on matching product trees; final live campaigns pending",
-    "evidence": "final-local-candidate.json",
-    "native_suite_run_id": 39029580219,
-    "production_findings": 9,
-    "focused_sdk_unit_tests": 202,
-    "focused_sdk_type_tests": 15,
-    "focused_guide_tests": 37,
-    "full_browser_repetitions": "pending after genuine-overlap oracle and SDK correction",
-    "ordinary_ci_evidence": "ci-sdk006-final-product-trees.json",
-    "native_suite_evidence": "native-final-suite/index.json",
-    "native_binary_sha256": "6aa5d48e502dc9b2ac46c595bc24bea4e56a5960f07af81c291e8f8b2708aedc"
+    "status": "candidate007 build pending after tenth SDK correction and regenerated embedded assets",
+    "latest_fix_commit": "9bca03bc689c425a7660c5da9305180450aeaa7c",
+    "generated_asset_commit": "df77883b1d149938979ba7a76bde2b125b7dbf44",
+    "last_frozen_artifact_evidence": "final-local-candidate.json",
+    "last_frozen_scope": "candidate006 before additional independent-server-client defect; its historical CI18/native12 and two genuine-overlap browser passes do not certify later source",
+    "SDK_before_after": [
+      "sdk-independent-server-clients-before-001.json",
+      "sdk-independent-server-clients-after-ci-001.json",
+      "sdk-independent-server-clients-built-before-after-001.json"
+    ],
+    "SDK_unit_passed": 204,
+    "latest_harness_passed": 308,
+    "SDK_projection_regressions_passed": 3
   },
   "current_campaign_checkpoint": {
-    "checkpoint": "load-time-checkpoint-018.json",
-    "effective_local_load_seconds": 139464,
-    "current_product_source": "860d2f990949bfc5c8c612de3341c65a39e8d259",
-    "active_local_at_recording": "large-s3-retained-baseline-001",
-    "active_remote_at_recording": [
-      39029580219
-    ],
-    "recorded_utc": "2026-10-17T11:54:25.025135+00:00",
-    "scope": "Timestamped checkpoint only; open phases, remote overlap and SDK diagnostics excluded. No whole matrix or endurance approval."
+    "checkpoint": "load-time-checkpoint-019.json",
+    "effective_local_load_seconds": 143634,
+    "active_local_at_recording": null,
+    "recorded_utc": "2026-10-17T13:20:21.799734+00:00",
+    "scope": "Retained million-row realS3 baseline load/summary/cleanup passed; redundant second compression refused after successful verified compression. SDK/virtual controls and remote overlap excluded. Preparing next frozen source, no final endurance approval."
   }
 }

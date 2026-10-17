@@ -1,16 +1,16 @@
 # G05 — relatório técnico de stress
 
 **Estado: em execução, sem aprovação do G05.** Este relatório é atualizado
-durante as campanhas. Checkpoint de carga consolidada: 17/10/2026, 11:15 UTC.
-Atualização da investigação: 17/10/2026, 12:09 UTC.
+durante as campanhas. Checkpoint de carga consolidada: 17/10/2026, 13:07 UTC.
+Atualização da investigação: 17/10/2026, 13:15 UTC.
 Não houve merge nem deploy de produção. O trabalho está na branch
 `test/g05-stress-verification`, no [PR #90](https://github.com/Nelcota/Nelcota/pull/90),
 mantido como rascunho para revisão.
 
 ## Tempo efetivo e artefatos
 
-O [checkpoint 018](results/stress/load-time-checkpoint-018.json) registra
-**139.464 segundos, ou 38h44min24s, de carga efetiva concluída**. O cálculo
+O [checkpoint 019](results/stress/load-time-checkpoint-019.json) registra
+**143.634 segundos, ou 39h53min54s, de carga efetiva concluída**. O cálculo
 conservador exclui preparação, aquecimento, descanso, fases interrompidas,
 controles artificiais e dupla contagem de janelas simultâneas. Tempo mínimo
 de oito horas atingido não significa aprovação dos demais critérios.
@@ -20,7 +20,7 @@ O tempo parcial das campanhas ainda abertas não está somado nesse checkpoint.
 |---|---|
 | Código após as correções de cancelamento SQL/export e de exportação grande não consumida | Regressões reais aprovadas; [último antes/depois](results/stress/export-large-unpolled-deadline-after.json) inclui 17 testes. Binário final reconstruído; campanhas afetadas continuam pendentes |
 | SHA-256 do binário de baseline preservado | `75c44c85a85db26195166aa1d2c6caf481e3db476801ec8131525ef62adf1be0` |
-| Candidato local atual congelado | `860d2f990949bfc5c8c612de3341c65a39e8d259`; SHA-256 `c7e3d25467823c9d44157aca762761c23a49cd81f8ee96915b468f7bc3d119a4`; 30.480.704 bytes; build release de 90,048 s. [Proveniência](results/stress/final-local-candidate.json). Inclui a correção de refresh do SDK e guias reconstruídos. CI ordinário 18/18 e nova suíte nativa 12/12 aprovados nas mesmas seis árvores de produto. Campanhas afetadas continuam pendentes |
+| Último candidato local congelado (006) | `860d2f990949bfc5c8c612de3341c65a39e8d259`; SHA-256 `c7e3d25467823c9d44157aca762761c23a49cd81f8ee96915b468f7bc3d119a4`; 30.480.704 bytes; build release de 90,048 s. [Proveniência](results/stress/final-local-candidate.json). Inclui a correção de refresh do SDK e guias reconstruídos. CI ordinário 18/18 e nova suíte nativa 12/12 aprovados nas mesmas seis árvores de produto. Campanhas afetadas continuam pendentes |
 | Candidato anterior preservado | Fonte `f40774e`; ELF `9cc6cbf0...`; [proveniência histórica](results/stress/final-local-candidate-f40774e.json). CI ordinário 18/18 e suíte nativa 12/12 passaram nesse produto; esses resultados não certificam a correção posterior do SDK |
 | Candidato nativo anterior do Actions | Mesma fonte histórica de produto `f40774e`; ELF `872c3b1efc71e0118386cdd3caf36bae0de26cb213307b91396fe30c0af83d75`, 30.463.736 bytes. [12 relatórios históricos](results/stress/native-final-suite-f40774e/index.json) aprovados no mesmo ELF; diferença entre hosts registrada, sem alegar build byte a byte reproduzível |
 | Candidato nativo atual do Actions | Fonte `860d2f9`; ELF `6aa5d48e502dc9b2ac46c595bc24bea4e56a5960f07af81c291e8f8b2708aedc`, 30.463.736 bytes. [12 casos originais](results/stress/native-final-suite/index.json) aprovados, com limpeza, dois restores e reconciliação de 30 ACKs após perda da RAM da VM em cada passagem. Não resolve a falha nativa original nem certifica endurance |
@@ -51,15 +51,50 @@ O backend de produção continua um único binário Rust, sem Node ou Python.
 | 1 | Inventário, baseline imutável e SLOs declarados | Atendido para o staging local | [Inventário](results/stress/coverage-inventory.json), [plano](results/stress/final-campaign-plan.json), manifestos por execução. A matriz registra os cenários ainda incompletos. |
 | 2 | Calibração, unidades, amostragem e oráculos | Validado nos controles corrigidos | Controles nativos de bytes, redirects, contadores esparsos, cgroups e compactação; campanhas finais ainda precisam terminar. |
 | 3 | Cancelamento, watchdogs, redação e limpeza restrita | Demonstrado nos escopos local e nativo executados | [Controle nativo de guardas/pidfd](results/stress/native-guards-pidfd.json), interrupções reais e recibos de limpeza. A VM própria também confirmou limpeza e limites reais de kernel, sem guard crítico disparado nas execuções aprovadas. |
-| 4 | Duas passagens de steady/staircase/picos/descanso | Pendente no artefato final006 | Fases anteriores e falhas preservadas. Duas passagens por backend ainda exigem conclusão no ELF final. |
+| 4 | Duas passagens de steady/staircase/picos/descanso | Pendente na próxima revisão congelada | O SDK recebeu uma décima correção após o candidato006; nenhum endurance candidato006 havia iniciado. Novos artefatos e duas passagens por backend são necessários. |
 | 5 | Toda a matriz funcional, de segurança e concorrência | Parcial | Duas matrizes completas do backend passaram no ELF anterior, com variação de calibração ainda investigada. Um ciclo browser/auth passou no oráculo anterior; a repetição revelou a nona falha. Novo oráculo prova sobreposição real e exige novas passagens. CI funcional e subconjuntos não substituem os demais cenários. |
 | 6 | Isolamento/fairness em 1/5/10 projetos e controle responsivo | Reprovado/incompleto | Cinco/dez projetos tiveram falhas anteriores de fairness/drain. Novo smoke compartilhado falhou com 101 registros, incluindo 8 SLOs absolutos. Smoke de cotas de 10ms falhou com 106 registros relativos, sem falhas absolutas; 1.381 eventos íntegros e limpeza completa. Nenhum smoke substitui os passos obrigatórios de cinco minutos. |
-| 7 | Quatro horas contínuas em disco e S3 no artefato final | Pendente | Três execuções históricas completaram fisicamente quatro horas, com aprovação de contadores retirada. Uma nova campanha em disco passou no protocolo atual, como baseline; correções posteriores invalidaram as campanhas afetadas do candidato. Nenhuma campanha final006 de quatro horas foi aprovada até aqui. |
+| 7 | Quatro horas contínuas em disco e S3 no artefato final | Pendente | Três execuções históricas completaram fisicamente quatro horas, com aprovação de contadores retirada. Uma nova campanha em disco passou no protocolo atual, como baseline; correções posteriores invalidaram as campanhas afetadas do candidato. Nenhuma campanha do próximo candidato, com as dez correções, foi aprovada até aqui. |
 | 8 | Falhas, drain, restart, restore e deployment aplicável | Parcial | Primeiro fault passou com reconciliação de ACKs e restore local novo. Dois fluxos nativos passaram no escopo de restore no mesmo alvo e perda da RAM da convidada. Repetição final de faults/carga, atualização operacional, DNS/ACME públicos e recuperação fora do host continuam incompletos. |
 | 9 | Recursos, invariantes de dados/arquivos/eventos e regressão | Parcial | Invariantes locais e plateaus observados; precisam das campanhas finais comparáveis. Retenção anônima do provedor ainda exige atribuição. |
-| 10 | Correções focadas e regressões dos defeitos confirmados | Verificado localmente nos nove defeitos reproduzidos; repetições completas pendentes | Cinco falhas na CLI, três na admissão/liberação de recursos SQL/export e uma no refresh concorrente do SDK. SDK: duas rotações antes, uma depois, 202 testes unitários e 15 testes de tipos aprovados. A falha nativa original após perda da RAM e as falhas de fairness continuam sem causa comprovada. |
-| 11 | Rust/UI/SDK/lint/CI correspondentes ao SHA testado | CI ordinário e suíte nativa aprovados para o produto atual; harness novo pendente | [18 checks ordinários](results/stress/ci-sdk006-final-product-trees.json) e [12 casos nativos](results/stress/native-final-suite/index.json) passaram nas mesmas seis árvores do produto 860d2f9. O ELF local é identificado separadamente. Extensões novas de links e agendamento do gerador ainda serão testadas após a carga local aberta; campanhas finais permanecem pendentes. |
+| 10 | Correções focadas e regressões dos defeitos confirmados | Dez defeitos reproduzidos; regressões focadas aprovadas, campanhas finais pendentes | Cinco falhas na CLI, três de SQL/export e duas no SDK. A nova falha bloqueava clientes independentes no servidor: 202 aprovados/2 reprovados antes, 204/204 aprovados depois. A falha nativa original e a fairness ainda exigem investigação. |
+| 11 | Rust/UI/SDK/lint/CI correspondentes ao SHA testado | Pendente no novo produto após a décima correção | O candidato006 tinha CI18/18 e native12/12. O novo SDK passou em Node22/24/26, com204/204unit e budgets inalterados. O dist foi regenerado em commit separado, com checks locais aprovados. Novo freeze, CI correspondente e campanhas finais ainda precisam terminar. |
 | 12 | Relatório, limites e todos os testes falhos/bloqueados/não executados | Em consolidação | Este relatório e o [registro detalhado](stress-verification-execution.md) preservam os resultados; ainda há campanhas abertas. |
+
+## Décima correção: isolamento do SDK no servidor
+
+O [controle anterior](results/stress/sdk-independent-server-clients-before-001.json)
+manteve um login pendente no cliente A e tentou ler a sessão já armazenada no
+cliente B, criado com outro adaptador padrão em memória. A chave de lock global
+por URL fazia B aguardar a rede de A. Os dois novos cenários falharam, tanto
+com Web Locks quanto com a fila local, enquanto os 202 testes anteriores passaram.
+
+O commit `9bca03b` usa uma fila identificada por um `Symbol` privado para cada
+cliente de servidor com memória padrão. Adapters fornecidos e sessões no
+navegador mantêm o nome de coordenação compartilhado. A
+[verificação posterior](results/stress/sdk-independent-server-clients-after-ci-001.json)
+passou 204/204 testes, sem pendentes, e os jobs Node22/24/26 passaram. O job
+principal incluiu tipos, build, limites de tamanho inalterados, pacote, memória,
+Node/Bun/Deno, contratos dos três browsers e o exemplo Notes.
+
+Os relatórios separam o SHA do head do workflow do merge sintético realmente
+checado no PR. Os dois arquivos de implementação foram obtidos nesses checkouts
+e comparados byte a byte aos respectivos heads. Tokens e payloads dos testes
+não foram publicados. Controles do SDK não recebem crédito de carga efetiva.
+
+Os assets dos guias foram reconstruídos no commit `df77883`, após encerrar
+a carga S3. Passaram 37 testes focados, typecheck e build. O CI anterior falhou
+especificamente no check de `dist` versionado; essa falha foi preservada.
+O produto com os assets corrigidos precisa de novo freeze, CI e repetições.
+Nenhum endurance do candidato006 foi iniciado antes dessa nova descoberta.
+
+A [primeira passagem completa do browser no candidato006](results/stress/browser-sdk006-genuine-overlap-pass-1-007.json)
+confirmou a correção anterior: 48 chamadas realmente sobrepostas geraram uma
+requisição de refresh, com sete plateaus de recursos e limpeza confirmada.
+A [segunda passagem](results/stress/browser-sdk006-genuine-overlap-pass-2-008.json)
+também encerrou aprovada, com a mesma prova de uma rotação e sete plateaus.
+São evidências históricas desse código, sem certificação automática da revisão
+posterior do SDK ou do G05 completo.
 
 ## Staging e limites
 
@@ -92,9 +127,11 @@ cgroup e steal do host. Os gates de latência e entrega permanecem iguais.
 O [baseline maior em disco](results/stress/large-disk-retained-baseline-001.json)
 passou com um milhão de linhas em cada tabela products/private, objetos de
 1 MiB, 7.811 eventos únicos reconciliados e nenhum evento perdido, extra ou
-duplicado. Foram 4.170 s efetivos, excluindo 15 s de aquecimento. O baseline
-maior em S3 real foi iniciado às 11:44 UTC; seu tempo aberto não está incluído
-no checkpoint 018. Esses soaks de dez minutos não cumprem o gate de quatro horas.
+duplicado. Foram 4.170 s efetivos, excluindo 15 s de aquecimento. O [baseline maior em S3 real](results/stress/large-s3-retained-baseline-001.json)
+também passou: 7.612 eventos sem perdas/duplicações/extras, 786 amostras, gap
+máximo de 11,6 s e census com 1M/1M linhas, 10.129 objetos e zero transações
+ociosas. Acrescentou 4.170 s efetivos ao checkpoint019. Esses soaks de dez
+minutos não cumprem o gate de quatro horas.
 
 O ambiente local oferece cinco slots de afinidade e quota efetiva de quatro
 CPUs para o controlador. Containers filhos têm limites próprios; não se

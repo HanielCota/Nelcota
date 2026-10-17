@@ -1,7 +1,7 @@
 # G05 — Registro técnico da execução
 
-Status: em execução, G05 sem aprovação. O checkpoint conservador 018 registra
-38h44min24s de intervalos de carga efetiva concluídos. O mínimo de oito horas
+Status: em execução, G05 sem aprovação. O checkpoint conservador 019 registra
+39h53min54s de intervalos de carga efetiva concluídos. O mínimo de oito horas
 foi atingido; as campanhas afetadas no candidato final006 ainda precisam
 terminar. O relatório em português contém a situação atual dos 12 critérios.
 As passagens históricas de quatro horas com contadores incompletos continuam
@@ -2961,3 +2961,81 @@ pending. A newly inspected fault-ledger admission bug and seeded single-use-link
 pressure case are prepared but not tested during local measured traffic. They
 are harness changes, not a tenth confirmed production defect. No acceptance
 threshold or historical failed result was changed.
+
+
+### 2026-10-17, 12:50 UTC — tenth production defect: independent SDK server queues
+
+Two test-only controls in `583d31a` failed while 202 existing units passed. Holding
+one default-memory server client's sign-in HTTP prevented a second independent
+client from reading its own cached session. Both native-Web-Lock and module-queue
+modes reached the one-second caller cancellation bound. Every manager used the
+same URL/storage-key lock even though these default adapters own separate data.
+
+Fix `9bca03b` gives default non-browser memory clients a private Symbol queue;
+shared/custom adapters and browser sessions retain their stable string scope.
+Queue tails still release after settlement. The unchanged public storage key,
+authoritative browser journal and cancellation/rotation checks remain intact.
+Node 22/24/26 SDK jobs passed. The complete Node 24 SDK job reports 204/204 units,
+zero failed/pending, both previously failing cases passed, and successful type,
+build, unchanged size, package, runtime, memory, browser-contract and Notes steps.
+Conditional failure-diagnostic steps remain skipped as intended, not missing tests.
+
+The source-bound SDK notices record actual PR merge checkouts separately:
+before `332e6e6742dee1cb98467c36438d34023eb144e0` versus workflow head `583d31a`;
+after `847ac93452a86519786a9b77a20b167f1cd28096` versus head `9bca03b`. Both changed
+implementation files at those checkouts match the corresponding heads byte for
+byte. The public before/after projections exclude test payloads. These SDK-only
+controls are not backend load and earn no effective-time credit.
+
+Candidate 006 had not started any final endurance case. It must not substitute
+for the next product source after this additional correction. The bundled SDK
+changelog/contract and Portuguese fragments changed. The current panel CI failed
+its tracked-dist drift step; its typecheck and build passed. Rebuild generated
+assets separately after the ongoing retained real-S3 baseline closes, then
+freeze/revalidate the new local and common native ELF without weakening six-tree
+identity checks. No local heavy suites/builds ran during that baseline.
+
+The first complete genuine-overlap browser pass on candidate006 also closed:
+run 39031606029/job 117393007774, source `f385843`, 219 samples, cleanup confirmed,
+27 focused guards,48 callers/one actual refresh, one held/two pending Web Locks and
+seven browser-owner plateaus. Heap deltas were 0.69/2.22/2.26 MiB, within the
+existing 8 MiB gate, with no positive node/listener growth. That historical result
+proves the ninth fix in its own scope and cannot certify the later source.
+The second immutable-ref pass and the retained million-row S3 baseline remain
+open; checkpoint 018 is unchanged. G05 and draft PR #90 remain open.
+
+
+### 2026-10-17, 13:15 UTC — S3 closure, source checks and generated assets
+
+The retained million-row real-S3 baseline passed its workload, invariants,
+summary and owned cleanup: 4,170 effective seconds, 786 samples, maximum gap
+11.6 seconds, 7,612 unique signed events with no missing/extra/duplicate IDs,
+1M rows in each table, 10,129 objects and zero idle transactions. The outer
+operator stopped because I added a second compression call after the short
+summarizer had already compressed and verified the series. The preservation
+guard refused the duplicate. The original stopped state and error remain;
+reverification confirmed 18,415,357 original bytes/786 samples and both original
+and compressed SHA-256 values. No measured workload or summary failed. Future
+short chains invoke compression only through the summarizer; long v3 summaries
+need their separate post-comparison compression. Checkpoint019 now records
+143,634 effective seconds (39h53m54s), without preparation or diagnostic credit.
+
+After closure, all 308 stress harness and three SDK projection tests passed.
+The actual AST-extracted scheduler before/after control submitted 15 versus 16
+of 16 offered virtual arrivals; the extra false drop is gone, with no capacity
+claim or explanation assigned to the prior remote rate variation. A retained
+built-SDK Node 24 control also reproduced the tenth defect before and returned
+the independent cached session before releasing the unrelated sign-in after.
+Native Node Web Locks were available; the repaired private default server
+queue intentionally uses the module-local Symbol scope. Local gzip sizes pass
+unchanged budgets: main 17,060/17,100 B, auth 11,242/11,250 B, rest 9,387/9,550 B and
+storage 7,267/7,400 B. No local unit/network capacity credit is assigned.
+
+Both candidate 006 genuine-overlap browser passes closed successfully on their
+original immutable source and common ELF, each with 27 focused guards,48 callers/
+one actual refresh, seven owner plateaus, 219 samples and cleanup. Preserve these
+historical results; the later SDK correction requires a new final source.
+The embedded guide assets were regenerated separately in df77883 after guide
+translation checks, zero panel diagnostics, 37 focused tests and Vite build passed.
+The existing large-reference-chunk warning remains. The next release artifact
+and final native/live campaigns are still pending; no merge or deployment.
