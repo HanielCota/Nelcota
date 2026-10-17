@@ -51,7 +51,7 @@ O backend de produção continua um único binário Rust, sem Node ou Python.
 | # | Critério do G05 | Situação neste checkpoint | Evidência ou impedimento |
 |---|---|---|---|
 | 1 | Inventário, baseline imutável e SLOs declarados | Atendido para o staging local | [Inventário](results/stress/coverage-inventory.json), [plano](results/stress/final-campaign-plan.json), manifestos por execução. A matriz registra os cenários ainda incompletos. |
-| 2 | Calibração, unidades, amostragem e oráculos | Validado nos controles corrigidos | Controles nativos de bytes, redirects, contadores esparsos, cgroups e compactação; campanhas finais ainda precisam terminar. |
+| 2 | Calibração, unidades, amostragem e oráculos | Controles focados aprovados; nova repetição real da matriz pendente | Controles nativos de bytes, redirects, contadores esparsos, cgroups e compactação; campanhas finais ainda precisam terminar. |
 | 3 | Cancelamento, watchdogs, redação e limpeza restrita | Demonstrado nos escopos local e nativo executados | [Controle nativo de guardas/pidfd](results/stress/native-guards-pidfd.json), interrupções reais e recibos de limpeza. A VM própria também confirmou limpeza e limites reais de kernel, sem guard crítico disparado nas execuções aprovadas. |
 | 4 | Duas passagens de steady/staircase/picos/descanso | Em execução no candidato007 | Primeira campanha nova em disco iniciada às13:34:48UTC. A sequência prevê duas passagens completas por backend e para em qualquer falha; início de campanha não é aprovação. |
 | 5 | Toda a matriz funcional, de segurança e concorrência | Parcial | Duas matrizes completas do backend passaram no ELF anterior, com variação de calibração ainda investigada. Um ciclo browser/auth passou no oráculo anterior; a repetição revelou a nona falha. Novo oráculo prova sobreposição real e exige novas passagens. CI funcional e subconjuntos não substituem os demais cenários. |
@@ -94,6 +94,26 @@ aberta; não há comparação numérica antes/depois contra valores perdidos.
 A segunda passagem independente ainda precisa concluir. Os
 [18checks do head80d29c8](results/stress/ci-sdk007-auth-metrics-product-trees.json)
 passaram e têm prova da árvore completa do merge realmente usado no CI.
+
+## Correção do executor: escala da capacidade da matriz
+
+O driver real usava64como taxa provisória e oferecia16/32/48/64iterações/s
+por300s, mas o novo validador de publicação esperava8/16/24/32. O
+[controle antes/depois](results/stress/matrix-capacity-declaration-before-after-001.json)
+reproduziu essa rejeição incorreta usando o parser e a expressão originais.
+Driver, comando e validador agora compartilham a mesma declaração. A carga
+máxima de64/s e as durações permanecem iguais; degraus não qualificados não
+são removidos do relatório. As36guardas focadas passaram, incluindo três
+regressões novas. A primeira tentativa do wrapper de descoberta falhou antes
+dos testes e continua registrada. A matriz remota em andamento usa a revisão
+antiga e mantém seu resultado; duas passagens reais corrigidas são pendentes.
+Essa falha de medição não é uma nova correção de produto nem prova a causa
+da variação histórica32→16/s.
+
+A campanha final007 de disco qualificou400iterações mistas/s no teto já
+predeclarado e iniciou o intervalo contínuo a280/s,70por cento. O teto não
+é uma afirmação de capacidade máxima. As quatro horas, a reconciliação,
+a recuperação e a comparação ainda precisam fechar.
 
 ## Décima correção: isolamento do SDK no servidor
 

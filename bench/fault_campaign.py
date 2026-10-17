@@ -40,6 +40,7 @@ from http_boundary import opener
 from fixture_copy import copy_to_tmpfs
 from disk_usage import container as container_disk_usage
 from lost_reply import discard_reply
+from ledger_capacity import DEFAULT_PROVISIONAL_RATE, STEP_SECONDS, STEP_PERCENTAGES, offered_rates
 
 ROOT = Path(__file__).resolve().parents[1]
 MUTATION_PATH='/rest/v1/rpc/stress_transfer'
@@ -444,9 +445,8 @@ def run(args):
         if args.capacity:
             probes=[]
             qualified=0
-            for percent in [25,50,75,100]:
-                offered=max(1,args.provisional_rate*percent//100)
-                result=traffic('capacity-'+str(percent),300,rate=offered,allow_unavailable=True,exploratory=True)
+            for percent, offered in zip(STEP_PERCENTAGES, offered_rates(args.provisional_rate)):
+                result=traffic('capacity-'+str(percent),STEP_SECONDS,rate=offered,allow_unavailable=True,exploratory=True)
                 probes.append(result)
                 atomic_json(output/'capacity-probes.json',probes)
                 if result['nominal_qualified']:
@@ -881,7 +881,7 @@ def main():
     parser.add_argument('--output',type=Path,required=True)
     parser.add_argument('--rate',type=int,default=8)
     parser.add_argument('--capacity',action='store_true')
-    parser.add_argument('--provisional-rate',type=int,default=64)
+    parser.add_argument('--provisional-rate',type=int,default=DEFAULT_PROVISIONAL_RATE)
     parser.add_argument('--s3-faults',action='store_true')
     parser.add_argument('--focus',choices=['all','filesystem','provider','matrix'],default='all',help='A named subset is diagnostic only and cannot certify the complete fault matrix')
     parser.add_argument('--matrix-step-seconds',type=int,choices=[20,120],default=120,help='Twenty seconds is an explicit supplemental smoke; full matrix steps use120')

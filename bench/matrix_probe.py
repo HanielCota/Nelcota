@@ -19,9 +19,40 @@ from native_artifact import artifact
 from native_evidence import publish
 from native_preflight import inventory
 from watchdog import atomic_json, cleanup, process_identity
+from ledger_capacity import DEFAULT_PROVISIONAL_RATE, STEP_SECONDS, offered_rates
 
 ROOT = Path(__file__).resolve().parents[1]
 PRODUCT_PATHS = {"crates", "sdk", "migrations", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml"}
+
+
+def capacity_profile():
+    return {'provisional_rate':DEFAULT_PROVISIONAL_RATE, 'step_seconds':STEP_SECONDS,
+            'rates':offered_rates(DEFAULT_PROVISIONAL_RATE)}
+
+
+def campaign_arguments(binary, identity, full):
+    command = [sys.executable, str(ROOT/'bench/launch.py'), '--kind', 'fault', '--run-id', identity,
+               '--binary', str(binary), '--focus', 'matrix', '--rate', '8']
+    if full:
+        return command + ['--capacity', '--provisional-rate', str(DEFAULT_PROVISIONAL_RATE),
+                          '--matrix-step-seconds', '120']
+    return command + ['--matrix-step-seconds', '20']
+
+
+def capacity_probe_evidence(probes):
+    profile = capacity_profile()
+    require(isinstance(probes,list) and len(probes)==len(profile['rates']),
+            'Missing complete four-step capacity evidence')
+    for probe, rate in zip(probes, profile['rates']):
+        require(isinstance(probe,dict) and type(probe.get('rate')) is int and probe['rate']==rate
+                and type(probe.get('requested_seconds')) is int
+                and probe['requested_seconds']==profile['step_seconds']
+                and type(probe.get('elapsed_seconds')) in {int,float}
+                and math.isfinite(probe['elapsed_seconds'])
+                and probe['elapsed_seconds']>=profile['step_seconds']
+                and type(probe.get('nominal_qualified')) is bool,
+                'Capacity receipt differs from the actual declared rate or five-minute duration')
+    return probes
 
 
 def input_artifact(directory, provenance, native):
@@ -148,13 +179,11 @@ def main():
               "checks": {"product_artifact": proof, "controller_kernel_budget": budget, "profile": PROFILE,
                          "full_profile": args.full, "local_load_checkpoint_credit_seconds": 0,
                          "cases": {}, "foreground_phases": {}, "scope": "Separate disposable backend diagnostic; overlapping remote time is excluded from the local eight-hour checkpoint."}}
-    command = [sys.executable, str(ROOT / "bench/launch.py"), "--kind", "fault", "--run-id", identity,
-               "--binary", str(args.artifact.resolve() / "nelcota"), "--focus", "matrix", "--rate", "8"]
+    command = campaign_arguments(args.artifact.resolve()/'nelcota', identity, args.full)
     step = 20
     if args.full:
         step = 120
-        command += ["--capacity"]
-    command += ["--matrix-step-seconds", str(step)]
+        report['checks']['capacity_profile'] = capacity_profile()
     child = None
     try:
         images = {}
@@ -198,11 +227,7 @@ def main():
         if args.full:
             report["checks"]["capacity"] = read_receipt(output / "capacity.json")
             probes = read_receipt(output / 'capacity-probes.json')
-            require(isinstance(probes, list) and len(probes) == 4
-                    and [probe['rate'] for probe in probes] == [8, 16, 24, 32]
-                    and all(probe['requested_seconds'] == 300 for probe in probes),
-                    'Missing complete five-minute capacity qualification evidence')
-            report['checks']['capacity_probes'] = probes
+            report['checks']['capacity_probes'] = capacity_probe_evidence(probes)
         for name in ["invariants.json", "restore.json", "lost-commit-replies.json", "launch-manifest.json"]:
             report["checks"][name] = read_receipt(output / name)
         with (output / "resources.jsonl").open("rb") as stream:

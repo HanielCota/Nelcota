@@ -747,7 +747,8 @@
       "s3-candidate-pass-2-006"
     ],
     "continuous_soak_seconds_each": 14400,
-    "scope": "Declared source/hash guards and all previous limits/SLOs retained. Stop on any workload/evidence/cleanup/comparison failure. No approval from partial load."
+    "scope": "Declared source/hash guards and all previous limits/SLOs retained. Stop on any workload/evidence/cleanup/comparison failure. No approval from partial load.",
+    "local_phase": "first final007 continuous disk soak active after qualifying400mixediterations/s at predeclared400ceiling; soak280/s=70percent; incomplete interval not counted yet"
   },
   "post_endurance_final007_predeclaration": {
     "declared_utc": "2026-10-17T13:51:54.695537+00:00",
@@ -929,5 +930,21 @@
     "expected_negative_responses": 160,
     "scope": "Only the metric publication changed before the passing repetition. Original failed percentiles were not exported; no causal or before/after performance claim. Second independent final pass still required.",
     "latest_ordinary_CI": "ci-sdk007-auth-metrics-product-trees.json"
+  },
+  "supplemental_matrix_capacity_contract": {
+    "declared_utc": "2026-10-17T15:00:06.662760+00:00",
+    "provisional_rate": 64,
+    "offered_rates": [
+      16,
+      32,
+      48,
+      64
+    ],
+    "seconds_each_step": 300,
+    "full_foreground_seconds_each_case": 120,
+    "scenarios": 5,
+    "maximum_offer_unchanged": true,
+    "scope": "Actual full driver already used its64default. A wrong half-rate publication guard is corrected by sharing ledger_capacity.py between the actual driver, command factory and validator. Keep failed saturation steps, never reduce traffic to fit the old validator.36focused guards passed; both corrected full matrix repetitions pending.",
+    "evidence": "matrix-capacity-declaration-before-after-001.json"
   }
 }

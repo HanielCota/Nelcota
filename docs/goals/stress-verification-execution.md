@@ -3172,3 +3172,40 @@ eight separate native startup reproductions on immutable source80d29c8, ref
 `test/g05-remaining-final007-001`. It stops at any failure. A second complete
 browser repetition remains separate. The local ordinary final007 disk campaign
 is still active, so no full final endurance/comparison result is inferred.
+
+
+### 2026-10-17, 15:00 UTC — capacity publication guard disagreed with actual driver
+
+A read-only audit found a deterministic benchmark inconsistency before the
+active remote matrix closed. Its actual fault CLI default was64, offering
+16/32/48/64iterations/s for300seconds each. The new publication assertion
+incorrectly expected8/16/24/32. The actual old assertion, extracted from its
+AST, rejected a complete bounded receipt set matching the actual parser.
+This is a benchmark defect, not an eleventh confirmed production defect or
+a new explanation for the historical32versus16qualified-rate variation.
+
+The driver, emitted full command and validator now share
+`bench/ledger_capacity.py`: the unchanged64maximum,25/50/75/100percent steps
+and300second durations. The full command explicitly passes the same64value.
+All four completed observations, including unsuccessful saturation steps,
+remain visible. The validator rejects missing/reordered/half-rate, short,
+untyped and nonfinite receipts. Three focused regressions include the actual
+command through the actual fault CLI parser with only its service launcher
+mocked. All36exact workflow guards passed in0.019s,0.265s operator, on the
+reserved OS CPU4 at low priority. A private preliminary discovery wrapper
+expected eight patterns instead of seven and failed before any test; its
+exit1and log remain retained, followed by corrected36/36controls.
+[Before/after and source hashes](results/stress/matrix-capacity-declaration-before-after-001.json).
+
+No backend/SDK/product tree, offered rate, CPU/RAM/disk limit, duration or SLO
+changed. The active immutable old-source matrix39041951068 keeps its actual
+result; no corrected real run is claimed yet. Repeat both full matrices on
+the corrected harness and retain all previous failed reports.
+
+Meanwhile local final007 disk passed the four independent five-minute
+capacity steps through the predeclared400mixediterations/s ceiling. This is
+a qualified lower bound, not a maximum-capacity result from the closed-loop
+calibration. Its continuous soak is active at280mixediterations/s,70percent.
+The14,400second interval is not credited or approved until completed, with
+unchanged app/database processes, retention, resource, integrity and cleanup
+evidence followed by the required baseline comparison.
