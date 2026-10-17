@@ -95,6 +95,7 @@ def prepare(destination, sdk, chrome_executable=None):
     if executable_chrome.name != 'chromium':
         copy(executable_chrome, destination/'chrome/chromium')
     copy(executable, destination/'python/bin/python3')
+    copy(Path(__file__).with_name('browser_entry.py'), destination/'browser_entry.py')
     stdlib = Path(sysconfig.get_path('stdlib'))
     # This headless Chromium profile does not import Python's separate Tcl/Tk
     # GUI toolkit. Some development Python installs retain its extension while
@@ -161,6 +162,7 @@ def prepare(destination, sdk, chrome_executable=None):
     profile = {'kind':'owned development browser tooling, not a production dependency',
                'bytes':copied, 'maximum_bytes':MAXIMUM_BYTES, 'files':len(records),
                'python_version':sys.version.split()[0], 'playwright_version':importlib.metadata.version('playwright'),
+               'isolated_python':True, 'explicit_package_directory':str(site.relative_to(destination)),
                'excluded_optional_Python_GUI_modules':['tkinter', '_tkinter'],
                'sdk_assets':len(list((destination/'sdk').rglob('*.js')))}
     manifest = json.dumps({'profile':profile, 'files':records}, sort_keys=True, indent=2)+'\n'

@@ -244,7 +244,7 @@ def campaign(args):
                        '-e', 'HOME=/home/ubuntu', '-e', 'XDG_CONFIG_HOME=/home/ubuntu/.config', '-e', 'XDG_CACHE_HOME=/home/ubuntu/.cache',
                        '-e', 'FONTCONFIG_FILE=/runtime/fonts.conf', '-e', 'LANG=C.UTF-8',
                        '-e', 'DEBUG=pw:browser',
-                       image['Id'], '/runtime/python/bin/python3', '-I', '/driver.py']
+                       image['Id'], '/runtime/python/bin/python3', '-I', '/runtime/browser_entry.py']
             limiter = shutil.which('prlimit')
             if limiter is None:
                 raise RuntimeError('Bounded private browser diagnostics require prlimit')

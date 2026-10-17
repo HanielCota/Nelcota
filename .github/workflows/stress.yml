@@ -266,6 +266,7 @@ jobs:
           suite = unittest.defaultTestLoader.discover('scripts/review_tests', pattern='test_stress_browser_auth.py')
           suite.addTests(unittest.defaultTestLoader.discover('scripts/review_tests', pattern='test_stress_browser_images.py'))
           suite.addTests(unittest.defaultTestLoader.discover('scripts/review_tests', pattern='test_stress_browser_diagnostics.py'))
+          suite.addTests(unittest.defaultTestLoader.discover('scripts/review_tests', pattern='test_stress_browser_entry.py'))
           result = unittest.TextTestRunner(verbosity=2).run(suite)
           report = {'source_commit': os.environ['GITHUB_SHA'], 'tests': result.testsRun,
                     'failures': len(result.failures), 'errors': len(result.errors), 'skipped': len(result.skipped),
@@ -276,7 +277,7 @@ jobs:
           with target.open('x') as stream:
               stream.write(json.dumps(report, indent=2, allow_nan=False) + '\n')
           print('::notice title=Browser auth regression summary::' + json.dumps(report, separators=(',', ':'), allow_nan=False))
-          if not result.wasSuccessful() or result.testsRun < 18 or result.skipped:
+          if not result.wasSuccessful() or result.testsRun < 21 or result.skipped:
               raise SystemExit(1)
           PYTEST
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -383,9 +384,14 @@ jobs:
         timeout-minutes: 3
         run: |
           docker pull postgres:17-alpine
-          timeout --kill-after=30s 120s nice -n19 ionice -c3 \
-            prlimit --as=134217728:134217728 --cpu=90:90 -- \
-            python3 bench/database_readiness_probe.py
+          sudo -n systemd-run --wait --pipe --collect \
+            --unit="g05-readiness-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --uid="$(id -u)" --gid="$(id -g)" --working-directory="$GITHUB_WORKSPACE" \
+            --property=CPUQuota=100% --property=MemoryMax=256M --property=MemorySwapMax=0 \
+            --property=Nice=19 --property=IOSchedulingClass=idle --property=TasksMax=64 \
+            --property=RuntimeMaxSec=150 --property=KillMode=control-group \
+            env GITHUB_ACTIONS="$GITHUB_ACTIONS" RUNNER_ENVIRONMENT="$RUNNER_ENVIRONMENT" \
+              GITHUB_SHA="$GITHUB_SHA" python3 bench/database_readiness_probe.py
       - name: Locate the retained final native ELF
         id: retained
         run: |

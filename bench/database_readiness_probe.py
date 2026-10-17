@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import secrets
+import re
 import signal
 import subprocess
 import sys
@@ -57,6 +58,15 @@ def main():
             'unix_socket_admitted_temporary_server':False,'temporary_server_TCP_listening_disabled':False,
             'TCP_rejected_temporary_server':False,'final_authenticated_TCP_ready':False}
     try:
+        relative=next(line.split(':',2)[2] for line in Path('/proc/self/cgroup').read_text().splitlines() if line.startswith('0::'))
+        cgroup=(Path('/sys/fs/cgroup')/relative.lstrip('/')).resolve(strict=True)
+        require(cgroup.is_relative_to(Path('/sys/fs/cgroup').resolve())
+                and any(re.fullmatch(r'g05-readiness-[0-9]{1,20}-[0-9]{1,4}\.service',part) for part in cgroup.parts))
+        quota,period=(cgroup/'cpu.max').read_text().split()
+        memory,swap,tasks=[(cgroup/name).read_text().strip() for name in ['memory.max','memory.swap.max','pids.max']]
+        require(quota.isdigit() and quota==period and memory==str(256*1024**2) and swap=='0' and tasks=='64')
+        report['controller_kernel_budget']={'cpu_quota_usec':int(quota),'cpu_period_usec':int(period),
+                                             'memory_bytes':int(memory),'swap_bytes':int(swap),'pids':int(tasks)}
         project.docker('run','-d','--name',project.pg,'--label',LABEL+'='+identity,
                        '--network','none','--cpus','.5','--memory','256m','--memory-swap','256m','--pids-limit','64',
                        '--tmpfs','/var/lib/postgresql/data:rw,nosuid,size=192m',

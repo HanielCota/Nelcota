@@ -1,16 +1,16 @@
 # G05 — relatório técnico de stress
 
 **Estado: em execução, sem aprovação do G05.** Este relatório é atualizado
-durante as campanhas. Checkpoint de carga consolidada: 17/10/2026, 08:29 UTC.
-Atualização da investigação: 17/10/2026, 08:29 UTC.
+durante as campanhas. Checkpoint de carga consolidada: 17/10/2026, 10:04 UTC.
+Atualização da investigação: 17/10/2026, 10:04 UTC.
 Não houve merge nem deploy de produção. O trabalho está na branch
 `test/g05-stress-verification`, no [PR #90](https://github.com/Nelcota/Nelcota/pull/90),
 mantido como rascunho para revisão.
 
 ## Tempo efetivo e artefatos
 
-O [checkpoint 016](results/stress/load-time-checkpoint-016.json) registra
-**134.814 segundos, ou 37h26min54s, de carga efetiva concluída**. O cálculo
+O [checkpoint 017](results/stress/load-time-checkpoint-017.json) registra
+**135.294 segundos, ou 37h34min54s, de carga efetiva concluída**. O cálculo
 conservador exclui preparação, aquecimento, descanso, fases interrompidas,
 controles artificiais e dupla contagem de janelas simultâneas. Tempo mínimo
 de oito horas atingido não significa aprovação dos demais critérios.
@@ -18,9 +18,10 @@ O tempo parcial das campanhas ainda abertas não está somado nesse checkpoint.
 
 | Artefato | Identidade e alcance |
 |---|---|
-| Código após o novo defeito SQL confirmado | Correção local em `crates/admin/src/sql/executor.rs`, com dois testes reais aprovados e hashes em [evidência](results/stress/sql-cancellation-admission-after.json). O binário anterior foi interrompido; novo build e repetições afetadas são obrigatórios |
+| Código após as correções de cancelamento SQL/export e de exportação grande não consumida | Regressões reais aprovadas; [último antes/depois](results/stress/export-large-unpolled-deadline-after.json) inclui 17 testes. Binário final reconstruído; campanhas afetadas continuam pendentes |
 | SHA-256 do binário de baseline preservado | `75c44c85a85db26195166aa1d2c6caf481e3db476801ec8131525ef62adf1be0` |
-| Candidato local atual congelado | `f40774e1504a924fe6d9c801e251278cee1a8fab`; SHA-256 `9cc6cbf0be68d38ba1c9e138cbeee7c4fac0324e91c406fae977eba591c76f44`; 30.480.704 bytes; build release de 90,633 s. [Proveniência](results/stress/final-local-candidate.json). CI, suíte nativa e campanhas finais desta correção ainda precisam concluir |
+| Candidato local atual congelado | `f40774e1504a924fe6d9c801e251278cee1a8fab`; SHA-256 `9cc6cbf0be68d38ba1c9e138cbeee7c4fac0324e91c406fae977eba591c76f44`; 30.480.704 bytes; build release de 90,633 s. [Proveniência](results/stress/final-local-candidate.json). CI ordinário 18/18 e suíte nativa 12/12 aprovados; campanhas finais de carga ainda pendentes |
+| Candidato nativo separado do Actions | Mesma fonte de produto `f40774e`; ELF `872c3b1efc71e0118386cdd3caf36bae0de26cb213307b91396fe30c0af83d75`, 30.463.736 bytes. [12 relatórios originais](results/stress/native-final-suite/index.json) aprovados no mesmo ELF; diferença entre hosts registrada, sem alegar build byte a byte reproduzível |
 | SHA-256 do workload k6 atual | `0ac01578bf19155302fe465884b480d792569086f23bb4ba3615ca5f0ce2547d` |
 | Baseline em disco no protocolo atual | Snapshot imutável de `1f391594dd8db6cccac54d6720d90c33d461d1f1`; `disk-final-pass-1-002` concluiu como baseline no binário retido, com protocolo atual |
 | Primeira execução nativa separada | [Actions 38962480993](https://github.com/Nelcota/Nelcota/actions/runs/38962480993), código congelado `e80770b3f6aa1f64d011a3d62f8ebf0f1201bdac`; reprovada no oráculo de signup antes do backup |
@@ -47,14 +48,14 @@ O backend de produção continua um único binário Rust, sem Node ou Python.
 | 1 | Inventário, baseline imutável e SLOs declarados | Atendido para o staging local | [Inventário](results/stress/coverage-inventory.json), [plano](results/stress/final-campaign-plan.json), manifestos por execução. A matriz registra os cenários ainda incompletos. |
 | 2 | Calibração, unidades, amostragem e oráculos | Validado nos controles corrigidos | Controles nativos de bytes, redirects, contadores esparsos, cgroups e compactação; campanhas finais ainda precisam terminar. |
 | 3 | Cancelamento, watchdogs, redação e limpeza restrita | Demonstrado nos escopos local e nativo executados | [Controle nativo de guardas/pidfd](results/stress/native-guards-pidfd.json), interrupções reais e recibos de limpeza. A VM própria também confirmou limpeza e limites reais de kernel, sem guard crítico disparado nas execuções aprovadas. |
-| 4 | Duas passagens de steady/staircase/picos/descanso | Pendente no protocolo final | Fases anteriores e falhas estão preservadas. A primeira repetição foi interrompida; sua substituta passou no protocolo atual como baseline. A primeira campanha do candidato foi interrompida após o defeito SQL confirmado; as duas passagens por backend exigem o próximo artefato. |
+| 4 | Duas passagens de steady/staircase/picos/descanso | Pendente no artefato final005 | Fases anteriores e falhas preservadas; interrupções após defeitos confirmados não aprovam o candidato. Duas passagens por backend ainda exigem conclusão no ELF final. |
 | 5 | Toda a matriz funcional, de segurança e concorrência | Parcial | CI funcional, primeiros browser/fault e smokes reais disponíveis; cobertura funcional não substitui stress repetido de cada célula. |
-| 6 | Isolamento/fairness em 1/5/10 projetos e controle responsivo | Reprovado/incompleto | Primeira topologia de um projeto passou no protocolo anterior; cinco/dez projetos tiveram violações reais de fairness. Dez projetos também falharam no drain de 30 s. |
-| 7 | Quatro horas contínuas em disco e S3 no artefato final | Pendente | Três execuções históricas completaram fisicamente quatro horas, com aprovação de contadores retirada. Uma nova campanha em disco passou no protocolo atual, como baseline; o candidato foi interrompido após o defeito SQL confirmado; nenhuma campanha final de quatro horas foi aprovada até aqui. |
+| 6 | Isolamento/fairness em 1/5/10 projetos e controle responsivo | Reprovado/incompleto | Cinco/dez projetos tiveram falhas anteriores de fairness/drain. Novo smoke compartilhado falhou com 101 registros, incluindo 8 SLOs absolutos. Smoke de cotas de 10ms falhou com 106 registros relativos, sem falhas absolutas; 1.381 eventos íntegros e limpeza completa. Nenhum smoke substitui os passos obrigatórios de cinco minutos. |
+| 7 | Quatro horas contínuas em disco e S3 no artefato final | Pendente | Três execuções históricas completaram fisicamente quatro horas, com aprovação de contadores retirada. Uma nova campanha em disco passou no protocolo atual, como baseline; correções posteriores invalidaram as campanhas afetadas do candidato. Nenhuma campanha final005 de quatro horas foi aprovada até aqui. |
 | 8 | Falhas, drain, restart, restore e deployment aplicável | Parcial | Primeiro fault passou com reconciliação de ACKs e restore local novo. Dois fluxos nativos passaram no escopo de restore no mesmo alvo e perda da RAM da convidada. Repetição final de faults/carga, atualização operacional, DNS/ACME públicos e recuperação fora do host continuam incompletos. |
 | 9 | Recursos, invariantes de dados/arquivos/eventos e regressão | Parcial | Invariantes locais e plateaus observados; precisam das campanhas finais comparáveis. Retenção anônima do provedor ainda exige atribuição. |
-| 10 | Correções focadas e regressões dos defeitos confirmados | Verificado nos defeitos já reproduzidos; revisão continua | Antes/depois em sete defeitos reais: cluster incorreto, unit relativa, outro host nativo, lease aninhado na migração, remoção com limpeza incompleta e liberação antecipada da admissão SQL e de exportações. A correção SQL passou em dois testes locais reais; CI e campanhas finais ainda precisam repeti-la. Os cenários específicos passaram em VMs novas. A falha da fixture Rust teve local original recuperado e passou 1.000 repetições após I/O de prontidão; o erro original continua visível. Fairness não recebeu causa de produção inventada. |
-| 11 | Rust/UI/SDK/lint/CI correspondentes ao SHA testado | Aprovado no source intermediário e6fdfd7; nova correção exige CI próprio | [18 checks de e6fdfd7](results/stress/ci-e6fdfd7-final-product-source.json) e [12 casos nativos](results/stress/native-suite-e6fdfd7/index.json) passaram. O teste novo de exportações em `7468c3a` falhou conforme a [evidência original](results/stress/export-large-unpolled-deadline-before.json). A correção local passou 17 regressões; novo build, CI e suíte nativa ainda são necessários |
+| 10 | Correções focadas e regressões dos defeitos confirmados | Verificado nos oito defeitos reproduzidos; revisão continua | Cinco falhas na CLI e três na admissão/liberação de recursos SQL/export. A última exportação retinha duas conexões além do deadline; passou a reter zero sem consumir os corpos expirados, com 17 regressões reais aprovadas. A falha nativa original após perda da RAM e as falhas de fairness continuam sem causa comprovada. |
+| 11 | Rust/UI/SDK/lint/CI correspondentes ao SHA testado | Aprovado no source final do produto f40774e | [18 checks ordinários](results/stress/ci-f40774e-final-product-source.json), build local e [12 casos nativos](results/stress/native-final-suite/index.json) aprovados. Mudanças posteriores no executor preservam as seis árvores do produto; novas campanhas validam essa identidade antes de usar o ELF retido. |
 | 12 | Relatório, limites e todos os testes falhos/bloqueados/não executados | Em consolidação | Este relatório e o [registro detalhado](stress-verification-execution.md) preservam os resultados; ainda há campanhas abertas. |
 
 ## Staging e limites
@@ -274,7 +275,7 @@ AWS/S3 remoto, restauração fora do host, PITR configurado, ARM64, gerador em
 outra máquina e DNS/ACME públicos seguem sem alvo configurado. A VM KVM
 tem uma execução inicial reprovada por oráculo, dois fluxos completos
 aprovados em seus próprios hashes, cinco defeitos reais reproduzidos com regressões
-aprovadas em seus escopos e controle real de relógio aprovado. A [suíte final](results/stress/native-final-suite/index.json) concluiu **12/12 casos**,
+aprovadas em seus escopos e controle real de relógio aprovado. A [suíte então final](results/stress/native-final-suite-7e68fd2/index.json) concluiu **12/12 casos**,
 os seis cenários em duas passagens próprias, na fonte `7e68fd2`.
 Seu ELF comum `010d0fc52f5cc5961f56baf6902294abfcc2c9d855ccbf7605e4b91e8a89a45c`
 foi conferido em todos os casos. Houve 12 verificações de inode/digest
@@ -732,3 +733,72 @@ validação passaram, totalizando 19 guardas focadas para a nova matriz.
 O checkpoint 016 acrescenta somente os 480 segundos concluídos do smoke
 anterior, chegando a 37h26min54s. O diagnóstico de CPU ainda aberto e todas
 as janelas remotas sobrepostas continuam excluídos.
+
+## Checkpoint 017 e campanhas finais em 17/10, 10:04 UTC
+
+O tempo efetivo fechado chegou a **37h34min54s**, acrescentando apenas os
+480 segundos completos do diagnóstico de cotas de 10ms. A campanha maior
+ainda aberta e os testes remotos simultâneos não entram nesse valor.
+
+O [diagnóstico de dez projetos com cotas de 10ms](results/stress/host10-quota10ms-smoke-failure-001.json)
+foi reprovado nos cinco cenários de vizinho ruidoso: 106 registros de
+interferência relativa, sem violações absolutas de SLO nessa repetição.
+As 414 amostras não registraram guardas críticos; 90 rejeições entre projetos
+e 1.381 eventos únicos assinados foram reconciliados, sem perda, extras,
+duplicatas ou fila restante. A limpeza foi completa. O resultado não demonstra
+causa de produção nem permite certificar fairness com passos de 30 segundos.
+
+A [repetição do browser com cache frio](results/stress/browser-auth-image-preflight-failure-003.json)
+preparou as três imagens ausentes e avançou até `untrusted-browser`, mas
+falhou após 22,439 segundos; 14 guardas passaram e a limpeza foi confirmada.
+Isso verifica a correção do pré-requisito de imagem, mas o ciclo do navegador
+continua reprovado. Diagnósticos adicionais registram somente estados,
+marcadores, categorias e linhas numéricas do driver; 25 testes focados locais
+passaram, incluindo quatro de privacidade/limites. A nova execução imutável
+é `39023157250`, fonte `8becf02`; a matriz `39021737154`, fonte `812296a`,
+permanece em execução. Ambas usam o ELF nativo retido, sem crédito duplicado
+no tempo local.
+
+Às 09:57:26 UTC começou a sequência independente com um milhão de linhas
+em cada tabela products/private e objetos de 1 MiB: baseline preservado,
+duas passagens do candidato final005 por backend e comparações. O soak de
+600 segundos dessa fixture maior não substitui as quatro horas contínuas.
+
+A inspeção identificou ainda um risco de prontidão da fixture: o `SELECT 1`
+por socket Unix pode aceitar o servidor temporário de inicialização do
+entrypoint PostgreSQL antes de haver TCP. O executor agora exige consulta
+TCP autenticada; três guardas passaram. A reprodução real em VM nova mantém
+o servidor temporário durante dez segundos, exige rejeição TCP nessa etapa
+e sucesso autenticado após a inicialização. O resultado real está pendente;
+essa hipótese não explica retroativamente a falha opaca da primeira matriz.
+Os health checks Compose de produção já usam TCP e permanecem iguais.
+
+A [primeira matriz completa do backend final](results/stress/matrix-full-final-pass-1-002.json)
+passou: 1.730 segundos de carga, 347 amostras, quatro degraus de 300 segundos
+e quatro cenários de 120 segundos. A taxa qualificada foi 32 operações/s;
+a carga dos cenários ficou em 25/s, ou 78,125%. Foram reconciliados 44.092
+ACKs sem perda e 2.279 operações efetivamente confirmadas entre 4.803 respostas
+ambíguas, sem retry automático de mutações. Cancelamento SQL/exportação,
+exportação exata de 1.000 linhas, 20 tabelas DDL e rejeições hostis passaram.
+Restore em alvo novo: RTO 1,850366 s, RPO superior 17,998048 s; integridade e
+limpeza aprovadas. As 19 guardas focadas passaram. O relatório original foi
+recuperado por notices com checksum; o download direto do ZIP do provedor
+retornou HTTP 403, e a série numérica permanece no artefato remoto com hash
+registrado. Zero crédito adicional no checkpoint local por sobreposição.
+
+O [diagnóstico seguinte do navegador](results/stress/browser-auth-driver-diagnostic-failure-004.json)
+identificou `Playwright` ausente no caminho de importação, na linha 12 do
+driver, antes de qualquer marcador de prontidão. Apps/banco estavam ativos,
+sem OOM ou reinícios. O novo entrypoint inclui somente o diretório de pacotes
+copiados da fixture e mantém Python `-I`, mounts somente leitura e sandbox
+externa. O controle real de subprocesso falha sem o entrypoint e passa com
+ele, continuando a ignorar um `PYTHONPATH` adulterado. São 28 testes focados
+locais aprovados; a execução corrigida com Playwright ainda é obrigatória.
+
+A [segunda tentativa de matriz](results/stress/database-readiness-bootstrap-failure-001.json)
+não iniciou a carga: o novo preflight falhou antes da consulta SQL. O limite
+de espaço virtual de 128 MiB impede o cliente Docker em Go de reservar seu
+espaço de endereçamento; isso foi reproduzido em controle local somente de
+leitura, exit2 em 0,004164 s. Substituí esse mecanismo por cgroup de memória
+de 256 MiB, mantendo CPU, tarefas, swap e duração limitados. As 22 guardas
+passaram, mas a reprodução real de prontidão PostgreSQL continua pendente.

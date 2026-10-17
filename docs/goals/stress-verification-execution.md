@@ -2803,3 +2803,35 @@ then requires final authenticated TCP readiness and owned cleanup. Its real
 result is pending; do not attribute the original opaque matrix failure to this
 risk without evidence. Production Compose already uses TCP readiness and is
 unchanged; the native systemd health probe has a different startup contract.
+
+The [first complete final-ELF supplemental matrix](results/stress/matrix-full-final-pass-1-002.json)
+passed1730effective seconds/347resource samples, four300s capacity steps and
+four120s supplemental scenarios. Qualified ledger rate32/s, measured fault
+rate25/s;44092ACKs had0missing, with2279of4803ambiguous operations committed
+and reconciled without mutation retries. SQL/export cancellation, exact1000row
+export,20committed catalog tables and fixed hostile-input rejections passed.
+Fresh restoreRTO1.850366s, RPOupper17.998048s; no corruption/OOM, cleanup
+confirmed.19focused guards passed. Its complete original report is recovered
+losslessly through checksummed notices; direct16.8KB provider-artifact download
+returnedHTTP403. The numeric series remains in the provider artifact with its
+hash retained. Remote overlap earns0local time credit. A second fresh pass is
+still required; this success does not explain the opaque first setup failure.
+
+The [browser driver failure](results/stress/browser-auth-driver-diagnostic-failure-004.json)
+now identifies missing Playwright at driver line12, before any ready marker;
+both apps/PG remain running without OOM/restarts. The copied package directory
+was not in the isolated interpreter's platform-dependent default search path.
+Add an explicitly owned staged-package entrypoint while preserving `-I`,
+read-only mounts and the outer browser sandbox. An isolated real-process
+regression fails before entry and imports the owned package afterwards, while
+ignoring poisoned PYTHONPATH; escape/missing-directory controls also pass.
+28focused local browser tests passed; actual Playwright lifecycle remains
+pending until the corrected VM execution.
+
+The [new readiness-control bootstrap](results/stress/database-readiness-bootstrap-failure-001.json)
+failed before SQL or matrix traffic;22focused guards passed. A
+[read-only Docker CLI control](results/stress/database-readiness-AS-before-001.json)
+reproduced Go's virtual-address reservation failure under the128MiBASlimit
+in0.004164s, exit2. Apply a256MiB kernel memory cgroup instead, retaining
+CPU/task/swap/runtime limits. This fixes the resource-limiter mechanism;
+the real temporary-PG before/after remains pending and is not called passed.
