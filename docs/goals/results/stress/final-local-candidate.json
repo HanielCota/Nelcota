@@ -1,5 +1,5 @@
 {
-  "source_commit": "f40774e1504a924fe6d9c801e251278cee1a8fab",
+  "source_commit": "860d2f990949bfc5c8c612de3341c65a39e8d259",
   "build_command": [
     "cargo",
     "build",
@@ -20,8 +20,8 @@
   },
   "compiler_overrides": [],
   "build_exit": 0,
-  "build_seconds": 90.63318545097718,
-  "completed_utc": "2026-10-17T08:32:28.812587+00:00",
+  "build_seconds": 90.04832498799078,
+  "completed_utc": "2026-10-17T11:41:11.148392+00:00",
   "cpu_affinity": [
     0,
     1,
@@ -29,20 +29,20 @@
     3,
     4
   ],
-  "binary_sha256": "9cc6cbf0be68d38ba1c9e138cbeee7c4fac0324e91c406fae977eba591c76f44",
+  "binary_sha256": "c7e3d25467823c9d44157aca762761c23a49cd81f8ee96915b468f7bc3d119a4",
   "size": 30480704,
-  "scope": "Fresh frozen local staging candidate after SQL/export cleanup ownership and large unpolled export deadline corrections; no production release or deployment",
-  "status": "frozen; fresh final affected CI/native/live campaigns pending",
+  "scope": "Fresh frozen local staging candidate after native-browser SDK late-overlap refresh correction and rebuilt embedded guide assets, retaining SQL/export ownership corrections; no production release or deployment",
+  "status": "frozen; fresh final SDK/assets CI/native/live campaigns pending",
   "certifies_g05": false,
   "product_tree_objects": {
-    "crates": "986c88ac9de6d4c117ed8027d329b3e7b566140c",
+    "crates": "edcd9d9f13b82a7062fb2738031ff7b5abd1b35f",
     "Cargo.toml": "20a3154fea3f1883ccc42882fbd671bc0b12b17f",
     "Cargo.lock": "9150a443d0d0cec57de152e13bd9a6cb8e7a8c2d",
     "migrations": "e88cfbfd12955dc8cb9180d3324df6a5d9e62206",
-    "sdk": "864119c5aa5bfd0edc1799d9de018e096f39d67e",
+    "sdk": "273cc4331f10fb509e1b77590d970854d4a73a2e",
     "rust-toolchain.toml": "0fd1b3a84b408770d883519014b040aed30a15f0"
   },
-  "previous_build": "final-local-candidate-e6fdfd7.json",
-  "build_receipt": "candidate-final-005.json",
+  "previous_build": "final-local-candidate-f40774e.json",
+  "build_receipt": "candidate-final-006.json",
   "architecture": "x86_64-unknown-linux-gnu"
 }

@@ -229,6 +229,20 @@
       "prior_failed_evidence": "host10-shared-smoke-failure-002.json",
       "difference": "Same single CPU per app role/database role; replace shared1CPU ceiling per project with0.1CPU hard quotas replenished every10ms. No offered load, memory, disk, duration or SLO/fairness reduction.",
       "certifies_g05": false
+    },
+    {
+      "declared_utc": "2026-10-17T11:43:21.772858+00:00",
+      "change": "Freeze candidate006 after ninth confirmed production defect (SDK late overlapping browser refresh) and rebuild bundled guide assets. Use fresh disk/S3 candidate pass suffix005 and larger candidate suffix002; do not reuse prior output IDs. Existing rates, SLOs, datasets, safety reserves and durations are unchanged.",
+      "approval_thresholds_reduced": false,
+      "new_local_binary_sha256": "c7e3d25467823c9d44157aca762761c23a49cd81f8ee96915b468f7bc3d119a4",
+      "harness_regressions": {
+        "executed": 300,
+        "passed": 300,
+        "skipped": 0,
+        "seconds": 12.586,
+        "log_sha256": "ae2d867b42024637e0779e90b3a3e9c5b6b4730d8d3a559a242e68f637a93b5f"
+      },
+      "next_order": "Run the still-unstarted retained million-row S3 baseline while new CI/native checks execute remotely; prioritize the four final disk/S3 continuous endurance runs after candidate006 verification before remaining larger/topology profiles. Stop and diagnose every failed workload or comparison."
     }
   ],
   "native_same_artifact_suite": {
@@ -537,13 +551,13 @@
     "approval_thresholds_reduced": false
   },
   "current_final_artifact": {
-    "source_commit": "f40774e1504a924fe6d9c801e251278cee1a8fab",
-    "binary_sha256": "9cc6cbf0be68d38ba1c9e138cbeee7c4fac0324e91c406fae977eba591c76f44",
-    "build_seconds": 90.63318545097718,
-    "status": "built; final affected CI/native/campaigns pending",
-    "prior_candidate003": "interrupted after confirmed large unpolled export defect; cleanup confirmed; partial soak excluded",
-    "before_evidence": "export-large-unpolled-deadline-before.json",
-    "after_evidence": "export-large-unpolled-deadline-after.json",
+    "source_commit": "860d2f990949bfc5c8c612de3341c65a39e8d259",
+    "binary_sha256": "c7e3d25467823c9d44157aca762761c23a49cd81f8ee96915b468f7bc3d119a4",
+    "build_seconds": 90.04832498799078,
+    "status": "frozen; new affected CI/native/live browser and candidate campaigns pending",
+    "previous_candidate_source": "f40774e1504a924fe6d9c801e251278cee1a8fab",
+    "previous_candidate_approval": "Historical f40774e checks and backend matrix remain preserved; browser coalescence approval does not cover the confirmed late-overlap defect. No final endurance had started.",
+    "before_after_evidence": "sdk-native-overlapping-refresh-before-after-001.json",
     "evidence": "final-local-candidate.json"
   },
   "additional_browser_auth_pressure": {
@@ -624,12 +638,12 @@
     }
   },
   "current_final_candidate": {
-    "source_commit": "f40774e1504a924fe6d9c801e251278cee1a8fab",
-    "binary_sha256": "9cc6cbf0be68d38ba1c9e138cbeee7c4fac0324e91c406fae977eba591c76f44",
-    "build_seconds": 90.63318545097718,
-    "status": "built; final affected CI/native/campaigns pending",
-    "prior_candidate003": "interrupted after confirmed large unpolled export defect; cleanup confirmed; partial soak excluded",
-    "before_evidence": "export-large-unpolled-deadline-before.json",
-    "after_evidence": "export-large-unpolled-deadline-after.json"
+    "source_commit": "860d2f990949bfc5c8c612de3341c65a39e8d259",
+    "binary_sha256": "c7e3d25467823c9d44157aca762761c23a49cd81f8ee96915b468f7bc3d119a4",
+    "build_seconds": 90.04832498799078,
+    "status": "frozen; new affected CI/native/live browser and candidate campaigns pending",
+    "previous_candidate_source": "f40774e1504a924fe6d9c801e251278cee1a8fab",
+    "previous_candidate_approval": "Historical f40774e checks and backend matrix remain preserved; browser coalescence approval does not cover the confirmed late-overlap defect. No final endurance had started.",
+    "before_after_evidence": "sdk-native-overlapping-refresh-before-after-001.json"
   }
 }
