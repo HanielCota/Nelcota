@@ -920,9 +920,10 @@
       "scope": "Owned guest clock only; 1018.326s observed advance, expired access denied, service/anonymous canaries correct, original clock/NTP restored within 0.471s. External host unchanged; no load-time credit."
     },
     "remove_boundary": {
-      "status": "failed",
-      "evidence": "native-remove-boundary-before.json",
-      "scope": "Owned VM source a2a0123 confirmed remove exit0, cluster/unit gone and owner released although backup config cleanup failed. Sentinel deletion was requested by no-backup; defect is false completion/early owner release. Guard/propagation regressions and fresh corrected VM pending."
+      "status": "passed",
+      "evidence": "native-remove-boundary-after.json",
+      "before_evidence": "native-remove-boundary-before.json",
+      "scope": "Fresh VM source85 rejects malformed backup config before mutation: exit1 specific, owner/manifest/cluster/COUNT1 retained. Fault removed in finally; normal backup/removal and empty-host guard then passed. 16 samples/80.168s prep-inclusive, cleanup confirmed. Remote PITR is not certified."
     }
   },
   "provider_allocator_discovery": {
@@ -938,5 +939,10 @@
     "scope": "Original first-validation identity panic at line 863 preserved. Bounded real child I/O added only to fixture; 1000/1000 real repetitions passed in 9.064s on c98aaaf. Production fail-closed validation unchanged; final whole-CI gates remain separate.",
     "diagnostic_evidence": "ci-native-executable-panic-location.json",
     "regression_evidence": "ci-native-executable-identity-after.json"
+  },
+  "native_final_same_artifact_suite": {
+    "status": "not run",
+    "source_extension": "ffae0e5",
+    "scope": "Two independent passes of six native cases, serialized fresh VMs, one retained ELF verified per-case and in actual running processes. Dispatch after final asset/source freeze; local performance binary and native runner binary remain separately identified builds."
   }
 }

@@ -1,7 +1,7 @@
 # G05 — relatório técnico de stress
 
 **Estado: em execução, sem aprovação do G05.** Este relatório é atualizado
-durante as campanhas. Data deste checkpoint: 16/10/2026, 23:40 UTC.
+durante as campanhas. Data deste checkpoint: 17/10/2026, 00:07 UTC.
 Não houve merge nem deploy de produção. O trabalho está na branch
 `test/g05-stress-verification`, no [PR #90](https://github.com/Nelcota/Nelcota/pull/90),
 mantido como rascunho para revisão.
@@ -50,7 +50,7 @@ O backend de produção continua um único binário Rust, sem Node ou Python.
 | 7 | Quatro horas contínuas em disco e S3 no artefato final | Pendente | Três execuções completaram fisicamente quatro horas, mas a aprovação dos contadores foi retirada após auditoria. Nenhuma substituta final foi aprovada neste checkpoint. |
 | 8 | Falhas, drain, restart, restore e deployment aplicável | Parcial | Primeiro fault passou com reconciliação de ACKs e restore local novo. Dois fluxos nativos passaram no escopo de restore no mesmo alvo e perda da RAM da convidada. Repetição final, atualização operacional, DNS/ACME públicos e recuperação fora do host continuam incompletos. |
 | 9 | Recursos, invariantes de dados/arquivos/eventos e regressão | Parcial | Invariantes locais e plateaus observados; precisam das campanhas finais comparáveis. Retenção anônima do provedor ainda exige atribuição. |
-| 10 | Correções focadas e regressões dos defeitos confirmados | Verificado nos defeitos já reproduzidos; revisão continua | Antes/depois em quatro defeitos reais: cluster incorreto, unit relativa, outro host nativo e lease aninhado na migração. Os cenários específicos passaram em VMs novas. Uma falha intermitente Rust de identidade de executável segue sob investigação; o passe posterior não demonstra sua causa. Fairness não recebeu causa de produção inventada. |
+| 10 | Correções focadas e regressões dos defeitos confirmados | Verificado nos defeitos já reproduzidos; revisão continua | Antes/depois em cinco defeitos reais: cluster incorreto, unit relativa, outro host nativo, lease aninhado na migração e sucesso indevido de remoção com limpeza incompleta. Os cenários específicos passaram em VMs novas. A falha da fixture Rust teve local original recuperado e passou 1.000 repetições após I/O de prontidão; o erro original continua visível. Fairness não recebeu causa de produção inventada. |
 | 11 | Rust/UI/SDK/lint/CI correspondentes ao SHA testado | Parcial | [18 checks de `1f39159`](results/stress/ci-1f39159.json) passaram. O [CodeQL corrigido](results/stress/codeql-invalid-fixtures-before-after.json) passou em `f560493`; Rust de `3b56b25` e CodeQL de `14725d6` passaram em seus próprios SHAs, mas a falha Rust de `14725d6` permanece registrada e sob investigação. CI final ainda incompleto. `dist` continua pendente de rebuild separado. Falhas anteriores permanecem registradas. |
 | 12 | Relatório, limites e todos os testes falhos/bloqueados/não executados | Em consolidação | Este relatório e o [registro detalhado](stress-verification-execution.md) preservam os resultados; ainda há campanhas abertas. |
 
@@ -106,6 +106,7 @@ de desempenho do backend de produção por essa correção de segurança.
 | Outro diretório podia tomar a instalação nativa | Segundo init com `--skip-checks` exit 0 mudou senha/Caddy e criou outro manifesto/unit | Lease da máquina e owner persistente antes de provisionar; fronteira de diretório e liberação somente após remoção completa. Na VM nova: rejeição específica exit 1, senha/Caddy/linha inalterados, nenhum segundo manifesto/unit; 72,177 s com preparo, 14 amostras e limpeza. Rust de `f560493`/`3b56b25` passou; remoção real confirmou owner liberado e recusa de `up` no host vazio. |
 
 
+| Remoção nativa declarava sucesso apesar da configuração de backup não removida | `remove --no-backup` exit 0, unit/cluster apagados e owner liberado apesar do erro de unlink | Validação do caminho antes de destruir o runtime, propagação de erros e mesma regra na desativação do PITR. [Antes](results/stress/native-remove-boundary-before.json)/[depois](results/stress/native-remove-boundary-after.json): exit 1 específico, owner/manifest/cluster/linha preservados, seguido de remoção normal com backup bem-sucedida. As exclusões do sentinel eram solicitadas pelo probe; não foram classificadas como perda não intencional de ACKs. PITR real remoto continua não certificado. |
 | Migração nativa no cwd/`NELCOTA_ROOT` tentava adquirir o próprio lease | Dois comandos reais retornavam exit 1/`deployment_busy`, com o lease externo corretamente mantido | Filho nativo recebe `--dir` explícito do projeto, preservando o lease do host no pai. [Antes](results/stress/native-cwd-migration-before.json)/[depois](results/stress/native-cwd-migration-after.json): ambos exit 0, tabela e journal presentes, uma linha em SQL. [Errata](results/stress/native-cwd-migration-census-erratum.json) retira a alegação antiga de ausência de tabela, pois o primeiro census comparava bytes/string; não retira os exits 1/busy observados. |
 | Census nativo podia negar presença SQL válida | Repetição já tinha migrate exit 0, mas o oráculo interpretava `b"t"` como falso e não contava linhas | Parser de bytes estrito, presença de tabela/journal separada e COUNT decimal limitado. Três regressões; VM nova passou com COUNT 1. A [execução intermediária](results/stress/native-cwd-migration-census-failure.json) continua reprovada. |
 | Descoberta de alocador ignorava o prefixo real e não publicava arquivo legível | 17 exports reais continham `rustfs_memory_allocator_`, mas o controle contou zero; uploader falhou no JSON 0600 | Prefixo corrigido, disponibilidade explícita separada de valor e publicação validada 0644. [Primeira falha](results/stress/provider-memory-discovery-first-failure.json) preservada; [repetição corrigida](results/stress/provider-memory-discovery-after.json) passou com 17 exports e três gauges de memória, inclusive publicação. Bytes solicitados vivos continuam indisponíveis e owners não verificados. |
@@ -183,6 +184,9 @@ de descoberta/publicação. O relatório original permanece bloqueado e o job or
 | `14725d6` / `96c875d` | Migração nativa por diretório do projeto e census SQL tipado; antes/depois e falha intermediária preservados. |
 | `3b56b25` | Controle real de clock drift com restauração em finally e watchdog monotônico. |
 | `9e1f236` / `4ffad18` | Descoberta limitada do alocador real; prefixo, disponibilidade e permissão do artefato corrigidos. |
+| `85b3c5a` | Preflight e propagação de erros na limpeza nativa de pgBackRest/PITR; falha e repetição real de remoção preservadas. |
+| `c98aaaf` / `5fab62a` | I/O de prontidão da fixture de identidade; 1.000/1.000 repetições reais aprovadas. |
+| `ffae0e5` | Suite manual de seis cenários nativos em duas passagens com o mesmo ELF; verificação do processo ativo; execução final ainda pendente. |
 | `a9bb8c2` | Diagnóstico CI HTTPS limitado, sem encaminhamento de token nem publicação de assertions. |
 | `e4e89d3` / `5abdf2a` | Fixtures aleatórias e distinção entre candidato de validação e credencial efetiva; segunda falha preservada e CodeQL posterior aprovado. |
 
@@ -223,9 +227,11 @@ testes aprovados a partir de smokes, CI funcional ou resultados históricos.
 AWS/S3 remoto, restauração fora do host, PITR configurado, ARM64, gerador em
 outra máquina e DNS/ACME públicos seguem sem alvo configurado. A VM KVM
 tem uma execução inicial reprovada por oráculo, dois fluxos completos
-aprovados em seus próprios hashes, quatro defeitos reais reproduzidos com regressões
+aprovados em seus próprios hashes, cinco defeitos reais reproduzidos com regressões
 aprovadas em seus escopos, controle real de relógio aprovado e outras verificações em andamento. A repetição
-completa do candidato final continua pendente.
+completa do candidato final continua pendente. O novo target native-suite
+congela um único ELF para os seis cenários em duas passagens próprias;
+a preparação e cinco regressões do artefato não são doze casos já executados.
 A perda de RAM da convidada não certifica perda de energia do host físico. Nenhum desses
 impedimentos foi substituído silenciosamente por mock ou critério menor.
 

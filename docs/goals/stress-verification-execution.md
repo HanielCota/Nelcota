@@ -2013,3 +2013,17 @@ A suite real deve ser disparada no source final após o build separado dos
 assets; sua preparação não representa doze casos já executados. Os dois
 artefatos finais, local de performance e nativo construído no runner, terão
 hashes e escopos próprios, sem alegação de builds bit-a-bit reproduzíveis.
+
+### 17/10, 00:07 UTC — fronteira de remoção corrigida passou em VM nova
+
+A [repetição corrigida](results/stress/native-remove-boundary-after.json),
+fonte `85b3c5a`, binário
+`40791c78912c680ca8994a0f803ff3c246dcf48c74aa71d3fbe4e75404496818`,
+passou: remove exit **1**, rejeição específica, owner/manifest/cluster
+preservados e sentinel COUNT **1**. A configuração de tipo incorreto
+permaneceu intacta durante a recusa e foi desfeita pelo finally do probe.
+Em seguida, a remoção normal com backup passou e confirmou liberação do owner
+somente ao final, além de recusa de up no host antigo vazio. Foram 16 amostras,
+80,168 s incluindo preparo e limpeza, sem aprovação de endurance/throughput.
+As quatro regressões Rust novas aguardam conclusão do CI de seu próprio SHA;
+o teste real valida o fluxo de remoção, não PITR remoto ainda não configurado.
