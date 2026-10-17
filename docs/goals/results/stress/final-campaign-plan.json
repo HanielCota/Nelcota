@@ -224,22 +224,14 @@
     }
   ],
   "native_same_artifact_suite": {
-    "target": "native-suite",
-    "passes": 2,
-    "cases_each_pass": [
-      "cluster-routing",
-      "default-root",
-      "host-root",
-      "remove-boundary",
-      "clock-drift",
-      "runtime"
-    ],
-    "one_retained_elf_across_all_cases": true,
-    "fresh_disposable_runner_and_guest_each_case": true,
-    "max_parallel_jobs": 1,
-    "case_controller_maximum_seconds": 1800,
-    "source": "final source after generated asset rebuild",
-    "certifies_endurance": false
+    "workflow_run_id": 39017663454,
+    "source_commit": "f40774e1504a924fe6d9c801e251278cee1a8fab",
+    "binary_sha256": "872c3b1efc71e0118386cdd3caf36bae0de26cb213307b91396fe30c0af83d75",
+    "status": "passed",
+    "cases": 12,
+    "evidence": "native-final-suite/index.json",
+    "historical_7e_suite": "native-final-suite-7e68fd2/index.json",
+    "scope": "Native functional scope only; final load/other matrices and unresolved earlier startup failure remain separate."
   },
   "allocator_follow_up": {
     "declared_utc": "2026-10-17T01:19:02.464282+00:00",

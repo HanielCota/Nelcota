@@ -21,9 +21,9 @@
         "scope": "Existing real-PostgreSQL auth, independent consumers, rotation/revocation, recovery links and bounded password-worker cancellation; release-load endurance still pending.",
         "test_count": null,
         "latest_confirmed_ci": {
-          "source_commit": "7e68fd21430ac93125149f60927f8676b077811d",
-          "evidence": "ci-final-artifact-source.json",
-          "scope": "Existing functional subset repeated in exact frozen-source CI; whole stress/topology row remains separate."
+          "source_commit": "f40774e1504a924fe6d9c801e251278cee1a8fab",
+          "evidence": "ci-f40774e-final-product-source.json",
+          "scope": "Existing functional subset repeated in exact final product-source CI; this does not pass unrun sustained matrix clauses."
         }
       },
       "native_diagnostics": [
@@ -126,9 +126,9 @@
         "scope": "Existing REST/RPC/RLS, paging, admission and catalog regressions on real PostgreSQL; native million-row load profile still pending.",
         "test_count": null,
         "latest_confirmed_ci": {
-          "source_commit": "7e68fd21430ac93125149f60927f8676b077811d",
-          "evidence": "ci-final-artifact-source.json",
-          "scope": "Existing functional subset repeated in exact frozen-source CI; whole stress/topology row remains separate."
+          "source_commit": "f40774e1504a924fe6d9c801e251278cee1a8fab",
+          "evidence": "ci-f40774e-final-product-source.json",
+          "scope": "Existing functional subset repeated in exact final product-source CI; this does not pass unrun sustained matrix clauses."
         }
       },
       "native_diagnostics": [
@@ -231,9 +231,9 @@
         "scope": "Existing concurrent password/account/storage mutations and rollback regressions. The new native discarded post-COMMIT reply campaign is not certified by this subset.",
         "test_count": null,
         "latest_confirmed_ci": {
-          "source_commit": "7e68fd21430ac93125149f60927f8676b077811d",
-          "evidence": "ci-final-artifact-source.json",
-          "scope": "Existing functional subset repeated in exact frozen-source CI; whole stress/topology row remains separate."
+          "source_commit": "f40774e1504a924fe6d9c801e251278cee1a8fab",
+          "evidence": "ci-f40774e-final-product-source.json",
+          "scope": "Existing functional subset repeated in exact final product-source CI; this does not pass unrun sustained matrix clauses."
         }
       },
       "native_diagnostics": [
@@ -275,9 +275,9 @@
         "scope": "Existing committed DDL, failed catalog refresh, concurrent migration export and cancellation regressions.",
         "test_count": null,
         "latest_confirmed_ci": {
-          "source_commit": "7e68fd21430ac93125149f60927f8676b077811d",
-          "evidence": "ci-final-artifact-source.json",
-          "scope": "Existing functional subset repeated in exact frozen-source CI; whole stress/topology row remains separate."
+          "source_commit": "f40774e1504a924fe6d9c801e251278cee1a8fab",
+          "evidence": "ci-f40774e-final-product-source.json",
+          "scope": "Existing functional subset repeated in exact final product-source CI; this does not pass unrun sustained matrix clauses."
         }
       },
       "native_diagnostics": [
@@ -319,9 +319,9 @@
         "scope": "Existing real-file storage API, paths, listings, quotas, concurrent replacements and cancellation cases; continuous disk endurance still pending.",
         "test_count": null,
         "latest_confirmed_ci": {
-          "source_commit": "7e68fd21430ac93125149f60927f8676b077811d",
-          "evidence": "ci-final-artifact-source.json",
-          "scope": "Existing functional subset repeated in exact frozen-source CI; whole stress/topology row remains separate."
+          "source_commit": "f40774e1504a924fe6d9c801e251278cee1a8fab",
+          "evidence": "ci-f40774e-final-product-source.json",
+          "scope": "Existing functional subset repeated in exact final product-source CI; this does not pass unrun sustained matrix clauses."
         }
       },
       "native_diagnostics": [
@@ -409,9 +409,9 @@
         "scope": "Explicit storage_s3 ignored tests were run against real RustFS, including multipart, grant expiry, timeout/cancel cleanup. A continuous four-hour release campaign is a separate gate.",
         "test_count": null,
         "latest_confirmed_ci": {
-          "source_commit": "7e68fd21430ac93125149f60927f8676b077811d",
-          "evidence": "ci-final-artifact-source.json",
-          "scope": "Existing functional subset repeated in exact frozen-source CI; whole stress/topology row remains separate."
+          "source_commit": "f40774e1504a924fe6d9c801e251278cee1a8fab",
+          "evidence": "ci-f40774e-final-product-source.json",
+          "scope": "Existing functional subset repeated in exact final product-source CI; this does not pass unrun sustained matrix clauses."
         }
       },
       "native_diagnostics": [
@@ -474,9 +474,9 @@
         "scope": "Existing real HTTP receivers, signatures/retries/leases/workers and the full 100000-event retained-history boundary. 99999 history fixtures are explicitly cancelled, not claimed network deliveries.",
         "test_count": null,
         "latest_confirmed_ci": {
-          "source_commit": "7e68fd21430ac93125149f60927f8676b077811d",
-          "evidence": "ci-final-artifact-source.json",
-          "scope": "Existing functional subset repeated in exact frozen-source CI; whole stress/topology row remains separate."
+          "source_commit": "f40774e1504a924fe6d9c801e251278cee1a8fab",
+          "evidence": "ci-f40774e-final-product-source.json",
+          "scope": "Existing functional subset repeated in exact final product-source CI; this does not pass unrun sustained matrix clauses."
         }
       },
       "native_diagnostics": [
@@ -548,7 +548,7 @@
       "area": "SQL/export admission and cancellation",
       "entrypoints": "crates/server/tests/architecture.rs; admin/sql.rs; hardening.rs",
       "status": "not run",
-      "scope_or_limit": "SQL and export delayed-cancellation admission defects confirmed and locally fixed.16 related real-service regressions passed; initial failed correction validation retained. New immutable artifact, full CI and two qualified combined-pressure repetitions remain pending.",
+      "scope_or_limit": "SQL/export cancellation admission and large-unpolled export deadline bugs reproduced and fixed;17 related real-PostgreSQL regressions and all18ordinary final-product-source checks passed. Two full combined-pressure repetitions and final performance/endurance remain pending.",
       "functional_subset": {
         "status": "passed",
         "source_commit": "3203330cf3df2b9b7dd68efebc79412a8564e9fd",
@@ -561,9 +561,9 @@
         "scope": "Existing real-PostgreSQL SQL/export limits, slow/unpolled consumer cancellation, deadlines and role/connection recovery.",
         "test_count": null,
         "latest_confirmed_ci": {
-          "source_commit": "7e68fd21430ac93125149f60927f8676b077811d",
-          "evidence": "ci-final-artifact-source.json",
-          "scope": "Existing functional subset repeated in exact frozen-source CI; whole stress/topology row remains separate."
+          "source_commit": "f40774e1504a924fe6d9c801e251278cee1a8fab",
+          "evidence": "ci-f40774e-final-product-source.json",
+          "scope": "Existing functional subset repeated in exact final product-source CI; this does not pass unrun sustained matrix clauses."
         }
       },
       "native_diagnostics": [
@@ -659,9 +659,9 @@
         "scope": "Existing Vite browser suites and memory regressions with explicit endpoint/response doubles. This is not a measured release-panel visual p95 under native traffic.",
         "test_count": null,
         "latest_confirmed_ci": {
-          "source_commit": "7e68fd21430ac93125149f60927f8676b077811d",
-          "evidence": "ci-final-artifact-source.json",
-          "scope": "Existing functional subset repeated in exact frozen-source CI; whole stress/topology row remains separate."
+          "source_commit": "f40774e1504a924fe6d9c801e251278cee1a8fab",
+          "evidence": "ci-f40774e-final-product-source.json",
+          "scope": "Existing functional subset repeated in exact final product-source CI; this does not pass unrun sustained matrix clauses."
         }
       },
       "native_diagnostics": [
@@ -721,9 +721,9 @@
         "scope": "Existing TypeScript/Rust package, runtime, memory and server/browser contracts on documented CI runtimes; no VPS load envelope follows from these functional checks.",
         "test_count": null,
         "latest_confirmed_ci": {
-          "source_commit": "7e68fd21430ac93125149f60927f8676b077811d",
-          "evidence": "ci-final-artifact-source.json",
-          "scope": "Existing functional subset repeated in exact frozen-source CI; whole stress/topology row remains separate."
+          "source_commit": "f40774e1504a924fe6d9c801e251278cee1a8fab",
+          "evidence": "ci-f40774e-final-product-source.json",
+          "scope": "Existing functional subset repeated in exact final product-source CI; this does not pass unrun sustained matrix clauses."
         }
       },
       "native_diagnostics": [
@@ -809,9 +809,9 @@
         "scope": "Isolated root Docker lifecycle, paired backup/restore and recovery with explicit provenance/DNS/TLS/proxy doubles, plus actual 255-receipt and 256-identity boundaries.",
         "test_count": null,
         "latest_confirmed_ci": {
-          "source_commit": "7e68fd21430ac93125149f60927f8676b077811d",
-          "evidence": "ci-final-artifact-source.json",
-          "scope": "Existing functional subset repeated in exact frozen-source CI; whole stress/topology row remains separate."
+          "source_commit": "f40774e1504a924fe6d9c801e251278cee1a8fab",
+          "evidence": "ci-f40774e-final-product-source.json",
+          "scope": "Existing functional subset repeated in exact final product-source CI; this does not pass unrun sustained matrix clauses."
         }
       },
       "native_diagnostics": [
@@ -830,8 +830,14 @@
         {
           "run_id": "native-suite-38990677734",
           "status": "passed",
-          "evidence": "native-final-suite/index.json",
+          "evidence": "native-final-suite-7e68fd2/index.json",
           "scope": "Two fresh independent passes of all six native cases using one common ELF; actual runtime inode/digest, provisioning rejection boundaries, clock restore, backup/restore,30 ACKs per runtime after guest RAM loss and cleanup. No full combined management/update stress, in-flight power cut, physical host power loss or off-host certification."
+        },
+        {
+          "run_id": "native-suite-39017663454",
+          "status": "passed",
+          "evidence": "native-final-suite/index.json",
+          "scope": "Final product-source common ELF; all six native cases twice, fresh VMs, verified runtime inode/digest, same-target restore,30ACKs per runtime after guest RAM loss, cleanup. Original af01678startup failure still unresolved; no combined controller/update stress or off-host certification."
         }
       ]
     },
@@ -853,11 +859,19 @@
         "scope": "Existing upgrade/rollback acceptance against published v0.3.1 and v0.4.0 and the checkout. Public deployment/power-loss acceptance remains separate.",
         "test_count": null,
         "latest_confirmed_ci": {
-          "source_commit": "7e68fd21430ac93125149f60927f8676b077811d",
-          "evidence": "ci-final-artifact-source.json",
-          "scope": "Existing functional subset repeated in exact frozen-source CI; whole stress/topology row remains separate."
+          "source_commit": "f40774e1504a924fe6d9c801e251278cee1a8fab",
+          "evidence": "ci-f40774e-final-product-source.json",
+          "scope": "Existing functional subset repeated in exact final product-source CI; this does not pass unrun sustained matrix clauses."
         }
-      }
+      },
+      "native_diagnostics": [
+        {
+          "run_id": "native-suite-39017663454",
+          "status": "passed",
+          "evidence": "native-final-suite/index.json",
+          "scope": "Final product-source common ELF; all six native cases twice, fresh VMs, verified runtime inode/digest, same-target restore,30ACKs per runtime after guest RAM loss, cleanup. Original af01678startup failure still unresolved; no combined controller/update stress or off-host certification."
+        }
+      ]
     },
     {
       "id": "backup",
@@ -877,9 +891,9 @@
         "scope": "Existing owned Docker paired snapshots and restored files/database integrity. Off-host/PITR and power loss are not established.",
         "test_count": null,
         "latest_confirmed_ci": {
-          "source_commit": "7e68fd21430ac93125149f60927f8676b077811d",
-          "evidence": "ci-final-artifact-source.json",
-          "scope": "Existing functional subset repeated in exact frozen-source CI; whole stress/topology row remains separate."
+          "source_commit": "f40774e1504a924fe6d9c801e251278cee1a8fab",
+          "evidence": "ci-f40774e-final-product-source.json",
+          "scope": "Existing functional subset repeated in exact final product-source CI; this does not pass unrun sustained matrix clauses."
         }
       },
       "native_diagnostics": [
@@ -904,8 +918,14 @@
         {
           "run_id": "native-suite-38990677734",
           "status": "passed",
-          "evidence": "native-final-suite/index.json",
+          "evidence": "native-final-suite-7e68fd2/index.json",
           "scope": "Two fresh independent passes of all six native cases using one common ELF; actual runtime inode/digest, provisioning rejection boundaries, clock restore, backup/restore,30 ACKs per runtime after guest RAM loss and cleanup. No full combined management/update stress, in-flight power cut, physical host power loss or off-host certification."
+        },
+        {
+          "run_id": "native-suite-39017663454",
+          "status": "passed",
+          "evidence": "native-final-suite/index.json",
+          "scope": "Final product-source common ELF; all six native cases twice, fresh VMs, verified runtime inode/digest, same-target restore,30ACKs per runtime after guest RAM loss, cleanup. Original af01678startup failure still unresolved; no combined controller/update stress or off-host certification."
         }
       ]
     },
@@ -927,9 +947,9 @@
         "scope": "Existing malformed input, bounded API/storage/admin admission, peer identity, webhook destination/redirect and signature regressions; public ingress stress remains separate.",
         "test_count": null,
         "latest_confirmed_ci": {
-          "source_commit": "7e68fd21430ac93125149f60927f8676b077811d",
-          "evidence": "ci-final-artifact-source.json",
-          "scope": "Existing functional subset repeated in exact frozen-source CI; whole stress/topology row remains separate."
+          "source_commit": "f40774e1504a924fe6d9c801e251278cee1a8fab",
+          "evidence": "ci-f40774e-final-product-source.json",
+          "scope": "Existing functional subset repeated in exact final product-source CI; this does not pass unrun sustained matrix clauses."
         }
       },
       "native_diagnostics": [
@@ -1011,8 +1031,14 @@
         {
           "run_id": "native-suite-38990677734",
           "status": "passed",
-          "evidence": "native-final-suite/index.json",
+          "evidence": "native-final-suite-7e68fd2/index.json",
           "scope": "Two fresh independent passes of all six native cases using one common ELF; actual runtime inode/digest, provisioning rejection boundaries, clock restore, backup/restore,30 ACKs per runtime after guest RAM loss and cleanup. No full combined management/update stress, in-flight power cut, physical host power loss or off-host certification."
+        },
+        {
+          "run_id": "native-suite-39017663454",
+          "status": "passed",
+          "evidence": "native-final-suite/index.json",
+          "scope": "Final product-source common ELF; all six native cases twice, fresh VMs, verified runtime inode/digest, same-target restore,30ACKs per runtime after guest RAM loss, cleanup. Original af01678startup failure still unresolved; no combined controller/update stress or off-host certification."
         }
       ]
     },
@@ -1094,13 +1120,13 @@
     "regression_evidence": "ci-native-executable-identity-after.json"
   },
   "native_final_same_artifact_suite": {
+    "workflow_run_id": 39017663454,
+    "source_commit": "f40774e1504a924fe6d9c801e251278cee1a8fab",
+    "binary_sha256": "872c3b1efc71e0118386cdd3caf36bae0de26cb213307b91396fe30c0af83d75",
     "status": "passed",
-    "source_commit": "7e68fd21430ac93125149f60927f8676b077811d",
-    "workflow_run_id": 38990677734,
-    "evidence": "native-final-suite/index.json",
     "cases": 12,
-    "cleanup_confirmed": true,
-    "scope": "Two independent passes of six native cases, serialized fresh VMs, one common ELF verified in actual running processes. Does not certify ordinary final load, full management/update stress, public DNS/ACME, in-flight power cut or off-host restore."
+    "evidence": "native-final-suite/index.json",
+    "earlier_startup_failure": "native-af-post-cut-runtime-investigation.json"
   },
   "completed_current_protocol_disk_baseline": {
     "run_id": "disk-final-pass-1-002",

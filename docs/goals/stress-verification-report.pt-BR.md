@@ -668,3 +668,15 @@ futuros exigem restaurar/reconstruir as dependências antes de executar.
 Os [18 checks de f40774e](results/stress/ci-f40774e-final-product-source.json)
 passaram, incluindo a suíte Rust e CodeQL. A suíte nativa final e as campanhas
 ainda precisam concluir; CI ordinário não aprova esses critérios.
+
+
+A [suíte nativa final](results/stress/native-final-suite/index.json), fonte
+`f40774e`, concluiu seus 12 relatórios aprovados em duas passagens de seis
+casos, com limpeza e um ELF comum de 30.463.736 bytes, SHA-256
+`872c3b1efc71e0118386cdd3caf36bae0de26cb213307b91396fe30c0af83d75`.
+Cada runtime reconciliou 30 ACKs, sem perdas, duplicatas ou extras. Esse ELF
+remoto é distinto do binário local de performance; não há afirmação de build
+reproduzível byte a byte entre hosts. A suíte antiga de `7e68fd2` foi
+[preservada integralmente](results/stress/native-final-suite-7e68fd2/index.json).
+A falha anterior de startup continua aberta e não recebe causa ou correção
+inferida desses resultados aprovados.

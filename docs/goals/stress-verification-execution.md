@@ -2727,3 +2727,12 @@ local compiler or UI dependencies before any further related local checks.
 
 [All18ordinary checks](results/stress/ci-f40774e-final-product-source.json) passed
 on exact product sourcef40774e. Final native acceptance and stress remain separate.
+
+
+[Final native suite39017663454](results/stress/native-final-suite/index.json)
+passed all12original reports on sourcef40774e and common ActionsELF872c3b1e...
+(30463736bytes). Each runtime reconciled30externalACKs with no missing,
+duplicates or extras; all cases confirmed cleanup. The local performance
+ELF9cc6cbf0...remains distinct; no cross-host byte reproducibility is inferred.
+The prior7e68fd2index and12reports were [preserved](results/stress/native-final-suite-7e68fd2/index.json)
+before promotion. Preserve the unresolved af01678startup failure separately.
