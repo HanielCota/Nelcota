@@ -2232,3 +2232,22 @@ bounded publication. They have only had syntax/guard-flow review locally;
 the disposable Actions job runs them before starting any provider. Local
 ordinary tests/builds remain suspended during the active final disk campaign.
 No remote diagnostic is reported as executed or passed at this checkpoint.
+
+
+### First provider runtime diagnostic failed during idle observation
+
+[Actions 39001481313](https://github.com/Nelcota/Nelcota/actions/runs/39001481313)
+passed the focused regression step and verified all 960 default-case
+PUT/GET/DELETE operations. The observer failed during idle after 128
+telemetry exports; only the first 360 idle seconds have a boundary snapshot.
+The [original failed report](results/stress/provider-runtime-first-failure.json)
+retains its source e8ea2c7, transport checksum, 129 observations/gap 5.145s,
+no recorded OOM, failed verdict and confirmed cleanup. Other settings were
+not run, and no second validation pass is started from this failure.
+
+The reused capability receiver limits cumulative exports to 128 for its
+90-second discovery. Exhaustion is consistent with the counters, but the
+original observer recorded only RuntimeError. A fresh unchanged-limit
+reproduction will retain the exact sampler step and a safe telemetry error
+category before any budget correction. The legacy failed report remains
+unchanged. The independent local final disk campaign continues safely.

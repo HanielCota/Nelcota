@@ -56,6 +56,7 @@ PUBLIC_FIELDS = {"identity", "source", "status", "certifies_g05", "scope", "imag
 CASE_FIELDS = {"name", "status", "overrides", "snapshots", "requests_attempted", "requests_completed", "verified_operations",
                "unauthorized_collector_status", "container_runtime_environment", "unauthorized_provider_status",
                "physical_inventory", "failure", "exports_received", "allocator_capabilities", "resource_samples",
+               "telemetry_wire_bytes", "telemetry_failure",
                "maximum_gap_seconds", "peaks", "resource_series_sha256", "resource_violations", "cleanup_confirmed",
                "cleanup_errors", "elapsed_seconds", "measured_pressure_seconds", "measured_idle_seconds", "heap_ownership_status"}
 
@@ -325,31 +326,40 @@ def case(name, identity, output, provider_cpu, deadline, initial_network):
             nonlocal resource_at
             while not sampler_stop.is_set():
                 cycle = time.monotonic()
+                step = "owner-watchdog"
                 try:
                     require_running()
+                    step = "host-network-reserve"
                     require(host_reserves(directory) is None and network_bytes() - initial_network <= PROFILE["maximum_network_bytes"],
                             "Provider runtime reached a host/network reserve")
+                    step = "provider-identity"
                     state = json.loads(owned("inspect", "--size", server))[0]
                     require(state["State"]["Running"] and not state["State"]["OOMKilled"] and state["RestartCount"] == 0
                             and state["State"]["Pid"] == host_pid and state["State"]["StartedAt"] == started_at,
                             "Provider unexpectedly restarted or changed process")
+                    step = "kernel-budget"
                     values = owned_cgroup_snapshot(owned, server)
                     require_no_oom(values["memory.events"])
                     require(values["memory.max"] == 1024 ** 3 and values["pids.max"] == 256
                             and values["cpu.max"]["quota_usec"] * 2 == values["cpu.max"]["period_usec"],
                             "Provider kernel budget changed")
+                    step = "data-disk-budget"
                     disk = int(owned("exec", server, "du", "-sk", "/data").split()[0]) * 1024
                     require(disk <= 512 * 1024 ** 2 and state["SizeRw"] <= 512 * 1024 ** 2, "Provider disk budget reached")
+                    step = "telemetry"
                     require(receiver.failure is None, "Provider telemetry export failed")
+                    step = "observation-gap"
                     now = time.monotonic()
                     if observations:
                         require(now - observations[-1]["monotonic"] <= 30, "Provider observation gap exceeded thirty seconds")
+                    step = "process-owners"
                     row = {"monotonic": now, "elapsed_seconds": now - began, "phase": phase,
                            "memory_current_bytes": values["memory.current"], "memory_peak_bytes": values["memory.peak"],
                            "anonymous_bytes": values["memory.stat"]["anon"], "file_bytes": values["memory.stat"]["file"],
                            "cgroup_tasks": values["pids.current"], "data_bytes": disk, "writable_layer_bytes": state["SizeRw"],
                            "oom_events": values["memory.events"]["oom"], "oom_kills": values["memory.events"]["oom_kill"],
                            "owners": process_owners(host_pid, generation)}
+                    step = "resource-write"
                     require(len(observations) < PROFILE["maximum_resource_samples_per_case"], "Provider observation count exceeded its budget")
                     with (directory / "resources.jsonl").open("a") as stream:
                         stream.write(json.dumps(row, allow_nan=False) + "\n")
@@ -357,7 +367,7 @@ def case(name, identity, output, provider_cpu, deadline, initial_network):
                     resource_at = now
                     first_sample.set()
                 except Exception as error:
-                    violations.append({"type": type(error).__name__, "phase": phase})
+                    violations.append({"type": type(error).__name__, "phase": phase, "step": step})
                     stopped.set()
                     return
                 sampler_stop.wait(max(0, 5 - (time.monotonic() - cycle)))
@@ -421,8 +431,15 @@ def case(name, identity, output, provider_cpu, deadline, initial_network):
                 if receiver_thread.is_alive():
                     errors.append("receiver_join_timeout")
             with receiver.lock:
-                report.update(exports_received=receiver.exports,
+                report.update(exports_received=receiver.exports, telemetry_wire_bytes=receiver.received,
                               allocator_capabilities=allocator_capabilities((receiver.last or {}).get("points", [])))
+                report["telemetry_failure"] = None
+                if receiver.failure is not None:
+                    atomic_json(directory / "telemetry-failure.private.json", receiver.failure)
+                    category = "validation_or_transport"
+                    if receiver.failure.get("reason") == "Provider telemetry exceeded its cumulative budget":
+                        category = "cumulative_budget"
+                    report["telemetry_failure"] = {"type": receiver.failure["type"], "category": category}
         if observations:
             report["resource_samples"] = len(observations)
             report["maximum_gap_seconds"] = max([b["monotonic"] - a["monotonic"] for a, b in zip(observations, observations[1:])], default=0)
