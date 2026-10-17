@@ -409,7 +409,19 @@ def clock_probe(guest, api, token, service, result):
     result["status"] = "passed"
 
 
-def campaign(binary, output, scenario):
+def campaign_identity(run, attempt, scenario, pass_index=None):
+    require(re.fullmatch(r"[0-9]{1,20}", run) is not None and re.fullmatch(r"[0-9]{1,4}", attempt) is not None,
+            "Invalid workflow identity")
+    identity = "native-vm-" + run + "-" + attempt
+    if pass_index is not None:
+        require(type(pass_index) is int and pass_index in {1, 2} and
+                scenario in {"runtime", "cluster-routing", "default-root", "host-root", "clock-drift", "remove-boundary"},
+                "Unknown bounded native suite case")
+        identity += "-p" + str(pass_index) + "-" + scenario
+    return identity
+
+
+def campaign(binary, output, scenario, pass_index=None):
     capabilities = inventory()
     require(os.geteuid() == 0, "Native VM control requires root on the disposable Actions VM")
     require(os.access("/dev/kvm", os.R_OK | os.W_OK), "KVM is unavailable to the isolated VM controller")
@@ -423,7 +435,7 @@ def campaign(binary, output, scenario):
     cpu_sum = 2.25
     if scenario == "cluster-routing":
         cpu_sum = 3.25
-    identity = "native-vm-" + os.environ["GITHUB_RUN_ID"] + "-" + os.environ["GITHUB_RUN_ATTEMPT"]
+    identity = campaign_identity(os.environ["GITHUB_RUN_ID"], os.environ["GITHUB_RUN_ATTEMPT"], scenario, pass_index)
     unit(identity)
     require(unit_fields(identity).get("LoadState") == "not-found", "VM service already exists")
     owner = {"identity": identity, "output": str(output), "pid": os.getpid(),
@@ -516,6 +528,8 @@ def campaign(binary, output, scenario):
                         "Native migrations from host cwd or NELCOTA_ROOT failed")
                 require(evidence["fixture_table_created"] and evidence["migration_journal_present"] and evidence["applied_fixture_migrations"] == 1,
                         "Native cwd migrations were absent or repeated")
+                require(evidence["running_binary_identity"]["running_binary_sha256"] == binary_digest,
+                        "Native cwd app differs from the frozen artifact")
             if scenario == "host-root":
                 require(not evidence["first_database_password_changed"] and not evidence["first_caddy_configuration_changed"],
                         "Second native host directory modified the first installation")
@@ -523,6 +537,9 @@ def campaign(binary, output, scenario):
                         "Second native host directory was accepted on the same machine")
                 require(evidence["owner_rejection_reported"], "Second native host failed without the specific ownership rejection")
                 require(evidence["first_sentinel_rows"] == 1, "Second native host directory changed existing fixture data")
+            if scenario in {"host-root", "remove-boundary"}:
+                require(evidence["first_native_init"]["running_binary_identity"]["running_binary_sha256"] == binary_digest,
+                        "Native contract app differs from the frozen artifact")
             if scenario == "remove-boundary":
                 require(evidence["remove_exit_code"] != 0 and evidence["specific_rejection"],
                         "Native remove ignored an unsafe backup configuration")
@@ -556,6 +573,8 @@ def campaign(binary, output, scenario):
         guest.phase = "native-init"
         report["native_init"] = guest.action("prepare", timeout=650)
         require(report["native_init"]["binary_sha256"] == json.loads((public / "predeclared-profile.json").read_text())["binary_sha256"], "Guest binary differs from frozen input")
+        require(report["native_init"]["running_binary_identity"]["running_binary_sha256"] == binary_digest,
+                "Actual running native app differs from the frozen input")
         certificate = guest.ssh(["sudo", "-n", "cat", "/var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt"]).stdout.decode()
         require(len(certificate) <= 65536, "Native CA exceeded its bound")
         report["tls_ca_sha256"] = hashlib.sha256(certificate.encode()).hexdigest()
@@ -641,6 +660,9 @@ def campaign(binary, output, scenario):
         api.ready()
         report["guest_power_cut_recovery_seconds"] = time.monotonic() - fault_began
         after = guest.action("resources")
+        recovered_identity = guest.action("identity")
+        require(recovered_identity["running_binary_sha256"] == binary_digest,
+                "Recovered native app differs from the frozen input")
         require(after["boot_id"] != before_boot, "Guest power cut did not produce a fresh kernel boot")
         actual = json.loads(api.request("GET", "/rest/v1/native_probe?select=id&order=id", token=users[0]))
         require([item["id"] for item in actual] == [1, *acknowledged], "Guest power cut lost or duplicated an externally acknowledged operation")
@@ -648,6 +670,7 @@ def campaign(binary, output, scenario):
         report["checks"].append("guest power cut: changed kernel boot, native boot activation and external acknowledgement reconciliation")
         report["power_cut_reconciliation"] = {"acknowledged": len(acknowledged), "missing": 0, "duplicate": 0,
                                                "extra": 0, "file_sha256": hashlib.sha256(original).hexdigest(),
+                                               "running_binary_identity": recovered_identity,
                                                "fault_during_in_flight_write": False,
                                                "scope": "loss of guest RAM after completed durable acknowledgements; no host power loss claim"}
         guest.phase = "post-load-idle"
@@ -701,6 +724,7 @@ def main():
     parser.add_argument("--binary", type=Path)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--watchdog", type=Path)
+    parser.add_argument("--pass-index", type=int, choices=[1, 2])
     parser.add_argument("--scenario", choices=["runtime", "cluster-routing", "default-root", "host-root", "clock-drift", "remove-boundary"], default="runtime")
     args = parser.parse_args()
     if args.watchdog is not None:
@@ -712,7 +736,7 @@ def main():
     for signum in [signal.SIGTERM, signal.SIGINT, signal.SIGALRM]:
         signal.signal(signum, stop)
     signal.setitimer(signal.ITIMER_REAL, MAXIMUM_SECONDS)
-    campaign(args.binary.resolve(strict=True), args.output.resolve(), args.scenario)
+    campaign(args.binary.resolve(strict=True), args.output.resolve(), args.scenario, args.pass_index)
 
 
 if __name__ == "__main__":

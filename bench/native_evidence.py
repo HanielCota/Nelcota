@@ -80,7 +80,7 @@ if __name__ == "__main__":
                       "profile_file_sha256": hashlib.sha256(raw).hexdigest(),
                       "scenario": value.get("scenario", "runtime"),
                       "scope": "Artifact identity from the original public predeclared native profile; no verdict is changed"}
-        if projection["scenario"] not in {"runtime", "cluster-routing", "default-root", "host-root", "clock-drift"}:
+        if projection["scenario"] not in {"runtime", "cluster-routing", "default-root", "host-root", "clock-drift", "remove-boundary"}:
             raise SystemExit("Invalid prior native scenario")
         print("::notice title=Native VM profile::" + json.dumps(projection, separators=(",", ":")), flush=True)
         raise SystemExit(0)

@@ -6,7 +6,7 @@ on:
       target:
         description: Dedicated benchmark, disposable VM inventory or native acceptance
         type: choice
-        options: [benchmark, native-preflight, native-vm, provider-preflight, native-identity]
+        options: [benchmark, native-preflight, native-vm, provider-preflight, native-identity, native-suite]
         default: benchmark
       evidence_run:
         description: Optional earlier native workflow artifact to republish before native-vm
@@ -39,6 +39,84 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  native-suite-build:
+    if: inputs.target == 'native-suite'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CARGO_BUILD_JOBS: 2
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d
+        with:
+          toolchain: '1.99.0'
+      - name: Build and freeze the single native suite ELF
+        timeout-minutes: 25
+        run: |
+          nice -n19 ionice -c3 cargo build --locked --release -p nelcota-server
+          python3 bench/native_artifact.py freeze target/native-suite-input --binary target/release/nelcota
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-suite-candidate
+          path: target/native-suite-input
+          if-no-files-found: error
+          retention-days: 14
+
+  native-suite:
+    if: inputs.target == 'native-suite'
+    needs: native-suite-build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      actions: read
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        pass: [1, 2]
+        case: [cluster-routing, default-root, host-root, remove-boundary, clock-drift, runtime]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: native-suite-candidate
+          path: target/native-suite-input
+      - name: Verify the common immutable native artifact
+        run: |
+          python3 bench/native_artifact.py verify target/native-suite-input
+          chmod 555 target/native-suite-input/nelcota
+      - name: Inventory the disposable native suite VM
+        run: python3 bench/native_preflight.py
+      - name: Prepare bounded KVM tooling
+        timeout-minutes: 10
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends qemu-system-x86 qemu-utils cloud-image-utils
+      - name: Bounded native case with the same suite ELF
+        timeout-minutes: 35
+        env:
+          NATIVE_CASE: ${{ matrix.case }}
+          NATIVE_PASS: ${{ matrix.pass }}
+        run: |
+          sudo env GITHUB_ACTIONS="$GITHUB_ACTIONS" RUNNER_ENVIRONMENT="$RUNNER_ENVIRONMENT" \
+            GITHUB_SHA="$GITHUB_SHA" GITHUB_RUN_ID="$GITHUB_RUN_ID" GITHUB_RUN_ATTEMPT="$GITHUB_RUN_ATTEMPT" \
+            python3 bench/native_vm.py --binary target/native-suite-input/nelcota \
+              --output "target/stress-g05/native-vm-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-p${NATIVE_PASS}-${NATIVE_CASE}" \
+              --scenario "$NATIVE_CASE" --pass-index "$NATIVE_PASS"
+      - name: Public native suite case evidence only
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-suite-evidence-${{ matrix.pass }}-${{ matrix.case }}
+          path: target/stress-g05/native-vm-*-public
+          if-no-files-found: ignore
+          retention-days: 14
+
   native-identity:
     if: inputs.target == 'native-identity'
     runs-on: ubuntu-24.04

@@ -1996,3 +1996,20 @@ O PITR real fora do host continua bloqueado; não se certifica esse fluxo por
 uma prova de helper. Quatro regressões Rust cobrem rejeição antes de teardown,
 arquivo ausente/presente, falha de teardown/alteração tardia e symlinks.
 Rustfmt passou; essas regressões e a VM corrigida ainda precisam executar.
+
+### 17/10, 00:06 UTC — suite nativa com artefato comum preparada
+
+O target manual native-suite congela um ELF e seu manifesto de build antes
+de distribuir o mesmo arquivo a doze casos serializados: seis cenários,
+duas passagens, cada uma em runner/convidada descartáveis próprios. Nenhum
+caso recompila o candidato. Source, tamanho e SHA do download são verificados
+antes da VM, e identidades preservam run/attempt reais mais pass/case. Cada
+job publica seus notices separadamente, respeitando o limite de dez por step.
+Os casos de app também comprovam inode e bytes de /proc/PID/exe em relação
+ao executável implantado/fornecido, inclusive após o power cut. O freeze
+recusa overrides de compilação não declarados. São cinco regressões novas
+(0,003 s), mais 17 do runner (0,013 s), todas aprovadas sem carga local.
+A suite real deve ser disparada no source final após o build separado dos
+assets; sua preparação não representa doze casos já executados. Os dois
+artefatos finais, local de performance e nativo construído no runner, terão
+hashes e escopos próprios, sem alegação de builds bit-a-bit reproduzíveis.

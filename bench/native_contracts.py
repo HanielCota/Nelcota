@@ -6,7 +6,7 @@ from pathlib import Path
 import subprocess
 import time
 
-from native_guest import ROOT, PROJECT, UNIT, cli, command, install_limits, prepare, require, sql, unit_state, versions, write_migration
+from native_guest import ROOT, PROJECT, UNIT, binary_identity, cli, command, install_limits, prepare, require, sql, unit_state, versions, write_migration
 
 BACKUP_CONFIG = Path("/etc/pgbackrest/pgbackrest.conf")
 MACHINE_OWNER = Path("/var/lib/nelcota-native/owner.json")
@@ -111,6 +111,8 @@ def default_root():
         result["up_timed_out"] = True
     time.sleep(3)
     result["app_unit"] = unit_state(UNIT)
+    if result["up_exit_code"] == 0 and result["app_unit"].get("ActiveState") == "active":
+        result["running_binary_identity"] = binary_identity()
     write_migration()
     for label, environment in [("cwd", ["env", "-u", "NELCOTA_ROOT"]),
                                ("root_environment", ["env", "NELCOTA_ROOT=" + str(ROOT)])]:

@@ -121,6 +121,30 @@ and restore, guest power cut, boot activation, acknowledgement reconciliation
 and removal. This is a small functional/durability campaign, not capacity or
 four-hour endurance. Its report records actual source/binary/image hashes.
 
+`target=native-suite` builds and retains **one** source-bound ELF, then runs
+all six native scenarios twice on independent disposable runners/guests.
+The twelve cases are serialized with `max-parallel: 1`; a failed case retains
+its verdict without cancelling independent evidence. Every case verifies the
+downloaded ELF against the common build manifest before creating its VM.
+Application cases also compare the actual running `/proc/PID/exe` inode and
+bytes with the deployed/provided artifact, including after the runtime power
+cut. Workflow run/attempt and pass/case remain distinct in each owned identity.
+Each case publishes its own bounded step annotations and public artifact;
+the retained executable is a review artifact, never a published release.
+
+`native_case=remove-boundary` injects a marked configuration directory only
+inside its owned guest. Removal must reject it before changing the unit,
+cluster, registry or machine owner. A finally handler restores the original
+configuration, then ordinary backup/removal must succeed. Missing files and
+unlink-only symlinks retain their supported cleanup behavior.
+
+`target=native-identity` separately repeats the exact real executable-identity
+unit test 1,000 times after one compilation. The repetition controller verifies
+its two-CPU/4-GiB/128-task budget, allows ten seconds per test and stops after
+240 seconds, with a 300-second systemd backstop. Child readiness uses bounded
+real I/O; production executable validation remains fail closed. This is a
+regression control with no BaaS traffic/endurance credit.
+
 The guest has two vCPUs/3 GiB RAM; its QEMU service is capped at two CPUs,
 4 GiB RAM, 128 tasks and 1,800 seconds. App/PostgreSQL/Caddy have separate
 systemd CPU, memory and task limits in a 1.5-CPU/2-GiB slice, leaving

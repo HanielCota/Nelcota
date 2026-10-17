@@ -108,6 +108,27 @@ def unit_state(name):
     return state
 
 
+def running_binary_identity(installed, running, provided):
+    expected, observed = installed.stat(), running.stat()
+    require((expected.st_dev, expected.st_ino) == (observed.st_dev, observed.st_ino),
+            "Native app runs another executable inode")
+    values = []
+    for path in [running, provided]:
+        require(path.stat().st_size <= 64 * 1024 ** 2, "Native executable exceeds its hash budget")
+        with path.open("rb") as stream:
+            values.append(hashlib.file_digest(stream, "sha256").hexdigest())
+    require(values[0] == values[1], "Native app differs from the provided frozen artifact")
+    return {"running_binary_sha256": values[0], "provided_binary_sha256": values[1], "same_deployed_inode": True}
+
+
+def binary_identity():
+    state = unit_state(UNIT)
+    pid = state.get("MainPID")
+    require(type(pid) is int and pid > 0 and state.get("ActiveState") == "active"
+            and state.get("ControlGroup", "").startswith("/g05native.slice/"), "Native identity requires the active owned app")
+    return running_binary_identity(Path("/usr/local/lib/nelcota/nelcota"), Path("/proc") / str(pid) / "exe", Path("/usr/local/bin/nelcota"))
+
+
 def resource_report():
     memory = {}
     for line in Path("/proc/meminfo").read_text().splitlines():
@@ -188,9 +209,10 @@ def prepare():
     require(actual["cpu_quota_usec"] == 1.5 * actual["cpu_period_usec"] and
             actual["memory_bytes"] == 2 * 1024 ** 3 and actual["swap_bytes"] == 0 and actual["pids"] == 768,
             "Native aggregate kernel limits differ from the declared OS reserve")
-    return {"checks": ["native init", "native systemd up", "repeatable application migration", "native unit budgets"],
+    identity = binary_identity()
+    return {"checks": ["native init", "native systemd up", "repeatable application migration", "native unit budgets", "actual running ELF identity"],
             "units": units, "target_slice": parent, "versions": versions(),
-            "binary_sha256": hashlib.file_digest(Path('/usr/local/bin/nelcota').open('rb'), 'sha256').hexdigest()}
+            "binary_sha256": identity["provided_binary_sha256"], "running_binary_identity": identity}
 
 
 def backup():
@@ -208,7 +230,7 @@ def backup():
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("identity")
-    parser.add_argument("action", choices=["prepare", "resources", "token", "backup", "restore", "remove", "diagnostics", "cluster-routing", "default-root", "host-root", "remove-boundary"])
+    parser.add_argument("action", choices=["prepare", "resources", "identity", "token", "backup", "restore", "remove", "diagnostics", "cluster-routing", "default-root", "host-root", "remove-boundary"])
     parser.add_argument("--dump")
     args = parser.parse_args()
     owned(args.identity)
@@ -225,6 +247,9 @@ def main():
         return
     if args.action == "resources":
         print(json.dumps(resource_report(), allow_nan=False))
+        return
+    if args.action == "identity":
+        print(json.dumps(binary_identity(), allow_nan=False))
         return
     if args.action == "token":
         # This output travels only over authenticated SSH into controller memory.
