@@ -1,0 +1,86 @@
+{
+  "started_utc": "2026-10-17T20:48:05.249941+00:00",
+  "status": "passed",
+  "checks": [
+    {
+      "case": "boot-controls",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "scripts/review_tests",
+        "-p",
+        "test_stress_native_pitr*.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.1650348809780553,
+      "log_sha256": "09e6d1d2e0a8f6565c7baf169ff1b53aa61ce48ad691afec6739f9c6ecc731da"
+    },
+    {
+      "case": "format",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.6661643069819547,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "case": "boundaries",
+      "command": [
+        "python3",
+        "scripts/check-boundaries.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.03272501501487568,
+      "log_sha256": "3b3473801ef68a4290fc8e597cca9d2958d91b363c5b08d96beb9cafa4fbbd2c"
+    },
+    {
+      "case": "clippy",
+      "command": [
+        "nice",
+        "-n",
+        "19",
+        "ionice",
+        "-c3",
+        "cargo",
+        "clippy",
+        "--locked",
+        "-p",
+        "nelcota-server",
+        "--test",
+        "sql_cancellation",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 22.537580616015475,
+      "log_sha256": "dca28986e645657269429a96bb2d829d46dd7593f97b66795bca2af301b3a526"
+    },
+    {
+      "case": "diff-check",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.016749726957641542,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "scope": "Sequential related development checks only; no load-time credit.",
+  "ended_utc": "2026-10-17T20:48:28.669937+00:00",
+  "boot_controls": {
+    "passed": 18,
+    "failed": 0,
+    "skipped": 0
+  }
+}

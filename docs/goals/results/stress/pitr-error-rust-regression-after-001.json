@@ -1,0 +1,32 @@
+{
+  "observed_utc": "2026-10-17T19:20:54.069583+00:00",
+  "production_fix_applied": true,
+  "command": [
+    "nice",
+    "-n",
+    "19",
+    "ionice",
+    "-c3",
+    "cargo",
+    "test",
+    "--locked",
+    "-p",
+    "nelcota-cli",
+    "--lib",
+    "pitr::",
+    "--",
+    "--nocapture"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 4.681532372022048,
+  "log_sha256": "3f87d58933c0cf514ae74ec03267367a6e645472a115e0a41bc542f145ac12b4",
+  "test_result_lines": [
+    "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 88 filtered out; finished in 0.00s"
+  ],
+  "regression_passed": true,
+  "source_sha256": {
+    "crates/cli/src/pitr/restore.rs": "5e02e0465dc131169914e0239961982c6a4c509110c156d0567e0e59b38290c6",
+    "crates/cli/src/pitr/restore/tests.rs": "221905e45fd6d066f878be9c48dec9ece3b5942bd170ebae5e99f21c07bc5853"
+  },
+  "scope": "Focused CLI PITR tests after single error-path change. Actual recovery VM still needs repeat on new product; no no-corruption or realPITR/S3 certificate."
+}

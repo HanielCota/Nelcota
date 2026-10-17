@@ -1,0 +1,39 @@
+{
+  "observed_utc": "2026-10-17T19:19:56.781258+00:00",
+  "source_product_commit": "35f4a9725d7edcf571f91084c555c127e7323653",
+  "test_added_to_worktree": true,
+  "production_fix_applied": false,
+  "command": [
+    "nice",
+    "-n",
+    "19",
+    "ionice",
+    "-c3",
+    "cargo",
+    "test",
+    "--locked",
+    "-p",
+    "nelcota-cli",
+    "--lib",
+    "pitr::restore::tests::failed_restore_keeps_database_and_app_stopped",
+    "--",
+    "--exact",
+    "--nocapture"
+  ],
+  "exit_code": 101,
+  "elapsed_seconds": 11.802044390002266,
+  "log_sha256": "e1ff60f6b0ae1a591f5c2476e1a8ca8de9f62fcac5cfb4d93e2af30e144b26e8",
+  "expected_defect_assertion_observed": true,
+  "test_result_lines": [
+    "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 93 filtered out; finished in 0.01s"
+  ],
+  "toolchain": "existing workspaceRust1.99.0; child PATH/CARGO_HOME/RUSTUP_HOME restored after environment reconnect",
+  "previous_attempt": {
+    "evidence": "pitr-error-rust-regression-before-001.json",
+    "exit_code": 127,
+    "actual_tests_run": 0,
+    "reason": "cargo absent from reconnect defaultPATH",
+    "erratum": "fixture_marker_observed in prior private001 was computed from absence of a string and is invalid; it is not execution/fixture evidence."
+  },
+  "scope": "Actual restore orchestration with child-only fake Docker; no real database or foreign/shared development Postgres mutation. Local campaigns safely closed before compilation. Four Cargo jobs/two test threads default."
+}

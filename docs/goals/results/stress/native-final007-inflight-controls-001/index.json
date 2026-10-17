@@ -1,0 +1,148 @@
+{
+  "utc": "2026-10-17T18:41:42.507144+00:00",
+  "status": "two actual observed-inflight guest cut controls passed",
+  "certifies_g05": false,
+  "source_commit": "ec9701225176c497c580bdb099ff06021e272981",
+  "product_build_source_commit": "35f4a9725d7edcf571f91084c555c127e7323653",
+  "product_tree_objects": {
+    "crates": "2162e23a35dfcc0f04b7605a7493161817513d23",
+    "Cargo.toml": "20a3154fea3f1883ccc42882fbd671bc0b12b17f",
+    "Cargo.lock": "9150a443d0d0cec57de152e13bd9a6cb8e7a8c2d",
+    "migrations": "e88cfbfd12955dc8cb9180d3324df6a5d9e62206",
+    "sdk": "9bd7af8fc90a0a3cd5429ad40d8c3ec7b23efedd",
+    "rust-toolchain.toml": "0fd1b3a84b408770d883519014b040aed30a15f0"
+  },
+  "passes": [
+    {
+      "pass": 1,
+      "evidence": "pass-1.json",
+      "workflow_run_id": 39057126426,
+      "job_id": 117467278312,
+      "source": "ec9701225176c497c580bdb099ff06021e272981",
+      "actual_binary_sha256": "81dc0b0ebd0c79e98b94bf985a48df743d3b1a00ef402ae563369fae43a7436b",
+      "original_report_sha256": "3ae1352828b762e218e7b930463f302219b563952169c987b76110836a37adef",
+      "status": "passed",
+      "cleanup_confirmed": true,
+      "resource_samples": 33,
+      "restore_seconds": 2.145764621000012,
+      "guest_recovery_seconds": 16.988846645999956,
+      "in_flight_control": {
+        "arm": {
+          "status": "armed",
+          "lockers": 1,
+          "waiting_writes": 0,
+          "maximum_hold_seconds": 30,
+          "runtime_maximum_seconds": 40,
+          "kernel_budget": {
+            "cpu_quota_usec": 5000,
+            "cpu_period_usec": 100000,
+            "memory_bytes": 50331648,
+            "swap_bytes": 0,
+            "pids": 16
+          }
+        },
+        "before_cut": {
+          "lockers": 1,
+          "waiting_writes": 1,
+          "helper_active": true,
+          "observation_age_before_signal_request_seconds": 0.3898111839999956,
+          "maximum_observation_age_seconds": 2,
+          "scope": "Request blocked on an owned table lock before COMMIT; no commit-flush or physical host power-loss claim"
+        },
+        "blocked_request_disconnected": true,
+        "after_recovery": {
+          "lockers": 0,
+          "waiting_writes": 0,
+          "helper_active": false
+        },
+        "recovered_unauthorized_API_status": 401,
+        "recovered_other_user_rows": 0,
+        "recovered_unauthorized_private_file_status": 404
+      },
+      "reconciliation": {
+        "acknowledged": 30,
+        "missing": 0,
+        "duplicate": 0,
+        "extra": 0,
+        "file_sha256": "a0c6ec8647fbb3e57a625b1a89163ae8a4feef69ca5f8fdc910946b8dccf2b6e",
+        "running_binary_identity": {
+          "running_binary_sha256": "81dc0b0ebd0c79e98b94bf985a48df743d3b1a00ef402ae563369fae43a7436b",
+          "provided_binary_sha256": "81dc0b0ebd0c79e98b94bf985a48df743d3b1a00ef402ae563369fae43a7436b",
+          "same_deployed_inode": true
+        },
+        "fault_during_in_flight_write": true,
+        "scope": "Loss of guest RAM with one observed table-lock-blocked unacknowledged write; thirty ACKs and row values retained, blocked write rolled back. No cut-during-COMMIT or physical host power-loss claim",
+        "verified_row_values": 31,
+        "blocked_unacknowledged_writes": 1,
+        "blocked_write_visible_after_recovery": false
+      }
+    },
+    {
+      "pass": 2,
+      "evidence": "pass-2.json",
+      "workflow_run_id": 39057780852,
+      "job_id": 117469219489,
+      "source": "ec9701225176c497c580bdb099ff06021e272981",
+      "actual_binary_sha256": "4898c6543fa02c049a6da8f237d41f10780b5c86fdeb675357948576c7611252",
+      "original_report_sha256": "e6470663e291463cdfc387b8eefdcc50fc0d7498b888bcc8fc410612e2857652",
+      "status": "passed",
+      "cleanup_confirmed": true,
+      "resource_samples": 31,
+      "restore_seconds": 1.845058690999963,
+      "guest_recovery_seconds": 15.409275320999996,
+      "in_flight_control": {
+        "arm": {
+          "status": "armed",
+          "lockers": 1,
+          "waiting_writes": 0,
+          "maximum_hold_seconds": 30,
+          "runtime_maximum_seconds": 40,
+          "kernel_budget": {
+            "cpu_quota_usec": 5000,
+            "cpu_period_usec": 100000,
+            "memory_bytes": 50331648,
+            "swap_bytes": 0,
+            "pids": 16
+          }
+        },
+        "before_cut": {
+          "lockers": 1,
+          "waiting_writes": 1,
+          "helper_active": true,
+          "observation_age_before_signal_request_seconds": 0.329620172000034,
+          "maximum_observation_age_seconds": 2,
+          "scope": "Request blocked on an owned table lock before COMMIT; no commit-flush or physical host power-loss claim"
+        },
+        "blocked_request_disconnected": true,
+        "after_recovery": {
+          "lockers": 0,
+          "waiting_writes": 0,
+          "helper_active": false
+        },
+        "recovered_unauthorized_API_status": 401,
+        "recovered_other_user_rows": 0,
+        "recovered_unauthorized_private_file_status": 404
+      },
+      "reconciliation": {
+        "acknowledged": 30,
+        "missing": 0,
+        "duplicate": 0,
+        "extra": 0,
+        "file_sha256": "a0c6ec8647fbb3e57a625b1a89163ae8a4feef69ca5f8fdc910946b8dccf2b6e",
+        "running_binary_identity": {
+          "running_binary_sha256": "4898c6543fa02c049a6da8f237d41f10780b5c86fdeb675357948576c7611252",
+          "provided_binary_sha256": "4898c6543fa02c049a6da8f237d41f10780b5c86fdeb675357948576c7611252",
+          "same_deployed_inode": true
+        },
+        "fault_during_in_flight_write": true,
+        "scope": "Loss of guest RAM with one observed table-lock-blocked unacknowledged write; thirty ACKs and row values retained, blocked write rolled back. No cut-during-COMMIT or physical host power-loss claim",
+        "verified_row_values": 31,
+        "blocked_unacknowledged_writes": 1,
+        "blocked_write_visible_after_recovery": false
+      }
+    }
+  ],
+  "first_workflow_adopted_without_redispatch_after_supervisor_read_error": 39057126426,
+  "local_effective_load_credit_seconds": 0,
+  "scope": "Fresh owned guests with separate actual native ELFs on frozen final007 product trees. Each cut had one observed table-lock-blocked HTTPS write before COMMIT, with witness age below2seconds including observer roundtrip and VM lookup. Thirty ACKs/31values and immutable private bytes preserved; blocked write rolled back, helper/locks gone; actual recovery401/empty RLS/404 verified. No cut during COMMIT flush, physical host power loss, off-host durability, performance or original startup-failure cause claim."
+}

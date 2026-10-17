@@ -1,0 +1,132 @@
+{
+  "scope": "Complete original private-file real-service preflight report reconstructed losslessly from checksummed public notices. Original source, verdict and cleanup are preserved; overlapping remote time earns no local checkpoint credit.",
+  "workflow_run_id": 39058335068,
+  "job_id": 117470843634,
+  "job_conclusion": "failure",
+  "notice_report_sha256": "5dbfa0b92c462fa99e0c2b0e6f1ebfc1e74f2da18ecdc190ca69036ce060e54a",
+  "notice_parts": 1,
+  "regression_summary": null,
+  "report": {
+    "identity": "host-files-39058335068-1",
+    "source": "3cc1b83bfb83a7daa4747cfbd8119d95d2615550",
+    "binary_sha256": "d0d1090c91da4435a0d27dcf1dddba1b8695f18f944b1dd8cc5e472089d17432",
+    "scenario": "host-private-file-preflight",
+    "certifies_g05": false,
+    "status": "failed",
+    "cleanup_confirmed": true,
+    "resource_samples": 0,
+    "completed_effective_load_seconds": 0,
+    "checks": {
+      "scope": "Functional private-file preflight; 60-second phases are not five-minute capacity or final fairness certification",
+      "product_artifact": {
+        "source_commit": "35f4a9725d7edcf571f91084c555c127e7323653",
+        "binary_sha256": "d0d1090c91da4435a0d27dcf1dddba1b8695f18f944b1dd8cc5e472089d17432",
+        "size_bytes": 30463736,
+        "product_tree_objects": {
+          "crates": "2162e23a35dfcc0f04b7605a7493161817513d23",
+          "Cargo.toml": "20a3154fea3f1883ccc42882fbd671bc0b12b17f",
+          "Cargo.lock": "9150a443d0d0cec57de152e13bd9a6cb8e7a8c2d",
+          "migrations": "e88cfbfd12955dc8cb9180d3324df6a5d9e62206",
+          "sdk": "9bd7af8fc90a0a3cd5429ad40d8c3ec7b23efedd",
+          "rust-toolchain.toml": "0fd1b3a84b408770d883519014b040aed30a15f0"
+        },
+        "artifact_workflow_run_id": 39036557006,
+        "scope": "The retained Actions ELF is distinct from the local performance ELF; current product trees must match its build source."
+      },
+      "profile": {
+        "enabled": true,
+        "protocol": "g05-private-project-files-v1",
+        "maximum_requests": 8192,
+        "maximum_requests_per_second": 64,
+        "request_timeout_seconds": 2,
+        "maximum_body_bytes": 128,
+        "maximum_read_bytes": 2048,
+        "maximum_header_bytes": 16384,
+        "maximum_logical_HTTP_bytes": 134217728,
+        "maximum_graph_seconds": 20,
+        "extra_controller_threads_during_graph": 1,
+        "minimum_foreground_seconds": 60,
+        "controller_affinity_policy": "one telemetry/OS slot, disjoint from app/PostgreSQL/k6",
+        "transport": "owned direct loopback HTTP; main k6 ingress unchanged",
+        "units": "auxiliary requests excluded from k6 useful throughput and latency"
+      },
+      "controller_kernel_budget": {
+        "cpu_quota_usec": 50000,
+        "cpu_period_usec": 100000,
+        "memory_bytes": 536870912,
+        "swap_bytes": 0,
+        "pids": 128,
+        "maximum_seconds": 2700,
+        "CPU_policy": {
+          "target_app_role_affinity_bound": 1,
+          "target_PostgreSQL_role_affinity_bound": 1,
+          "generator": 1,
+          "telemetry": 0.25,
+          "controller": 0.5,
+          "independent_watchdog": 0.05,
+          "effective_sum": 3.8,
+          "telemetry_slot_sum": 0.8,
+          "telemetry_slot_OS_reserve": 0.2,
+          "five_project_shared_quota_sum_exceeds_role_affinity_bound": true,
+          "one_project_configured_quota_sum": 3.8,
+          "five_project_configured_quota_sum": 11.8
+        },
+        "separate_watchdog": {
+          "CPU_percent": 5,
+          "memory_mib": 128,
+          "swap_bytes": 0,
+          "tasks": 32,
+          "maximum_seconds": 1500,
+          "case_deadline_seconds": 1200
+        }
+      },
+      "cases": [
+        {
+          "projects": 1,
+          "rate_per_project": 4,
+          "CPU_policy": "quota",
+          "status": "failed",
+          "cleanup_confirmed": true,
+          "exit_code": 1,
+          "original_completion": {
+            "status": "failed",
+            "projects": 1,
+            "load_seconds": 0,
+            "resource_observations": 0,
+            "cleanup_confirmed": true,
+            "error_type": "RuntimeError"
+          },
+          "resource_violations": [],
+          "failure_type": "RuntimeError",
+          "original_private_file_receipts": [
+            {
+              "status": "passed",
+              "protocol": "g05-private-project-files-v1",
+              "counts": {
+                "projects": 1,
+                "directed_pairs": 0,
+                "foreign_reads_rejected": 0,
+                "foreign_writes_rejected": 0,
+                "owner_bytes_verified": 1,
+                "anonymous_private_reads_rejected": 1,
+                "metadata_objects_unchanged": 1,
+                "requests": 2
+              },
+              "elapsed_seconds": 0.1573315779999973,
+              "requests_total": 3,
+              "logical_HTTP_bytes_total": 2338,
+              "in_offered_window": false,
+              "run_id": "host-files-39058335068-1-p1",
+              "phase": "before",
+              "minimum_response_gap_seconds": 0.015702382999997155
+            }
+          ],
+          "cleanup_errors": []
+        }
+      ],
+      "local_load_checkpoint_credit_seconds": 0
+    },
+    "failure": "RuntimeError",
+    "elapsed_seconds_including_preparation": 14.697988848000001
+  }
+}

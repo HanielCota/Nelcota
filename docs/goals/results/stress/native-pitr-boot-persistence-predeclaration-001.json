@@ -1,0 +1,45 @@
+{
+  "declared_utc": "2026-10-17T20:20:26.225167+00:00",
+  "status": "prepared; actual boot probe not run; source hypothesis unconfirmed",
+  "confirmed_production_defects": 11,
+  "certifies_g05": false,
+  "product_source": "da262d77f4d2557ff5cbd9007b9a3a6273a92221",
+  "scenario": "runtime-pitr-reboot",
+  "source_sha256": {
+    "bench/native_pitr_failure.py": "f03f76d21187ba206c0d9c5bb068cd3019ebbc332d48f24746d21480263b87d2",
+    "bench/native_pitr_reboot.py": "e8064dfee3abf04436eb87125315c2c38dc347caa2369222389ef0a52d0296da",
+    "bench/native_vm.py": "9364e2e48395c2f8ba4cfc84682263c720b0aa25a9d608daa1001696a5e62c86",
+    "bench/native_evidence.py": "6c9882bbc3ccd52b2a113d68a8c3edd381c43583f0812c5829f89a6f567da008",
+    "scripts/review_tests/test_stress_native_pitr_error.py": "55ee585490899256e05174ee3ad1ba33992c0ad694c4bc19534fd611197d87ed",
+    "scripts/review_tests/test_stress_native_pitr_reboot.py": "9da7545c8e2209470f740839e67c2c571025b4462cc3b5fdb1fa707a37b62774",
+    ".github/workflows/stress.yml": "22bd9eb06ae2268fd236407fc322647ef2facd683ca68e26c8a149461b178101"
+  },
+  "trigger": "Current immediate error-path fix passed two actualVMs, but native units remain enabled and no durable recovery gate is present in that path. Verify actual guest reboot before any production change; read-only review is not a confirmed boot defect.",
+  "protocol": [
+    "Fresh owned disposableVM, actualCLI on frozen008producttrees, generatedfixturecredentials and normalTLS/SSH verification.",
+    "Identical fixedadapter writes only inertmarker andfails; inspect immediate stoppedstate, durablyrestore originalpackage/removeownflagandmarker. Explicitfixture recovery deferred.",
+    "Lose guestRAM and boot same owned disk through existing boundedQEMUcut/start. Require changedbootid and persistedknownadaptercleanup.",
+    "Observe actualapp/PGunitstates andauthenticatedGET for20seconds, max50seconds/22samples, minimumtwo stoppedobservations. Any activation, failedunit or positiveprotectedresponse fails; a shortpointobservation cannotpass.",
+    "Onlyafterpreservedbootobservation, explicitknown-marker-onlyfixture recovery in fresh boundedhelper; digest/privatebytes/authcanaries and ownedcleanup musthold. Originalfailedresultretainedbeforepositiveonlyaccess."
+  ],
+  "budgets": {
+    "outer_VM_CPUs": 2,
+    "outer_VM_memory_mib": 4096,
+    "guest_CPUs": 2,
+    "guest_memory_mib": 3072,
+    "target_slice_CPU": 1.5,
+    "target_slice_memory_mib": 2048,
+    "helper_CPU_percent": 10,
+    "helper_memory_mib": 96,
+    "helper_tasks": 32,
+    "helper_seconds": 120,
+    "maximum_external_bytes": 4294967296,
+    "maximum_native_case_seconds": 1800,
+    "critical_sample_gap_seconds": 30,
+    "boot_observation_grace_seconds": 180,
+    "minimum_host_guest_free_RAM_fraction": 0.1,
+    "minimum_host_guest_free_disk_inode_fraction": 0.15
+  },
+  "validation": "Syntax parsed only. No localunitexecution during liveS3; new18focusedPITR/boot tests and completePythondiscovery mustpass in CI before freshmanualVM. Actualcurrentnative-suite015 mustclose and globalmanualqueueempty beforedispatch.",
+  "scope": "Nativebootpersistence only after knowninertadaptererror. No actualPGfilemodification, realPITR/S3, hostpowerloss, offhost, performance or localoverlaptimecredit. Current11thfix immediateproof remains valid in its declaredscope; no newdefect/fixcountorbootpassclaim beforeactualevidence."
+}

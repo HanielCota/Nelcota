@@ -1,0 +1,14 @@
+{
+  "utc": "2026-10-17T18:28:17.418928+00:00",
+  "local_owner_identity_unchanged": true,
+  "remote_owner_identity_unchanged": true,
+  "local_active": "disk-candidate-pass-1-006",
+  "phase": "soak",
+  "resource_sample_age_seconds": 1.9957528279628605,
+  "resource_samples": 3012,
+  "remote_status": "running",
+  "remote_completed": 1,
+  "remote_active": "native-inflight-final007-pass-2",
+  "source_HEAD": "6f693fc31f7b952c7b709a6808822831b2e0ec25",
+  "scope": "Environment reconnection inventory; no fixture restart, workload dispatch, credential or configuration change. Final continuous sampler coverage still must pass the unchanged gate. No partial soak credit."
+}
