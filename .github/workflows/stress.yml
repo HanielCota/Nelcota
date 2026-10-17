@@ -264,6 +264,7 @@ jobs:
           import json, os, pathlib, time, unittest
           began = time.monotonic()
           suite = unittest.defaultTestLoader.discover('scripts/review_tests', pattern='test_stress_browser_auth.py')
+          suite.addTests(unittest.defaultTestLoader.discover('scripts/review_tests', pattern='test_stress_browser_images.py'))
           result = unittest.TextTestRunner(verbosity=2).run(suite)
           report = {'source_commit': os.environ['GITHUB_SHA'], 'tests': result.testsRun,
                     'failures': len(result.failures), 'errors': len(result.errors), 'skipped': len(result.skipped),
@@ -274,7 +275,7 @@ jobs:
           with target.open('x') as stream:
               stream.write(json.dumps(report, indent=2, allow_nan=False) + '\n')
           print('::notice title=Browser auth regression summary::' + json.dumps(report, separators=(',', ':'), allow_nan=False))
-          if not result.wasSuccessful() or result.testsRun < 9 or result.skipped:
+          if not result.wasSuccessful() or result.testsRun < 14 or result.skipped:
               raise SystemExit(1)
           PYTEST
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -294,6 +295,9 @@ jobs:
           python3 -m venv target/browser-auth-tooling
           target/browser-auth-tooling/bin/python -m pip install 'playwright==1.62.0'
           target/browser-auth-tooling/bin/python -m playwright install --with-deps chromium
+      - name: Prepare and inventory cold-cache browser fixture images
+        timeout-minutes: 5
+        run: nice -n19 ionice -c3 python3 bench/browser_images.py
       - name: Locate the retained final native ELF
         id: retained
         run: |
@@ -359,6 +363,7 @@ jobs:
           import json, os, pathlib, time, unittest
           began = time.monotonic()
           suite = unittest.defaultTestLoader.discover('scripts/review_tests', pattern='test_stress_matrix_pressure.py')
+          suite.addTests(unittest.defaultTestLoader.discover('scripts/review_tests', pattern='test_stress_project_diagnostics.py'))
           result = unittest.TextTestRunner(verbosity=2).run(suite)
           report = {'source_commit': os.environ['GITHUB_SHA'], 'tests': result.testsRun,
                     'failures': len(result.failures), 'errors': len(result.errors), 'skipped': len(result.skipped),
@@ -369,7 +374,7 @@ jobs:
           with target.open('x') as stream:
               stream.write(json.dumps(report, indent=2, allow_nan=False) + '\n')
           print('::notice title=Supplemental matrix regression summary::' + json.dumps(report, separators=(',', ':'), allow_nan=False))
-          if not result.wasSuccessful() or result.testsRun < 14 or result.skipped:
+          if not result.wasSuccessful() or result.testsRun < 19 or result.skipped:
               raise SystemExit(1)
           PY
       - name: Locate the retained final native ELF

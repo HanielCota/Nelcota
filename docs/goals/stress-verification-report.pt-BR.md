@@ -9,8 +9,8 @@ mantido como rascunho para revisão.
 
 ## Tempo efetivo e artefatos
 
-O [checkpoint 015](results/stress/load-time-checkpoint-015.json) registra
-**134.334 segundos, ou 37h18min54s, de carga efetiva concluída**. O cálculo
+O [checkpoint 016](results/stress/load-time-checkpoint-016.json) registra
+**134.814 segundos, ou 37h26min54s, de carga efetiva concluída**. O cálculo
 conservador exclui preparação, aquecimento, descanso, fases interrompidas,
 controles artificiais e dupla contagem de janelas simultâneas. Tempo mínimo
 de oito horas atingido não significa aprovação dos demais critérios.
@@ -710,3 +710,25 @@ na mesma afinidade. O total efetivo por papel permanece 1 CPU. A execução
 hipótese de isolamento do staging, sem causa de produção ou aprovação inferida.
 Os resultados anteriores continuam reprovados e os degraus completos ainda
 precisam ser executados.
+
+
+O [novo diagnóstico do browser](results/stress/browser-auth-preparation-diagnostic-failure-002.json)
+reproduziu a falha no checkpoint `proxy-start`, operação Docker, após 26,360 s;
+nove regressões passaram e a limpeza foi confirmada. O código de ingress
+inspeciona a imagem Caddy antes de qualquer criação, mas o workflow não
+preparava essa imagem numa VM nova. Foi acrescentado um preflight explícito
+para Ubuntu/PostgreSQL/Caddy, com IDs e digests publicados, captura real de
+cache frio e cinco regressões. O teste real após essa preparação ainda é
+necessário; não se infere aprovação do browser dessa alteração.
+
+A [primeira matriz completa do artefato final](results/stress/matrix-full-final-preparation-failure-001.json)
+falhou em preparação, após 44,068 s, com zero segundos de carga concluída,
+zero amostras e limpeza confirmada. Seus 14 testes de guardas passaram.
+A falha original permanece opaca; novos diagnósticos de estágio de fixture,
+estado numérico de app/banco e categorias fixas de log foram adicionados,
+sem publicar mensagens ou ambiente. Cinco regressões de privacidade e
+validação passaram, totalizando 19 guardas focadas para a nova matriz.
+
+O checkpoint 016 acrescenta somente os 480 segundos concluídos do smoke
+anterior, chegando a 37h26min54s. O diagnóstico de CPU ainda aberto e todas
+as janelas remotas sobrepostas continuam excluídos.

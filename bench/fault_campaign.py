@@ -826,6 +826,15 @@ def run(args):
         if sampler.is_alive() or critical.is_set() or violations:
             raise RuntimeError('Fault resource evidence failed')
         status='passed'
+    except Exception:
+        if phase=='preparation':
+            from project_diagnostics import snapshot as project_setup_snapshot
+            try:
+                atomic_json(output/'preparation-failure.json', {'phase':'preparation',
+                    'source':project_setup_snapshot(source), 'target':project_setup_snapshot(target)})
+            except Exception:
+                atomic_json(output/'preparation-failure-diagnostic-unavailable.json', {'available':False})
+        raise
     finally:
         phase='teardown'
         stop.set()

@@ -2756,3 +2756,21 @@ with10ms bandwidth periods, keeping the role's effective1CPU and all offered
 traffic/dataset/duration/RAM/disk/SLO/fairness requirements. Diagnostic
 host10-quota10ms-candidate-smoke-001started09:18:35UTC. It investigates staging
 isolation only; neither a product cause nor a successful result is inferred.
+
+
+The [instrumented browser repeat](results/stress/browser-auth-preparation-diagnostic-failure-002.json)
+failed at proxy-start/Docker after26.360s;9guards passed, cleanup confirmed.
+Ingress inspects Caddy before creating resources, but the fresh-VM workflow
+omitted explicit Caddy image preparation. Add a cold-cache image preflight,
+actual IDs/digests and5focused regressions; a real corrected lifecycle remains
+required, not inferred.
+
+The [first final full-matrix request](results/stress/matrix-full-final-preparation-failure-001.json)
+failed preparation after44.068s, with0completed load seconds/0samples and
+confirmed cleanup;14focused guards passed. Its original RuntimeError has no
+causal diagnostic. Add fixed project setup stages, numeric component exit/OOM
+states and bounded log-category counts; no raw error text/environment is
+published.5privacy/boundary regressions passed, bringing focused matrix guards
+to19. [Checkpoint016](results/stress/load-time-checkpoint-016.json) records
+134814completed local load seconds(37h26m54s), excluding the entire still-active
+CPU diagnostic and all overlapping remote windows.

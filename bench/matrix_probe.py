@@ -201,6 +201,16 @@ def main():
         report["status"] = "passed"
     except Exception as error:
         report["failure"] = {"type": type(error).__name__}
+        preparation = output / 'preparation-failure.json'
+        if preparation.exists():
+            from project_diagnostics import validate as validate_setup
+            try:
+                value = read_receipt(preparation)
+                require(set(value)=={'phase','source','target'} and value['phase']=='preparation', 'Unknown setup diagnostic envelope')
+                report['checks']['preparation_failure'] = {'phase':'preparation',
+                    'source':validate_setup(value['source']), 'target':validate_setup(value['target'])}
+            except Exception:
+                report['checks']['preparation_diagnostic_invalid'] = True
         failure = output / "matrix-failure.json"
         if failure.is_file():
             report["checks"]["failed_supplemental_probe"] = read_receipt(failure)

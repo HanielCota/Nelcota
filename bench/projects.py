@@ -53,11 +53,13 @@ class Project:
         self.ephemeral_storage_inodes = None
         self.extra_labels = {}
         self.webhooks_enabled = False
+        self.setup_stage = 'constructed'
 
     def sql(self, statement):
         return self.docker('exec', '-i', '-e', 'PGOPTIONS=-cstatement_timeout=15000', self.pg, 'psql', '-Atq', '-U', 'postgres', '-v', 'ON_ERROR_STOP=1', stdin=statement)
 
     def start_app(self):
+        self.setup_stage = 'app-starting'
         command = ['run', '-d', '--name', self.app, '--label', LABEL+'='+self.identity, '--pids-limit', '128', '--network', 'host', '--user', f'{os.getuid()}:{os.getgid()}', *self.cpu_limits, '--cpuset-cpus', str(self.cpus[0]), '--memory', '128m', '--memory-swap', '128m', '-v', str(self.binary)+':/usr/local/bin/nelcota:ro']
         if self.ephemeral_storage_mib is None:
             command.extend(['-v',str(self.storage)+':/storage'])
@@ -85,6 +87,7 @@ class Project:
             try:
                 if owns_listener(created, self.port):
                     request(self.base, '/auth/v1/.well-known/jwks.json')
+                    self.setup_stage = 'app-ready'
                     return
             except (RuntimeError, urllib.error.URLError):
                 pass
@@ -92,10 +95,12 @@ class Project:
         raise RuntimeError('Owned project listener did not become ready: '+self.label)
 
     def create(self):
+        self.setup_stage = 'database-create'
         password = secrets.token_urlsafe(32)
         self.pg_port=free_port()
         self.docker('volume', 'create', '--label', LABEL+'='+self.identity, self.volume)
         self.docker('run', '-d', '--name', self.pg, '--label', LABEL+'='+self.identity, '--pids-limit', '128', *self.cpu_limits, '--cpuset-cpus', str(self.cpus[1]), '--memory', '256m', '--memory-swap', '256m', '-e', 'POSTGRES_PASSWORD', '-p', f'127.0.0.1:{self.pg_port}:5432', '--mount', f'type=volume,source={self.volume},destination=/var/lib/postgresql/data', 'postgres:17-alpine', 'postgres', '-c', 'max_connections=32', '-c', 'shared_buffers=32MB', '-c', 'max_wal_size=64MB', '-c', 'min_wal_size=32MB', env={'POSTGRES_PASSWORD': password})
+        self.setup_stage = 'database-readiness'
         port = published_port(self.docker,self.pg,5432,self.pg_port)
         for attempt in range(120):
             try:
@@ -110,19 +115,25 @@ class Project:
         if self.webhooks_enabled:
             self.environment['NELCOTA_WEBHOOKS_ALLOW_LOOPBACK'] = 'true'
         self.start_app()
+        self.setup_stage = 'auth-signup'
         request(self.base, '/auth/v1/signup', {'email':self.admin_email,'password':self.password})
+        self.setup_stage = 'admin-credentials'
         self.environment['NELCOTA_ADMIN_EMAIL'] = self.admin_email
         self.environment['NELCOTA_ADMIN_PASSWORD_HASH'] = self.sql('SELECT encrypted_password FROM auth.users LIMIT 1')
         self.sql("INSERT INTO auth.users SELECT (json_populate_record(NULL::auth.users, (to_jsonb(u)||jsonb_build_object('id','"+FIXED_USER+"','email','"+self.email+"'))::json)).* FROM auth.users u LIMIT 1;")
         self.docker('rm', '-f', self.app)
         self.start_app()
+        self.setup_stage = 'admin-login'
         _, headers = request(self.base, '/admin/api/login', {'email':self.admin_email,'password':self.password}, {'Origin':self.base})
         cookie = headers['Set-Cookie'].split(';',1)[0]
+        self.setup_stage = 'fixture-data'
         self.sql("CREATE TABLE public.bench_products(id integer PRIMARY KEY,name text,stock integer); INSERT INTO public.bench_products SELECT i,'"+self.label+":'||i,i%50 FROM generate_series(1,1000)i; CREATE INDEX ON public.bench_products(stock,id); GRANT SELECT ON public.bench_products TO anon; GRANT SELECT,UPDATE ON public.bench_products TO service_role; CREATE TABLE public.bench_private(id integer PRIMARY KEY,user_id uuid,body text); INSERT INTO public.bench_private SELECT i,CASE WHEN i%2=0 THEN '"+FIXED_USER+"'::uuid ELSE gen_random_uuid() END,'"+self.label+"' FROM generate_series(1,1000)i; CREATE INDEX ON public.bench_private(user_id,id); ALTER TABLE public.bench_private ENABLE ROW LEVEL SECURITY; CREATE POLICY own ON public.bench_private TO authenticated USING(user_id=auth.uid()); GRANT SELECT ON public.bench_private TO authenticated; INSERT INTO storage.buckets(id,public) VALUES('bench',true); ANALYZE public.bench_products; ANALYZE public.bench_private; NOTIFY nelcota,'reload schema';")
         service = token(self.jwt, {'role':'service_role','exp':int(time.time())+7200})
         time.sleep(.25)
+        self.setup_stage = 'fixture-object'
         request(self.base, '/storage/v1/object/bench/fixture.txt', self.label+': payload', {'Authorization':'Bearer '+service}, method='PUT')
         self.fixture = {'label':self.label,'marker':self.label+':','base':self.base,'email':self.email,'password':self.password,'service':service,'cookie':cookie,'user':FIXED_USER,'invalid_access':token(secrets.token_urlsafe(48),{'role':'authenticated','sub':FIXED_USER,'exp':int(time.time())+7200})}
+        self.setup_stage = 'ready'
         return self.fixture
 
     def assert_foreign_denied(self, foreign):
