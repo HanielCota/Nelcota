@@ -11,7 +11,7 @@ import subprocess
 import sys
 import time
 
-from browser_auth import PROFILE, complete, validate_failure_receipt
+from browser_auth import PROFILE, complete, validate_failure_receipt, singleflight_control
 from browser_diagnostics import validate as validate_diagnostics
 from browser_owners import complete as complete_owners
 from campaign import docker
@@ -86,11 +86,25 @@ def main():
                 'actual_expired_access_status','actual_expires_in_seconds','auth_observation_seconds','logout_refresh_status',
                 'cross_tab_refresh_coalesced','actual_credential_renewal','disposed_clients_collected','page_errors','external_requests_blocked']
         report['checks']['browser']={key:live[key] for key in fields}
+        control=singleflight_control(read_receipt(output/'live-panel-SDK/browser-auth-controls.json'))
+        require(control['simultaneous_refresh_callers']==48 and control['callers_started_per_tab']==[16,16,16]
+                and control['actual_refresh_requests']==1 and control['shared_access_token_digest_matches'] is True
+                and control['all_tabs_returned_session'] is True and control['held_refresh_locks']==1
+                and control['queued_refresh_locks']>=2
+                and control['first_real_response_held_until_late_callers_started'] is True,
+                'Actual overlapping browser refreshes did not coalesce')
+        report['checks']['singleflight_control']=control
         report['checks']['browser_owners']=complete_owners(read_receipt(output/'live-panel-SDK/browser-plateaus.json'))
         require(live['authoritative_visual_feedback_p95_ms']<=1000,'Browser feedback missed its original SLO')
         report['status']='passed'
     except Exception as error:
         report['failure']={'type':type(error).__name__}
+        control=output/'live-panel-SDK/browser-auth-controls.json'
+        if control.exists():
+            try:
+                report['checks']['singleflight_control']=singleflight_control(read_receipt(control))
+            except Exception:
+                report['checks']['singleflight_control_invalid']=True
         diagnostic=output/'browser-diagnostics.json'
         if diagnostic.exists():
             try:

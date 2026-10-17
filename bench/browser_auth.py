@@ -109,6 +109,27 @@ def cycle(value, index):
     return {key:value[key] for key in fields}
 
 
+def singleflight_control(value):
+    fields={'simultaneous_refresh_callers','actual_refresh_requests','shared_access_token_digest_matches',
+            'all_tabs_returned_session','callers_started_per_tab','first_real_response_held_until_late_callers_started',
+            'held_refresh_locks','queued_refresh_locks','real_auth_consumers'}
+    require(isinstance(value,dict) and set(value)==fields, 'Unknown browser singleflight control fields')
+    for key,maximum in [('simultaneous_refresh_callers',48),('actual_refresh_requests',48),
+                        ('held_refresh_locks',3),('queued_refresh_locks',128)]:
+        require(type(value[key]) is int and 0<=value[key]<=maximum, 'Invalid browser singleflight count')
+    for key in ['shared_access_token_digest_matches','all_tabs_returned_session','first_real_response_held_until_late_callers_started']:
+        require(type(value[key]) is bool, 'Invalid browser singleflight state')
+    callers=value['callers_started_per_tab']
+    require(isinstance(callers,list) and len(callers)==3
+            and all(type(count) is int and 0<=count<=16 for count in callers)
+            and sum(callers)==value['simultaneous_refresh_callers'], 'Invalid per-tab caller accounting')
+    consumers=value['real_auth_consumers']
+    require(isinstance(consumers,dict) and set(consumers)<={'0','1'}
+            and all(type(count) is int and 0<=count<=12000 for count in consumers.values()),
+            'Invalid browser singleflight consumer accounting')
+    return value
+
+
 def complete(values):
     require(isinstance(values,list) and len(values)==5, 'Missing complete five-cycle auth pressure evidence')
     return [cycle(value,index) for index,value in enumerate(values)]

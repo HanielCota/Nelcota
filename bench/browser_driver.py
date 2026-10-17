@@ -164,50 +164,6 @@ async def main():
             await asyncio.sleep(.5)
             for page in pages:
                 await sdk_read(page)
-            before = grants['refresh_token']
-            state['phase'] = 'simultaneous-SDK-refresh'
-            refreshed = await asyncio.gather(*[page.evaluate('''async () => {
-              const values=await Promise.all(Array.from({length:16},()=>window.g05Client.auth.refreshSession()));
-              const token=values[0]?.data?.access_token;
-              if(!token||values.some(value=>value.error||value.data?.access_token!==token)) return null;
-              const bytes=new TextEncoder().encode(token);const digest=await crypto.subtle.digest('SHA-256',bytes);
-              return Array.from(new Uint8Array(digest)).map(value=>value.toString(16).padStart(2,'0')).join('');
-            }''') for page in pages])
-            require(refreshed[0] and len(set(refreshed)) == 1 and grants['refresh_token']-before == 1, 'cross_tab_refresh_did_not_coalesce')
-            auth_started = time.monotonic()
-            initial = await pages[0].evaluate('''async () => {const value=await window.g05Client.auth.getSession();window.g05InitialAccess=value.data?.access_token;return !value.error&&Boolean(window.g05InitialAccess);}''')
-            require(initial, 'browser_SDK_session_missing')
-            save(output/'browser-auth-controls.json', {'simultaneous_refresh_callers':48, 'actual_refresh_requests':grants['refresh_token']-before, 'shared_access_token_digest_matches':len(set(refreshed))==1, 'real_auth_consumers':dict(consumers)})
-            state['phase'] = 'offline-and-reconnect'
-            rest_path = '/rest/v1/bench_private'
-            before_offline = paths[rest_path]
-            try:
-                await context.set_offline(True)
-                disconnected = await pages[0].evaluate('''async () => {
-                  const result=await window.g05Client.from('bench_private').select('id').limit(1).timeout(3000);
-                  return {code:result.error?.code,hasData:result.data!==null};
-                }''')
-                await asyncio.sleep(1)
-                offline_attempts = paths[rest_path]-before_offline
-                save(output/'browser-offline-read.json', {'actual_attempts':offline_attempts, 'maximum_attempts':3, 'configured_additional_read_retries':2, 'code':disconnected['code'], 'has_data':disconnected['hasData']})
-                require(disconnected['code']=='network_error' and not disconnected['hasData'], 'offline_SDK_reported_success')
-                require(offline_attempts==3, 'offline_SDK_exceeded_or_missed_declared_read_retry_contract')
-                before_mutation = paths[rest_path]
-                offline_mutation = await pages[0].evaluate('''async ({user}) => {
-                  const result=await window.g05Client.from('bench_private').insert({id:-1,user_id:user,body:'owned-offline-canary'}).timeout(3000);
-                  return {code:result.error?.code,hasData:result.data!==null};
-                }''', {'user':fixture['user']})
-                await asyncio.sleep(1)
-                offline_mutation_attempts = paths[rest_path]-before_mutation
-                require(offline_mutation['code']=='network_error' and not offline_mutation['hasData'] and offline_mutation_attempts==1, 'offline_SDK_mutation_retry_or_false_success')
-            finally:
-                await context.set_offline(False)
-            for page in pages:
-                await sdk_read(page)
-                await navigate(page, 'bench_alternate', 'alternate:')
-                await navigate(page, 'bench_products', 'project-0:')
-            require(await pages[0].evaluate('''async () => {const result=await window.g05Client.from('bench_private').select('id').eq('id',-1);return !result.error&&Array.isArray(result.data)&&result.data.length===0;}'''), 'offline_mutation_was_committed_or_replayed')
-            state['phase'] = 'real-response-cancellation'
             delayed = []
             async def hold_actual_response(pattern, action, continuation):
                 """Pause verified real response headers, never substitute a body.
@@ -262,6 +218,82 @@ async def main():
                     await profiler.send('Fetch.disable')
                     profiler.remove_listener('Network.loadingFailed', failed)
                     profiler.remove_listener('Fetch.requestPaused', paused)
+            before = grants['refresh_token']
+            state['phase'] = 'simultaneous-SDK-refresh'
+            refresh_callers = [0, 0, 0]
+            overlap = {'held':0, 'pending':0}
+            begin_refresh = r"""() => {
+              const requests=Array.from({length:16},()=>window.g05Client.auth.refreshSession());
+              window.g05OverlappingRefresh=Promise.all(requests).then(async values=>{
+                const token=values[0]?.data?.access_token;
+                if(!token||values.some(value=>value.error||value.data?.access_token!==token))return null;
+                const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(token));
+                return Array.from(new Uint8Array(digest)).map(value=>value.toString(16).padStart(2,'0')).join('');
+              });
+              return requests.length;
+            }"""
+            async def first_refresh():
+                refresh_callers[0] = await pages[0].evaluate(begin_refresh)
+            async def late_refreshes():
+                for index in [1,2]:
+                    refresh_callers[index] = await pages[index].evaluate(begin_refresh)
+                overlap.update(await pages[0].evaluate(r"""async name => {
+                  const state=await navigator.locks.query();
+                  return {held:state.held.filter(value=>value.name===name).length,
+                          pending:state.pending.filter(value=>value.name===name).length};
+                }""", fixture['storage_key']+'.refresh'))
+                require(refresh_callers==[16,16,16] and overlap['held']==1 and overlap['pending']>=2,
+                        'cross_tab_refresh_overlap_not_established')
+            # Hold the first real HTTPS response, not a mock. Later callers
+            # must enter before it completes; task delivery alone is no barrier.
+            await hold_actual_response(base+'/auth/v1/token?grant_type=refresh_token', first_refresh, late_refreshes)
+            refreshed = await asyncio.gather(*[page.evaluate(r"""async () => {
+              const pending=window.g05OverlappingRefresh;delete window.g05OverlappingRefresh;
+              return await pending;
+            }""") for page in pages])
+            save(output/'browser-auth-controls.json', {
+                'simultaneous_refresh_callers':sum(refresh_callers),
+                'actual_refresh_requests':grants['refresh_token']-before,
+                'shared_access_token_digest_matches':len(set(refreshed))==1,
+                'all_tabs_returned_session':bool(all(refreshed)),
+                'callers_started_per_tab':refresh_callers,
+                'first_real_response_held_until_late_callers_started':True,
+                'held_refresh_locks':overlap['held'], 'queued_refresh_locks':overlap['pending'],
+                'real_auth_consumers':dict(consumers)})
+            require(refreshed[0] and len(set(refreshed)) == 1 and grants['refresh_token']-before == 1, 'cross_tab_refresh_did_not_coalesce')
+            auth_started = time.monotonic()
+            initial = await pages[0].evaluate(r"""async () => {const value=await window.g05Client.auth.getSession();window.g05InitialAccess=value.data?.access_token;return !value.error&&Boolean(window.g05InitialAccess);} """)
+            require(initial, 'browser_SDK_session_missing')
+            state['phase'] = 'offline-and-reconnect'
+            rest_path = '/rest/v1/bench_private'
+            before_offline = paths[rest_path]
+            try:
+                await context.set_offline(True)
+                disconnected = await pages[0].evaluate('''async () => {
+                  const result=await window.g05Client.from('bench_private').select('id').limit(1).timeout(3000);
+                  return {code:result.error?.code,hasData:result.data!==null};
+                }''')
+                await asyncio.sleep(1)
+                offline_attempts = paths[rest_path]-before_offline
+                save(output/'browser-offline-read.json', {'actual_attempts':offline_attempts, 'maximum_attempts':3, 'configured_additional_read_retries':2, 'code':disconnected['code'], 'has_data':disconnected['hasData']})
+                require(disconnected['code']=='network_error' and not disconnected['hasData'], 'offline_SDK_reported_success')
+                require(offline_attempts==3, 'offline_SDK_exceeded_or_missed_declared_read_retry_contract')
+                before_mutation = paths[rest_path]
+                offline_mutation = await pages[0].evaluate('''async ({user}) => {
+                  const result=await window.g05Client.from('bench_private').insert({id:-1,user_id:user,body:'owned-offline-canary'}).timeout(3000);
+                  return {code:result.error?.code,hasData:result.data!==null};
+                }''', {'user':fixture['user']})
+                await asyncio.sleep(1)
+                offline_mutation_attempts = paths[rest_path]-before_mutation
+                require(offline_mutation['code']=='network_error' and not offline_mutation['hasData'] and offline_mutation_attempts==1, 'offline_SDK_mutation_retry_or_false_success')
+            finally:
+                await context.set_offline(False)
+            for page in pages:
+                await sdk_read(page)
+                await navigate(page, 'bench_alternate', 'alternate:')
+                await navigate(page, 'bench_products', 'project-0:')
+            require(await pages[0].evaluate('''async () => {const result=await window.g05Client.from('bench_private').select('id').eq('id',-1);return !result.error&&Array.isArray(result.data)&&result.data.length===0;}'''), 'offline_mutation_was_committed_or_replayed')
+            state['phase'] = 'real-response-cancellation'
             async def old_navigation():
                 await pages[0].evaluate('''() => {history.pushState(null,'','/admin/tables/bench_alternate');dispatchEvent(new PopStateEvent('popstate'));}''')
             async def new_navigation():
