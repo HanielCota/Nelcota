@@ -2415,3 +2415,23 @@ provide the required before/after comparison for those fixtures. Existing
 candidate rows and active endurance arguments are unchanged. Runs remain
 serial, subject to the original reserves and full acceptance; a failed or
 blocked baseline cannot certify a candidate. No such new baseline has run.
+
+### Delayed PostgreSQL cancellation control prepared
+
+A new real-PostgreSQL integration control holds only protocol CancelRequest
+packets on an owned loopback proxy. Four sleeping queries are cancelled by
+their callers; admission is checked while their backend work is still active,
+with positive API and invalid-JWT canaries. The gate then releases every
+packet and verifies cleanup before the admission assertion. It admits at
+most twelve sockets, expires handlers after twenty-five seconds, and changes
+no rows, roles, cluster settings or production cancellation code. TestApp
+owns its generated test database/container. This hypothesis is not a
+confirmed production defect until its actual control result is observed.
+
+The standard Rust job will execute the control and publish fixed numeric
+fields without SQL, passwords or cancellation keys. A passing whole suite
+also repeats the focused target with visible control output. Only formatting/
+static review has run locally; measured local load remains isolated. The new
+integration-test tree differs from the frozen source, so further artifact
+reuse must satisfy explicit build/source checks. Any production correction
+requires a fresh final artifact and replacement of affected load results.

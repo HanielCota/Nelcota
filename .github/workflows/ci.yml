@@ -35,6 +35,9 @@ jobs:
       - name: expose failed Rust test identities
         if: ${{ failure() && steps.rust-tests.outcome == 'failure' }}
         run: python3 scripts/report-rust-test-failures.py "$RUNNER_TEMP/nelcota-rust-test.log"
+      - name: SQL cancellation ownership control
+        timeout-minutes: 2
+        run: nice -n19 ionice -c3 cargo test --locked -p nelcota-server --test sql_cancellation -- --nocapture
       - name: documented Notes onboarding
         timeout-minutes: 5
         run: |
