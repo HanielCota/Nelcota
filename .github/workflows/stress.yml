@@ -219,7 +219,7 @@ jobs:
           with target.open('x') as stream:
               stream.write(json.dumps(report, indent=2, allow_nan=False) + '\n')
           print('::notice title=Provider runtime regression summary::' + json.dumps(report, separators=(',', ':'), allow_nan=False))
-          if not result.wasSuccessful() or result.testsRun < 15 or result.skipped:
+          if not result.wasSuccessful() or result.testsRun < 16 or result.skipped:
               raise SystemExit(1)
           PY
       - name: Compare provider runtime owners on fresh fixtures
@@ -340,6 +340,7 @@ jobs:
           DIAGNOSTIC_JOBS: ${{ inputs.diagnostic_jobs }}
         run: |
           python3 -m unittest discover -s scripts/review_tests -p test_ci_diagnostics.py
+          python3 scripts/check-provider-fixture-clock.py
           python3 scripts/report-ci-diagnostics.py "$DIAGNOSTIC_JOBS"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

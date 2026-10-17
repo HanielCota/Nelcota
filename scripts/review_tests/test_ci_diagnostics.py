@@ -78,6 +78,14 @@ class BoundedCIDiagnostics(unittest.TestCase):
         general = text.replace("test_stress_provider_runtime", "test_stress_matrix_pressure")
         self.assertEqual(diagnostics.focused_python_failures(general)[0]["locations"][0]["file"],
                          "test_stress_matrix_pressure.py")
+        relative = text.replace('/home/runner/work/Nelcota/Nelcota/scripts/', 'scripts/').replace('in test_fixture', 'in RuntimeBoundaries.test_fixture')
+        relative = relative.replace('AssertionError: private-token-must-stay-private', 'RuntimeError: Invalid allocator observation time')
+        projected = diagnostics.focused_python_failures(relative)[0]
+        self.assertEqual(projected["category"], "invalid_allocator_observation_time")
+        self.assertEqual(projected["locations"][0]["function"], "RuntimeBoundaries.test_fixture")
+        self.assertEqual(diagnostics.python_unit_summaries("2026-10-17T04:45:02.000Z Ran 15 tests in 1.137s\n"),
+                         [{"tests": 15, "elapsed_seconds": 1.137}])
+        self.assertEqual(diagnostics.python_unit_summaries("private payload: Ran 15 tests in 1.137s\nRan 15 tests in NaNs\n"), [])
 
 
 if __name__ == "__main__":

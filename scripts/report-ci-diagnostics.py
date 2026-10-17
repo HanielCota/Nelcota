@@ -107,15 +107,27 @@ def focused_python_failures(content):
             continue
         if current is None:
             continue
-        location = re.fullmatch(r'File "[^"\n]*/scripts/review_tests/(test_[a-z0-9_]+\.py)", line ([0-9]{1,8}), in ([A-Za-z0-9_]+)', line)
+        location = re.fullmatch(r'File "(?:[^"\n]*/)?scripts/review_tests/(test_[a-z0-9_]+\.py)", line ([0-9]{1,8}), in ([A-Za-z0-9_.]+)', line)
         if location is not None and len(current["locations"]) < 8:
             current["locations"].append({"file": location[1], "line": int(location[2]), "function": location[3]})
         for name in ["AssertionError", "RuntimeError", "ValueError", "TimeoutError"]:
             if line.startswith(name + ":"):
                 current["category"] = name
+                if line == "RuntimeError: Invalid allocator observation time":
+                    current["category"] = "invalid_allocator_observation_time"
                 current = None
                 break
     return findings
+
+
+def python_unit_summaries(content):
+    result = []
+    for raw in content.splitlines():
+        line = re.sub(r"^[0-9T:.+-]+Z\s+", "", raw).strip()
+        match = re.fullmatch(r"Ran ([0-9]{1,5}) tests? in ([0-9]{1,8}(?:\.[0-9]{1,8})?)s", line)
+        if match is not None and len(result) < 4:
+            result.append({"tests": int(match[1]), "elapsed_seconds": float(match[2])})
+    return result
 
 
 def main():
@@ -156,6 +168,7 @@ def main():
                   "headers": headers, "raw_log_bytes": len(content.encode()),
                   "panic_locations": panic_locations(content),
                   "python_failure_locations": focused_python_failures(content),
+                  "python_unit_summaries": python_unit_summaries(content),
                   "scope": "Selected public compiler/lint/guide diagnostics and Rust/Python failure source locations/categories only; no assertion payloads, runtime logs or test-result certification"}
         message = json.dumps(report, separators=(",", ":"), allow_nan=False)
         message = message.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")

@@ -2342,3 +2342,32 @@ only review-test identities, source locations and exception classes. The
 pending diagnostic dispatch will be replaced with one that recovers these
 two jobs and the first focused failure together. No active workload is
 cancelled and no passing rerun resolves an unexplained failure by itself.
+
+### First complete corrected provider runtime pass
+
+[Actions 39003974676](https://github.com/Nelcota/Nelcota/actions/runs/39003974676)
+passed all three fresh cases on a8fd8d0: 960 verified object sequences,
+180.001s pressure, 600.000s idle, 156 exports and 157 resource observations
+per case. Maximum gaps were 5.242/5.111/5.171s; all cleanup passed, no OOM
+or observer violation occurred and final API object/multipart inventories
+were empty. The [full original report](results/stress/provider-runtime-corrected-pass-1.json)
+preserves actual first/last allocator gauges and owner snapshots. A second
+complete independent pass remains required. Ordinary profiles stay fixed.
+
+The runtime-worker override did not establish a reduction: its observed
+anonymous peak was 317,616,128B versus default 250,281,984B and fsync-worker
+258,719,744B. Default/fsync idle anonymous memory continued rising despite
+stable descriptor/socket counts and declining thread owners. Those settings
+are not recommended as a memory fix from this experiment; live ownership
+and historical retention remain unattributed. No BaaS time is credited.
+
+The bounded original-log recovery identified the same fixture method in
+all three earlier failed unit jobs: missing/stale/partial allocator evidence.
+It used monotonic uptime minus 60 seconds, which can generate a negative
+synthetic timestamp on a newly booted VM. Its clock is now explicitly 120s,
+with a separate zero/one/59/1000s fresh-observation regression. Production
+timestamp validation is unchanged. A disposable control will execute the
+exact unwrapped fixture body at 5s and 120s, then its fixed-clock wrapper 1000
+times under short uptime; that control has not run yet. Original log
+recovery will also retain the fixed negative-time category/source lines
+and actual unittest summary counts before cause/validation is confirmed.

@@ -180,7 +180,8 @@ class RuntimePublication(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "Invalid allocator gauge"):
             runtime.allocator_observation({**snapshot, "points": [{**point, "value": float("nan")}]})
 
-    def test_missing_stale_or_partial_allocator_evidence_cannot_certify_a_case(self):
+    @patch.object(runtime.time, "monotonic", return_value=120.0)
+    def test_missing_stale_or_partial_allocator_evidence_cannot_certify_a_case(self, clock):
         receiver = SimpleNamespace(lock=threading.Lock(), exports=0, last=None)
         with self.assertRaisesRegex(RuntimeError, "Missing repeated"):
             runtime.require_telemetry(receiver)
@@ -194,6 +195,14 @@ class RuntimePublication(unittest.TestCase):
             runtime.require_telemetry(receiver)
         receiver.last = {"observed_monotonic": time.monotonic(), "points": points}
         runtime.require_telemetry(receiver)
+
+    def test_fresh_observations_are_valid_on_newly_booted_vms(self):
+        points = [{"name": name, "kind": "gauge", "available": True, "value": 10} for name in runtime.ALLOCATOR_GAUGES]
+        receiver = SimpleNamespace(lock=threading.Lock(), exports=3)
+        for uptime in [0.0, 1.0, 59.0, 1000.0]:
+            with self.subTest(uptime=uptime), patch.object(runtime.time, "monotonic", return_value=uptime):
+                receiver.last = {"observed_monotonic": uptime, "points": points}
+                runtime.require_telemetry(receiver)
 
     def test_invalid_telemetry_evidence_returns_a_failure_without_skipping_cleanup(self):
         receiver = SimpleNamespace(lock=threading.Lock(), exports=3, received=100, first=None,
