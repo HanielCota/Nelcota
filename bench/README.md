@@ -757,7 +757,7 @@ owned systemd unit with a 3,000-second hard deadline. The existing fault fixture
 retains per-app/database quotas, 512-MiB database disk guards, 10% RAM/15%
 filesystem reserves, five-second sampling and the 30-second gap gate.
 
-Nine focused safety regressions run before artifact download or backend
+Eleven focused safety regressions run before artifact download or backend
 traffic. Public receipts retain failed source locations without assertion or
 SQL payloads and a bounded, checksummed numeric cgroup series. This subset does
 not certify forced catalog-refresh failures,

@@ -2371,3 +2371,38 @@ exact unwrapped fixture body at 5s and 120s, then its fixed-clock wrapper 1000
 times under short uptime; that control has not run yet. Original log
 recovery will also retain the fixed negative-time category/source lines
 and actual unittest summary counts before cause/validation is confirmed.
+
+[Actions 39006750283](https://github.com/Nelcota/Nelcota/actions/runs/39006750283)
+confirmed the original invalid_allocator_observation_time category in all
+three failed jobs. Their actual unittest summaries were 15/306/315 tests.
+The [clock control](results/stress/provider-fixture-clock-before-after.json)
+reproduced the exact unwrapped fixture body at 5s uptime, passed it at 120s,
+then passed 1000 fixed-wrapper repetitions in 0.102s. AST comparison proves
+the original body unchanged; production timestamp validation stays strict.
+Original traceback line projection was unavailable, so the receipt labels
+the exact original expression line 189 as static AST resolution rather than
+claiming it was recovered from the traceback. The runtime helper objects
+are unchanged between the first complete pass and queued second source.
+
+The supplemental matrix smoke was dispatched separately on 6e6b51e. Review
+before full campaigns also tightened its census ordering: elapsed deadlines
+must be checked before accepting an otherwise successful SQL/catalog census.
+A late positive response cannot certify recovery. The new focused regression
+and exact exported IDs/fields/uniqueness raise the matrix guard count to
+eleven; they await remote execution. This
+changes no application bytes, provider runtime helper or ordinary profile.
+
+[The first matrix smoke](results/stress/matrix-backend-smoke-001.json)
+passed its declared transport/admission scope: 9 focused checks in 0.122s,
+130s requested ledger traffic, 936 ACKs and 52 deliberately discarded real
+commit replies reconciled, no missing/corrupt ACKs, 27 samples/gap 5.095s
+and confirmed cleanup. Five SQL disconnects released connections within
+0.092s, ten unpolled exports within 0.096s, and twenty committed tables
+appeared within 0.224s. Five SQL/export admission boundaries and malformed/
+origin/JWT cases had explicit outcomes. The report preserves the original
+20s scenario profile, actual latencies, RTO 1.881s and intentional snapshot
+rewind of 136 rows separately from unintended loss. Overlapping remote time
+is excluded from the local checkpoint. Exact export content and late-positive
+oracle hardening require a fresh smoke and two full qualified repetitions.
+The numeric public series checksum is retained; local binary artifact
+transport failed, while the public Actions artifact remains its location.

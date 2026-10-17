@@ -132,6 +132,29 @@ class SupplementalProbeGuards(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "Invalid supplemental observation"):
                 runner.export_resources(source, root)
 
+    def test_late_successful_censuses_cannot_bypass_the_declared_deadline(self):
+        project = self.project()
+        project.sql = Mock(return_value="0")
+        probes = matrix.Probes(project, Path("."), Mock())
+        with patch.object(matrix.time, "monotonic", side_effect=[10, 14]):
+            with self.assertRaisesRegex(RuntimeError, "deadline exceeded"):
+                probes.wait_connections("nelcota-admin-sql", 0, 3)
+        table = "matrix_catalog_" + "a" * 16
+        with patch.object(probes, "json", return_value=(200, {"tables": [{"name": table}]})), \
+                patch.object(matrix.time, "monotonic", side_effect=[10, 16]):
+            with self.assertRaisesRegex(RuntimeError, "did not discover"):
+                probes.wait_table(table)
+
+    def test_complete_export_rejects_duplicate_foreign_or_changed_rows(self):
+        rows = [{"id": i, "name": "project-0:" + str(i), "stock": i % 50} for i in range(1, 1001)]
+        self.assertTrue(matrix.export_matches("project-0", rows))
+        self.assertFalse(matrix.export_matches("project-0", rows[:-1]))
+        self.assertFalse(matrix.export_matches("project-0", [rows[0], *rows[:-1]]))
+        for changed in [{**rows[0], "name": "project-1:1"}, {**rows[0], "stock": 2},
+                        {**rows[0], "id": float("nan")}, {**rows[0], "private": "must stay private"}]:
+            with self.subTest(changed=changed):
+                self.assertFalse(matrix.export_matches("project-0", [changed, *rows[1:]]))
+
 
 if __name__ == "__main__":
     unittest.main()

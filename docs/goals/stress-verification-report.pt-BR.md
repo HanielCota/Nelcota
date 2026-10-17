@@ -1,7 +1,8 @@
 # G05 — relatório técnico de stress
 
 **Estado: em execução, sem aprovação do G05.** Este relatório é atualizado
-durante as campanhas. Data deste checkpoint: 17/10/2026, 03:47 UTC.
+durante as campanhas. Checkpoint de carga consolidada: 17/10/2026, 03:47 UTC.
+Atualização da investigação: 17/10/2026, 05:39 UTC.
 Não houve merge nem deploy de produção. O trabalho está na branch
 `test/g05-stress-verification`, no [PR #90](https://github.com/Nelcota/Nelcota/pull/90),
 mantido como rascunho para revisão.
@@ -17,7 +18,7 @@ O tempo parcial das campanhas ainda abertas não está somado nesse checkpoint.
 
 | Artefato | Identidade e alcance |
 |---|---|
-| Código do candidato agora sob carga local | `7e68fd21430ac93125149f60927f8676b077811d`; a fonte de build permanece congelada após commits somente de evidência/documentação |
+| Código do candidato agora sob carga local | `7e68fd21430ac93125149f60927f8676b077811d`; os diretórios de produto permanecem iguais; alterações posteriores estão nos executores de teste, CI, evidências e documentação |
 | SHA-256 do binário de baseline preservado | `75c44c85a85db26195166aa1d2c6caf481e3db476801ec8131525ef62adf1be0` |
 | Candidato local final congelado | `7e68fd21430ac93125149f60927f8676b077811d`; SHA-256 `b047fb880feb10e41e7d0308e6037b8cd3bc770b0452a30cab59c3e2d20514a0`; [proveniência](results/stress/final-local-candidate.json), [18 checks ordinários aprovados](results/stress/ci-final-artifact-source.json), primeira campanha final em disco iniciada |
 | SHA-256 do workload k6 atual | `0ac01578bf19155302fe465884b480d792569086f23bb4ba3615ca5f0ce2547d` |
@@ -346,3 +347,37 @@ de evidência. Métricas ausentes, incompletas ou antigas reprovam a execução;
 os gauges numéricos disponíveis não demonstram bytes vivos nem atribuição
 exata da retenção a cache. Essas observações não contam como endurance do
 BaaS nem alteram o checkpoint de 34h55min54s.
+
+A [primeira passagem completa corrigida](results/stress/provider-runtime-corrected-pass-1.json)
+passou nos três perfis independentes, cada um com 960 sequências verificadas,
+180 s de carga, 600 s de descanso, 156 exportações, 157 amostras e limpeza
+confirmada. Os maiores gaps foram 5,242/5,111/5,171 s. A memória anônima de
+pico foi 250.281.984 B no padrão, 317.616.128 B com runtime-workers e
+258.719.744 B com fsync-workers. Isso não demonstra benefício das mudanças;
+os dados não justificam recomendar nenhuma delas como correção de memória.
+O crescimento durante descanso no padrão/fsync segue sem atribuição exata.
+A segunda passagem foi agendada separadamente; ainda não foi aprovada.
+
+A [causa das três falhas intermitentes de CI](results/stress/provider-fixture-clock-before-after.json)
+foi confirmada: a fixture criava um instante negativo ao subtrair 60 s do
+uptime de uma VM recém-iniciada. O guard de produção o rejeitava corretamente.
+O corpo original do teste é idêntico por AST; sem relógio controlado, falha
+em uptime de 5 s e passa em 120 s. Com a fixture corrigida, passou
+**1.000/1.000 repetições em 0,102 s**, sem mudar a validação de produção.
+As falhas originais tiveram 15/306/315 testes em seus escopos; os recibos
+mantêm esses resultados. As 18 verificações ordinárias passaram em c575019,
+mas as alterações posteriores exigem seus próprios checks. Esse controle
+unitário soma zero ao tempo efetivo de stress.
+
+O [primeiro smoke da matriz HTTP](results/stress/matrix-backend-smoke-001.json)
+passou no escopo curto de transporte/admissão: nove regressões, 130 s de
+carga solicitada, 936 ACKs e 52 respostas reais pós-COMMIT descartadas
+reconciliados, sem ACK perdido/corrupção, 27 amostras e limpeza confirmada.
+Cinco cancelamentos SQL liberaram conexões em até 0,092 s; dez exports não
+consumidos, em até 0,096 s; 20 tabelas apareceram em até 0,224 s.
+O restore local levou 1,881 s; os 136 registros de rewind intencional estão
+separados de perdas indevidas. Esse tempo remoto sobreposto não entra no
+checkpoint local. Antes das passagens completas, os oráculos passaram a
+rejeitar respostas positivas tardias e a verificar IDs, campos e unicidade
+de cada linha exportada. Essas novas asserções precisam de nova execução;
+o smoke anterior não certifica a matriz completa nem o oráculo mais forte.

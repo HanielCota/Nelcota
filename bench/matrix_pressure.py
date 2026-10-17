@@ -45,6 +45,20 @@ def failure_receipt(error, scenario):
     return {"case": scenario, "type": type(error).__name__, "locations": locations}
 
 
+def export_matches(label, rows):
+    if not isinstance(rows, list) or len(rows) != 1000:
+        return False
+    for row in rows:
+        if not isinstance(row, dict) or set(row) != {"id", "name", "stock"} or type(row["id"]) is not int:
+            return False
+        identity = row["id"]
+        if not 1 <= identity <= 1000 or row["name"] != label + ":" + str(identity):
+            return False
+        if type(row["stock"]) is not int or row["stock"] != identity % 50:
+            return False
+    return len({row["id"] for row in rows}) == 1000
+
+
 class Probes:
     def __init__(self, project, output, guard):
         address = urllib.parse.urlsplit(project.base)
@@ -116,9 +130,10 @@ class Probes:
         while True:
             self.guard()
             actual = int(self.project.sql("SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND application_name='" + application + "'"))
+            elapsed = time.monotonic() - began
+            require(elapsed <= seconds, "Administrative connection release/admission deadline exceeded")
             if actual == count:
-                return time.monotonic() - began
-            require(time.monotonic() - began <= seconds, "Administrative connection release/admission deadline exceeded")
+                return elapsed
             time.sleep(.025)
 
     def retain(self, name, values):
@@ -187,11 +202,11 @@ class Probes:
                     connection.close()
             exports.append(self.wait_connections("nelcota-admin-export", 0, PROFILE["export_release_seconds"]))
         status, value = self.json("GET", "/admin/api/tables/bench_products/export?format=json", panel=True)
-        require(status == 200 and isinstance(value, list) and len(value) == 1000
-                and all(row["name"].startswith(self.project.label + ":") for row in value), "Complete export has missing or foreign rows")
+        require(status == 200 and export_matches(self.project.label, value), "Complete export has missing, repeated or changed rows")
         self.retain("admin-cancellation", {"cancelled_queries": cancelled, "intentionally_unconsumed_exports": len(exports) * 2,
                     "query_release_seconds": queries, "export_release_seconds": exports,
-                    "complete_export_rows": len(value), "interrupted_exports_claimed_complete": 0})
+                    "complete_export_rows": len(value), "complete_export_exact_fixture_match": True,
+                    "interrupted_exports_claimed_complete": 0})
 
     def wait_table(self, table):
         require(re.fullmatch(r"matrix_[a-z]+_[0-9a-f]{16}", table) is not None, "Invalid owned catalog fixture name")
@@ -199,9 +214,10 @@ class Probes:
         while True:
             status, value = self.json("GET", "/admin/api/tables", panel=True)
             require(status == 200, "Catalog introspection failed")
+            elapsed = time.monotonic() - began
+            require(elapsed <= PROFILE["catalog_recovery_seconds"], "Catalog did not discover committed DDL")
             if any(row["name"] == table for row in value["tables"]):
-                return time.monotonic() - began
-            require(time.monotonic() - began <= PROFILE["catalog_recovery_seconds"], "Catalog did not discover committed DDL")
+                return elapsed
             time.sleep(.1)
 
     def catalog_recovery(self):

@@ -188,7 +188,7 @@
     "performance_comparison_scope": "Alternative provider runtime settings cannot certify equivalence with the default profile. Requested-live-byte accounting remains unavailable until observed; cumulative allocation is never treated as live bytes.",
     "production_deployment": false,
     "manual_target": "provider-runtime",
-    "status": "Both original and unchanged-limit reproduction failed at the collector cumulative-export ceiling; corrected fresh passes pending",
+    "status": "First corrected three-case pass passed; independent second source6e6b51e active or queued; exact live allocation remains unattributed",
     "profiles": [
       {},
       {
@@ -245,11 +245,13 @@
         "change": "Retain the original16-MiB byte ceiling. Only the exhausted export-count window changes; the initially prepared32-MiB allowance was never used in a provider campaign.",
         "evidence": "Unchanged-limit reproduction received3151161 bytes, below the original byte ceiling."
       }
-    }
+    },
+    "first_pass_evidence": "provider-runtime-corrected-pass-1.json",
+    "second_workflow_run_id": 39006884440
   },
   "supplemental_backend_matrix": {
     "declared_utc": "2026-10-17T05:05:43.723694+00:00",
-    "status": "prepared; not dispatched",
+    "status": "First20s-per-case transport/admission smoke passed; deadline and exact-export oracles strengthened before full campaigns, requiring fresh smoke and two full passes",
     "manual_target": "matrix",
     "smoke_first": true,
     "full_independent_passes": 2,
@@ -286,6 +288,8 @@
       "disk_mib_each_database": 512
     },
     "scope": "Supplemental real-backend HTTP admin/catalog/security subset only. Forced catalog-refresh failure, SMTP/OAuth, public ingress and full management/update matrix remain separate. No BaaS overlap time credit and no ordinary profile changes.",
-    "approval_thresholds_reduced": false
+    "approval_thresholds_reduced": false,
+    "first_smoke_evidence": "matrix-backend-smoke-001.json",
+    "focused_guard_count": 11
   }
 }

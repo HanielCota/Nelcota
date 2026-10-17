@@ -274,7 +274,7 @@ jobs:
           with target.open('x') as stream:
               stream.write(json.dumps(report, indent=2, allow_nan=False) + '\n')
           print('::notice title=Supplemental matrix regression summary::' + json.dumps(report, separators=(',', ':'), allow_nan=False))
-          if not result.wasSuccessful() or result.testsRun < 9 or result.skipped:
+          if not result.wasSuccessful() or result.testsRun < 11 or result.skipped:
               raise SystemExit(1)
           PY
       - name: Locate the retained final native ELF

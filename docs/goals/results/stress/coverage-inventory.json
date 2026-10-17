@@ -274,6 +274,12 @@
           "status": "passed",
           "evidence": "disk-current-protocol-baseline.json",
           "scope": "Retained baseline only: current counter/logical-latency/TSDB protocol, 62 closed phases, 14400s continuous at280/s, zero drops/unexpected, 3937 negatives, 257500 events reconciled, same app/PG, two pruning cohorts,16 renewals,3283 samples/gap11s, six identical idle owner censuses and owned cleanup. Final candidate and remaining row clauses still separate."
+        },
+        {
+          "run_id": "native-matrix-39006863297-1",
+          "status": "passed",
+          "evidence": "matrix-backend-smoke-001.json",
+          "scope": "First20s-per-case real-HTTP transport/admission subset at8ledgeriterations/s; no full capacity/matrix approval. Query/export release,20committedtables,malformed/origin/JWT/partialclients and ledgerrestore reconciled. Fresh smoke and two full runs with stronger exact-export/deadline oracles pending."
         }
       ]
     },
@@ -548,6 +554,12 @@
           "status": "passed",
           "evidence": "s3-current-protocol-baseline.json",
           "scope": "Retained old binary comparison baseline only:62 closed phases, three steady per workload, qualified400/s ceiling and600s soak at280/s;168001 useful/171036 physical HTTP/128 negatives, zero drops/unexpected,64248 events reconciled,843 samples/gap11.5s, final idle/census/cleanup. No four-hour or final-candidate approval."
+        },
+        {
+          "run_id": "native-matrix-39006863297-1",
+          "status": "passed",
+          "evidence": "matrix-backend-smoke-001.json",
+          "scope": "First20s-per-case real-HTTP transport/admission subset at8ledgeriterations/s; no full capacity/matrix approval. Query/export release,20committedtables,malformed/origin/JWT/partialclients and ledgerrestore reconciled. Fresh smoke and two full runs with stronger exact-export/deadline oracles pending."
         }
       ]
     },
@@ -848,6 +860,12 @@
           "status": "passed",
           "scope": "verified local HTTPS, untrusted CA rejection, actual reload failure with positive data and 401 probes; no slow-client/public-ingress certification",
           "evidence": "caddy-before-after.json"
+        },
+        {
+          "run_id": "native-matrix-39006863297-1",
+          "status": "passed",
+          "evidence": "matrix-backend-smoke-001.json",
+          "scope": "First20s-per-case real-HTTP transport/admission subset at8ledgeriterations/s; no full capacity/matrix approval. Query/export release,20committedtables,malformed/origin/JWT/partialclients and ledgerrestore reconciled. Fresh smoke and two full runs with stronger exact-export/deadline oracles pending."
         }
       ]
     },
@@ -1050,14 +1068,17 @@
     }
   },
   "provider_runtime_diagnostic": {
-    "status": "not run",
-    "scope": "Both complete corrected repetitions pending. Original first run and unchanged-limit reproduction failed after128exports, cleanupconfirmed and960verifiedoperations each. Reproduction confirms telemetry cumulative_budget at3151161wirebytes, below16MiB. Count correction256 keeps16MiB ceiling; failed focused regression attempt preserved and original assertion recovery in progress. No BaaS time credit or exact live-owner attribution.",
+    "status": "in progress",
+    "scope": "Three fresh cases passed in first corrected probe,960operations/156exports/157samples each; cleanupconfirmed. Second independent probe pending completion. Clock fixture failure reproduced and1000 corrected repetitions passed; runtime helper objects unchanged. OS/gauges do not attribute live heap or justify worker changes; no BaaS time credit.",
     "failed_evidence": [
       "provider-runtime-first-failure.json",
       "provider-runtime-reproduced-budget-failure.json",
       "provider-runtime-regression-first-failure.json"
     ],
-    "active_workflow_run_id": 39003974676,
-    "active_source_commit": "a8fd8d0c9bd1909258f242958ab47731d0cb56d6"
+    "active_workflow_run_id": 39006884440,
+    "active_source_commit": "6e6b51e666681b2d472cb886a0001e59fc0b6f51",
+    "completed_independent_passes": 1,
+    "first_pass_evidence": "provider-runtime-corrected-pass-1.json",
+    "clock_fixture_before_after": "provider-fixture-clock-before-after.json"
   }
 }
